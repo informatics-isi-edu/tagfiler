@@ -1,0 +1,10 @@
+$def with (target, tagdefs)
+<h2>Set a tag</h2>
+<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+Select predefined tag name: <br />
+$for tagdef in tagdefs:
+	<input type="radio" name="tag" value="${tagdef.tagname}" /> ${tagdef.tagname} <br />
+Tag value: <input type="text" name="value" /> <br />
+<input type="hidden" name="action" value="put" />
+<input type="submit" value="Apply tag" />
+</form>

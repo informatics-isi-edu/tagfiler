@@ -1,0 +1,22 @@
+$def with (target, tagvals)
+<h2>Existing tags</h2>
+<table>
+<tr>
+<th>Tag name</th>
+<th>Tag value</th>
+<th>Delete</th>
+</tr>
+$for tagval in tagvals:
+	$ tag, val = tagval
+	<tr>
+	  <td>${tag}</td>
+	  <td>${val}</td>
+	  <td>
+	    <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+	      <input type="hidden" name="tag" value="${tag}" />
+	      <input type="hidden" name="action" value="delete" />
+	      <input type="submit" value="Delete tag" />
+	    </form>
+	  </td>
+	</tr>
+</table>

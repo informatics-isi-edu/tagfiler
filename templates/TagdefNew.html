@@ -1,0 +1,10 @@
+$def with (target, tagdefs, typenames)
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<h2>Create a new Tag</h2>
+<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+New tag name: <input name="tag" type="text" /> <br />
+New tag content type:<br />
+$for value in typenames.keys():
+	<input type="radio" name="type" value="${value}" /> ${typenames[value]}<br />
+<input type="submit" value="Create tag" />
+</form>

@@ -1,0 +1,6 @@
+$def with (target, name, vers, quote)
+<p>Click the [v.N] links below to get a version-specific link that will not change.</p>
+<p><ol>
+$for ver in vers:
+	<li><a href="${target}/file/${quote(name)}/${ver}">[v.${ver}]</a></li>
+</ol></p>
