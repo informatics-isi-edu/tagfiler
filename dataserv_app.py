@@ -152,6 +152,12 @@ class Application:
         self.db.query(tabledef)
         return True
 
+    def delete_tagdef(self):
+        self.db.query("DELETE FROM tagdefs WHERE tagname = $tag_id",
+                      vars=dict(tag_id=self.tag_id))
+        self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
+
+
     def select_file_tag(self, tagname):
         return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
                              + " WHERE file = $file", vars=dict(file=self.data_id))

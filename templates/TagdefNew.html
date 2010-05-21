@@ -6,5 +6,6 @@ New tag name: <input name="tag" type="text" /> <br />
 New tag content type:<br />
 $for value in typenames.keys():
 	<input type="radio" name="type" value="${value}" /> ${typenames[value]}<br />
+<input type="hidden" name="action" value="add" />
 <input type="submit" value="Create tag" />
 </form>

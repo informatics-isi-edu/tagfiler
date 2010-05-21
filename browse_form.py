@@ -96,10 +96,11 @@ class FileVersionList (Application):
 
 
 class TagForm (Application):
-    __slots__ = [ 'target' ]
+    __slots__ = [ 'target', 'action' ]
     def __init__(self):
         Application.__init__(self)
         self.target = self.home + web.ctx.homepath + '/tagdef'
+        self.action = None
 
     def GET(self, uri):
 
@@ -118,17 +119,38 @@ class TagForm (Application):
 
         return self.dbtransact(body, postCommit)
 
+    def DELETE(self, uri):
+        
+        def body():
+            self.delete_tagdef()
+            return ''
+
+        def postCommit(results):
+            return ''
+
+        return self.dbtransact(body, postCommit)
+        
+        
     def POST(self, uri):
 
         storage = web.input()
         try:
             self.tag_id = storage.tag
-            self.typestr = storage.type
+            self.action = storage.action
+            try:
+                self.typestr = storage.type
+            except:
+                self.typestr = None
         except:
             raise web.BadRequest()
 
         def body():
-            self.insert_tagdef()
+            if self.action == 'add':
+                self.insert_tagdef()
+            elif self.action == 'delete':
+                self.delete_tagdef()
+            else:
+                raise web.BadRequest()
             return [ ( tagdef.tagname, tagdef.typestr) for tagdef in self.select_tagdefs() ]
 
         def postCommit(tagdefs):
@@ -137,6 +159,7 @@ class TagForm (Application):
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         return self.dbtransact(body, postCommit)
+
 
 
 class FileTags (Application):
