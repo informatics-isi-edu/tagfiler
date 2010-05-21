@@ -32,11 +32,11 @@ class Dispatcher:
 
         urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
-        web.debug(uri)
+#        web.debug(uri)
 
         ast = urlparse(uri)
         if ast != None:
-            web.debug(ast)
+#            web.debug(ast)
             return (uri, ast)
         else:
             raise web.HTTPError('404 not found', {}, "URI %s not recognized." % uri)
