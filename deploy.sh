@@ -51,6 +51,16 @@ runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 
 
 # create local helper scripts
+mkdir /etc/httpd/passwd
+
+cat > ${HOME}/README-${SVCPREFIX} <<EOF
+This service requires passwords to be configured via:
+
+  htdigest /etc/httpd/passwd/passwd "${SVCUSER}" username
+
+for each user you wish to add.
+
+EOF
 
 cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 #!/bin/sh
@@ -102,6 +112,7 @@ WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
 WSGISocketPrefix /var/run/wsgi/wsgi
 
 <Directory ${SVCDIR}>
+
     SetEnv dataserv.source_path ${SVCDIR}
     SetEnv dataserv.dbnstr postgres
     SetEnv dataserv.dbstr ${SVCUSER}
@@ -109,8 +120,13 @@ WSGISocketPrefix /var/run/wsgi/wsgi
     SetEnv dataserv.store_path ${DATADIR}
     SetEnv dataserv.template_path ${SVCDIR}/templates
     SetEnv dataserv.chunkbytes 1048576
-    Order allow,deny
-    Allow from all
+
+    AuthType Digest
+    AuthName "${SVCPREFIX}"
+    AuthDigestDomain /${SVCPREFIX}/
+    AuthUserFile /etc/httpd/passwd/passwd
+    Require valid-user
+
 </Directory>
 
 EOF
