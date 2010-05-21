@@ -149,7 +149,6 @@ class Application:
         if self.typestr != '':
             tabledef += ", value %s" % (self.typestr)
         tabledef += ", UNIQUE(file) )"
-        web.debug(tabledef)
         self.db.query(tabledef)
         return True
 
