@@ -39,6 +39,7 @@ class FileIO (Application):
 
         # need to yield outside postCommit as a generator func
         filename = self.makeFilename()
+        web.debug(filename)
         f = open(filename, "rb")
 
         p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)

@@ -18,7 +18,7 @@ SVCPREFIX=tagfiler
 SVCUSER=${SVCPREFIX}
 
 SVCDIR=/var/www/${SVCPREFIX}
-DATADIR=/var/www/${SVCDIR}-data
+DATADIR=${SVCDIR}-data
 
 # we need all of this
 yum -y install httpd mod_wsgi \

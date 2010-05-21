@@ -84,6 +84,9 @@ class Application:
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
+    def wraptag(self, tagname):
+        return '_' + tagname.replace('"','""')
+
     def tagval(self, tagname):
         results = self.select_file_tag(tagname)
         try:
@@ -141,17 +144,17 @@ class Application:
         self.db.query("INSERT INTO tagdefs ( tagname, typestr ) VALUES ( $tag_id, $typestr )",
                       vars=dict(tag_id=self.tag_id, typestr=self.typestr))
 
-        tabledef = "CREATE TABLE \"%s\"" % (self.tag_id)
+        tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
         if self.typestr != '':
             tabledef += ", value %s" % (self.typestr)
         tabledef += ", UNIQUE(file) )"
-
+        web.debug(tabledef)
         self.db.query(tabledef)
         return True
 
     def select_file_tag(self, tagname):
-        return self.db.query("SELECT * FROM \"%s\"" % (tagname)
+        return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
                              + " WHERE file = $file", vars=dict(file=self.data_id))
 
     def select_file_tags(self):
@@ -159,7 +162,7 @@ class Application:
                              vars=dict(file=self.data_id))
 
     def delete_file_tag(self, tagname):
-        self.db.query("DELETE FROM \"%s\"" % (tagname) + " WHERE file = $file",
+        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname)) + " WHERE file = $file",
                       vars=dict(file=self.data_id))
         self.db.delete("filetags", where="file = $file AND tagname = $tagname",
                        vars=dict(file=self.data_id, tagname=tagname))
@@ -177,12 +180,12 @@ class Application:
             self.delete_file_tag(tagname)
 
         if value != '' and tagtype != '':
-            self.db.query("INSERT INTO \"%s\"" % (tagname)
+            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
                           + " ( file, value ) VALUES ( $file, $value )",
                           vars=dict(file=self.data_id, value=value))
         else:
             # insert untyped or typed w/ default value...
-            self.db.query("INSERT INTO \"%s\"" % (tagname)
+            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
                           + " ( file ) VALUES ( $file )",
                           vars=dict(file=self.data_id))
 
@@ -199,11 +202,11 @@ class Application:
         tags = [ t for t in self.tagnames ]
 
         if len(self.tagnames) > 1:
-            tables = " JOIN ".join(["\"%s\"" % (tags[0]),
-                                    " JOIN ".join([ "\"%s\" USING (file)" % (t) 
+            tables = " JOIN ".join(["\"%s\"" % (self.wraptag(tags[0])),
+                                    " JOIN ".join([ "\"%s\" USING (file)" % (self.wraptag(t))
                                                     for t in tags[1:] ])])
         else:
-            tables = "\"%s\"" % (tags[0])
+            tables = "\"%s\"" % (self.wraptag(tags[0]))
 
         return self.db.query("SELECT file FROM %s" % (tables))
 
