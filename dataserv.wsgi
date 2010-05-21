@@ -1,8 +1,7 @@
 import web
-
-# we need to pick up the deployed app files
 import sys
-sys.path.append('/var/www/dataserv')
+
+# need to find our other local modules
 
 # we short-circuit the web.py regexp dispatch rule, because we need to
 # work with REQUEST_URI to get undecoded URI w/ escape sequences.
@@ -14,11 +13,7 @@ urls = (
 
 # instantiate our custom URL parse routine, which returns active
 # AST nodes that implement the web.py HTTP methods
-import url_parse
 
-from dataserv_app import NotFound
-
-urlparse = url_parse.make_parse()
 
 class Dispatcher:
     def prepareDispatch(self):
@@ -27,6 +22,15 @@ class Dispatcher:
            with the HTTP method of the request, e.g. GET, PUT,
            DELETE...
         """
+        # NOTE: we need this threaded dictionary not available until
+        # we start dispatching!
+        sys.path.append(web.ctx.env['dataserv.source_path'])
+
+        # cannot import until we get the import path above!
+        import url_parse
+        from dataserv_app import NotFound
+
+        urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
         web.debug(uri)
         try:

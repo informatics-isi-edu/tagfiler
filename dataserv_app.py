@@ -15,8 +15,6 @@ import psycopg2
 # see Application.__init__() and prepareDispatch() for real dispatch
 # see rules = [ ... ] for real matching rules
 
-
-
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
@@ -32,13 +30,17 @@ class Application:
 
     def __init__(self):
         "store common configuration data for all service classes"
-        self.dbnstr='postgres'
-        self.dbstr='kczweb1'
-        self.home="http://basin.isi.edu"
-        self.store_path="/var/www/dataserv-data"
-        self.template_path='/var/www/dataserv/templates'
-        self.chunkbytes=1024*1024
+
+        self.dbnstr = web.ctx.env['dataserv.dbnstr']
+        self.dbstr = web.ctx.env['dataserv.dbstr']
+        self.home = web.ctx.env['dataserv.home']
+        self.store_path = web.ctx.env['dataserv.store_path']
+        self.template_path = web.ctx.env['dataserv.template_path']
+        self.chunkbytes = int(web.ctx.env['dataserv.chunkbytes'])
+
         self.render = web.template.render(self.template_path)
+
+        # TODO: pull this from database?
         self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point', 
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }

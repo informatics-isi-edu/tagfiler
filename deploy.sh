@@ -1,19 +1,24 @@
 #!/bin/sh
 
-# this is the service daemon account
-# change here and in dataserv_app.Application constructor!
-SVCUSER=kczweb1
+# you can set this to override...
+HOME_HOST=
 
-# this is the privileged postgresql user
+# default to `hostname` setting
+HOST=$(hostname)
+HOME_HOST=${HOME_HOST:-$HOST}
+
+# this is the privileged postgresql user for createdb etc.
 PGADMIN=postgres
 
 # this is the URL base path of the service
 # service automatically detects how it is called
-SVCPREFIX=dataserv
+SVCPREFIX=tagfiler
 
-# these don't need to match SVCPREFIX
-SVCDIR=dataserv  # also change in dataserv.wsgi
-DATADIR=dataserv-data # also change in dataserv_app.Application
+# this is the service daemon account
+SVCUSER=${SVCPREFIX}
+
+SVCDIR=/var/www/${SVCPREFIX}
+DATADIR=/var/www/${SVCDIR}-data
 
 # we need all of this
 yum -y install httpd mod_wsgi \
@@ -28,30 +33,41 @@ chkconfig httpd on
 chkconfig postgresql on
 
 # finish initializing system for our service
-mkdir -p /var/www/${SVCDIR}/templates
-mkdir -p /var/www/${DATADIR}
-useradd -m -r ${SVCUSER}
-chown ${SVCUSER}: /var/www/${DATADIR}
-chmod og=rx /var/www/${DATADIR}
-service postgres start
-runuser -c "createuser -S -D -R ${SVCUSER}" ${PGADMIN}
-runuser -c "createdb ${SVCUSER}" ${PGADMIN}
+mkdir -p ${SVCDIR}/templates
+mkdir -p ${DATADIR}
 
-# create helper scripts
+if ! runuser -c "/bin/true" ${SVCUSER}
+then
+    useradd -m -r ${SVCUSER}
+fi
 
-cat ~${SVCUSER}/dbsetup.sh <<EOF
+chown ${SVCUSER}: ${DATADIR}
+chmod og=rx ${DATADIR}
+
+# try some blind database setup as well
+service postgresql start
+runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
+
+
+# create local helper scripts
+
+cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 #!/bin/sh
 
 # this script will recreate all tables, but only on a clean database
 
 psql -c "CREATE TABLE files ( name text PRIMARY KEY )"
 psql -c "CREATE TABLE fileversions ( name text REFERENCES files (name), version int, UNIQUE (name, version) )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr str )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name), tagname text REFERENCES tagdefs (tagname), UNIQUE (file, tagname) )"
 
 EOF
 
-cat ~${SVCUSER}/dbclear.sh <<EOF
+chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
+chmod a+x /home/${SVCUSER}/dbsetup.sh
+
+cat > /home/${SVCUSER}/dbclear.sh <<EOF
 #!/bin/sh
 
 # this script will remove all service tables to clean the database
@@ -68,19 +84,31 @@ psql -c "DROP TABLE files"
 
 EOF
 
-# run helper
-runuser -c "~/dbsetup.sh" ${SVCUSER}
+chown ${SVCUSER}: /home/${SVCUSER}/dbclear.sh
+chmod a+x /home/${SVCUSER}/dbclear.sh
+
+# blindly clean and setup db tables
+runuser -c "~${SVCUSER}/dbclear.sh" - ${SVCUSER}
+runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
 
 # register our service code
-cat > /etc/httpd/conf.d/zz_dataserv.conf <<EOF
+cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 # this file must be loaded (alphabetically) after wsgi.conf
 
-WSGIDaemonProcess dataserv processes=4 threads=15 user=${SVCUSER}
-WSGIProcessGroup dataserv
-WSGIScriptAlias /${SVCPREFIX} /var/www/${SVCDIR}/dataserv.wsgi
+WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
+WSGIProcessGroup ${SVCPREFIX}
+WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
+
 WSGISocketPrefix /var/run/wsgi/wsgi
 
-<Directory /var/www/dataserv>
+<Directory ${SVCDIR}>
+    SetEnv dataserv.source_path ${SVCDIR}
+    SetEnv dataserv.dbnstr postgres
+    SetEnv dataserv.dbstr ${SVCUSER}
+    SetEnv dataserv.home http://${HOME_HOST}
+    SetEnv dataserv.store_path ${DATADIR}
+    SetEnv dataserv.template_path ${SVCDIR}/templates
+    SetEnv dataserv.chunkbytes 1048576
     Order allow,deny
     Allow from all
 </Directory>

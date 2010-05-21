@@ -1,6 +1,6 @@
 
 INSTALLHOST=basin.isi.edu
-INSTALLDIRBASE=/var/www/dataserv
+INSTALLDIRBASE=/var/www/tagfiler
 INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
 
 FILES=dataserv.wsgi \
