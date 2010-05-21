@@ -47,5 +47,5 @@ def t_error(t):
     raise LexicalError()
 
 def make_lexer():
-    return lex.lex()
+    return lex.lex(debug=False)
 
