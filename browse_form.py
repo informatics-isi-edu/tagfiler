@@ -269,7 +269,7 @@ class HasTags (Application):
         self.action = 'query'
 
     def qtarget(self):
-        return self.home + web.ctx.homepath + '/query/' + ';'.join([t for t in self.tagnames])
+        return self.home + web.ctx.homepath + '/query/' + ';'.join([urlquote(t) for t in self.tagnames])
 
     def GET(self, uri):
 
