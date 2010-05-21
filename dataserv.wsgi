@@ -33,13 +33,13 @@ class Dispatcher:
         urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
         web.debug(uri)
-        try:
-            ast = urlparse(uri)
+
+        ast = urlparse(uri)
+        if ast != None:
             web.debug(ast)
             return (uri, ast)
-        except:
-            raise NotFound("URI %s not recognized." % uri )
-
+        else:
+            raise web.HTTPError('404 not found', {}, "URI %s not recognized." % uri)
 
     # is there some fancier way to do this via introspection
     # in one generic method?
@@ -58,8 +58,6 @@ class Dispatcher:
     def POST(self):
         uri, ast = self.prepareDispatch()
         return ast.POST(uri)
-
-
 
 # this creates the WSGI app from the urls map
 application = web.application(urls, globals()).wsgifunc() 
