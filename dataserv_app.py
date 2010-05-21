@@ -212,6 +212,5 @@ class Application:
                                                     for t in tags[1:] ])])
         else:
             tables = "\"%s\"" % (self.wraptag(tags[0]))
-        web.debug(tables)
         return self.db.query("SELECT file FROM %s" % (tables))
 
