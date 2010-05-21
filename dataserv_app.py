@@ -194,7 +194,7 @@ class Application:
     def select_files_having_tagnames(self):
         for t in self.tagnames:
             try:
-                self.select_tagdef(t)
+                self.select_tagdef(t)[0]
             except:
                 raise web.BadRequest()
 
@@ -206,6 +206,6 @@ class Application:
                                                     for t in tags[1:] ])])
         else:
             tables = "\"%s\"" % (self.wraptag(tags[0]))
-
+        web.debug(tables)
         return self.db.query("SELECT file FROM %s" % (tables))
 
