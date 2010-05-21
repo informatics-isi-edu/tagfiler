@@ -12,10 +12,11 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders' ]
+    __slots__ = [ 'formHeaders', 'action' ]
 
     def __init__(self):
         Application.__init__(self)
+        self.action = None
 
     def makeFilename(self):
         return ''
@@ -169,14 +170,14 @@ class FileIO (Application):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
-        def body():
+        def putBody():
             self.insertForStore()
             tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
             tags = [ result.tagname for result in self.select_file_tags() ]
             tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
             return (tagvals, tagdefs)
 
-        def postCommit(results):
+        def putPostCommit(results):
             tagvals, tagdefs = results
             inf = web.ctx.env['wsgi.input']
 
@@ -198,5 +199,20 @@ class FileIO (Application):
                 return self.renderlist("\"%s\" tags" % (self.data_id),
                                        [self.render.FileTagNew(target, tagdefs)])
 
-        return self.dbtransact(body, postCommit)
+        if self.vers_id != None and self.data_id != None:
+            # we support alternative form action on specific version
+            storage = web.input()
+            try:
+                self.action = storage.action
+            except:
+                self.action = 'put'
+        elif self.vers_id == None and self.data_id != None:
+            self.action = 'put'
 
+        if self.action == 'delete':
+            self.DELETE(uri)
+            raise web.seeother('/file')
+        elif self.action == 'put':
+            return self.dbtransact(putBody, putPostCommit)
+        else:
+            raise web.BadRequest()

@@ -1,6 +1,10 @@
 $def with (target, name, vers, quote)
-<p>Click the [v.N] links below to get a version-specific link that will not change.</p>
 <p><ol>
 $for ver in vers:
-	<li><a href="${target}/file/${quote(name)}/${ver}">[v.${ver}]</a></li>
+	<li><a href="${target}/file/${quote(name)}/${ver}">Download ${name} version ${ver}</a>
+	  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}/${ver}" method="post">
+	      <input type="hidden" name="action" value="delete" />
+	      <input type="submit" value="Delete ${name} version ${ver}" />
+	    </form>
+	</li>
 </ol></p>

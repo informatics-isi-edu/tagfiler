@@ -103,6 +103,12 @@ class Application:
         self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
                       vars=dict(name=self.data_id))
 
+    def count_file_versions(self):
+        results = self.db.query("SELECT count(*) AS count "
+                                + "FROM fileversions WHERE name = $name",
+                                vars=dict(name=self.data_id))
+        return results[0].count
+
     def select_file_version_max(self):
         results = self.db.query("SELECT max(version) AS max_version "
                                 + "FROM fileversions WHERE name = $name",
@@ -113,9 +119,16 @@ class Application:
         return self.db.select('fileversions', where="name = $name AND version = $version",
                               vars=dict(name=self.data_id, version=self.vers_id))
 
+    def delete_file(self):
+        self.db.query("DELETE FROM files where name = $name",
+                      vars=dict(name=self.data_id))
+
     def delete_file_version(self):
         self.db.delete('fileversions', where="name=$name AND version = $version",
-                       vars=dict(name=self.data_id, version=vers_id))
+                       vars=dict(name=self.data_id, version=self.vers_id))
+        count = self.count_file_versions()
+        if count == 0:
+            self.delete_file()
 
     def insert_file_version(self):
         try:
