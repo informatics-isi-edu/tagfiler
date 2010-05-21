@@ -105,6 +105,9 @@ runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 # this file must be loaded (alphabetically) after wsgi.conf
 
+# need this for some of the RESTful URIs we can generate
+AllowEncodedSlashes On
+
 WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 WSGIProcessGroup ${SVCPREFIX}
 WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
