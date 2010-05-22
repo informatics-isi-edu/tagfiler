@@ -19,11 +19,12 @@ SVCUSER=${SVCPREFIX}
 
 SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
+RUNDIR=/var/run/wsgi
 
 # we need all of this
 yum -y install httpd mod_wsgi \
     postgresql{,-devel,-server} \
-    python{,-psycopg2,-webpy}
+    python{,-psycopg2,-webpy,-ply}
 
 # let's try this blindly in case we need it
 service postgresql initdb
@@ -35,6 +36,7 @@ chkconfig postgresql on
 # finish initializing system for our service
 mkdir -p ${SVCDIR}/templates
 mkdir -p ${DATADIR}
+mkdir -p ${RUNDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -112,7 +114,7 @@ WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 WSGIProcessGroup ${SVCPREFIX}
 WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
 
-WSGISocketPrefix /var/run/wsgi/wsgi
+WSGISocketPrefix ${RUNDIR}/wsgi-${SVCPREFIX}
 
 <Directory ${SVCDIR}>
 
