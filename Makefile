@@ -1,6 +1,8 @@
 
-INSTALLHOST=basin.isi.edu
-INSTALLDIRBASE=/var/www/tagfiler
+# change INSTALLHOST to an FQDN to install to a remote testing VM etc.
+INSTALLHOST=localhost
+INSTALLSVC=tagfiler
+INSTALLDIRBASE=/var/www/$(INSTALLSVC)
 INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
 
 FILES=dataserv.wsgi \
@@ -21,7 +23,7 @@ TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 
 deploy:
 	rsync -av deploy.sh root@$(INSTALLHOST):.
-	ssh root@$(INSTALLHOST) ./deploy.sh
+	ssh root@$(INSTALLHOST) ./deploy.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES)
 	rsync -av $(FILES) $(INSTALLDIR)/.

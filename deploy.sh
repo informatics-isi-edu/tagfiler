@@ -1,5 +1,13 @@
 #!/bin/sh
 
+######
+# NOTE: you can leave all this as defaults and modify Makefile
+# which invokes this with SVCPREFIX...
+######
+
+# this is the URL base path of the service
+SVCPREFIX=${1:-tagfiler}
+
 # you can set this to override...
 HOME_HOST=
 
@@ -9,10 +17,6 @@ HOME_HOST=${HOME_HOST:-$HOST}
 
 # this is the privileged postgresql user for createdb etc.
 PGADMIN=postgres
-
-# this is the URL base path of the service
-# service automatically detects how it is called
-SVCPREFIX=tagfiler
 
 # this is the service daemon account
 SVCUSER=${SVCPREFIX}
