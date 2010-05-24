@@ -151,12 +151,11 @@ class TagForm (Application):
                 self.delete_tagdef()
             else:
                 raise web.BadRequest()
-            return [ ( tagdef.tagname, tagdef.typestr) for tagdef in self.select_tagdefs() ]
+            return None
 
-        def postCommit(tagdefs):
-            return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, tagdefs, self.typenames),
-                                    self.render.TagdefNew(self.target, tagdefs, self.typenames)])
+        def postCommit(results):
+            # send client back to get form page again
+            raise web.seeother('/tagdef')
 
         return self.dbtransact(body, postCommit)
 
@@ -184,34 +183,29 @@ class FileTags (Application):
 
         def postCommit(value):
             # return raw value to REST client
+            # BUG?  will this ever be a non-string result?
             return value
 
         return self.dbtransact(body, postCommit)
 
-    def browseBody(self):
-        tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
-        tags = [ result.tagname for result in self.select_file_tags() ]
-        tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
-        return (tagvals, tagdefs)
-
-    def browsePostCommit(self, results):
-        tagvals, tagdefs = results
-        target = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
-        if len(tagvals) > 0:
-            return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(target, tagvals),
-                                    self.render.FileTagNew(target, tagdefs)])
-        else:
-            return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagNew(target, tagdefs)])
-
     def GETall(self, uri):
         # HTML get of all tags on one file...
         def body():
-            return self.browseBody()
+            tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
+            tags = [ result.tagname for result in self.select_file_tags() ]
+            tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
+            return (tagvals, tagdefs)
 
         def postCommit(results):
-            return self.browsePostCommit(results)
+            tagvals, tagdefs = results
+            target = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
+            if len(tagvals) > 0:
+                return self.renderlist("\"%s\" tags" % (self.data_id),
+                                       [self.render.FileTagExisting(target, tagvals),
+                                        self.render.FileTagNew(target, tagdefs)])
+            else:
+                return self.renderlist("\"%s\" tags" % (self.data_id),
+                                       [self.render.FileTagNew(target, tagdefs)])
             
         return self.dbtransact(body, postCommit)
 
@@ -237,51 +231,51 @@ class FileTags (Application):
             
         return self.dbtransact(body, postCommit)
 
-    def deletetag(self):
-        # internal helper
-        def body():
-            self.delete_file_tag(self.tag_id)
-            return ''
-        def postCommit(results):
-            return results
-        return self.dbtransact(body, postCommit)
-        
     def DELETE(self, uri):
         # RESTful delete of exactly one tag on one file...
         if self.tag_id == '' or self.value != '':
             raise web.BadRequest
-        return self.deletetag()
+
+        def body():
+            self.delete_file_tag(self.tag_id)
+            return None
+
+        def postCommit(results):
+            return ''
+
+        return self.dbtransact(body, postCommit)
 
     def POST(self, uri):
         # simulate RESTful actions and provide helpful web pages to browsers
         def putBody():
             self.set_file_tag(self.tag_id, self.value)
-            return self.browseBody()
+            return None
 
         def deleteBody():
-            self.deletetag()
-            return self.browseBody()
+            self.delete_file_tag(self.tag_id)
+            return None
 
         def postCommit(results):
-            return self.browsePostCommit(results)
+            url = '/tags/' + urlquote(self.data_id)
+            raise web.seeother(url)
 
         storage = web.input()
         try:
             action = storage.action
             self.tag_id = storage.tag
-
-            if action == 'put':
-                try:
-                    self.value = storage.value
-                except:
-                    self.value = ''
-
-                return self.dbtransact(putBody, postCommit)
-            elif action == 'delete':
-                return self.dbtransact(deleteBody, postCommit)
-            else:
-                raise web.BadRequest()
         except:
+            raise web.BadRequest()
+
+        if action == 'put':
+            try:
+                self.value = storage.value
+            except:
+                self.value = ''
+
+            return self.dbtransact(putBody, postCommit)
+        elif action == 'delete':
+            return self.dbtransact(deleteBody, postCommit)
+        else:
             raise web.BadRequest()
 
 class HasTags (Application):
@@ -295,12 +289,11 @@ class HasTags (Application):
         return self.home + web.ctx.homepath + '/query/' + ';'.join([urlquote(t) for t in self.tagnames])
 
     def GET(self, uri):
-
         # this interface has both REST and form-based functions
         tagname = None
         try:
-            tagname = self.queryopts['tag']
             self.action = self.queryopts['action']
+            tagname = self.queryopts['tag']
         except:
             pass
 
@@ -310,6 +303,8 @@ class HasTags (Application):
             self.tagnames = self.tagnames - set([tagname])
         elif self.action == 'query':
             pass
+        elif self.action == 'edit':
+            pass
         else:
             raise web.BadRequest()
 
@@ -318,7 +313,6 @@ class HasTags (Application):
                 files = [ res.file for res in self.select_files_having_tagnames() ]
             else:
                 files = []
-
             alltags = [ tagdef.tagname for tagdef in self.select_tagdefs() ]
             return ( files, alltags )
 
@@ -326,6 +320,9 @@ class HasTags (Application):
             files, alltags = results
 
             target = self.home + web.ctx.homepath
+
+            if self.action in set(['add', 'delete']):
+                raise web.seeother(self.qtarget() + '?action=edit')
 
             if len(self.tagnames) == 0:
                 # render a blank starting form
@@ -340,7 +337,6 @@ class HasTags (Application):
                                        [self.render.QueryAdd(self.qtarget(), alltags),
                                         self.render.QueryView(self.qtarget(), self.tagnames),
                                         self.render.FileList(target, files, urlquote)])
-            return 
 
         # this only runs if we need to do a DB query
         return self.dbtransact(body, postCommit)
