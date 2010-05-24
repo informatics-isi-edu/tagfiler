@@ -4,8 +4,12 @@ $def with (target, tagdefs, typenames)
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 New tag name: <input name="tag" type="text" /> <br />
 New tag content type:<br />
-$for value in typenames.keys():
-	<input type="radio" name="type" value="${value}" /> ${typenames[value]}<br />
+$if len(typenames.keys()) > 0:
+	$ value = typenames.keys()[0]
+	<input type="radio" name="type" value="${value}" checked /> ${typenames[value]}<br />
+$if len(typenames.keys()) > 1:
+	$for value in typenames.keys()[1:]:
+		<input type="radio" name="type" value="${value}" /> ${typenames[value]}<br />
 <input type="hidden" name="action" value="add" />
 <input type="submit" value="Create tag" />
 </form>

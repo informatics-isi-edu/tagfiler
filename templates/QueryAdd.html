@@ -1,10 +1,13 @@
-$def with (target, tagnames)
+$def with (target, tags)
 <h2>Add a Query Tag</h2>
 <p>Select an available tag and click 'Add' to build a query:
 </p>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
-$for tag in tagnames:
-	  <input type="radio" name="tag" value="${tag}" /> ${tag} <br />
+$if len(tags) > 0:
+	<input type="radio" name="tag" value="${tags[0]}" checked /> ${tags[0]} <br />
+$if len(tags) > 1:
+	$for tag in tags[1:]:
+		<input type="radio" name="tag" value="${tag}" /> ${tag} <br />
 <input type="submit" value="Add tag to query" />
 <input type="hidden" name="action" value="add" />
 </form>
