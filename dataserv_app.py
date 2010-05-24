@@ -139,7 +139,7 @@ class Application:
                       vars=dict(name=self.data_id, version=self.vers_id))
 
     def select_files_versions_max(self):
-        return self.db.query("SELECT name, max(version) AS version FROM fileversions GROUP BY name")
+        return self.db.query("SELECT name, max(version) AS version FROM fileversions GROUP BY name ORDER BY name")
 
     def select_file_versions(self):
         return self.db.query("SELECT version FROM fileversions"
@@ -151,7 +151,7 @@ class Application:
                               vars=dict(tagname=tagname))
 
     def select_tagdefs(self):
-        return self.db.select('tagdefs')
+        return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr ) VALUES ( $tag_id, $typestr )",
@@ -176,7 +176,7 @@ class Application:
                              + " WHERE file = $file", vars=dict(file=self.data_id))
 
     def select_file_tags(self):
-        return self.db.query("SELECT tagname FROM filetags WHERE file = $file",
+        return self.db.query("SELECT tagname FROM filetags WHERE file = $file ORDER BY tagname",
                              vars=dict(file=self.data_id))
 
     def delete_file_tag(self, tagname):
@@ -225,5 +225,5 @@ class Application:
                                                     for t in tags[1:] ])])
         else:
             tables = "\"%s\"" % (self.wraptag(tags[0]))
-        return self.db.query("SELECT file FROM %s" % (tables))
+        return self.db.query("SELECT file FROM %s ORDER BY file" % (tables))
 
