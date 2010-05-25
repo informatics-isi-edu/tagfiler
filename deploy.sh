@@ -90,7 +90,7 @@ cat > /home/${SVCUSER}/dbclear.sh <<EOF
 
 psql -c "SELECT tagname FROM tagdefs" -t | while read tagname
 do
-   psql -c "DROP TABLE \"${tagname}\""
+   psql -c "DROP TABLE \"\${tagname}\""
 done
 
 psql -c "DROP TABLE filetags"
