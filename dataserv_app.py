@@ -1,6 +1,7 @@
 import urllib
 import web
 import psycopg2
+import os
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -31,12 +32,17 @@ class Application:
     def __init__(self):
         "store common configuration data for all service classes"
 
-        self.dbnstr = web.ctx.env['dataserv.dbnstr']
-        self.dbstr = web.ctx.env['dataserv.dbstr']
-        self.home = web.ctx.env['dataserv.home']
-        self.store_path = web.ctx.env['dataserv.store_path']
-        self.template_path = web.ctx.env['dataserv.template_path']
-        self.chunkbytes = int(web.ctx.env['dataserv.chunkbytes'])
+        myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
+
+        def getParam(suffix):
+            return web.ctx.env['%s.%s' % (myAppName, suffix)]
+
+        self.dbnstr = getParam('dbnstr')
+        self.dbstr = getParam('dbstr')
+        self.home = getParam('home')
+        self.store_path = getParam('store_path')
+        self.template_path = getParam('template_path')
+        self.chunkbytes = int(getParam('chunkbytes'))
 
         self.render = web.template.render(self.template_path)
 

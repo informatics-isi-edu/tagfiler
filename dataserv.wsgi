@@ -1,5 +1,6 @@
 import web
 import sys
+import os
 
 # need to find our other local modules
 
@@ -24,7 +25,7 @@ class Dispatcher:
         """
         # NOTE: we need this threaded dictionary not available until
         # we start dispatching!
-        sys.path.append(web.ctx.env['dataserv.source_path'])
+        sys.path.append(os.path.dirname(web.ctx.env['SCRIPT_FILENAME']))
 
         # cannot import until we get the import path above!
         import url_parse
