@@ -6,7 +6,7 @@ INSTALLDIRBASE=/var/www/$(INSTALLSVC)
 INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
 
 FILES=dataserv.wsgi \
-	dataserv_app.py rest_fileio.py browse_form.py \
+	dataserv_app.py rest_fileio.py \
 	url_ast.py url_lex.py url_parse.py
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
