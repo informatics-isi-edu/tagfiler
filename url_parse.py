@@ -30,35 +30,35 @@ def p_filelist(p):
                 | slash string slash
                 | slash string slash FILE
                 | slash string slash FILE slash"""
-    p[0] = url_ast.Files(appname=p[2])
+    p[0] = url_ast.FileList(appname=p[2])
 
 def p_verslist(p):
     """verslist : slash string slash HISTORY slash string
                 | slash string slash HISTORY slash string slash"""
-    p[0] = url_ast.History(appname=p[2], data_id=p[6])
+    p[0] = url_ast.FileHistory(appname=p[2], data_id=p[6])
 
 def p_file(p):
     """file : slash string slash FILE slash string
             | slash string slash FILE slash string slash"""
-    p[0] = url_ast.FileIdVers(appname=p[2], data_id=p[6])
+    p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6])
 
 def p_vfile(p):
     """vfile : slash string slash FILE slash string slash string"""
-    p[0] = url_ast.FileIdVers(appname=p[2], data_id=p[6], vers_id=p[8])
+    p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6], vers_id=p[8])
 
 def p_upload(p):
     """upload : slash string slash UPLOAD slash string
               | slash string slash UPLOAD slash string slash"""
-    p[0] = url_ast.FormId(appname=p[2], data_id=p[6])
+    p[0] = url_ast.Upload(appname=p[2], data_id=p[6])
 
 def p_upload_form(p):
     """uploadform : slash string slash UPLOAD '?' NAME '=' string"""
-    p[0] = url_ast.FormId(appname=p[2], data_id=p[8])
+    p[0] = url_ast.Upload(appname=p[2], data_id=p[8])
 
 def p_upload_new(p):
     """uploadnew : slash string slash UPLOAD
                  | slash string slash UPLOAD slash"""
-    p[0] = url_ast.FormId(appname=p[2])
+    p[0] = url_ast.Upload(appname=p[2])
 
 def p_tagdef_start(p):
     """tagdef : slash string slash TAGDEF
@@ -73,7 +73,7 @@ def p_tags(p):
 def p_tagsresttag(p):
     """tagsresttag : slash string slash TAGS slash string slash string 
             | slash string slash TAGS slash string slash string slash"""
-    p[0] = url_ast.Tags(appname=p[2], data_id=p[6], tag_id=p[8])
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8])
 
 def p_query1(p):
     """query : slash string slash QUERY
