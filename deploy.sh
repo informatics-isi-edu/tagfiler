@@ -115,20 +115,22 @@ cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 AllowEncodedSlashes On
 
 WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
-WSGIProcessGroup ${SVCPREFIX}
+
 WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
 
-WSGISocketPrefix ${RUNDIR}/wsgi-${SVCPREFIX}
+WSGISocketPrefix ${RUNDIR}/wsgi
 
 <Directory ${SVCDIR}>
 
-    SetEnv dataserv.source_path ${SVCDIR}
-    SetEnv dataserv.dbnstr postgres
-    SetEnv dataserv.dbstr ${SVCUSER}
-    SetEnv dataserv.home http://${HOME_HOST}
-    SetEnv dataserv.store_path ${DATADIR}
-    SetEnv dataserv.template_path ${SVCDIR}/templates
-    SetEnv dataserv.chunkbytes 1048576
+    WSGIProcessGroup ${SVCPREFIX}
+
+    SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
+    SetEnv ${SVCPREFIX}.dbnstr postgres
+    SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
+    SetEnv ${SVCPREFIX}.home http://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
+    SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
+    SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
     AuthType Digest
     AuthName "${SVCPREFIX}"
