@@ -103,6 +103,27 @@ EOF
 chown ${SVCUSER}: /home/${SVCUSER}/dbclear.sh
 chmod a+x /home/${SVCUSER}/dbclear.sh
 
+cat > /home/${SVCUSER}/dbdump.sh <<EOF
+#!/bin/sh
+
+# this script will remove all service tables to clean the database
+
+psql -c "SELECT tagname FROM tagdefs" -t | while read tagname
+do
+    if [[ -n "\$tagname" ]]
+    then
+        echo "DUMPING TAG \"\${tagname}\""
+        psql -c "SELECT * FROM \"_\${tagname//\"/\"\"}\""
+    fi
+done
+
+for table in filetags tagdefs fileversions files
+do
+    echo "DUMPING TABLE \"\$table\""
+    psql -c "SELECT * FROM \$table"
+done
+EOF
+
 # blindly clean and setup db tables
 runuser -c "~${SVCUSER}/dbclear.sh" - ${SVCUSER}
 runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
