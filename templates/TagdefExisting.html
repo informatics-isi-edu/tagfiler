@@ -2,24 +2,26 @@ $def with (target, tagdefs, typenames)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <h2>Existing tag definitions:</h2>
 <p>
-<table border="1" >
-<tr>
-<th>Tag name</th>
-<th>Tag content type</th>
-<th>Delete</th>
-</tr>
-$for tagdef in tagdefs:
-	$ tagname, typestr = tagdef
-	<tr>
-	  <td>${tagname}</td>
-	  <td>${typenames[typestr]}</td>
-	  <td>
-	    <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-	      <input type="hidden" name="tag" value="${tagname}" />
-	      <input type="hidden" name="action" value="delete" />
-	      <input type="submit" value="Delete ${tagname}" />
-	    </form>
-
-	</tr>
-</table>
+$if len(tagdefs) > 0:
+	<table border="1" >
+	  <tr>
+	    <th>Tag name</th>
+	    <th>Tag content type</th>
+	    <th>Delete</th>
+	  </tr>
+	$for tagdef in tagdefs:
+		$ tagname, typestr = tagdef
+		<tr>
+		  <td>${tagname}</td>
+		  <td>${typenames[typestr]}</td>
+		  <td>
+		    <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+		      <input type="hidden" name="tag" value="${tagname}" />
+		      <input type="hidden" name="action" value="delete" />
+		      <input type="submit" value="Delete ${tagname}" />
+		    </form>
+		</tr>
+	</table>
+$else:
+	There are no tags currently defined.
 </p>
