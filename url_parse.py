@@ -68,7 +68,7 @@ def p_tagdef_start(p):
 def p_tags(p):
     """tags : slash string slash TAGS slash string 
             | slash string slash TAGS slash string slash"""
-    p[0] = url_ast.Tags(appname=p[2], data_id=p[6])
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
 
 def p_tagsresttag(p):
     """tagsresttag : slash string slash TAGS slash string slash string 
