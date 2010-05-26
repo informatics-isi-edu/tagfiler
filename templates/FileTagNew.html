@@ -1,13 +1,15 @@
-$def with (target, tagdefs, typenames, urlquote)
-<h2>Set a tag</h2>
-<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-<table border="1">
-<tr>
-  <th>Set</th>
-  <th>Tag name</th>
-  <th>Type</th>
-  <th>Value</th>
-</tr>
+$def with (apptarget, data_id, tagdefs, typenames, urlquote)
+$if len(tagdefs) > 0:
+	<h2>Set a tag</h2>
+	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Appy". Multiple tags may be set at once.</p>
+	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
+	  <table border="1">
+	    <tr>
+	      <th>Set</th>
+	      <th>Tag name</th>
+	      <th>Type</th>
+	      <th>Value</th>
+	    </tr>
 	$for tagdef in tagdefs:
 		<tr>
 		  <td><input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /></td>
@@ -20,8 +22,14 @@ $def with (target, tagdefs, typenames, urlquote)
 			N/A
 		  </td>	
 		</tr>
-</table>
-<input type="hidden" name="action" value="put" />
-<input type="submit" value="Apply tag(s)" />
-<input type="reset" value="Reset form" />
-</form>
+	  </table>
+	  <input type="hidden" name="action" value="put" />
+	  <input type="submit" value="Apply tag(s)" />
+	  <input type="reset" value="Reset form" />
+	</form>
+$else:
+	<h2>Notice</h2>
+	<p>You cannot annotate this file until tag definitions are created.</p>
+<h2>Define more tags</h2>
+<p>You may go to the <a href="${apptarget + '/tagdef/'}">Tag definitions</a> page to
+create tag definitions, and then come back to this page to annotate your file.</p>

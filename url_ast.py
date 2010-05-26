@@ -236,14 +236,10 @@ class FileTags (Node):
 
         def postCommit(results):
             tagvals, tagdefs = results
-            target = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
-            if len(tagvals) > 0:
-                return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagExisting(target, tagvals),
-                                        self.render.FileTagNew(target, tagdefs, self.typenames, urlquote)])
-            else:
-                return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagNew(target, tagdefs, self.typenames, urlquote)])
+            apptarget = self.home + web.ctx.homepath
+            return self.renderlist("\"%s\" tags" % (self.data_id),
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, urlquote),
+                                    self.render.FileTagNew(apptarget, self.data_id, tagdefs, self.typenames, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
