@@ -1,13 +1,27 @@
-$def with (target, tagdefs)
+$def with (target, tagdefs, typenames, urlquote)
 <h2>Set a tag</h2>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-Select predefined tag name: <br />
-$if len(tagdefs) > 0:
-	<input type="radio" name="tag" value="${tagdefs[0].tagname}" checked /> ${tagdefs[0].tagname} <br />
-$if len(tagdefs) > 1:
-	$for tagdef in tagdefs[1:]:
-		<input type="radio" name="tag" value="${tagdef.tagname}" /> ${tagdef.tagname} <br />
-Tag value: <input type="text" name="value" /> <br />
+<table border="1">
+<tr>
+  <th>Set</th>
+  <th>Tag name</th>
+  <th>Type</th>
+  <th>Value</th>
+</tr>
+	$for tagdef in tagdefs:
+		<tr>
+		  <td><input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /></td>
+		  <td>${tagdef.tagname}</td>
+		  <td>${typenames[tagdef.typestr]}</td>
+		  <td>
+		$if tagdef.typestr != '':
+	  		<input type="text" name="val-${urlquote(tagdef.tagname)}" />
+		$else:
+			N/A
+		  </td>	
+		</tr>
+</table>
 <input type="hidden" name="action" value="put" />
-<input type="submit" value="Apply tag" />
+<input type="submit" value="Apply tag(s)" />
+<input type="reset" value="Reset form" />
 </form>

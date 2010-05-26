@@ -190,14 +190,15 @@ class FileIO (Application):
             f.truncate() # truncate to current seek location
             #bytes = f.tell()
             f.close()
-            target = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
+            tagtarget = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
+            deftarget = self.home + web.ctx.homepath + '/tagdef'
             if len(tagvals) > 0:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagExisting(target, tagvals),
-                                        self.render.FileTagNew(target, tagdefs)])
+                                       [self.render.FileTagExisting(tagtarget, tagvals),
+                                        self.render.FileTagNew(tagtarget, tagdefs, self.typenames, urlquote)])
             else:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagNew(target, tagdefs)])
+                                       [self.render.FileTagNew(tagtarget, tagdefs, self.typenames, urlquote)])
 
         if self.vers_id != None and self.data_id != None:
             # we support alternative form action on specific version

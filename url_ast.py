@@ -1,6 +1,7 @@
 # define abstract syntax tree nodes for more readable code
 
 import web
+import urllib
 from dataserv_app import Application, NotFound, urlquote
 from rest_fileio import FileIO
 
@@ -195,13 +196,14 @@ class Tagdef (Node):
 class FileTags (Node):
     """Represents TAGS/data_id URIs"""
 
-    __slots__ = [ 'data_id', 'tag_id', 'value' ]
+    __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
     def __init__(self, appname, data_id, tag_id='', value=''):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
+        self.tagvals = {}
 
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
@@ -238,10 +240,10 @@ class FileTags (Node):
             if len(tagvals) > 0:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
                                        [self.render.FileTagExisting(target, tagvals),
-                                        self.render.FileTagNew(target, tagdefs)])
+                                        self.render.FileTagNew(target, tagdefs, self.typenames, urlquote)])
             else:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagNew(target, tagdefs)])
+                                       [self.render.FileTagNew(target, tagdefs, self.typenames, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
@@ -283,8 +285,12 @@ class FileTags (Node):
 
     def POST(self, uri):
         # simulate RESTful actions and provide helpful web pages to browsers
+        def nullBody():
+            return None
+
         def putBody():
-            self.set_file_tag(self.tag_id, self.value)
+            for tag_id in self.tagvals:
+                self.set_file_tag(tag_id, self.tagvals[tag_id])
             return None
 
         def deleteBody():
@@ -298,17 +304,27 @@ class FileTags (Node):
         storage = web.input()
         try:
             action = storage.action
-            self.tag_id = storage.tag
+            for key in storage.keys():
+                if key[0:4] == 'set-':
+                    tag_id = key[4:]
+                    try:
+                        value = storage['val-%s' % (tag_id)]
+                    except:
+                        value = ''
+                    self.tagvals[urllib.unquote(tag_id)] = value
+            try:
+                self.tag_id = storage.tag
+            except:
+                pass
         except:
             raise web.BadRequest()
 
         if action == 'put':
-            try:
-                self.value = storage.value
-            except:
-                self.value = ''
-
-            return self.dbtransact(putBody, postCommit)
+            if len(self.tagvals) > 0:
+                web.debug(self.tagvals)
+                return self.dbtransact(putBody, postCommit)
+            else:
+                return self.dbtransact(nullBody, postCommit)
         elif action == 'delete':
             return self.dbtransact(deleteBody, postCommit)
         else:
