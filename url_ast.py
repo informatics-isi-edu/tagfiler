@@ -65,7 +65,7 @@ class FileHistory (Node):
 
         return self.dbtransact(body, postCommit)
 
-class FileIdVers (Node, FileIO):
+class FileIdVersion (Node, FileIO):
     """Represents a direct FILE/data_id/vers_id URI
 
        Just creates filename and lets FileIO do the work.
