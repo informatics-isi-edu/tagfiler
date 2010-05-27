@@ -128,7 +128,7 @@ class Upload (Node):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs' ]
 
     def __init__(self, appname, tag_id=None, typestr=None):
         Node.__init__(self, appname)
@@ -136,6 +136,7 @@ class Tagdef (Node):
         self.typestr = typestr
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
+        self.tagdefs = {}
 
     def GET(self, uri):
 
@@ -169,18 +170,26 @@ class Tagdef (Node):
 
         storage = web.input()
         try:
-            self.tag_id = storage.tag
             self.action = storage.action
+            for key in storage.keys():
+                if key[0:4] == 'tag-':
+                    if storage[key] != '':
+                        typestr = storage['type-%s' % (key[4:])]
+                        self.tagdefs[storage[key]] = typestr
             try:
-                self.typestr = storage.type
+                self.tag_id = storage.tag
             except:
-                self.typestr = None
+                pass
+            
         except:
             raise web.BadRequest()
 
         def body():
             if self.action == 'add':
-                self.insert_tagdef()
+                for tagname in self.tagdefs.keys():
+                    self.tag_id = tagname
+                    self.typestr = self.tagdefs[tagname]
+                    self.insert_tagdef()
             elif self.action == 'delete':
                 self.delete_tagdef()
             else:
