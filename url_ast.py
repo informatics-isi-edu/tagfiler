@@ -32,13 +32,9 @@ class FileList (Node):
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = [ result.name for result in results ]
-            if len(files) > 0:
-                return self.renderlist("Repository Summary",
-                                       [self.render.Commands(target),
-                                        self.render.FileList(target, files, urlquote)])
-            else:
-                return self.renderlist("Repository Summary",
-                                       [self.render.Commands(target)])
+            return self.renderlist("Repository Summary",
+                                   [self.render.Commands(target),
+                                    self.render.FileList(target, files, urlquote)])
 
         return self.dbtransact(body, postCommit)
 
