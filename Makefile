@@ -10,7 +10,7 @@ FILES=dataserv.wsgi \
 	url_ast.py url_lex.py url_parse.py
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
-	FileForm.html NameForm.html \
+	FileForm.html NameForm.html UrlForm.html \
 	FileList.html FileVersionList.html \
 	TagdefExisting.html TagdefNew.html \
 	FileTagExisting.html FileTagNew.html \
