@@ -127,6 +127,11 @@ class FileIO (Application):
         else:
             self.vers_id = currentVersion + 1
         self.insert_file_version()
+        try:
+            self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+        except:
+            # let's fail safely if there's no owner tag defined yet
+            pass
         return True
 
     def storeInput(self, inf):
