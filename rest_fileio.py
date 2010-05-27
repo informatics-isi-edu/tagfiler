@@ -172,13 +172,9 @@ class FileIO (Application):
 
         def putBody():
             self.insertForStore()
-            tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
-            tags = [ result.tagname for result in self.select_file_tags() ]
-            tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
-            return (tagvals, tagdefs)
+            return None
 
         def putPostCommit(results):
-            tagvals, tagdefs = results
             inf = web.ctx.env['wsgi.input']
 
             boundary1, boundaryN = self.scanFormHeader(inf)
@@ -190,15 +186,7 @@ class FileIO (Application):
             f.truncate() # truncate to current seek location
             #bytes = f.tell()
             f.close()
-            tagtarget = self.home + web.ctx.homepath + '/tags/' + urlquote(self.data_id)
-            deftarget = self.home + web.ctx.homepath + '/tagdef'
-            if len(tagvals) > 0:
-                return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagExisting(tagtarget, tagvals),
-                                        self.render.FileTagNew(tagtarget, tagdefs, self.typenames, urlquote)])
-            else:
-                return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagNew(tagtarget, tagdefs, self.typenames, urlquote)])
+            raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         if self.vers_id != None and self.data_id != None:
             # we support alternative form action on specific version
