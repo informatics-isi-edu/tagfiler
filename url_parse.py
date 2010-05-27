@@ -128,8 +128,8 @@ def p_stringplus(p):
 
 def make_parser():
     # use this to shut it up: errorlog=yacc.NullLogger()
-#    return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
-    return yacc.yacc()
+    return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
+#    return yacc.yacc()
 
 def make_parse():
     parser = make_parser()

@@ -251,7 +251,6 @@ class FileIO (Application):
                 raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
-        web.debug(contentType)
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
             return self.dbtransact(putBody, putPostCommit)
