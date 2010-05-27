@@ -56,6 +56,7 @@ class FileIO (Application):
 
         # report length so browsers can show progress bar
         web.header('Content-Length', length)
+        web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
 
         bytes = 0
         while bytes < length:
