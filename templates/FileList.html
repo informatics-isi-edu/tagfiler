@@ -1,9 +1,12 @@
 $def with (target, files, quote)
-$for name in files:
-	<fieldset>
-	  <legend>${name}</legend>
-	  <a href="${target}/file/${quote(name)}">Download latest</a>,
-	  <a href="${target}/history/${quote(name)}">View revision history</a>,
-	  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
-	  <a href="${target}/upload/${quote(name)}">Upload new revision</a>
-	</fieldset>
+$if len(files) > 0:
+	$for name in files:
+		<fieldset>
+		  <legend>${name}</legend>
+		  <a href="${target}/file/${quote(name)}">Download latest</a>,
+		  <a href="${target}/history/${quote(name)}">View revision history</a>,
+		  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
+		  <a href="${target}/upload/${quote(name)}">Upload new revision</a>
+		</fieldset>
+$else:
+	<p>There are no files to list.</p>
