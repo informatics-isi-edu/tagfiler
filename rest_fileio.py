@@ -172,6 +172,7 @@ class FileIO (Application):
 
         def putBody():
             self.insertForStore()
+            web.debug(web.ctx)
             return None
 
         def putPostCommit(results):
