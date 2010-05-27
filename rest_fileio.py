@@ -201,6 +201,24 @@ class FileIO (Application):
             f.close()
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
+        def deleteBody():
+            if self.vers_id == None:
+                raise NotFound()
+            results = self.select_file_version()
+            if len(results) == 0:
+                raise NotFound()
+            self.delete_file_version()
+            return self.select_file_versions()
+
+        def deletePostCommit(results):
+            versions = results
+            filename = self.makeFilename()
+            os.unlink(filename)
+            if len(versions) > 0:
+                raise web.seeother('/history/%s' % (self.data_id))
+            else:
+                raise web.seeother('/file')
+
         if self.vers_id != None and self.data_id != None:
             # we support alternative form action on specific version
             storage = web.input()
@@ -212,8 +230,7 @@ class FileIO (Application):
             self.action = 'put'
 
         if self.action == 'delete':
-            self.DELETE(uri)
-            raise web.seeother('/file')
+            return self.dbtransact(deleteBody, deletePostCommit)
         elif self.action == 'put':
             return self.dbtransact(putBody, putPostCommit)
         else:
