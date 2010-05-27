@@ -1,12 +1,16 @@
-$def with (target, tags)
-<h2>Add a Query Tag</h2>
-<p>Select an available tag and click 'Add' to build a query:
-</p>
-<form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
-<select name="tag">
-$for tag in tags:
-	<option value="${tag}">${tag}</option>
-</select>
-<input type="submit" value="Add to query" />
-<input type="hidden" name="action" value="add" />
-</form>
+$def with (apptarget, querytarget, tags)
+$if len(tags) > 0:
+	<h2>Add a Query Tag</h2>
+	<p>Select an available tag and click 'Add' to build a query:
+	</p>
+	<form enctype="application/x-www-form-urlencoded" action="${querytarget}" method="get">
+	  <select name="tag">
+		$for tag in tags:
+			<option value="${tag}">${tag}</option>
+	  </select>
+	  <input type="submit" value="Add to query" />
+	  <input type="hidden" name="action" value="add" />
+	</form>
+$else:
+	<h2>Notice</h2>
+	<p>You must <a href="${apptarget}/tagdef">define tags</a> before you can use the query interface.</p>

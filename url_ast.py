@@ -382,17 +382,19 @@ class Query (Node):
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
 
+            apptarget = self.home + web.ctx.homepath
+
             if len(self.tagnames) == 0:
                 # render a blank starting form
                 return self.renderlist("Query by Tags",
-                                       [self.render.QueryAdd(self.qtarget(), alltags)])
+                                       [self.render.QueryAdd(target, self.qtarget(), alltags)])
 
             if self.action == 'query':
                 return self.renderlist("Query Results",
                                        [self.render.FileList(target, files, urlquote)])
             else:
                 return self.renderlist("Query by Tags",
-                                       [self.render.QueryAdd(self.qtarget(), alltags),
+                                       [self.render.QueryAdd(target, self.qtarget(), alltags),
                                         self.render.QueryView(self.qtarget(), self.tagnames),
                                         self.render.FileList(target, files, urlquote)])
 
