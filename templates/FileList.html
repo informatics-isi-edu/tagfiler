@@ -1,16 +1,9 @@
 $def with (target, files, quote)
-<table border="1" >
-<tr>
-<th>Dataset name<br />(history page)</th>
-<th>Latest<br />(get file)</th>
-<th>Update<br />(new file)</th>
-<th>Tags<br />(tags page)</th>
-</tr>
 $for name in files:
-	<tr>
-	  <td><a href="${target}/history/${quote(name)}">${name}</a></td>
-	  <td><a href="${target}/file/${quote(name)}">[LATEST]</a></td>
-	  <td><a href="${target}/upload/${quote(name)}">[UPDATE]</a></td>
-	  <td><a href="${target}/tags/${quote(name)}">[TAGS]</a></td>
-	</tr>
-</table>
+	<fieldset>
+	  <legend>${name}</legend>
+	  <a href="${target}/file/${quote(name)}">Download latest</a>,
+	  <a href="${target}/history/${quote(name)}">View revision history</a>,
+	  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
+	  <a href="${target}/upload/${quote(name)}">Upload new revision</a>
+	</fieldset>
