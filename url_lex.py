@@ -18,8 +18,6 @@ literals = [ '(', ')', ':', ';', ',', '=', '@', '&', '$',
 # special strings which are keywords
 keywords = {
     'file' : 'FILE',
-    'upload' : 'UPLOAD',
-    'name' : 'NAME',
     'history' : 'HISTORY',
     'tagdef' : 'TAGDEF',
     'tags' : 'TAGS',
