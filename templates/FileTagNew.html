@@ -1,7 +1,7 @@
 $def with (apptarget, data_id, tagdefs, typenames, urlquote)
 $if len(tagdefs) > 0:
 	<h2>Set a tag</h2>
-	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Appy". Multiple tags may be set at once.</p>
+	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Apply". Multiple tags may be set at once. Any tag which is unchecked will remain unchanged.</p>
 	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
 	$for tagdef in tagdefs:
 		<fieldset>
