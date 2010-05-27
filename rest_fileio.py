@@ -21,7 +21,7 @@ class FileIO (Application):
     def makeFilename(self):
         return ''
 
-    def GET(self, uri):
+    def GETfile(self, uri):
 
         def body():
             if self.vers_id == None:
@@ -73,6 +73,23 @@ class FileIO (Application):
             yield buf
 
         f.close()
+
+    def GET(self, uri):
+
+        storage = web.input()
+
+        try:
+            self.action = storage.action
+        except:
+            pass
+
+        if self.action == 'upload':
+            # getting a FileForm guides browser to upload file
+            target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
+            return self.renderlist("Upload data file",
+                                   [self.render.FileForm(target)])
+        else:
+            return self.GETfile(uri)
 
     def DELETE(self, uri):
 

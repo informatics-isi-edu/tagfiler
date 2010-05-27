@@ -96,10 +96,8 @@ class Upload (Node):
             return self.renderlist("Prepare to upload",
                                    [self.render.NameForm(target)])
         else:
-            # getting a FileForm guides browser to upload file
-            target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
-            return self.renderlist("Upload data file",
-                                   [self.render.FileForm(target)])
+            raise web.seeother(self.home + web.ctx.homepath + '/file/'
+                               + urlquote(self.data_id) + '?action=upload')
 
     def POST(self, uri):
         """process form submission from client"""

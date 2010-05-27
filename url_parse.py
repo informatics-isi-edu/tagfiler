@@ -39,7 +39,8 @@ def p_verslist(p):
 
 def p_file(p):
     """file : slash string slash FILE slash string
-            | slash string slash FILE slash string slash"""
+            | slash string slash FILE slash string slash
+            | slash string slash FILE slash string queryopts"""
     p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6])
 
 def p_vfile(p):
