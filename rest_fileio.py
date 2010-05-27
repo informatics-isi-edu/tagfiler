@@ -127,10 +127,18 @@ class FileIO (Application):
         else:
             self.vers_id = currentVersion + 1
         self.insert_file_version()
+        if self.vers_id == 1:
+            try:
+                self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+            except:
+                pass
         try:
-            self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+            self.set_file_tag('last modified by', web.ctx.env['REMOTE_USER'])
         except:
-            # let's fail safely if there's no owner tag defined yet
+            pass
+        try:
+            self.set_file_tag('last modified', 'now')
+        except:
             pass
         return True
 
