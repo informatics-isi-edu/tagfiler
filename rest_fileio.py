@@ -12,11 +12,12 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders', 'action' ]
+    __slots__ = [ 'formHeaders', 'action', 'filetype' ]
 
     def __init__(self):
         Application.__init__(self)
         self.action = None
+        self.filetype = 'file'
 
     def makeFilename(self):
         return ''
@@ -32,9 +33,14 @@ class FileIO (Application):
                 results = self.select_file_version()
                 if len(results) == 0:
                     raise NotFound()
+                return results[0]
 
-        def postCommit(results):
-            pass
+        def postCommit(result):
+            # if the dataset is a remote URL, just redirect client
+            if result.url:
+                raise web.seeother(result.url)
+
+        # we only get here if the dataset is a locally stored file
 
         self.dbtransact(body, postCommit)
 
@@ -80,14 +86,17 @@ class FileIO (Application):
 
         try:
             self.action = storage.action
+            self.filetype = storage.type
         except:
             pass
 
-        if self.action == 'upload':
-            # getting a FileForm guides browser to upload file
-            target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
+        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
+        if self.action == 'define' and self.filetype == 'file':
             return self.renderlist("Upload data file",
                                    [self.render.FileForm(target)])
+        elif self.action == 'define' and self.filetype == 'url':
+            return self.renderlist("Register a remote URL",
+                                   [self.render.UrlForm(target)])
         else:
             return self.GETfile(uri)
 
@@ -96,15 +105,16 @@ class FileIO (Application):
         def body():
             if self.vers_id == None:
                 raise NotFound()
-            else:
-                results = self.select_file_version()
-                if len(results) == 0:
-                    raise NotFound()
+            results = self.select_file_version()
+            if len(results) == 0:
+                raise NotFound()
             self.delete_file_version()
+            return results[0]
 
-        def postCommit(results):
-            filename = self.makeFilename()
-            os.unlink(filename)
+        def postCommit(result):
+            if result.url == None:
+                filename = self.makeFilename()
+                os.unlink(filename)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -208,15 +218,17 @@ class FileIO (Application):
         def putPostCommit(results):
             inf = web.ctx.env['wsgi.input']
 
-            boundary1, boundaryN = self.scanFormHeader(inf)
-            f = self.storeInput(inf)
+            if self.url == None:
+                boundary1, boundaryN = self.scanFormHeader(inf)
+                f = self.storeInput(inf)
 
-            # now we have to remove the trailing part boundary we
-            # copied to disk by being lazy above...
-            f.seek(0 - len(boundaryN), os.SEEK_END)
-            f.truncate() # truncate to current seek location
-            #bytes = f.tell()
-            f.close()
+                # now we have to remove the trailing part boundary we
+                # copied to disk by being lazy above...
+                f.seek(0 - len(boundaryN), os.SEEK_END)
+                f.truncate() # truncate to current seek location
+                # bytes = f.tell()
+                f.close()
+
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
@@ -226,30 +238,38 @@ class FileIO (Application):
             if len(results) == 0:
                 raise NotFound()
             self.delete_file_version()
-            return self.select_file_versions()
+            return (results[0], self.select_file_versions())
 
         def deletePostCommit(results):
-            versions = results
-            filename = self.makeFilename()
-            os.unlink(filename)
+            file_version, versions = results
+            if file_version.url == None:
+                filename = self.makeFilename()
+                os.unlink(filename)
             if len(versions) > 0:
                 raise web.seeother('/history/%s' % (self.data_id))
             else:
                 raise web.seeother('/file')
 
-        if self.vers_id != None and self.data_id != None:
-            # we support alternative form action on specific version
-            storage = web.input()
-            try:
-                self.action = storage.action
-            except:
-                self.action = 'put'
-        elif self.vers_id == None and self.data_id != None:
-            self.action = 'put'
-
-        if self.action == 'delete':
-            return self.dbtransact(deleteBody, deletePostCommit)
-        elif self.action == 'put':
+        contentType = web.ctx.env['CONTENT_TYPE'].lower()
+        web.debug(contentType)
+        if contentType[0:19] == 'multipart/form-data':
+            # we only support file PUT simulation this way
             return self.dbtransact(putBody, putPostCommit)
+
+        elif contentType[0:33] == 'application/x-www-form-urlencoded':
+            storage = web.input()
+            self.action = storage.action
+            try:
+                self.url = storage.url
+            except:
+                self.url = None
+
+            if self.action == 'delete':
+                return self.dbtransact(deleteBody, deletePostCommit)
+            elif self.action == 'put':
+                return self.dbtransact(putBody, putPostCommit)
+            else:
+                raise web.BadRequest()
+
         else:
             raise web.BadRequest()

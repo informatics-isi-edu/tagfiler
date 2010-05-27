@@ -15,9 +15,6 @@ def p_start(p):
              | verslist
              | file
              | vfile
-             | upload
-             | uploadform
-             | uploadnew
              | tagdef
              | tags
              | tagsresttag
@@ -29,7 +26,9 @@ def p_filelist(p):
     """filelist : slash string
                 | slash string slash
                 | slash string slash FILE
-                | slash string slash FILE slash"""
+                | slash string slash FILE slash
+                | slash string slash FILE queryopts"""
+    # ignore queryopts
     p[0] = url_ast.FileList(appname=p[2])
 
 def p_verslist(p):
@@ -41,25 +40,12 @@ def p_file(p):
     """file : slash string slash FILE slash string
             | slash string slash FILE slash string slash
             | slash string slash FILE slash string queryopts"""
+    # ignore queryopts
     p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6])
 
 def p_vfile(p):
     """vfile : slash string slash FILE slash string slash string"""
     p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6], vers_id=p[8])
-
-def p_upload(p):
-    """upload : slash string slash UPLOAD slash string
-              | slash string slash UPLOAD slash string slash"""
-    p[0] = url_ast.Upload(appname=p[2], data_id=p[6])
-
-def p_upload_form(p):
-    """uploadform : slash string slash UPLOAD '?' NAME '=' string"""
-    p[0] = url_ast.Upload(appname=p[2], data_id=p[8])
-
-def p_upload_new(p):
-    """uploadnew : slash string slash UPLOAD
-                 | slash string slash UPLOAD slash"""
-    p[0] = url_ast.Upload(appname=p[2])
 
 def p_tagdef_start(p):
     """tagdef : slash string slash TAGDEF
@@ -128,7 +114,6 @@ def p_stringany(p):
               | TAGS
               | TAGDEF
               | QUERY
-              | UPLOAD
               | HISTORY
               | STRING"""
     p[0] = p[1]
@@ -143,7 +128,8 @@ def p_stringplus(p):
 
 def make_parser():
     # use this to shut it up: errorlog=yacc.NullLogger()
-    return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
+#    return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
+    return yacc.yacc()
 
 def make_parse():
     parser = make_parser()

@@ -141,8 +141,12 @@ class Application:
             self.select_file()
         except:
             self.insert_file()
-        self.db.query("INSERT INTO fileversions ( name, version ) VALUES ( $name, $version )",
-                      vars=dict(name=self.data_id, version=self.vers_id))
+        if self.url:
+            self.db.query("INSERT INTO fileversions ( name, version, url ) VALUES ( $name, $version, $url )",
+                          vars=dict(name=self.data_id, version=self.vers_id, url=self.url))
+        else:
+            self.db.query("INSERT INTO fileversions ( name, version ) VALUES ( $name, $version )",
+                          vars=dict(name=self.data_id, version=self.vers_id))
 
     def select_files_versions_max(self):
         return self.db.query("SELECT name, max(version) AS version FROM fileversions GROUP BY name ORDER BY name")

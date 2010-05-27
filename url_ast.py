@@ -15,7 +15,12 @@ class Node (object, Application):
         Application.__init__(self)
 
 class FileList (Node):
-    """Represents a bare FILE/ URI which means give a listing of all files"""
+    """Represents a bare FILE/ URI
+
+       GET  FILE  or FILE/         -- gives a listing
+       GET  FILE?action=define     -- gives a new NameForm
+       POST FILE?name=foo&type=t   -- redirects to GET FILE/name?type=t&action=define
+    """
 
     __slots__ = []
 
@@ -36,7 +41,35 @@ class FileList (Node):
                                    [self.render.Commands(target),
                                     self.render.FileList(target, files, urlquote)])
 
-        return self.dbtransact(body, postCommit)
+        storage = web.input()
+        action = None
+        try:
+            action = storage.action
+        except:
+            pass
+
+        if action == 'define':
+            target = self.home + web.ctx.homepath + '/file'
+            return self.renderlist("Define a dataset",
+                                   [self.render.NameForm(target)])
+        else:
+            return self.dbtransact(body, postCommit)
+
+    def POST(self, uri):
+
+        storage = web.input()
+        try:
+            name = storage.name
+            filetype = storage.type
+        except:
+            raise web.BadRequest()
+
+        if name == '':
+            raise web.BadRequest()
+        else:
+            raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
+                               + '?type=' + urlquote(filetype) + '&action=define')
+        
 
 class FileHistory (Node):
     """Represents a VERSION/data_id URI which means give a listing of revisions for the file"""
@@ -68,56 +101,16 @@ class FileIdVersion (Node, FileIO):
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'data_id', 'vers_id' ]
-    def __init__(self, appname, data_id, vers_id=None):
+    __slots__ = [ 'data_id', 'vers_id', 'url' ]
+    def __init__(self, appname, data_id, vers_id=None, url=None):
         Node.__init__(self, appname)
+        FileIO.__init__(self)
         self.data_id = data_id
         self.vers_id = vers_id
+        self.url = url
 
     def makeFilename(self):
         return "%s/%s/%s" % (self.store_path, self.data_id, self.vers_id)
-
-class Upload (Node):
-    """Represents UPLOAD/ and UPLOAD/data_id URIs"""
-
-    __slots__ = [ 'data_id' ]
-
-    def __init__(self, appname, data_id=None):
-        Node.__init__(self, appname)
-        self.data_id = data_id
-
-    def GET(self, uri):
-        """send form to client"""
-
-        web.header('Content-Type', 'text/html;charset=ISO-8859-1')
-
-        if self.data_id == None:
-            target = self.home + web.ctx.homepath + '/upload'
-            return self.renderlist("Prepare to upload",
-                                   [self.render.NameForm(target)])
-        else:
-            raise web.seeother(self.home + web.ctx.homepath + '/file/'
-                               + urlquote(self.data_id) + '?action=upload')
-
-    def POST(self, uri):
-        """process form submission from client"""
-
-        if self.data_id != None:
-            raise web.BadRequest()
-
-        # post form data comes from HTTP header, not URI
-        storage = web.input()
-        self.data_id = storage.name
-
-        if self.data_id == None:
-            raise web.BadRequest()
-
-        # posting a NameForm gets a FileForm:
-        #    POST app / upload
-        #      with  name = foo
-        #    GET  app / upload / name
-        # these are equivalent functions, one REST, one for browser
-        return self.GET(uri + '/' + urlquote(self.data_id))
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""

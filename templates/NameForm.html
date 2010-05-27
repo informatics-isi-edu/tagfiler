@@ -1,5 +1,10 @@
 $def with (target)
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-<input name="name" type="text" /> Enter name for new dataset<br />
+Enter a name for the new dataset: <input name="name" type="text" /><br />
+Select a type of dataset definition: 
+<select name="type">
+  <option value="file">Upload a file</option>
+  <option value="url">Register a remote URL</option>
+</select>
 <input type="submit" value="Proceed" />
 </form>
