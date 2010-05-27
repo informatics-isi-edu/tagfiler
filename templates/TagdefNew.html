@@ -1,7 +1,7 @@
 $def with (target, tagdefs, typenames)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <h2>Define tags</h2>
-<p>For convenience, each row below can be configured to define one tag:
+<p>For convenience, each entry below can be configured to define one tag:
   <ol>
     <li>Enter a tag name</li>
     <li>Select the desired type for a tag content (default: no content)</li>
@@ -12,22 +12,17 @@ $def with (target, tagdefs, typenames)
 <p>You may return to this page and create as many tags as desired.</p>
 <p>Warning: any error such as trying to create a tag name that already exists will cause all definitions in the same page to be abandoned. Therefore, you may define one tag at a time if you are uncertain which one is causing the error.</p>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-<table border="1">
-  <tr>
-    <th>Tag name</th>
-    <th>Tag type</th>
-  </tr>
-$for i in range(10):
-	<tr>
-	<td><input name="tag-${i}" type="text" /></td>
-	<td>
-	<select name="type-${i}">
-	$ value = typenames.keys()[0]
-	<option value="${value}">${typenames[value]}</option>
-	$for value in typenames.keys()[1:]:
-	      		<option value="${value}">${typenames[value]}</option>
-	</select>
-	</tr>
+$for i in range(1,11):
+	<fieldset>
+	  <legend>New tag ${i}</legend>
+	  <input name="tag-${i}" type="text" />
+	  <select name="type-${i}">
+	  $ typestr = typenames.keys()[0]
+	  <option value="${typestr}">${typenames[typestr]}</option>
+	  $for typestr in typenames.keys()[1:]:
+	      		<option value="${typestr}">${typenames[typestr]}</option>
+	  </select>
+	</fieldset>
 </table>
 <input type="hidden" name="action" value="add" />
 <input type="submit" value="Define tag(s)" />

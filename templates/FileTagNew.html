@@ -3,26 +3,13 @@ $if len(tagdefs) > 0:
 	<h2>Set a tag</h2>
 	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Appy". Multiple tags may be set at once.</p>
 	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
-	  <table border="1">
-	    <tr>
-	      <th>Set</th>
-	      <th>Tag name</th>
-	      <th>Type</th>
-	      <th>Value</th>
-	    </tr>
 	$for tagdef in tagdefs:
-		<tr>
-		  <td><input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /></td>
-		  <td>${tagdef.tagname}</td>
-		  <td>${typenames[tagdef.typestr]}</td>
-		  <td>
+		<fieldset>
+		  <legend>${tagdef.tagname}</legend>
+		  <input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /> Set
 		$if tagdef.typestr != '':
-	  		<input type="text" name="val-${urlquote(tagdef.tagname)}" />
-		$else:
-			N/A
-		  </td>	
-		</tr>
-	  </table>
+	  		<input type="text" name="val-${urlquote(tagdef.tagname)}" /> (${typenames[tagdef.typestr]})
+		</fieldset>
 	  <input type="hidden" name="action" value="put" />
 	  <input type="submit" value="Apply tag(s)" />
 	  <input type="reset" value="Reset form" />
