@@ -23,8 +23,8 @@ $for i in range(1,11):
 	      		<option value="${typestr}">${typenames[typestr]}</option>
 	  </select>
 	  <select name="restricted-${i}">
-	    <option value="no">Anybody may set tag</option>
-	    <option value="yes">Only file owner may set tag</option>
+	    <option value="false">Anybody may set tag</option>
+	    <option value="true">Only file owner may set tag</option>
 	  </select>
 	</fieldset>
 </table>

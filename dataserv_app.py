@@ -147,7 +147,7 @@ class Application:
             else:
                 pass
 
-    def isFileTagRestricted(self, tag_id):
+    def isFileTagRestricted(tag_id):
         try:
             self.enforceFileTagRestriction(tag_id)
         except:

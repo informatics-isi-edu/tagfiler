@@ -90,32 +90,62 @@ class FileId(Node, FileIO):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted', 'queryopts' ]
 
-    def __init__(self, appname, tag_id=None, typestr=None):
+    def __init__(self, appname, tag_id=None, typestr=None, queryopts={}):
         Node.__init__(self, appname)
         self.tag_id = tag_id
         self.typestr = typestr
-        self.restricted = 'f'
+        self.restricted = None
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
         self.tagdefs = {}
+        self.queryopts = queryopts
 
     def GET(self, uri):
 
-        if self.tag_id != None or self.typestr != None:
-            raise web.BadRequest()
+        if self.tag_id != None:
+            if len(self.queryopts) > 0:
+                raise web.BadRequest()
+            else:
+                return self.GETone(uri)
+        else:
+            return self.GETall(uri)
 
-        web.header('Content-Type', 'text/html;charset=ISO-8859-1')
+    def GETall(self, uri):
 
         def body():
             return [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted)
                      for tagdef in self.select_tagdefs() ]
 
         def postCommit(tagdefs):
+            web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             return self.renderlist("Tag definitions",
                                    [self.render.TagdefExisting(self.target, tagdefs, self.typenames),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
+
+        if len(self.queryopts) > 0:
+            raise web.BadRequest()
+
+        return self.dbtransact(body, postCommit)
+
+    def GETone(self,uri):
+
+        def body():
+            return [ tagdef for tagdef in self.select_tagdef(self.tag_id) ]
+
+        def postCommit(tagdefs):
+            try:
+                tagdef = tagdefs[0]
+                web.debug(tagdef)
+                web.header('Content-Type', 'text/plain; charset=us-ascii')
+                return ('typestr=' + urlquote(tagdef.typestr) 
+                        + '&restricted=' + urlquote(unicode(tagdef.restricted)))
+            except:
+                raise NotFound()
+
+        if len(self.queryopts) > 0:
+            raise web.BadRequest()
 
         return self.dbtransact(body, postCommit)
 
@@ -130,6 +160,40 @@ class Tagdef (Node):
 
         return self.dbtransact(body, postCommit)
                 
+    def PUT(self, uri):
+
+        if self.tag_id == None:
+            raise web.BadRequest()
+
+        # self.typestr and self.restricted take precedence over queryopts...
+
+        if self.typestr == None:
+            try:
+                self.typestr = self.queryopts['typestr']
+            except:
+                self.typestr = ''
+
+        if self.restricted == None:
+            try:
+                restricted = self.queryopts['restricted'].lower()
+                if restricted in [ 'true', 't', 'yes', 'y' ]:
+                    self.restricted = True
+                else:
+                    self.restricted = False
+            except:
+                self.restricted = False
+
+        def body():
+            self.insert_tagdef()
+            return None
+
+        def postCommit(results):
+            # send client back to get new tag definition
+            # or should we just return empty success result?
+            raise web.seeother('/tagdef/' + urlquote(self.tag_id))
+
+        return self.dbtransact(body, postCommit)
+
     def POST(self, uri):
 
         storage = web.input()

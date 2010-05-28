@@ -35,10 +35,21 @@ def p_file(p):
     # ignore queryopts
     p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
 
-def p_tagdef_start(p):
+def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
               | slash string slash TAGDEF slash"""
+    # GET all definitions and a creation form (HTML)
     p[0] = url_ast.Tagdef(appname=p[2])
+
+def p_tagdef_rest_get(p):
+    """tagdef : slash string slash TAGDEF slash string"""
+    # GET a single definition (URL encoded)
+    p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6])
+
+def p_tagdef_rest_put(p):
+    """tagdef : slash string slash TAGDEF slash string queryopts"""
+    # PUT queryopts supports typestr=string&restricted=true/false
+    p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
 
 def p_tags(p):
     """tags : slash string slash TAGS slash string 
