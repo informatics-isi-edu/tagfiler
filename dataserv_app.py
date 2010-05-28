@@ -103,58 +103,23 @@ class Application:
 
     def select_file(self):
         results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
-        return results[0]
+        return results
+
+    def select_files(self):
+        results = self.db.select('files', order='name')
+        return results
 
     def insert_file(self):
-        self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
+        if self.url:
+            self.db.query("INSERT INTO files ( name, url ) VALUES ( $name, $url )",
+                      vars=dict(name=self.data_id, url=self.url))
+        else:
+            self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
                       vars=dict(name=self.data_id))
-
-    def count_file_versions(self):
-        results = self.db.query("SELECT count(*) AS count "
-                                + "FROM fileversions WHERE name = $name",
-                                vars=dict(name=self.data_id))
-        return results[0].count
-
-    def select_file_version_max(self):
-        results = self.db.query("SELECT max(version) AS max_version "
-                                + "FROM fileversions WHERE name = $name",
-                                vars=dict(name=self.data_id))
-        return results[0].max_version
-
-    def select_file_version(self):
-        return self.db.select('fileversions', where="name = $name AND version = $version",
-                              vars=dict(name=self.data_id, version=self.vers_id))
 
     def delete_file(self):
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
-
-    def delete_file_version(self):
-        self.db.delete('fileversions', where="name=$name AND version = $version",
-                       vars=dict(name=self.data_id, version=self.vers_id))
-        count = self.count_file_versions()
-        if count == 0:
-            self.delete_file()
-
-    def insert_file_version(self):
-        try:
-            self.select_file()
-        except:
-            self.insert_file()
-        if self.url:
-            self.db.query("INSERT INTO fileversions ( name, version, url ) VALUES ( $name, $version, $url )",
-                          vars=dict(name=self.data_id, version=self.vers_id, url=self.url))
-        else:
-            self.db.query("INSERT INTO fileversions ( name, version ) VALUES ( $name, $version )",
-                          vars=dict(name=self.data_id, version=self.vers_id))
-
-    def select_files_versions_max(self):
-        return self.db.query("SELECT name, max(version) AS version FROM fileversions GROUP BY name ORDER BY name")
-
-    def select_file_versions(self):
-        return self.db.query("SELECT version FROM fileversions"
-                             + " WHERE name = $name ORDER BY version",
-                             vars=dict(name=self.data_id))
 
     def select_tagdef(self, tagname):
         return self.db.select('tagdefs', where="tagname = $tagname",

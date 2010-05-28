@@ -73,8 +73,7 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 
 # this script will recreate all tables, but only on a clean database
 
-psql -c "CREATE TABLE files ( name text PRIMARY KEY )"
-psql -c "CREATE TABLE fileversions ( name text REFERENCES files (name) ON DELETE CASCADE, version int NOT NULL, url text, UNIQUE (name, version) )"
+psql -c "CREATE TABLE files ( name text PRIMARY KEY, url text )"
 psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
@@ -95,7 +94,6 @@ done
 
 psql -c "DROP TABLE filetags"
 psql -c "DROP TABLE tagdefs"
-psql -c "DROP TABLE fileversions"
 psql -c "DROP TABLE files"
 
 EOF
@@ -117,7 +115,7 @@ do
     fi
 done
 
-for table in filetags tagdefs fileversions files
+for table in filetags tagdefs files
 do
     echo "DUMPING TABLE \"\$table\""
     psql -c "SELECT * FROM \$table"

@@ -32,7 +32,7 @@ class FileList (Node):
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
 
         def body():
-            return self.select_files_versions_max()
+            return self.select_files()
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
@@ -71,46 +71,21 @@ class FileList (Node):
                                + '?type=' + urlquote(filetype) + '&action=define')
         
 
-class FileHistory (Node):
-    """Represents a VERSION/data_id URI which means give a listing of revisions for the file"""
-
-    __slots__ = [ 'data_id']
-
-    def __init__(self, appname, data_id):
-        Node.__init__(self, appname)
-        self.data_id = data_id
-
-    def GET(self, uri):
-        
-        web.header('Content-Type', 'text/html;charset=ISO-8859-1')
-
-        def body():
-            return self.select_file_versions()
-
-        def postCommit(results):
-            target = self.home + web.ctx.homepath
-            vers = [ result.version for result in results ]
-            return self.renderlist("\"%s\" history" % (self.data_id),
-                                   [self.render.FileVersionList(target, self.data_id, vers, urlquote)])
-
-        return self.dbtransact(body, postCommit)
-
-class FileIdVersion (Node, FileIO):
-    """Represents a direct FILE/data_id/vers_id URI
+class FileId(Node, FileIO):
+    """Represents a direct FILE/data_id URI
 
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'data_id', 'vers_id', 'url' ]
-    def __init__(self, appname, data_id, vers_id=None, url=None):
+    __slots__ = [ 'data_id', 'url' ]
+    def __init__(self, appname, data_id, url=None):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         self.data_id = data_id
-        self.vers_id = vers_id
         self.url = url
 
     def makeFilename(self):
-        return "%s/%s/%s" % (self.store_path, self.data_id, self.vers_id)
+        return "%s/%s" % (self.store_path, self.data_id)
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""

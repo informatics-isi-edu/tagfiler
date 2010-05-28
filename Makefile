@@ -11,7 +11,7 @@ FILES=dataserv.wsgi \
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
-	FileList.html FileVersionList.html \
+	FileList.html \
 	TagdefExisting.html TagdefNew.html \
 	FileTagExisting.html FileTagNew.html \
 	QueryAdd.html QueryView.html

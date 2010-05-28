@@ -12,9 +12,7 @@ start = 'start'
 
 def p_start(p):
     """start : filelist
-             | verslist
              | file
-             | vfile
              | tagdef
              | tags
              | tagsresttag
@@ -31,21 +29,12 @@ def p_filelist(p):
     # ignore queryopts
     p[0] = url_ast.FileList(appname=p[2])
 
-def p_verslist(p):
-    """verslist : slash string slash HISTORY slash string
-                | slash string slash HISTORY slash string slash"""
-    p[0] = url_ast.FileHistory(appname=p[2], data_id=p[6])
-
 def p_file(p):
     """file : slash string slash FILE slash string
             | slash string slash FILE slash string slash
             | slash string slash FILE slash string queryopts"""
     # ignore queryopts
-    p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6])
-
-def p_vfile(p):
-    """vfile : slash string slash FILE slash string slash string"""
-    p[0] = url_ast.FileIdVersion(appname=p[2], data_id=p[6], vers_id=p[8])
+    p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
 
 def p_tagdef_start(p):
     """tagdef : slash string slash TAGDEF
@@ -114,7 +103,6 @@ def p_stringany(p):
               | TAGS
               | TAGDEF
               | QUERY
-              | HISTORY
               | STRING"""
     p[0] = p[1]
 

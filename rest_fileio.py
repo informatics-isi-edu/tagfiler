@@ -25,15 +25,10 @@ class FileIO (Application):
     def GETfile(self, uri):
 
         def body():
-            if self.vers_id == None:
-                self.vers_id = self.select_file_version_max()
-            if self.vers_id == None:
+            results = self.select_file()
+            if len(results) == 0:
                 raise NotFound()
-            else:
-                results = self.select_file_version()
-                if len(results) == 0:
-                    raise NotFound()
-                return results[0]
+            return results[0]
 
         def postCommit(result):
             # if the dataset is a remote URL, just redirect client
@@ -103,12 +98,10 @@ class FileIO (Application):
     def DELETE(self, uri):
 
         def body():
-            if self.vers_id == None:
-                raise NotFound()
-            results = self.select_file_version()
+            results = self.select_file()
             if len(results) == 0:
                 raise NotFound()
-            self.delete_file_version()
+            self.delete_file()
             return results[0]
 
         def postCommit(result):
@@ -144,31 +137,22 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
+        results = self.select_file()
 
-        # disallow update to a specific version of the file
-        if self.vers_id != None:
-            raise web.BadRequest()
+        if len(results) > 0:
+            self.delete_file()
 
-        currentVersion = self.select_file_version_max()
-        if currentVersion == None:
-            self.vers_id = 1
-        else:
-            self.vers_id = currentVersion + 1
-        self.insert_file_version()
-        if self.vers_id == 1:
-            try:
-                self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
-            except:
-                pass
+        self.insert_file()
+
         try:
-            self.set_file_tag('last modified by', web.ctx.env['REMOTE_USER'])
+            self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
         except:
             pass
         try:
-            self.set_file_tag('last modified', 'now')
+            self.set_file_tag('created', 'now')
         except:
             pass
-        return True
+        return results
 
     def storeInput(self, inf):
         """copy content stream"""
@@ -195,8 +179,7 @@ class FileIO (Application):
     def PUT(self, uri):
         """store file content from client"""
         def body():
-            self.insertForStore()
-            return None
+            return self.insertForStore()
 
         def postCommit(results):
             f = self.storeInput(web.ctx.env['wsgi.input'])
@@ -212,8 +195,7 @@ class FileIO (Application):
         # return same result page as for GET app/tags/data_id for convenience
 
         def putBody():
-            self.insertForStore()
-            return None
+            return self.insertForStore()
 
         def putPostCommit(results):
             inf = web.ctx.env['wsgi.input']
@@ -229,26 +211,24 @@ class FileIO (Application):
                 # bytes = f.tell()
                 f.close()
 
+            elif len(results) > 0:
+                filename = self.makeFilename()
+                os.unlink(filename)
+
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
-            if self.vers_id == None:
-                raise NotFound()
-            results = self.select_file_version()
+            results = self.select_file()
             if len(results) == 0:
                 raise NotFound()
-            self.delete_file_version()
-            return (results[0], self.select_file_versions())
+            self.delete_file()
+            return results[0]
 
-        def deletePostCommit(results):
-            file_version, versions = results
-            if file_version.url == None:
+        def deletePostCommit(result):
+            if result.url == None:
                 filename = self.makeFilename()
                 os.unlink(filename)
-            if len(versions) > 0:
-                raise web.seeother('/history/%s' % (self.data_id))
-            else:
-                raise web.seeother('/file')
+            raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
