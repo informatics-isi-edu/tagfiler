@@ -1,13 +1,15 @@
-$def with (apptarget, data_id, tagvals, urlquote)
+$def with (apptarget, data_id, tagvals, tagdefs, urlquote)
 <h2>Existing tags</h2>
 $if len(tagvals) > 0:
-	$for tagval in tagvals:
-		$ tag, val = tagval
+	$for tag in tagvals.iterkeys():
+		$ val = tagvals[tag]
+		$ tagdef = tagdefs[tag]
 		<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
 		  <fieldset>
 		    <legend>${tag}</legend>
 		    <input type="hidden" name="tag" value="${tag}" />
-		    <input type="text" name="value" value="${val}" readonly />
+		    	$if tagdef.typestr:
+		    		<input type="text" name="value" value="${val}" readonly />
 		    <input type="hidden" name="action" value="delete" />
 		    <input type="submit" value="Delete" />
 		  </fieldset>

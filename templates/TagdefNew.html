@@ -22,6 +22,10 @@ $for i in range(1,11):
 	  $for typestr in typenames.keys()[1:]:
 	      		<option value="${typestr}">${typenames[typestr]}</option>
 	  </select>
+	  <select name="restricted-${i}">
+	    <option value="no">Anybody may set tag</option>
+	    <option value="yes">Only file owner may set tag</option>
+	  </select>
 	</fieldset>
 </table>
 <input type="hidden" name="action" value="add" />

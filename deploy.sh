@@ -74,7 +74,7 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 # this script will recreate all tables, but only on a clean database
 
 psql -c "CREATE TABLE files ( name text PRIMARY KEY, url text )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, restricted boolean )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
 EOF

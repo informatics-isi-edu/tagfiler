@@ -90,12 +90,13 @@ class FileId(Node, FileIO):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted' ]
 
     def __init__(self, appname, tag_id=None, typestr=None):
         Node.__init__(self, appname)
         self.tag_id = tag_id
         self.typestr = typestr
+        self.restricted = 'f'
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
         self.tagdefs = {}
@@ -108,7 +109,8 @@ class Tagdef (Node):
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
 
         def body():
-            return [ ( tagdef.tagname, tagdef.typestr) for tagdef in self.select_tagdefs() ]
+            return [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted)
+                     for tagdef in self.select_tagdefs() ]
 
         def postCommit(tagdefs):
             return self.renderlist("Tag definitions",
@@ -137,7 +139,8 @@ class Tagdef (Node):
                 if key[0:4] == 'tag-':
                     if storage[key] != '':
                         typestr = storage['type-%s' % (key[4:])]
-                        self.tagdefs[storage[key]] = typestr
+                        restricted = storage['restricted-%s' % (key[4:])]
+                        self.tagdefs[storage[key]] = (typestr, restricted)
             try:
                 self.tag_id = storage.tag
             except:
@@ -150,7 +153,7 @@ class Tagdef (Node):
             if self.action == 'add':
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
-                    self.typestr = self.tagdefs[tagname]
+                    self.typestr, self.restricted = self.tagdefs[tagname]
                     self.insert_tagdef()
             elif self.action == 'delete':
                 self.delete_tagdef()
@@ -200,17 +203,17 @@ class FileTags (Node):
     def GETall(self, uri):
         # HTML get of all tags on one file...
         def body():
-            tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
+            tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdefs() ])
             tags = [ result.tagname for result in self.select_file_tags() ]
-            tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
+            tagvals = dict([ (tag, self.tagval(tag)) for tag in tags ])
             return (tagvals, tagdefs)
 
         def postCommit(results):
             tagvals, tagdefs = results
             apptarget = self.home + web.ctx.homepath
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, tagdefs, self.typenames, urlquote)])
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefs, urlquote),
+                                    self.render.FileTagNew(apptarget, self.data_id, tagvals, tagdefs, self.typenames, self.isFileTagRestricted, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
@@ -228,6 +231,7 @@ class FileTags (Node):
         self.value = web.ctx.env['wsgi.input'].read()
 
         def body():
+            self.enforceFileTagRestriction(self.tag_id)
             self.set_file_tag(self.tag_id, self.value)
             return None
 
@@ -242,6 +246,7 @@ class FileTags (Node):
             raise web.BadRequest
 
         def body():
+            self.enforceFileTagRestriction(self.tag_id)
             self.delete_file_tag(self.tag_id)
             return None
 
@@ -257,10 +262,12 @@ class FileTags (Node):
 
         def putBody():
             for tag_id in self.tagvals:
+                self.enforceFileTagRestriction(tag_id)
                 self.set_file_tag(tag_id, self.tagvals[tag_id])
             return None
 
         def deleteBody():
+            self.enforceFileTagRestriction(self.tag_id)
             self.delete_file_tag(self.tag_id)
             return None
 
@@ -288,7 +295,6 @@ class FileTags (Node):
 
         if action == 'put':
             if len(self.tagvals) > 0:
-                web.debug(self.tagvals)
                 return self.dbtransact(putBody, postCommit)
             else:
                 return self.dbtransact(nullBody, postCommit)

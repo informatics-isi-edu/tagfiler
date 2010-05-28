@@ -90,6 +90,70 @@ class Application:
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
+    def owner(self):
+        try:
+            results = self.select_file_tag('owner')
+            if len(results) > 0:
+                return results[0].value
+            else:
+                return None
+        except:
+            return None
+
+    def user(self):
+        try:
+            user = web.ctx.env['REMOTE_USER']
+        except:
+            return None
+        return user
+
+    def restrictedFile(self):
+        try:
+            results = self.select_file_tag('restricted')
+            if len(results) > 0:
+                return True
+        except:
+            pass
+        return False
+
+    def enforceFileRestriction(self):
+        if self.restrictedFile():
+            owner = self.owner()
+            user = self.user()
+            if owner:
+                if user:
+                    if user != owner:
+                        raise web.Forbidden()
+                    else:
+                        pass
+                else:
+                    raise web.Unauthorized()
+            else:
+                pass
+
+    def enforceFileTagRestriction(self, tag_id):
+        results = self.select_tagdef(tag_id)
+        if results[0].restricted:
+            owner = self.owner()
+            user = self.user()
+            if owner:
+                if user:
+                    if user != owner:
+                        raise web.Forbidden()
+                    else:
+                        pass
+                else:
+                    raise web.Unauthorized()
+            else:
+                pass
+
+    def isFileTagRestricted(self, tag_id):
+        try:
+            self.enforceFileTagRestriction(tag_id)
+        except:
+            return True
+        return False
+      
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
@@ -129,8 +193,8 @@ class Application:
         return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr ) VALUES ( $tag_id, $typestr )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( $tag_id, $typestr, $restricted )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"

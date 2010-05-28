@@ -4,7 +4,7 @@ $def with (target, tagdefs, typenames)
 <p>
 $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
-		$ tagname, typestr = tagdef
+		$ tagname, typestr, restricted = tagdef
 		<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 		  <fieldset>
 		    <legend>${tagname}</legend>
@@ -13,6 +13,8 @@ $if len(tagdefs) > 0:
 		<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
+		$if restricted:
+			Tagging restricted to file owner.
 		</fieldset>
 		</form>
 $else:

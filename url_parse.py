@@ -15,7 +15,6 @@ def p_start(p):
              | file
              | tagdef
              | tags
-             | tagsresttag
              | query
 """
     p[0] = p[1]
@@ -46,8 +45,8 @@ def p_tags(p):
             | slash string slash TAGS slash string slash"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
 
-def p_tagsresttag(p):
-    """tagsresttag : slash string slash TAGS slash string slash string 
+def p_tagsrest(p):
+    """tags : slash string slash TAGS slash string slash string 
             | slash string slash TAGS slash string slash string slash"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8])
 

@@ -28,6 +28,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound()
+            self.enforceFileRestriction()
             return results[0]
 
         def postCommit(result):
@@ -101,6 +102,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound()
+            self.enforceFileRestriction()
             self.delete_file()
             return results[0]
 
@@ -140,6 +142,7 @@ class FileIO (Application):
         results = self.select_file()
 
         if len(results) > 0:
+            self.enforceFileRestriction()
             self.delete_file()
 
         self.insert_file()
@@ -221,6 +224,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound()
+            self.enforceFileRestriction()
             self.delete_file()
             return results[0]
 
