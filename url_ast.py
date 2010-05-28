@@ -430,6 +430,12 @@ class Query (Node):
                                        [self.render.QueryAdd(target, self.qtarget(), alltags)])
 
             if self.action == 'query':
+                for acceptType in self.acceptTypesPreferedOrder():
+                    if acceptType == 'text/uri-list':
+                        # return raw results for REST client
+                        return self.render.UriList(target, files, urlquote)
+                    elif acceptType == 'text/html':
+                        break
                 return self.renderlist("Query Results",
                                        [self.render.FileList(target, files, urlquote)])
             else:

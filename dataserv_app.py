@@ -87,6 +87,22 @@ class Application:
                 raise
         return postCommit(bodyval)
 
+    def acceptPair(self, s):
+        parts = s.split(';')
+        q = 1.0
+        t = parts[0]
+        for p in parts[1:]:
+            fields = p.split('=')
+            if len(fields) == 2 and fields[0] == 'q':
+                q = fields[1]
+        return (q, t)
+        
+    def acceptTypesPreferedOrder(self):
+        return [ pair[1]
+                 for pair in
+                 sorted([ self.acceptPair(s) for s in web.ctx.env['HTTP_ACCEPT'].lower().split(',') ],
+                        key=lambda pair: pair[0]) ]
+
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
