@@ -158,6 +158,9 @@ class Tagdef (Node):
         def postCommit(results):
             return ''
 
+        if len(self.queryopts) > 0:
+            raise web.BadRequest()
+
         return self.dbtransact(body, postCommit)
                 
     def PUT(self, uri):
