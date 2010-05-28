@@ -1,4 +1,4 @@
-$def with (apptarget, data_id, tagvals, tagdefs, typenames, tagRestricted, urlquote)
+$def with (apptarget, data_id, tagval, tagdefs, typenames, tagRestricted, urlquote)
 $if len(tagdefs) > 0:
 	<h2>Set a tag</h2>
 	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Apply". Multiple tags may be set at once. Any tag which is unchecked will remain unchanged.</p>
@@ -9,7 +9,7 @@ $if len(tagdefs) > 0:
 			  <legend>${tagdef.tagname}</legend>
 			  <input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /> Set
 			$if tagdef.typestr != '':
-	  			<input type="text" name="val-${urlquote(tagdef.tagname)}" value="${tagvals[tagdef.tagname]}" /> (${typenames[tagdef.typestr]})
+	  			<input type="text" name="val-${urlquote(tagdef.tagname)}" value="${tagval(tagdef.tagname)}" /> (${typenames[tagdef.typestr]})
 			</fieldset>
 	  <input type="hidden" name="action" value="put" />
 	  <input type="submit" value="Apply tag(s)" />

@@ -211,9 +211,14 @@ class FileTags (Node):
         def postCommit(results):
             tagvals, tagdefs = results
             apptarget = self.home + web.ctx.homepath
+            def tagval(tag):
+                try:
+                    return tagvals[tag]
+                except:
+                    return ''
             return self.renderlist("\"%s\" tags" % (self.data_id),
                                    [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefs, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, tagvals, tagdefs, self.typenames, self.isFileTagRestricted, urlquote)])
+                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, self.isFileTagRestricted, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
