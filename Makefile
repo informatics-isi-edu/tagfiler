@@ -3,7 +3,7 @@
 INSTALLHOST=localhost
 INSTALLSVC=tagfiler
 INSTALLDIRBASE=/var/www/$(INSTALLSVC)
-INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
+INSTALLDIR=$(INSTALLDIRBASE)
 
 FILES=dataserv.wsgi \
 	dataserv_app.py rest_fileio.py \
@@ -22,15 +22,16 @@ TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 .SUFFIXES:
 
 deploy:
-	rsync -av deploy.sh root@$(INSTALLHOST):.
-	ssh root@$(INSTALLHOST) ./deploy.sh $(INSTALLSVC)
+	chmod +x deploy.sh
+	rsync -av deploy.sh /root/
+	/root/deploy.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES)
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 
 restart: force install
-	ssh -l root $(INSTALLHOST) service httpd restart
+	service httpd restart
 
 force:
 

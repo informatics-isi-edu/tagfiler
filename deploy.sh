@@ -25,11 +25,6 @@ SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
 
-# we need all of this
-yum -y install httpd mod_wsgi \
-    postgresql{,-devel,-server} \
-    python{,-psycopg2,-webpy,-ply}
-
 # let's try this blindly in case we need it
 service postgresql initdb
 
@@ -148,7 +143,7 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
-    SetEnv ${SVCPREFIX}.home http://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
     SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
