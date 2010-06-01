@@ -50,7 +50,8 @@ class FileIO (Application):
 
         p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
         line = p.stdout.readline()
-        p.kill()
+        # kill attribute is not supported by Python 2.4
+        # p.kill()
         web.header('Content-type', line.split(':')[1].strip())
         
         #web.header('Content-type','text/html')
