@@ -57,7 +57,7 @@ runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 
 
 # create local helper scripts
-mkdir /etc/httpd/passwd
+mkdir -p /etc/httpd/passwd
 
 cat > ${HOME}/README-${SVCPREFIX} <<EOF
 This service requires passwords to be configured via:
@@ -153,12 +153,26 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
-    AuthType Digest
-    AuthName "${SVCPREFIX}"
-    AuthDigestDomain /${SVCPREFIX}/
-    AuthUserFile /etc/httpd/passwd/passwd
-    Require valid-user
+    # This section will be enabled for Digest authentication
+    
+    # AuthType Digest
+    # AuthName "${SVCPREFIX}"
+    # AuthDigestDomain /${SVCPREFIX}/
+    # AuthUserFile /etc/httpd/passwd/passwd
+    # Require valid-user
 
+    # This section will be enabled for Crowd authentication
+    # Currently, it is enabled in the /etc/httpd/conf.d/ssl.conf file on the psoc.misd.isi.edu VM
+    # Therefore, not necessary to be enabled here 
+    
+    # AuthName subversion
+    # AuthType Basic
+    # PerlAuthenHandler Apache::CrowdAuth
+    # PerlSetVar CrowdAppName subversion
+    # PerlSetVar CrowdAppPassword $UbV3R$1oN!
+    # PerlSetVar CrowdSOAPURL https://chi:8445/crowd/services/SecurityServer
+    # require valid-user
+    
 </Directory>
 
 EOF
