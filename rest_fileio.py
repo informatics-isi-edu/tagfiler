@@ -61,7 +61,9 @@ class FileIO (Application):
         # f.seek(0, os.SEEK_END)
         f.seek(0, 2)
         length = f.tell()
-        f.seek(0, os.SEEK_SET)
+        # SEEK_SET is not supported by Python 2.4
+        # f.seek(0, os.SEEK_SET)
+        f.seek(0, 0)
 
         # report length so browsers can show progress bar
         web.header('Content-Length', length)
