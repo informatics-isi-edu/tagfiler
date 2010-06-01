@@ -163,7 +163,7 @@ class Application:
             else:
                 pass
 
-    def isFileTagRestricted(tag_id):
+    def isFileTagRestricted(self, tag_id):
         try:
             self.enforceFileTagRestriction(tag_id)
         except:

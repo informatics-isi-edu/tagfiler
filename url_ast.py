@@ -285,7 +285,7 @@ class FileTags (Node):
                     return ''
             return self.renderlist("\"%s\" tags" % (self.data_id),
                                    [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefs, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, self.isFileTagRestricted, urlquote)])
+                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), urlquote)])
             
         return self.dbtransact(body, postCommit)
 
