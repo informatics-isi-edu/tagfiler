@@ -56,7 +56,9 @@ class FileIO (Application):
         #web.header('Content-type','text/html')
         #web.header('Transfer-Encoding','chunked')
 
-        f.seek(0, os.SEEK_END)
+        # SEEK_END attribute not supported by Python 2.4
+        # f.seek(0, os.SEEK_END)
+        f.seek(0, 2)
         length = f.tell()
         f.seek(0, os.SEEK_SET)
 
@@ -224,7 +226,9 @@ class FileIO (Application):
 
                 # now we have to remove the trailing part boundary we
                 # copied to disk by being lazy above...
-                f.seek(0 - len(boundaryN), os.SEEK_END)
+                # SEEK_END attribute not supported by Python 2.4
+                # f.seek(0 - len(boundaryN), os.SEEK_END)
+                f.seek(0 - len(boundaryN), 2)
                 f.truncate() # truncate to current seek location
                 # bytes = f.tell()
                 f.close()
