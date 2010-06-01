@@ -77,6 +77,23 @@ psql -c "CREATE TABLE files ( name text PRIMARY KEY, url text )"
 psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, restricted boolean )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
+# pre-establish core restricted tags used by codebase
+tagdef()
+{
+# args: tagname typestr
+psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
+if [[ -n "\$2" ]]
+then
+   psql -c "CREATE TABLE _created ( tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, value \$2 )"
+else
+   psql -c "CREATE TABLE _created ( tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE )"
+fi
+}
+
+tagdef owner text
+tagdef created timestamptz
+tagdef restricted
+
 EOF
 
 chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
