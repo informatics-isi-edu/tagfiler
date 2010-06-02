@@ -83,12 +83,14 @@ class Application:
             # except TypeError as te:
             except TypeError, te:
                 t.rollback()
-                return web.notfound()
+                web.debug('got to TypeError')
+                raise NotFound()
             # syntax "as" not supported by Python 2.4
             # except NotFound as nf:
             except NotFound, nf:
                 t.rollback()
-                return web.notfound(nf.data)
+                web.debug('got to NotFound')
+                raise NotFound()
             # syntax "as" not supported by Python 2.4
             # except psycopg2.IntegrityError as e:
             except psycopg2.IntegrityError, e:
