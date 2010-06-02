@@ -227,12 +227,14 @@ class FileIO (Application):
                 bytes = f.tell()
                 f.close()
 
-            elif len(results) > 0:
-                web.debug(results[0].url)
-                # BUG try to delete file converting to URL
-                # fragile when repating URLs
+            elif len(results) > 0 and results[0].url == None:
+                # we are registering a url on top of a local file
+                # try to reclaim space now
                 filename = self.makeFilename()
-                os.unlink(filename)
+                try:
+                    os.unlink(filename)
+                except:
+                    pass
 
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
