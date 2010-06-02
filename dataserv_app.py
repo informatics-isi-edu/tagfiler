@@ -73,9 +73,11 @@ class Application:
                 break
             except web.Forbidden, te:
                 t.rollback()
+                web.debug('got to forbidden')
                 raise
             except web.Unauthorized, te:
                 t.rollback()
+                web.debug('got to unauthorized')
                 raise
             # syntax "as" not supported by Python 2.4
             # except TypeError as te:
