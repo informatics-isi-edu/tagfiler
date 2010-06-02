@@ -214,6 +214,7 @@ class FileIO (Application):
             inf = web.ctx.env['wsgi.input']
 
             if self.url == None:
+                # then we are posting a file body
                 boundary1, boundaryN = self.scanFormHeader(inf)
                 f = self.storeInput(inf)
 
@@ -227,6 +228,7 @@ class FileIO (Application):
                 f.close()
 
             elif len(results) > 0:
+                web.debug(results[0].url)
                 # BUG try to delete file converting to URL
                 # fragile when repating URLs
                 filename = self.makeFilename()
