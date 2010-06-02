@@ -148,7 +148,6 @@ class FileIO (Application):
 
         if len(results) > 0:
             self.enforceFileRestriction()
-            raise web.BadRequest()
             self.delete_file()
 
         self.insert_file()
