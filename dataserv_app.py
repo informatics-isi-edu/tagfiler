@@ -25,6 +25,16 @@ class NotFound (web.HTTPError):
     def __init__(self, data='', headers={}):
         web.HTTPError.__init__(self, 404, headers=headers, data=data)
 
+class Forbidden (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        web.HTTPError.__init__(self, 403, headers=headers, data=data)
+
+class Unauthorized (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        web.HTTPError.__init__(self, 401, headers=headers, data=data)
+
 class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames' ]
@@ -71,28 +81,23 @@ class Application:
                 bodyval = body()
                 t.commit()
                 break
-            except web.Forbidden, te:
+            # syntax "Type as var" not supported by Python 2.4
+            except Forbidden, te:
                 t.rollback()
                 web.debug('got to forbidden')
-                raise web.Forbidden()
-            except web.Unauthorized, te:
+                raise te
+            except Unauthorized, te:
                 t.rollback()
                 web.debug('got to unauthorized')
-                raise web.Unauthorized()
-            # syntax "as" not supported by Python 2.4
-            # except TypeError as te:
+                raise te
             except TypeError, te:
                 t.rollback()
                 web.debug('got to TypeError')
                 raise NotFound()
-            # syntax "as" not supported by Python 2.4
-            # except NotFound as nf:
             except NotFound, nf:
                 t.rollback()
                 web.debug('got to NotFound')
                 raise NotFound()
-            # syntax "as" not supported by Python 2.4
-            # except psycopg2.IntegrityError as e:
             except psycopg2.IntegrityError, e:
                 t.rollback()
                 if count > limit:
@@ -156,11 +161,11 @@ class Application:
             if owner:
                 if user:
                     if user != owner:
-                        raise web.Forbidden()
+                        raise Forbidden()
                     else:
                         pass
                 else:
-                    raise web.Unauthorized()
+                    raise Unauthorized()
             else:
                 pass
 
