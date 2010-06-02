@@ -23,17 +23,17 @@ def urlquote(url):
 class NotFound (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, 404, headers=headers, data=data)
+        web.HTTPError.__init__(self, '404 Not Found', headers=headers, data=data)
 
 class Forbidden (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, 403, headers=headers, data=data)
+        web.HTTPError.__init__(self, '403 Forbidden', headers=headers, data=data)
 
 class Unauthorized (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, 401, headers=headers, data=data)
+        web.HTTPError.__init__(self, '401 Unauthorized', headers=headers, data=data)
 
 class Application:
     "common parent class of all service handler classes to use db etc."
