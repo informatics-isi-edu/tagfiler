@@ -153,14 +153,19 @@ class FileIO (Application):
 
         self.insert_file()
 
+        t = self.db.transaction()
         try:
             self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+            t.commit()
         except:
-            pass
+            t.rollback()
+
+        t = self.db.transaction()
         try:
             self.set_file_tag('created', 'now')
+            t.commit()
         except:
-            pass
+            t.rollback()
         return [ res for res in results ]
 
     def storeInput(self, inf):
