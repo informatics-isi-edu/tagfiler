@@ -1,7 +1,7 @@
 
 # change INSTALLHOST to an FQDN to install to a remote testing VM etc.
-INSTALLHOST=basin.isi.edu
-INSTALLSVC=xtagfiler
+INSTALLHOST=localhost
+INSTALLSVC=tagfiler
 INSTALLDIRBASE=/var/www/$(INSTALLSVC)
 INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
 
