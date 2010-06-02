@@ -71,6 +71,12 @@ class Application:
                 bodyval = body()
                 t.commit()
                 break
+            except web.Forbidden, te:
+                t.rollback()
+                raise te
+            except web.Unauthorized, te:
+                t.rollback()
+                raise te
             # syntax "as" not supported by Python 2.4
             # except TypeError as te:
             except TypeError, te:
