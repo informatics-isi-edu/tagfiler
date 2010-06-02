@@ -147,10 +147,12 @@ class FileIO (Application):
         results = [ res for res in self.select_file() ]
 
         if len(results) > 0:
+            # check permissions and update existing file
             self.enforceFileRestriction()
-            self.delete_file()
-
-        self.insert_file()
+            self.update_file()
+        else:
+            # anybody is free to insert new uniquely named file
+            self.insert_file()
 
         t = self.db.transaction()
         try:

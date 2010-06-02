@@ -215,6 +215,10 @@ class Application:
             self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
                       vars=dict(name=self.data_id))
 
+    def update_file(self):
+        self.db.query("UPDATE files SET url = $url WHERE name = $name",
+                      vars=dict(name=self.data_id, url=self.url))
+
     def delete_file(self):
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
