@@ -84,19 +84,15 @@ class Application:
             # syntax "Type as var" not supported by Python 2.4
             except Forbidden, te:
                 t.rollback()
-                web.debug('got to forbidden')
                 raise te
             except Unauthorized, te:
                 t.rollback()
-                web.debug('got to unauthorized')
                 raise te
             except TypeError, te:
                 t.rollback()
-                web.debug('got to TypeError')
                 raise NotFound()
             except NotFound, nf:
                 t.rollback()
-                web.debug('got to NotFound')
                 raise NotFound()
             except psycopg2.IntegrityError, e:
                 t.rollback()
@@ -105,7 +101,7 @@ class Application:
                 # else fall through to retry...
             except:
                 t.rollback()
-                web.debug('got to unknown exception')
+                web.debug('got unknown exception from body in dbtransact')
                 raise
         return postCommit(bodyval)
 
@@ -161,11 +157,11 @@ class Application:
             if owner:
                 if user:
                     if user != owner:
-                        raise Forbidden()
+                        raise Forbidden(data="Access to %s forbidden." % self.data_id)
                     else:
                         pass
                 else:
-                    raise Unauthorized()
+                    raise Unauthorized(data="Access to %s requires authorization." % self.data_id)
             else:
                 pass
 
