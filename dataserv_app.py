@@ -71,13 +71,19 @@ class Application:
                 bodyval = body()
                 t.commit()
                 break
-            except TypeError as te:
+            # syntax "as" not supported by Python 2.4
+            # except TypeError as te:
+            except TypeError, te:
                 t.rollback()
                 return web.notfound()
-            except NotFound as nf:
+            # syntax "as" not supported by Python 2.4
+            # except NotFound as nf:
+            except NotFound, nf:
                 t.rollback()
                 return web.notfound(nf.data)
-            except psycopg2.IntegrityError as e:
+            # syntax "as" not supported by Python 2.4
+            # except psycopg2.IntegrityError as e:
+            except psycopg2.IntegrityError, e:
                 t.rollback()
                 if count > limit:
                     raise web.BadRequest()

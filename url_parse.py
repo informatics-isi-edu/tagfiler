@@ -126,7 +126,9 @@ def p_stringplus(p):
 
 def make_parser():
     # use this to shut it up: errorlog=yacc.NullLogger()
-    return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
+    # NullLogger attribute not supported by Python 2.4
+    # return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
+    return yacc.yacc(debug=False)
 #    return yacc.yacc()
 
 def make_parse():

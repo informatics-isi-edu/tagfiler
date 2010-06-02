@@ -46,15 +46,20 @@ class FileIO (Application):
 
         p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
         line = p.stdout.readline()
-        p.kill()
+        # kill attribute is not supported by Python 2.4
+        # p.kill()
         web.header('Content-type', line.split(':')[1].strip())
         
         #web.header('Content-type','text/html')
         #web.header('Transfer-Encoding','chunked')
 
-        f.seek(0, os.SEEK_END)
+        # SEEK_END attribute not supported by Python 2.4
+        # f.seek(0, os.SEEK_END)
+        f.seek(0, 2)
         length = f.tell()
-        f.seek(0, os.SEEK_SET)
+        # SEEK_SET is not supported by Python 2.4
+        # f.seek(0, os.SEEK_SET)
+        f.seek(0, 0)
 
         # report length so browsers can show progress bar
         web.header('Content-Length', length)
@@ -143,6 +148,7 @@ class FileIO (Application):
 
         if len(results) > 0:
             self.enforceFileRestriction()
+            raise web.BadRequest()
             self.delete_file()
 
         self.insert_file()
@@ -155,7 +161,7 @@ class FileIO (Application):
             self.set_file_tag('created', 'now')
         except:
             pass
-        return results
+        return [ res for res in results ]
 
     def storeInput(self, inf):
         """copy content stream"""
@@ -209,12 +215,16 @@ class FileIO (Application):
 
                 # now we have to remove the trailing part boundary we
                 # copied to disk by being lazy above...
-                f.seek(0 - len(boundaryN), os.SEEK_END)
+                # SEEK_END attribute not supported by Python 2.4
+                # f.seek(0 - len(boundaryN), os.SEEK_END)
+                f.seek(0 - len(boundaryN), 2)
                 f.truncate() # truncate to current seek location
-                # bytes = f.tell()
+                bytes = f.tell()
                 f.close()
 
             elif len(results) > 0:
+                # BUG try to delete file converting to URL
+                # fragile when repating URLs
                 filename = self.makeFilename()
                 os.unlink(filename)
 
