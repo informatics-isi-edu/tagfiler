@@ -53,7 +53,7 @@ class Application:
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(title)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title)] + renderlist + [self.render.Bottom()]])
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
