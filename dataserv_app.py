@@ -74,11 +74,11 @@ class Application:
             except web.Forbidden, te:
                 t.rollback()
                 web.debug('got to forbidden')
-                raise
+                raise web.Forbidden()
             except web.Unauthorized, te:
                 t.rollback()
                 web.debug('got to unauthorized')
-                raise
+                raise web.Unauthorized()
             # syntax "as" not supported by Python 2.4
             # except TypeError as te:
             except TypeError, te:
@@ -98,6 +98,7 @@ class Application:
                 # else fall through to retry...
             except:
                 t.rollback()
+                web.debug('got to unknown exception')
                 raise
         return postCommit(bodyval)
 
