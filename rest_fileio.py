@@ -144,7 +144,7 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
-        results = self.select_file()
+        results = [ res for res in self.select_file() ]
 
         if len(results) > 0:
             self.enforceFileRestriction()
@@ -165,7 +165,7 @@ class FileIO (Application):
             t.commit()
         except:
             t.rollback()
-        return [ res for res in results ]
+        return results
 
     def storeInput(self, inf):
         """copy content stream"""
