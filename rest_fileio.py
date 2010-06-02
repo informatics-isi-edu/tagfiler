@@ -39,7 +39,6 @@ class FileIO (Application):
         # we only get here if the dataset is a locally stored file
 
         self.dbtransact(body, postCommit)
-        web.debug('after GETfile dbtransact')
 
         # need to yield outside postCommit as a generator func
         filename = self.makeFilename()

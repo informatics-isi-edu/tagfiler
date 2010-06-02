@@ -137,7 +137,6 @@ class Tagdef (Node):
         def postCommit(tagdefs):
             try:
                 tagdef = tagdefs[0]
-                web.debug(tagdef)
                 web.header('Content-Type', 'text/plain; charset=us-ascii')
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&restricted=' + urlquote(unicode(tagdef.restricted)))
