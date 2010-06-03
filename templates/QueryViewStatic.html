@@ -1,0 +1,9 @@
+$def with (target, tagnames)
+<h2>Query Terms</h2>
+<p><a href="${target}">Permanent link to this query</a></p>
+<p>Match files tagged with all of the following tags:</p>
+<ul>
+$for tag in tagnames:
+	<li>${tag}</li>
+</ul>
+<h2>Matching Datasets</h2>
