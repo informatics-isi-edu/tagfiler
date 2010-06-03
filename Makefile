@@ -1,9 +1,6 @@
 
-# change INSTALLHOST to an FQDN to install to a remote testing VM etc.
-INSTALLHOST=localhost
 INSTALLSVC=tagfiler
-INSTALLDIRBASE=/var/www/$(INSTALLSVC)
-INSTALLDIR=root@$(INSTALLHOST):$(INSTALLDIRBASE)
+INSTALLDIR=/var/www/$(INSTALLSVC)
 
 FILES=dataserv.wsgi \
 	dataserv_app.py rest_fileio.py \
@@ -22,15 +19,14 @@ TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 .SUFFIXES:
 
 deploy:
-	rsync -av deploy.sh root@$(INSTALLHOST):.
-	ssh root@$(INSTALLHOST) ./deploy.sh $(INSTALLSVC)
+	./deploy.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES)
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 
 restart: force install
-	ssh -l root $(INSTALLHOST) service httpd restart
+	service httpd restart
 
 force:
 
