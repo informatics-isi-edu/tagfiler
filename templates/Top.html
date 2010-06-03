@@ -10,5 +10,20 @@ $def with (home, title)
 <div class="title">
 <h1>${title}</h1>
 </div>
-<a href="${home}/">Home</a>
+<table cellpadding="10">
+  <tr>
+    <td>
+      <a href="${home}/">Home</a>
+    </td>
+    <td>
+      <a href="${home}/file?action=define">Create dataset</a>
+    </td>
+    <td>
+      <a href="${home}/tagdef">Tag definitions</a>
+    </td>
+    <td>
+      <a href="${home}/query">Query by tags</a>
+    </td>
+  </tr>
+</table>
 <div class="content">
