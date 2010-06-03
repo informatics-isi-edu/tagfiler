@@ -1,5 +1,6 @@
 $def with (apptarget, data_id, tagvals, tagdefs, urlquote)
 <h2>Existing tags</h2>
+<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(tagvals) > 0:
 	$for tag in tagvals.iterkeys():
 		$ val = tagvals[tag]
