@@ -53,6 +53,7 @@ chmod og=rx ${DATADIR}
 # try some blind database setup as well
 service postgresql start
 runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
 runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 
 
@@ -139,8 +140,7 @@ do
 done
 EOF
 
-# blindly clean and setup db tables
-runuser -c "~${SVCUSER}/dbclear.sh" - ${SVCUSER}
+# setup db tables
 runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
 
 # register our service code
