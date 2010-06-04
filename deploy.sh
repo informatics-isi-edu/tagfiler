@@ -26,7 +26,7 @@ DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
 
 # we need all of this
-yum -y install httpd mod_wsgi \
+yum -y --skip-broken install httpd mod_wsgi \
     postgresql{,-devel,-server} \
     python{,-psycopg2,-webpy,-ply}
 
