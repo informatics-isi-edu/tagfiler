@@ -268,6 +268,12 @@ class FileIO (Application):
                 self.url = None
 
             if self.action == 'delete':
+                target = self.home + web.ctx.homepath
+                return self.renderlist("Delete Confirmation",
+                                   [self.render.ConfirmForm(target, 'file', self.data_id, urlquote)])
+            elif self.action == 'CancelDelete':
+                raise web.seeother('/file')
+            elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
             elif self.action == 'put':
                 return self.dbtransact(putBody, putPostCommit)

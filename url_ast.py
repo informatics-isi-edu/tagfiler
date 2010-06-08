@@ -221,15 +221,21 @@ class Tagdef (Node):
                     self.tag_id = tagname
                     self.typestr, self.restricted = self.tagdefs[tagname]
                     self.insert_tagdef()
-            elif self.action == 'delete':
+            elif self.action == 'delete' or self.action == 'CancelDelete':
+                return None
+            elif self.action == 'ConfirmDelete':
                 self.delete_tagdef()
             else:
                 raise web.BadRequest()
             return None
 
         def postCommit(results):
-            # send client back to get form page again
-            raise web.seeother('/tagdef')
+            if self.action == 'delete':
+                return self.renderlist("Delete Confirmation",
+                                   [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, urlquote)])
+            else:
+                # send client back to get form page again
+                raise web.seeother('/tagdef')
 
         return self.dbtransact(body, postCommit)
 

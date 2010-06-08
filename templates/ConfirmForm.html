@@ -1,0 +1,18 @@
+$def with (target, type, name, quote)
+		<fieldset>
+		  <legend>Do you want to delete "${name}"?</legend>
+		  <table>
+		    <tr>
+		      <td>
+		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${type}/${quote(name)}" method="post">
+				  <input type="hidden" name="action" value="ConfirmDelete" />
+				  <input type="submit" value="Yes" />
+			    </form>
+		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${type}/${quote(name)}" method="post">
+				  <input type="hidden" name="action" value="CancelDelete" />
+				  <input type="submit" value="No" />
+		  		</form>
+		      </td>
+		    </tr>
+		  </table>
+		</fieldset>
