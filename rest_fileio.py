@@ -35,7 +35,7 @@ class FileIO (Application):
                 raise web.seeother(result.location)
             else:
                 self.location = result.location
-                filename = self.store_path + '/' + self.data_id + '/' + self.location
+                filename = self.location
                 try:
                     f = open(filename, "rb")
                     p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
@@ -126,8 +126,9 @@ class FileIO (Application):
         def postCommit(result):
             if result.local:
                 """delete the file"""
-                dir = self.store_path + '/' + self.data_id
-                os.unlink(dir + '/' + result.location)
+                filename = result.location
+                dir = os.path.dirname(filename)
+                os.unlink(filename)
                 
                 """delete the directory if empty"""
                 if len(os.listdir(dir)) == 0:
@@ -189,25 +190,6 @@ class FileIO (Application):
     def storeInput(self, inf, filename):
         """copy content stream"""
 
-        p = os.path.dirname(filename)
-
-        if not os.path.exists(p):
-            os.makedirs(p, mode=0755)
-        f = open(filename, "wb")
-
-        eof = False
-        while not eof:
-            buf = inf.read(self.chunkbytes)
-            if len(buf) == 0:
-                eof = True
-            f.write(buf)
-
-        return f
-
-
-    def storeInput(self, inf, filename):
-        """copy content stream"""
-
         f = open(filename, "wb")
 
         eof = False
@@ -253,7 +235,7 @@ class FileIO (Application):
             f.truncate() # truncate to current seek location
             bytes = f.tell()
             f.close()
-            self.location = os.path.basename(tempFileName)
+            self.location = tempFileName
             self.local = True
             self.insertForStore()
             return bytes
@@ -289,7 +271,7 @@ class FileIO (Application):
                 f.truncate() # truncate to current seek location
                 bytes = f.tell()
                 f.close()
-                self.location = os.path.basename(tempFileName)
+                self.location = tempFileName
                 self.local = True
 
             else:
@@ -299,8 +281,9 @@ class FileIO (Application):
                     # try to reclaim space now
                     try:
                         """delete the file"""
-                        dir = self.store_path + '/' + self.data_id
-                        os.unlink(dir + '/' + results[0].location)
+                        filename = results[0].location
+                        dir = os.path.dirname(filename)
+                        os.unlink(filename)
                         
                         """delete the directory if empty"""
                         if len(os.listdir(dir)) == 0:
@@ -325,8 +308,9 @@ class FileIO (Application):
 
         def deletePostCommit(result):
             if result.local:
-                dir = self.store_path + '/' + self.data_id
-                os.unlink(dir + '/' + result.location)
+                filename = result.location
+                dir = os.path.dirname(filename)
+                os.unlink(filename)
                 
                 """delete the directory if empty"""
                 if len(os.listdir(dir)) == 0:
