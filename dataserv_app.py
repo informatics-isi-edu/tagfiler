@@ -208,7 +208,7 @@ class Application:
         return results
 
     def insert_file(self):
-        self.db.query("INSERT INTO files VALUES ( $name, $local, $location )",
+        self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
                       vars=dict(name=self.data_id, local=self.local, location=self.location))
 
     def update_file(self):
