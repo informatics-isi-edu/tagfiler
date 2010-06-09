@@ -30,10 +30,12 @@ def p_filelist(p):
 
 def p_file(p):
     """file : slash string slash FILE slash string
-            | slash string slash FILE slash string slash
-            | slash string slash FILE slash string queryopts"""
-    # ignore queryopts
+            | slash string slash FILE slash string slash"""
     p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
+
+def p_file_opts(p):
+    """file : slash string slash FILE slash string queryopts"""
+    p[0] = url_ast.FileId(appname=p[2], data_id=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
@@ -95,11 +97,21 @@ def p_queryopts(p):
     """queryopts : '?' string '=' string"""
     p[0] = { p[2] : p[4] }
 
+def p_queryopts_short(p):
+    """queryopts : '?' string"""
+    p[0] = { p[2] : None }
+
 def p_queryopts_grow(p):
     """queryopts : queryopts '&' string '=' string
                  | queryopts ';' string '=' string"""
     p[0] = p[1]
     p[0][p[3]] = p[5]
+
+def p_queryopts_grow_short(p):
+    """queryopts : queryopts '&' string
+                 | queryopts ';' string"""
+    p[0] = p[1]
+    p[0][p[3]] = None
 
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):

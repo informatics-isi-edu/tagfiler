@@ -100,10 +100,14 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
+            if storage.restricted.lower() == 'true':
+                suffix = '?restricted'
+            else:
+                suffix = ''
         except:
             pass
 
-        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
+        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
         if self.action == 'define' and self.filetype == 'file':
             return self.renderlist("Upload data file",
                                    [self.render.FileForm(target)])
@@ -185,6 +189,13 @@ class FileIO (Application):
             t.commit()
         except:
             t.rollback()
+
+        # try to apply tags provided by user as PUT/POST queryopts in URL
+        # they all must work to complete transaction
+        for tagname in self.queryopts.keys():
+            self.enforceFileTagRestriction(tagname)
+            self.set_file_tag(tagname, self.queryopts[tagname])
+
         return results
 
     def storeInput(self, inf, filename):

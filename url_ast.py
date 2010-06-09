@@ -61,6 +61,7 @@ class FileList (Node):
         try:
             name = storage.name
             filetype = storage.type
+            restricted = storage.restricted
         except:
             raise web.BadRequest()
 
@@ -68,7 +69,7 @@ class FileList (Node):
             raise web.BadRequest()
         else:
             raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
-                               + '?type=' + urlquote(filetype) + '&action=define')
+                               + '?type=' + urlquote(filetype) + '&action=define' + '&restricted=' + urlquote(restricted))
         
 
 class FileId(Node, FileIO):
@@ -77,13 +78,14 @@ class FileId(Node, FileIO):
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'data_id', 'location', 'local' ]
-    def __init__(self, appname, data_id, location=None, local=False):
+    __slots__ = [ 'data_id', 'location', 'local', 'queryopts' ]
+    def __init__(self, appname, data_id, location=None, local=False, queryopts={}):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         self.data_id = data_id
         self.location = location
         self.local = local
+        self.queryopts = queryopts
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""

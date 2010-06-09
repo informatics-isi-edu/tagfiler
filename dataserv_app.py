@@ -167,6 +167,8 @@ class Application:
 
     def enforceFileTagRestriction(self, tag_id):
         results = self.select_tagdef(tag_id)
+        if len(results) == 0:
+            raise NotFound()
         if results[0].restricted:
             owner = self.owner()
             user = self.user()
