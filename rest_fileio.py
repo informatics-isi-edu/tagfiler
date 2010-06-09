@@ -35,7 +35,7 @@ class FileIO (Application):
                 raise web.seeother(result.location)
             else:
                 self.location = result.location
-                filename = self.location
+                filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, "rb")
                     p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
@@ -126,7 +126,7 @@ class FileIO (Application):
         def postCommit(result):
             if result.local:
                 """delete the file"""
-                filename = result.location
+                filename = self.store_path + '/' + result.location
                 dir = os.path.dirname(filename)
                 os.unlink(filename)
                 
@@ -235,7 +235,7 @@ class FileIO (Application):
         f.truncate() # truncate to current seek location
         bytes = f.tell()
         f.close()
-        self.location = tempFileName
+        self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
         self.local = True
 
         def body():
@@ -256,8 +256,9 @@ class FileIO (Application):
         def deletePrevious(result):
             if result.local:
                 # previous result had local file, so free it
-                dir = self.store_path + '/' + self.data_id
-                os.unlink(result.location)
+                filename = self.store_path + '/' + result.location
+                dir = os.path.dirname(filename)
+                os.unlink(filename)
 
                 """delete the directory if empty"""
                 if len(os.listdir(dir)) == 0:
@@ -300,7 +301,7 @@ class FileIO (Application):
             f.truncate() # truncate to current seek location
             bytes = f.tell()
             f.close()
-            self.location = tempFileName
+            self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
             self.local = True
 
             return self.dbtransact(putBody, putPostCommit)
