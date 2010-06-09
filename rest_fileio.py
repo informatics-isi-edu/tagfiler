@@ -256,8 +256,7 @@ class FileIO (Application):
         def deletePrevious(result):
             if result.local:
                 # previous result had local file, so free it
-                dir = self.store_path + '/' + self.data_id
-                os.unlink(dir + '/' + result.location)
+                os.unlink(result.location)
 
                 """delete the directory if empty"""
                 if len(os.listdir(dir)) == 0:
