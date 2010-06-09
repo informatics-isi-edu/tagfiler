@@ -221,27 +221,30 @@ class FileIO (Application):
 
     def PUT(self, uri):
         """store file content from client"""
+
+        # this work happens exactly once per web request, consuming input
+        inf = web.ctx.env['wsgi.input']
+        user, path = self.getTemporary()
+        fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
+        f = self.storeInput(inf, tempFileName)
+        # now we have to remove the trailing part boundary we
+        # copied to disk by being lazy above...
+        # SEEK_END attribute not supported by Python 2.4
+        # f.seek(0 - len(boundaryN), os.SEEK_END)
+        f.seek(0 - len(boundaryN), 2)
+        f.truncate() # truncate to current seek location
+        bytes = f.tell()
+        f.close()
+        self.location = tempFileName
+        self.local = True
+
         def body():
-            inf = web.ctx.env['wsgi.input']
-            user, path = self.getTemporary()
-            fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-            f = self.storeInput(inf, tempFileName)
-    
-            # now we have to remove the trailing part boundary we
-            # copied to disk by being lazy above...
-            # SEEK_END attribute not supported by Python 2.4
-            # f.seek(0 - len(boundaryN), os.SEEK_END)
-            f.seek(0 - len(boundaryN), 2)
-            f.truncate() # truncate to current seek location
-            bytes = f.tell()
-            f.close()
-            self.location = tempFileName
-            self.local = True
+            # this may repeat in case of database races
             self.insertForStore()
-            return bytes
+            return None
 
         def postCommit(results):
-            return 'Stored %s bytes' % (results)
+            return 'Stored %s bytes' % (bytes)
 
         return self.dbtransact(body, postCommit)
 
@@ -250,52 +253,22 @@ class FileIO (Application):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
+        def deletePrevious(result):
+            if result.local:
+                # previous result had local file, so free it
+                dir = self.store_path + '/' + self.data_id
+                os.unlink(dir + '/' + result.location)
+
+                """delete the directory if empty"""
+                if len(os.listdir(dir)) == 0:
+                    os.rmdir(dir)
+
         def putBody():
-            inf = web.ctx.env['wsgi.input']
-
-            if self.filetype == 'file':
-                # then we are posting a file body
-                boundary1, boundaryN = self.scanFormHeader(inf)
-                user, path = self.getTemporary()
-                    
-                """copy content stream into a temporary file"""
-        
-                fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-                f = self.storeInput(inf, tempFileName)
-        
-                # now we have to remove the trailing part boundary we
-                # copied to disk by being lazy above...
-                # SEEK_END attribute not supported by Python 2.4
-                # f.seek(0 - len(boundaryN), os.SEEK_END)
-                f.seek(0 - len(boundaryN), 2)
-                f.truncate() # truncate to current seek location
-                bytes = f.tell()
-                f.close()
-                self.location = tempFileName
-                self.local = True
-
-            else:
-                results = self.insertForStore();
-                if len(results) > 0 and results[0].local:
-                    # we are registering a url on top of a local file
-                    # try to reclaim space now
-                    try:
-                        """delete the file"""
-                        filename = results[0].location
-                        dir = os.path.dirname(filename)
-                        os.unlink(filename)
-                        
-                        """delete the directory if empty"""
-                        if len(os.listdir(dir)) == 0:
-                            os.rmdir(dir)
-                    except:
-                        pass
-                    
-                return results;
-                
             return self.insertForStore()
 
         def putPostCommit(results):
+            if len(results) > 0:
+                deletePrevious(results[0])
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
@@ -307,30 +280,34 @@ class FileIO (Application):
             return results[0]
 
         def deletePostCommit(result):
-            if result.local:
-                filename = result.location
-                dir = os.path.dirname(filename)
-                os.unlink(filename)
-                
-                """delete the directory if empty"""
-                if len(os.listdir(dir)) == 0:
-                    os.rmdir(dir)
+            deletePrevious(result)
             raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
+            inf = web.ctx.env['wsgi.input']
+            boundary1, boundaryN = self.scanFormHeader(inf)
+            user, path = self.getTemporary()
+            fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
+            f = self.storeInput(inf, tempFileName)
+        
+            # now we have to remove the trailing part boundary we
+            # copied to disk by being lazy above...
+            # SEEK_END attribute not supported by Python 2.4
+            # f.seek(0 - len(boundaryN), os.SEEK_END)
+            f.seek(0 - len(boundaryN), 2)
+            f.truncate() # truncate to current seek location
+            bytes = f.tell()
+            f.close()
+            self.location = tempFileName
+            self.local = True
+
             return self.dbtransact(putBody, putPostCommit)
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()
             self.action = storage.action
-            try:
-                self.location = storage.url
-                self.local = False
-                self.filetype = 'url'
-            except:
-                self.local = True
 
             if self.action == 'delete':
                 target = self.home + web.ctx.homepath
@@ -341,7 +318,11 @@ class FileIO (Application):
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
             elif self.action == 'put':
+                # we only support URL PUT simulation this way
+                self.location = storage.url
+                self.local = False
                 return self.dbtransact(putBody, putPostCommit)
+
             else:
                 raise web.BadRequest()
 
