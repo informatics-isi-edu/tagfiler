@@ -41,7 +41,7 @@ class FileIO (Application):
         self.dbtransact(body, postCommit)
 
         # need to yield outside postCommit as a generator func
-        filename = self.store_path+'/'+self.location
+        filename = self.store_path + '/' + self.data_id + '/' + self.location
         f = open(filename, "rb")
 
         p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
@@ -113,8 +113,13 @@ class FileIO (Application):
 
         def postCommit(result):
             if result.local:
-                filename = self.store_path+'/'+result.location
-                os.unlink(filename)
+                """delete the file"""
+                dir = self.store_path + '/' + self.data_id
+                os.unlink(dir + '/' + result.location)
+                
+                """delete the directory if empty"""
+                if len(os.listdir(dir)) == 0:
+                    os.rmdir(dir)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -188,11 +193,44 @@ class FileIO (Application):
         return f
 
 
+    def storeInput(self, inf, filename):
+        """copy content stream"""
+
+        f = open(filename, "wb")
+
+        eof = False
+        while not eof:
+            buf = inf.read(self.chunkbytes)
+            if len(buf) == 0:
+                eof = True
+            f.write(buf)
+
+        return f
+
+
+    def getTemporary(self):
+        """get the directory and the prefix for a temporary file"""
+
+        prefix = self.user()
+        if prefix != None:
+            prefix += '-'
+        else:
+            prefix = 'anonymous-'
+            
+        dir = self.store_path + '/' + self.data_id
+
+        if not os.path.exists(dir):
+            os.makedirs(dir, mode=0755)
+
+        return (prefix, dir)
+
+
     def PUT(self, uri):
         """store file content from client"""
         def body():
             inf = web.ctx.env['wsgi.input']
-            fileHandle, tempFileName = tempfile.mkstemp(dir=self.store_path)
+            user, path = self.getTemporary()
+            fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
             f = self.storeInput(inf, tempFileName)
     
             # now we have to remove the trailing part boundary we
@@ -224,9 +262,11 @@ class FileIO (Application):
             if self.filetype == 'file':
                 # then we are posting a file body
                 boundary1, boundaryN = self.scanFormHeader(inf)
+                user, path = self.getTemporary()
+                    
                 """copy content stream into a temporary file"""
         
-                fileHandle, tempFileName = tempfile.mkstemp(dir=self.store_path)
+                fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
                 f = self.storeInput(inf, tempFileName)
         
                 # now we have to remove the trailing part boundary we
@@ -246,7 +286,13 @@ class FileIO (Application):
                     # we are registering a url on top of a local file
                     # try to reclaim space now
                     try:
-                        os.unlink(self.store_path+'/'+results[0].location)
+                        """delete the file"""
+                        dir = self.store_path + '/' + self.data_id
+                        os.unlink(dir + '/' + results[0].location)
+                        
+                        """delete the directory if empty"""
+                        if len(os.listdir(dir)) == 0:
+                            os.rmdir(dir)
                     except:
                         pass
                     
@@ -267,8 +313,12 @@ class FileIO (Application):
 
         def deletePostCommit(result):
             if result.local:
-                filename = self.store_path+'/'+result.location
-                os.unlink(filename)
+                dir = self.store_path + '/' + self.data_id
+                os.unlink(dir + '/' + result.location)
+                
+                """delete the directory if empty"""
+                if len(os.listdir(dir)) == 0:
+                    os.rmdir(dir)
             raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
