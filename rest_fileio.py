@@ -1,6 +1,7 @@
 import os
 import web
 import subprocess
+import tempfile
 
 from dataserv_app import Application, NotFound, urlquote
 
@@ -19,9 +20,6 @@ class FileIO (Application):
         self.action = None
         self.filetype = 'file'
 
-    def makeFilename(self):
-        return ''
-
     def GETfile(self, uri):
 
         def body():
@@ -33,15 +31,17 @@ class FileIO (Application):
 
         def postCommit(result):
             # if the dataset is a remote URL, just redirect client
-            if result.url:
-                raise web.seeother(result.url)
+            if not result.local:
+                raise web.seeother(result.location)
+            else:
+                self.location = result.location
 
         # we only get here if the dataset is a locally stored file
 
         self.dbtransact(body, postCommit)
 
         # need to yield outside postCommit as a generator func
-        filename = self.makeFilename()
+        filename = self.store_path+'/'+self.location
         f = open(filename, "rb")
 
         p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
@@ -112,8 +112,8 @@ class FileIO (Application):
             return results[0]
 
         def postCommit(result):
-            if result.url == None:
-                filename = self.makeFilename()
+            if result.local:
+                filename = self.store_path+'/'+result.location
                 os.unlink(filename)
             return ''
 
@@ -169,11 +169,8 @@ class FileIO (Application):
             t.rollback()
         return results
 
-    def storeInput(self, inf):
+    def storeInput(self, inf, filename):
         """copy content stream"""
-
-        filename = self.makeFilename()
-        f = None
 
         p = os.path.dirname(filename)
 
@@ -194,13 +191,25 @@ class FileIO (Application):
     def PUT(self, uri):
         """store file content from client"""
         def body():
-            return self.insertForStore()
-
-        def postCommit(results):
-            f = self.storeInput(web.ctx.env['wsgi.input'])
+            inf = web.ctx.env['wsgi.input']
+            fileHandle, tempFileName = tempfile.mkstemp(dir=self.store_path)
+            f = self.storeInput(inf, tempFileName)
+    
+            # now we have to remove the trailing part boundary we
+            # copied to disk by being lazy above...
+            # SEEK_END attribute not supported by Python 2.4
+            # f.seek(0 - len(boundaryN), os.SEEK_END)
+            f.seek(0 - len(boundaryN), 2)
+            f.truncate() # truncate to current seek location
             bytes = f.tell()
             f.close()
-            return 'Stored %s bytes' % (bytes)
+            self.location = os.path.basename(tempFileName)
+            self.local = True
+            self.insertForStore()
+            return bytes
+
+        def postCommit(results):
+            return 'Stored %s bytes' % (results)
 
         return self.dbtransact(body, postCommit)
 
@@ -210,16 +219,16 @@ class FileIO (Application):
         # return same result page as for GET app/tags/data_id for convenience
 
         def putBody():
-            return self.insertForStore()
-
-        def putPostCommit(results):
             inf = web.ctx.env['wsgi.input']
 
-            if self.url == None:
+            if self.filetype == 'file':
                 # then we are posting a file body
                 boundary1, boundaryN = self.scanFormHeader(inf)
-                f = self.storeInput(inf)
-
+                """copy content stream into a temporary file"""
+        
+                fileHandle, tempFileName = tempfile.mkstemp(dir=self.store_path)
+                f = self.storeInput(inf, tempFileName)
+        
                 # now we have to remove the trailing part boundary we
                 # copied to disk by being lazy above...
                 # SEEK_END attribute not supported by Python 2.4
@@ -228,16 +237,24 @@ class FileIO (Application):
                 f.truncate() # truncate to current seek location
                 bytes = f.tell()
                 f.close()
+                self.location = os.path.basename(tempFileName)
+                self.local = True
 
-            elif len(results) > 0 and results[0].url == None:
-                # we are registering a url on top of a local file
-                # try to reclaim space now
-                filename = self.makeFilename()
-                try:
-                    os.unlink(filename)
-                except:
-                    pass
+            else:
+                results = self.insertForStore();
+                if len(results) > 0 and results[0].local:
+                    # we are registering a url on top of a local file
+                    # try to reclaim space now
+                    try:
+                        os.unlink(self.store_path+'/'+results[0].location)
+                    except:
+                        pass
+                    
+                return results;
+                
+            return self.insertForStore()
 
+        def putPostCommit(results):
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
@@ -249,8 +266,8 @@ class FileIO (Application):
             return results[0]
 
         def deletePostCommit(result):
-            if result.url == None:
-                filename = self.makeFilename()
+            if result.local:
+                filename = self.store_path+'/'+result.location
                 os.unlink(filename)
             raise web.seeother('/file')
 
@@ -263,9 +280,11 @@ class FileIO (Application):
             storage = web.input()
             self.action = storage.action
             try:
-                self.url = storage.url
+                self.location = storage.url
+                self.local = False
+                self.filetype = 'url'
             except:
-                self.url = None
+                self.local = True
 
             if self.action == 'delete':
                 target = self.home + web.ctx.homepath

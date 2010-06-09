@@ -208,16 +208,12 @@ class Application:
         return results
 
     def insert_file(self):
-        if self.url:
-            self.db.query("INSERT INTO files ( name, url ) VALUES ( $name, $url )",
-                      vars=dict(name=self.data_id, url=self.url))
-        else:
-            self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
-                      vars=dict(name=self.data_id))
+        self.db.query("INSERT INTO files VALUES ( $name, $local, $location )",
+                      vars=dict(name=self.data_id, local=self.local, location=self.location))
 
     def update_file(self):
-        self.db.query("UPDATE files SET url = $url WHERE name = $name",
-                      vars=dict(name=self.data_id, url=self.url))
+        self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
+                      vars=dict(name=self.data_id, location=self.location, local=self.local))
 
     def delete_file(self):
         self.db.query("DELETE FROM files where name = $name",

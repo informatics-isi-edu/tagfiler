@@ -77,15 +77,13 @@ class FileId(Node, FileIO):
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'data_id', 'url' ]
-    def __init__(self, appname, data_id, url=None):
+    __slots__ = [ 'data_id', 'location', 'local' ]
+    def __init__(self, appname, data_id, location=None, local=False):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         self.data_id = data_id
-        self.url = url
-
-    def makeFilename(self):
-        return "%s/%s" % (self.store_path, urlquote(self.data_id))
+        self.location = location
+        self.local = local
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
