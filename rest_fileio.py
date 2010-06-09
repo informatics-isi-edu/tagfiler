@@ -227,12 +227,6 @@ class FileIO (Application):
         user, path = self.getTemporary()
         fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
         f = self.storeInput(inf, tempFileName)
-        # now we have to remove the trailing part boundary we
-        # copied to disk by being lazy above...
-        # SEEK_END attribute not supported by Python 2.4
-        # f.seek(0 - len(boundaryN), os.SEEK_END)
-        f.seek(0 - len(boundaryN), 2)
-        f.truncate() # truncate to current seek location
         bytes = f.tell()
         f.close()
         self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
