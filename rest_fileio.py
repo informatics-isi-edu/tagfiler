@@ -211,7 +211,7 @@ class FileIO (Application):
         else:
             prefix = 'anonymous-'
             
-        dir = self.store_path + '/' + self.data_id
+        dir = self.store_path + '/' + urlquote(self.data_id)
 
         if not os.path.exists(dir):
             os.makedirs(dir, mode=0755)
