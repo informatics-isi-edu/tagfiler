@@ -35,24 +35,36 @@ class FileIO (Application):
                 raise web.seeother(result.location)
             else:
                 self.location = result.location
+                filename = self.store_path + '/' + self.data_id + '/' + self.location
+                try:
+                    f = open(filename, "rb")
+                    p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
+                    line = p.stdout.readline()
+                    content_type = line.split(':')[1].strip()
+                    return (f, content_type)
+                except:
+                    # this may happen sporadically under race condition:
+                    # query found unique file, but someone replaced it before we opened it
+                    return (None, None)
 
-        # we only get here if the dataset is a locally stored file
+        count = 0
+        limit = 10
+        f = None
+        while not f:
+            count = count + 1
+            if count > limit:
+                # we failed after too many tries, just give up
+                # if this happens in practice, need to investigate or redesign...
+                raise web.internallerror('Could not access local copy of ' + self.data_id)
 
-        self.dbtransact(body, postCommit)
+            # we do this in a loop to compensate for race conditions noted above
+            f, content_type = self.dbtransact(body, postCommit)
 
-        # need to yield outside postCommit as a generator func
-        filename = self.store_path + '/' + self.data_id + '/' + self.location
-        f = open(filename, "rb")
-
-        p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
-        line = p.stdout.readline()
-        # kill attribute is not supported by Python 2.4
-        # p.kill()
-        web.header('Content-type', line.split(':')[1].strip())
+        # we only get here if we were able to both:
+        #   a. open the file for reading its content
+        #   b. obtain its content-type from /usr/bin/file test
+        web.header('Content-type', content_type)
         
-        #web.header('Content-type','text/html')
-        #web.header('Transfer-Encoding','chunked')
-
         # SEEK_END attribute not supported by Python 2.4
         # f.seek(0, os.SEEK_END)
         f.seek(0, 2)
