@@ -85,7 +85,7 @@ class FileId(Node, FileIO):
         self.url = url
 
     def makeFilename(self):
-        return "%s/%s" % (self.store_path, self.data_id)
+        return "%s/%s" % (self.store_path, urlquote(self.data_id))
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
