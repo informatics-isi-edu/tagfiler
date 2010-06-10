@@ -96,7 +96,7 @@ class FileIO (Application):
     def GET(self, uri):
 
         storage = web.input()
-
+        suffix = ''
         try:
             self.action = storage.action
             self.filetype = storage.type
@@ -198,19 +198,34 @@ class FileIO (Application):
 
         return results
 
-    def storeInput(self, inf, filename):
+    def storeInput(self, inf, filename, length=None):
         """copy content stream"""
 
-        f = open(filename, "wb")
+        f = open(filename, "w+b")
 
+        bytes = 0
         eof = False
         while not eof:
-            buf = inf.read(self.chunkbytes)
-            if len(buf) == 0:
-                eof = True
-            f.write(buf)
+            if length:
+                buf = inf.read(min((length - bytes), self.chunkbytes))
+            else:
+                buf = inf.read(self.chunkbytes)
 
-        return f
+            f.write(buf)
+            buflen = len(buf)
+            bytes = bytes + buflen
+
+            if length:
+                if length == bytes:
+                    eof = True
+                elif buflen == 0:
+                    f.close()
+                    os.unlink(filename)
+                    raise web.BadRequest() # entity undersized
+            elif buflen == 0:
+                eof = True
+
+        return (f, bytes)
 
 
     def getTemporary(self):
@@ -235,10 +250,14 @@ class FileIO (Application):
 
         # this work happens exactly once per web request, consuming input
         inf = web.ctx.env['wsgi.input']
+        try:
+            length = int(web.ctx.env['CONTENT_LENGTH'])
+        except:
+            length = None
+            # raise LengthRequired()  # if we want to be picky
         user, path = self.getTemporary()
         fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-        f = self.storeInput(inf, tempFileName)
-        bytes = f.tell()
+        f, bytes = self.storeInput(inf, tempFileName, length=length)
         f.close()
         self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
         self.local = True
@@ -296,16 +315,22 @@ class FileIO (Application):
             boundary1, boundaryN = self.scanFormHeader(inf)
             user, path = self.getTemporary()
             fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-            f = self.storeInput(inf, tempFileName)
+            f, bytes = self.storeInput(inf, tempFileName)
         
             # now we have to remove the trailing part boundary we
             # copied to disk by being lazy above...
             # SEEK_END attribute not supported by Python 2.4
             # f.seek(0 - len(boundaryN), os.SEEK_END)
             f.seek(0 - len(boundaryN), 2)
+            buf = f.read(len(boundaryN))
+            f.seek(0 - len(boundaryN), 2)
             f.truncate() # truncate to current seek location
             bytes = f.tell()
             f.close()
+            if buf != boundaryN:
+                # we did not get an entire multipart body apparently
+                os.unlink(tempFileName)
+                raise web.BadRequest()
             self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
             self.local = True
 
