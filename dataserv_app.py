@@ -94,10 +94,10 @@ class Application:
             except NotFound, nf:
                 t.rollback()
                 raise NotFound()
-            except psycopg2.IntegrityError, e:
+            except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
-                    raise web.BadRequest()
+                    raise te
                 # else fall through to retry...
             except:
                 t.rollback()
