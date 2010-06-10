@@ -2,7 +2,9 @@ $def with (apptarget, data_id, tagvals, tagdefs, urlquote)
 <h2>Existing tags</h2>
 <a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(tagvals) > 0:
-	$for tag in tagvals.iterkeys():
+	$ keys = tagvals.keys()
+	$ keys.sort()
+	$for tag in keys:
 		$ val = tagvals[tag]
 		$ tagdef = tagdefs[tag]
 		<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">

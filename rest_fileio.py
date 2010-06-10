@@ -175,20 +175,19 @@ class FileIO (Application):
         else:
             # anybody is free to insert new uniquely named file
             self.insert_file()
-
-        t = self.db.transaction()
-        try:
-            self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
-            t.commit()
-        except:
-            t.rollback()
-
-        t = self.db.transaction()
-        try:
-            self.set_file_tag('created', 'now')
-            t.commit()
-        except:
-            t.rollback()
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+                t.commit()
+            except:
+                t.rollback()
+    
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('created', 'now')
+                t.commit()
+            except:
+                t.rollback()
 
         t = self.db.transaction()
         try:
