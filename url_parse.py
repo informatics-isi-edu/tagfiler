@@ -77,21 +77,38 @@ def p_query2b(p):
     p[0] = url_ast.Query(appname=p[2], tagnames=[], queryopts=p[6])
 
 def p_query3(p):
-    """query : slash string slash QUERY slash taglist"""
+    """query : slash string slash QUERY slash predlist"""
     p[0] = url_ast.Query(appname=p[2], tagnames=p[6], queryopts={})
 
 def p_query4(p):
-    """query : slash string slash QUERY slash taglist queryopts"""
+    """query : slash string slash QUERY slash predlist queryopts"""
     p[0] = url_ast.Query(appname=p[2], tagnames=p[6], queryopts=p[7])
 
-def p_taglist(p):
-    """taglist : string"""
+def p_predlist(p):
+    """predlist : pred"""
     p[0] = [ p[1] ]
 
-def p_taglist_grow(p):
-    """taglist : taglist ';' string"""
+def p_predlist_grow(p):
+    """predlist : predlist ';' pred"""
     p[0] = p[1]
     p[0].append(p[3])
+
+def p_pred_tag_val_comp(p):
+    """pred : string compare string"""
+    p[0] = dict([ ('tag', p[1]), ('op', p[2]), ('val', p[3]) ])
+
+def p_compare_eq(p):
+    """compare : '='"""
+    p[0] = '='
+
+ineqmap = { 'LT' : '<', 'LEQ' : '<=', 'GT' : '>', 'GEQ' : '>=' }
+
+def p_compare_ineq(p):
+    """compare : ':' LT ':'
+               | ':' GT ':'
+               | ':' LEQ ':'
+               | ':' GEQ ':'"""
+    p[0] = ineqmap[ p[2] ]
 
 def p_queryopts(p):
     """queryopts : '?' string '=' string"""

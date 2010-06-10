@@ -20,7 +20,11 @@ keywords = {
     'file' : 'FILE',
     'tagdef' : 'TAGDEF',
     'tags' : 'TAGS',
-    'query' : 'QUERY'
+    'query' : 'QUERY',
+    'lt' : 'LT',
+    'leq' : 'LEQ',
+    'gt'  : 'GT',
+    'geq' : 'GEQ'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())
