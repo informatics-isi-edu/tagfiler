@@ -277,7 +277,7 @@ class FileTags (Node):
         def body():
             tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdefs() ])
             tags = [ result.tagname for result in self.select_file_tags() ]
-            tagvals = dict([ (tag, self.tagval(tag)) for tag in tags ])
+            tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
             return (tagvals, tagdefs)
 
         def postCommit(results):
