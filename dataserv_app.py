@@ -97,6 +97,8 @@ class Application:
             except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
+                    web.debug('exceeded retry limit on IntegrityError')
+                    web.debug(te)
                     raise te
                 # else fall through to retry...
             except:
