@@ -66,23 +66,23 @@ def p_tagsrest(p):
 def p_query1(p):
     """query : slash string slash QUERY
              | slash string slash QUERY slash"""
-    p[0] = url_ast.Query(appname=p[2], tagnames=[], queryopts={})
+    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts={})
 
 def p_query2a(p):
     """query : slash string slash QUERY queryopts"""
-    p[0] = url_ast.Query(appname=p[2], tagnames=[], queryopts=p[5])
+    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts=p[5])
 
 def p_query2b(p):
     """query : slash string slash QUERY slash queryopts"""
-    p[0] = url_ast.Query(appname=p[2], tagnames=[], queryopts=p[6])
+    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts=p[6])
 
 def p_query3(p):
     """query : slash string slash QUERY slash predlist"""
-    p[0] = url_ast.Query(appname=p[2], tagnames=p[6], queryopts={})
+    p[0] = url_ast.Query(appname=p[2], predlist=p[6], queryopts={})
 
 def p_query4(p):
     """query : slash string slash QUERY slash predlist queryopts"""
-    p[0] = url_ast.Query(appname=p[2], tagnames=p[6], queryopts=p[7])
+    p[0] = url_ast.Query(appname=p[2], predlist=p[6], queryopts=p[7])
 
 def p_predlist(p):
     """predlist : pred"""
@@ -96,6 +96,10 @@ def p_predlist_grow(p):
 def p_pred_tag_val_comp(p):
     """pred : string compare string"""
     p[0] = dict([ ('tag', p[1]), ('op', p[2]), ('val', p[3]) ])
+
+def p_pred_tag(p):
+    """pred : string"""
+    p[0] = dict([ ('tag', p[1]), ('op', None), ('val', None) ])
 
 def p_compare_eq(p):
     """compare : '='"""

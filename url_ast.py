@@ -390,15 +390,15 @@ class FileTags (Node):
             raise BadRequest(data="Form field action=%s not understood." % action)
 
 class Query (Node):
-    __slots__ = [ 'tagnames', 'queryopts', 'action' ]
-    def __init__(self, appname, tagnames=[], queryopts={}):
+    __slots__ = [ 'predlist', 'queryopts', 'action' ]
+    def __init__(self, appname, predlist=[], queryopts={}):
         Node.__init__(self, appname)
-        self.tagnames = set(tagnames)
+        self.predlist = predlist
         self.queryopts = queryopts
         self.action = 'query'
 
     def qtarget(self):
-        return self.home + web.ctx.homepath + '/query/' + ';'.join([urlquote(t) for t in self.tagnames])
+        return self.home + web.ctx.homepath + '/query/' + ';'.join([urlquote(pred['tag']) for pred in self.predlist])
 
     def GET(self, uri):
         # this interface has both REST and form-based functions
@@ -410,9 +410,9 @@ class Query (Node):
             pass
 
         if self.action == 'add':
-            self.tagnames = self.tagnames | set([tagname])
+            self.predlist.append( { 'tag' : tagname, 'op' : None, 'val' : None } )
         elif self.action == 'delete':
-            self.tagnames = self.tagnames - set([tagname])
+            self.predlist = [ pred for pred in self.predlist if pred['tag'] != tagname ]
         elif self.action == 'query':
             pass
         elif self.action == 'edit':
@@ -421,7 +421,7 @@ class Query (Node):
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
-            if len(self.tagnames) > 0:
+            if len(self.predlist) > 0:
                 files = [ res.file for res in self.select_files_having_tagnames() ]
             else:
                 files = []
@@ -438,7 +438,7 @@ class Query (Node):
 
             apptarget = self.home + web.ctx.homepath
 
-            if len(self.tagnames) == 0:
+            if len(self.predlist) == 0:
                 # render a blank starting form
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags)])
@@ -451,12 +451,12 @@ class Query (Node):
                     elif acceptType == 'text/html':
                         break
                 return self.renderlist("Query Results",
-                                       [self.render.QueryViewStatic(self.qtarget(), self.tagnames),
+                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist),
                                         self.render.FileList(target, files, urlquote)])
             else:
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags),
-                                        self.render.QueryView(self.qtarget(), self.tagnames),
+                                        self.render.QueryView(self.qtarget(), self.predlist),
                                         self.render.FileList(target, files, urlquote)])
 
         # this only runs if we need to do a DB query

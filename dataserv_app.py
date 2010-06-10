@@ -327,15 +327,15 @@ class Application:
                       vars=dict(file=self.data_id, tagname=tagname))
 
     def select_files_having_tagnames(self):
-        for t in self.tagnames:
+        for pred in self.predlist:
             try:
-                self.select_tagdef(t)[0]
+                self.select_tagdef(pred['tag'])[0]
             except:
-                raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+                raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
-        tags = [ t for t in self.tagnames ]
+        tags = [ pred['tag'] for pred in self.predlist ]
 
-        if len(self.tagnames) > 1:
+        if len(tags) > 1:
             tables = " JOIN ".join(["\"%s\"" % (self.wraptag(tags[0])),
                                     " JOIN ".join([ "\"%s\" USING (file)" % (self.wraptag(t))
                                                     for t in tags[1:] ])])
