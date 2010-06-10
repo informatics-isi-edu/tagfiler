@@ -29,18 +29,20 @@ class Dispatcher:
 
         # cannot import until we get the import path above!
         import url_parse
-        from dataserv_app import NotFound
 
         urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
         web.debug(uri)
 
-        ast = urlparse(uri)
+        try:
+            ast = urlparse(uri)
+        except:
+            ast = None
         if ast != None:
             web.debug(ast)
             return (uri, ast)
         else:
-            raise web.HTTPError('404 not found', {}, "URI %s not recognized." % uri)
+            raise web.BadRequest()
 
     # is there some fancier way to do this via introspection
     # in one generic method?
