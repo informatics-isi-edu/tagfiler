@@ -275,7 +275,8 @@ class FileTags (Node):
     def GETall(self, uri):
         # HTML get of all tags on one file...
         def body():
-            tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdefs() ])
+            tagdefs = self.select_tagdefs()
+            tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
             tags = [ result.tagname for result in self.select_file_tags() ]
             tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
             return (tagvals, tagdefs)
@@ -289,7 +290,7 @@ class FileTags (Node):
                 except:
                     return ''
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefs, urlquote),
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, urlquote),
                                     self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), urlquote)])
             
         return self.dbtransact(body, postCommit)
