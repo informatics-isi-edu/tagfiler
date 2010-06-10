@@ -224,6 +224,7 @@ class Tagdef (Node):
             elif self.action == 'delete' or self.action == 'CancelDelete':
                 return None
             elif self.action == 'ConfirmDelete':
+                self.enforceTagRestriction(self.tag_id)
                 self.delete_tagdef()
             else:
                 raise web.BadRequest()

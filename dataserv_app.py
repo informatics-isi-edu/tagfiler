@@ -185,6 +185,23 @@ class Application:
             else:
                 pass
 
+    def enforceTagRestriction(self, tag_id):
+        results = self.select_tagdef(tag_id)
+        if len(results) == 0:
+            raise NotFound()
+        owner = results[0].owner
+        user = self.user()
+        if owner:
+            if user:
+                if user != owner:
+                    raise web.Forbidden(data="User \"%s\" is not authorized to delete tag \"%s\"." % (user, tag_id))
+                else:
+                    pass
+            else:
+                raise web.Unauthorized(data="You have no authorization to delete tag \"%s\"." % tag_id)
+        else:
+            raise web.Unauthorized(data="You have no authorization to delete tag \"%s\"." % tag_id)
+
     def isFileTagRestricted(self, tag_id):
         try:
             self.enforceFileTagRestriction(tag_id)
@@ -231,8 +248,8 @@ class Application:
         return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( $tag_id, $typestr, $restricted )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, owner ) VALUES ( $tag_id, $typestr, $restricted, $owner )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, owner=self.user()))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"

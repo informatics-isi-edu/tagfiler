@@ -75,7 +75,7 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 # this script will recreate all tables, but only on a clean database
 
 psql -c "CREATE TABLE files ( name text PRIMARY KEY, local boolean default False, location text )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, restricted boolean )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, restricted boolean, owner text )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
 # pre-establish core restricted tags used by codebase
