@@ -48,18 +48,26 @@ class Dispatcher:
     # in one generic method?
     def GET(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'GET'):
+            raise web.NoMethod()
         return ast.GET(uri)
 
     def PUT(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'PUT'):
+            raise web.NoMethod()
         return ast.PUT(uri)
 
     def DELETE(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'DELETE'):
+            raise web.NoMethod()
         return ast.DELETE(uri)
 
     def POST(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'POST'):
+            raise web.NoMethod()
         return ast.POST(uri)
 
 # this creates the WSGI app from the urls map
