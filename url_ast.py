@@ -2,7 +2,7 @@
 
 import web
 import urllib
-from dataserv_app import Application, NotFound, urlquote
+from dataserv_app import Application, NotFound, BadRequest, urlquote
 from rest_fileio import FileIO
 
 class Node (object, Application):
@@ -63,10 +63,10 @@ class FileList (Node):
             filetype = storage.type
             restricted = storage.restricted
         except:
-            raise web.BadRequest()
+            raise BadRequest(data="Missing one of the required form fields (name, filetype, restricted).")
 
         if name == '':
-            raise web.BadRequest()
+            raise BadRequest(data="The form field name must not be empty.")
         else:
             raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
                                + '?type=' + urlquote(filetype) + '&action=define' + '&restricted=' + urlquote(restricted))
@@ -106,7 +106,7 @@ class Tagdef (Node):
 
         if self.tag_id != None:
             if len(self.queryopts) > 0:
-                raise web.BadRequest()
+                raise BadRequest(data="Query options are not supported on this interface.")
             else:
                 return self.GETone(uri)
         else:
@@ -125,32 +125,37 @@ class Tagdef (Node):
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:
-            raise web.BadRequest()
+            raise BadRequest(data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
 
     def GETone(self,uri):
 
         def body():
-            return [ tagdef for tagdef in self.select_tagdef(self.tag_id) ]
+            results = self.select_tagdef(self.tag_id)
+            if len(results) == 0:
+                raise NotFound(data='tag definition %s' % (self.tag_id))
+            return results[0]
 
-        def postCommit(tagdefs):
+        def postCommit(tagdef):
             try:
-                tagdef = tagdefs[0]
                 web.header('Content-Type', 'text/plain; charset=us-ascii')
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&restricted=' + urlquote(unicode(tagdef.restricted)))
             except:
-                raise NotFound()
+                raise NotFound(data='tag definition %s' % (self.tag_id))
 
         if len(self.queryopts) > 0:
-            raise web.BadRequest()
+            raise BadRequest(data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
 
     def DELETE(self, uri):
         
         def body():
+            results = self.select_tagdef(self.tag_id)
+            if len(results) == 0:
+                raise NotFound(data='tag definition %s' % (self.tag_id))
             self.delete_tagdef()
             return ''
 
@@ -158,14 +163,14 @@ class Tagdef (Node):
             return ''
 
         if len(self.queryopts) > 0:
-            raise web.BadRequest()
+            raise BadRequest(data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
                 
     def PUT(self, uri):
 
         if self.tag_id == None:
-            raise web.BadRequest()
+            raise BadRequest(data="Tag definitions require a non-empty tag name.")
 
         # self.typestr and self.restricted take precedence over queryopts...
 
@@ -213,7 +218,7 @@ class Tagdef (Node):
                 pass
             
         except:
-            raise web.BadRequest()
+            raise BadRequest(data="Error extracting form data.")
 
         def body():
             if self.action == 'add':
@@ -227,7 +232,7 @@ class Tagdef (Node):
                 self.enforceTagRestriction(self.tag_id)
                 self.delete_tagdef()
             else:
-                raise web.BadRequest()
+                raise BadRequest(data="Form field action=%s not understood." % self.action)
             return None
 
         def postCommit(results):
@@ -255,15 +260,17 @@ class FileTags (Node):
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
         def body():
+            results = self.select_tagdef(self.tag_id)
+            if len(results) == 0:
+                raise NotFound(data='tag definition %s' % self.tag_id)
+            results = self.select_file_tag(self.tag_id)
+            if len(results) == 0:
+                raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
+            res = results[0]
             try:
-                results = self.select_file_tag(self.tag_id)
-                res = results[0]
-                try:
-                    value = res.value
-                except:
-                    value = ''
+                value = res.value
             except:
-                raise NotFound()
+                value = ''
             return value
 
         def postCommit(value):
@@ -306,7 +313,7 @@ class FileTags (Node):
     def PUT(self, uri):
         # RESTful put of exactly one tag on one file...
         if self.tag_id == '':
-            raise web.BadRequest()
+            raise BadRequest(data="A non-empty tag name is required.")
         self.value = web.ctx.env['wsgi.input'].read()
 
         def body():
@@ -321,9 +328,9 @@ class FileTags (Node):
 
     def DELETE(self, uri):
         # RESTful delete of exactly one tag on one file...
-        if self.tag_id == '' or self.value != '':
-            raise web.BadRequest
-
+        if self.tag_id == '':
+            raise BadRequest(data="A non-empty tag name is required.")
+        
         def body():
             self.enforceFileTagRestriction(self.tag_id)
             self.delete_file_tag(self.tag_id)
@@ -370,7 +377,7 @@ class FileTags (Node):
             except:
                 pass
         except:
-            raise web.BadRequest()
+            raise BadRequest(data="Error extracting form data.")
 
         if action == 'put':
             if len(self.tagvals) > 0:
@@ -380,7 +387,7 @@ class FileTags (Node):
         elif action == 'delete':
             return self.dbtransact(deleteBody, postCommit)
         else:
-            raise web.BadRequest()
+            raise BadRequest(data="Form field action=%s not understood." % action)
 
 class Query (Node):
     __slots__ = [ 'tagnames', 'queryopts', 'action' ]
@@ -411,7 +418,7 @@ class Query (Node):
         elif self.action == 'edit':
             pass
         else:
-            raise web.BadRequest()
+            raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
             if len(self.tagnames) > 0:

@@ -11,7 +11,8 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileList.html UriList.txt ConfirmForm.html \
 	TagdefExisting.html TagdefNew.html \
 	FileTagExisting.html FileTagNew.html \
-	QueryAdd.html QueryView.html QueryViewStatic.html
+	QueryAdd.html QueryView.html QueryViewStatic.html \
+	Error.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 

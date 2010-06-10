@@ -16,6 +16,8 @@ import os
 # see Application.__init__() and prepareDispatch() for real dispatch
 # see rules = [ ... ] for real matching rules
 
+render = None
+
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
@@ -23,17 +25,34 @@ def urlquote(url):
 class NotFound (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, '404 Not Found', headers=headers, data=data)
+        status = '404 Not Found'
+        desc = 'The requested %s could not be found.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
 
 class Forbidden (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, '403 Forbidden', headers=headers, data=data)
+        status = '403 Forbidden'
+        desc = 'The requested %s is forbidden.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
 
 class Unauthorized (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, '401 Unauthorized', headers=headers, data=data)
+        status = '401 Unauthorized'
+        desc = 'The requested %s requires authorization.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class BadRequest (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '400 Bad Request'
+        desc = 'The request is malformed. %s'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
 
 class Application:
     "common parent class of all service handler classes to use db etc."
@@ -41,6 +60,7 @@ class Application:
 
     def __init__(self):
         "store common configuration data for all service classes"
+        global render
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -55,6 +75,7 @@ class Application:
         self.chunkbytes = int(getParam('chunkbytes'))
 
         self.render = web.template.render(self.template_path)
+        render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
         self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point', 
@@ -90,10 +111,11 @@ class Application:
                 raise te
             except TypeError, te:
                 t.rollback()
-                raise NotFound()
+                web.debug(te)
+                raise te
             except NotFound, nf:
                 t.rollback()
-                raise NotFound()
+                raise nf
             except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
@@ -159,29 +181,29 @@ class Application:
             if owner:
                 if user:
                     if user != owner:
-                        raise Forbidden(data="Access to %s forbidden." % self.data_id)
+                        raise Forbidden(data="access to dataset %s" % self.data_id)
                     else:
                         pass
                 else:
-                    raise Unauthorized(data="Access to %s requires authorization." % self.data_id)
+                    raise Unauthorized(data="access to dataset %s" % self.data_id)
             else:
                 pass
 
     def enforceFileTagRestriction(self, tag_id):
         results = self.select_tagdef(tag_id)
         if len(results) == 0:
-            raise NotFound()
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
         if results[0].restricted:
             owner = self.owner()
             user = self.user()
             if owner:
                 if user:
                     if user != owner:
-                        raise web.Forbidden()
+                        raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
                     else:
                         pass
                 else:
-                    raise web.Unauthorized()
+                    raise Unauthorized(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
             else:
                 pass
 
@@ -194,13 +216,13 @@ class Application:
         if owner:
             if user:
                 if user != owner:
-                    raise web.Forbidden(data="User \"%s\" is not authorized to delete tag \"%s\"." % (user, tag_id))
+                    raise web.Forbidden(data="access to tag %s" % tag_id)
                 else:
                     pass
             else:
-                raise web.Unauthorized(data="You have no authorization to delete tag \"%s\"." % tag_id)
+                raise web.Unauthorized(data="access to tag %s" % tag_id)
         else:
-            raise web.Unauthorized(data="You have no authorization to delete tag \"%s\"." % tag_id)
+            raise web.Unauthorized(data="access to tag %s" % tag_id)
 
     def isFileTagRestricted(self, tag_id):
         try:
@@ -284,7 +306,7 @@ class Application:
             results = self.select_tagdef(tagname)
             tagtype = results[0].typestr
         except:
-            raise web.BadRequest()
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
         results = self.select_file_tag(tagname)
         if len(results) > 0:
@@ -309,7 +331,7 @@ class Application:
             try:
                 self.select_tagdef(t)[0]
             except:
-                raise web.BadRequest()
+                raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
         tags = [ t for t in self.tagnames ]
 

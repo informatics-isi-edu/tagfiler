@@ -3,7 +3,7 @@ import web
 import subprocess
 import tempfile
 
-from dataserv_app import Application, NotFound, urlquote
+from dataserv_app import Application, NotFound, BadRequest, urlquote
 
 class FileIO (Application):
     """Basic bulk file I/O
@@ -25,7 +25,7 @@ class FileIO (Application):
         def body():
             results = self.select_file()
             if len(results) == 0:
-                raise NotFound()
+                raise NotFound(data='dataset %s' % (self.data_id))
             self.enforceFileRestriction()
             return results[0]
 
@@ -122,7 +122,7 @@ class FileIO (Application):
         def body():
             results = self.select_file()
             if len(results) == 0:
-                raise NotFound()
+                raise NotFound(data='dataset %s' % (self.data_id))
             self.enforceFileRestriction()
             self.delete_file()
             return results[0]
@@ -234,7 +234,7 @@ class FileIO (Application):
                 elif buflen == 0:
                     f.close()
                     os.unlink(filename)
-                    raise web.BadRequest() # entity undersized
+                    raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, length)) # entity undersized
             elif buflen == 0:
                 eof = True
 
@@ -312,7 +312,7 @@ class FileIO (Application):
         def deleteBody():
             results = self.select_file()
             if len(results) == 0:
-                raise NotFound()
+                raise NotFound(data='dataset %s' % (self.data_id))
             self.enforceFileRestriction()
             self.delete_file()
             return results[0]
@@ -343,7 +343,7 @@ class FileIO (Application):
             if buf != boundaryN:
                 # we did not get an entire multipart body apparently
                 os.unlink(tempFileName)
-                raise web.BadRequest()
+                raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
             self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
             self.local = True
 
@@ -368,7 +368,7 @@ class FileIO (Application):
                 return self.dbtransact(putBody, putPostCommit)
 
             else:
-                raise web.BadRequest()
+                raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         else:
-            raise web.BadRequest()
+            raise BadRequest(data="Content-Type %s not expected via this interface."% contentType)
