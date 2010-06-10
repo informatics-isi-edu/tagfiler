@@ -190,6 +190,20 @@ class FileIO (Application):
         except:
             t.rollback()
 
+        t = self.db.transaction()
+        try:
+            self.set_file_tag('modified by', web.ctx.env['REMOTE_USER'])
+            t.commit()
+        except:
+            t.rollback()
+
+        t = self.db.transaction()
+        try:
+            self.set_file_tag('modified', 'now')
+            t.commit()
+        except:
+            t.rollback()
+
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():

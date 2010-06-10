@@ -85,15 +85,17 @@ tagdef()
 psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
 if [[ -n "\$2" ]]
 then
-   psql -c "CREATE TABLE _\$1 ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
+   psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
 else
-   psql -c "CREATE TABLE _\$1 ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
+   psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
 fi
 }
 
 tagdef owner text
 tagdef created timestamptz
 tagdef restricted
+tagdef "modified by" text
+tagdef modified timestamptz
 
 EOF
 
