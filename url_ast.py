@@ -275,14 +275,14 @@ class FileTags (Node):
     def GETall(self, uri):
         # HTML get of all tags on one file...
         def body():
-            tagdefs = self.select_tagdefs()
+            tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
             tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
             tags = [ result.tagname for result in self.select_file_tags() ]
             tagvals = [ (tag, self.tagval(tag)) for tag in tags ]
-            return (tagvals, tagdefs)
+            return (tagvals, tagdefs, tagdefsdict)
 
         def postCommit(results):
-            tagvals, tagdefs = results
+            tagvals, tagdefs, tagdefsdict = results
             apptarget = self.home + web.ctx.homepath
             def tagval(tag):
                 try:
