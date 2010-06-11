@@ -12,8 +12,9 @@ import ply.lex as lex
 
 # RFC 3986 reserved characters
 literals = [ '(', ')', ':', ';', ',', '=', '@', '&', '$', 
-             '/', '?', '#', '[', ']', '!', '*', '"', '\'',
+             '/', '?', '#', '[', ']', '!', '"', '\'',
              '+' ]
+# removed '*' because mozilla doesn't honor its reserved status
 
 # special strings which are keywords
 keywords = {
@@ -34,9 +35,10 @@ tokens = [ 'STRING' ] + list(keywords.values())
 
 # unreserved characters in RFC 3986
 # plus PERCENT so we accept percent-encoded forms as string content
+# plus ASTERISK because mozilla doesn't quote it properly
 # (consuming code must unescape after parsing)
 def t_STRING(t):
-    r'[-%_.~A-Za-z0-9]+'
+    r'[-*%_.~A-Za-z0-9]+'
     t.value = urllib.unquote(t.value)
     t.type = keywords.get(t.value, 'STRING')
     return t

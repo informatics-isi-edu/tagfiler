@@ -134,7 +134,8 @@ def p_queryopts(p):
     p[0] = { p[2] : p[4] }
 
 def p_queryopts_short(p):
-    """queryopts : '?' string"""
+    """queryopts : '?' string
+                 | '?' string '='"""
     p[0] = { p[2] : None }
 
 def p_queryopts_grow(p):
@@ -145,7 +146,9 @@ def p_queryopts_grow(p):
 
 def p_queryopts_grow_short(p):
     """queryopts : queryopts '&' string
-                 | queryopts ';' string"""
+                 | queryopts ';' string
+                 | queryopts '&' string '='
+                 | queryopts ';' string '='"""
     p[0] = p[1]
     p[0][p[3]] = None
 
@@ -172,8 +175,12 @@ def p_stringany(p):
     p[0] = p[1]
 
 def p_stringplus(p):
-    """string : STRING '+' STRING"""
+    """string : string '+' string"""
     p[0] = p[1] + ' ' + p[3]
+
+def p_stringplus_concat(p):
+    """string : string string"""
+    p[0] = p[1] + p[2]
 
 class ParseError:
     """Exception for parse errors"""
