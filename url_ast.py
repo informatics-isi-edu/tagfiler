@@ -422,7 +422,7 @@ class Query (Node):
 
         def body():
             if len(self.predlist) > 0:
-                files = [ res.file for res in self.select_files_having_tagnames() ]
+                files = [ res.file for res in self.select_files_by_predlist() ]
             else:
                 files = []
             alltags = [ tagdef.tagname for tagdef in self.select_tagdefs() ]

@@ -103,19 +103,13 @@ class Application:
                 t.commit()
                 break
             # syntax "Type as var" not supported by Python 2.4
-            except Forbidden, te:
-                t.rollback()
-                raise te
-            except Unauthorized, te:
+            except (NotFound, BadRequest, Unauthorized, Forbidden), te:
                 t.rollback()
                 raise te
             except TypeError, te:
                 t.rollback()
                 web.debug(te)
                 raise te
-            except NotFound, nf:
-                t.rollback()
-                raise nf
             except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
@@ -326,20 +320,36 @@ class Application:
         self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
                       vars=dict(file=self.data_id, tagname=tagname))
 
-    def select_files_having_tagnames(self):
+    def select_files_by_predlist(self):
+        tagdefs = {}
         for pred in self.predlist:
             try:
-                self.select_tagdef(pred['tag'])[0]
+                if not tagdefs.has_key(pred['tag']):
+                    tagdefs[pred['tag']] = self.select_tagdef(pred['tag'])[0]
             except:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
-        tags = [ pred['tag'] for pred in self.predlist ]
+        tags = tagdefs.keys()
+        preds = [ pred for pred in self.predlist if pred['op'] and pred['val'] ]
+        
+        tables = [ "\"%s\"" % self.wraptag(tag) for tag in tags ]
+        tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
+        tables = " JOIN ".join(tables)
 
-        if len(tags) > 1:
-            tables = " JOIN ".join(["\"%s\"" % (self.wraptag(tags[0])),
-                                    " JOIN ".join([ "\"%s\" USING (file)" % (self.wraptag(t))
-                                                    for t in tags[1:] ])])
-        else:
-            tables = "\"%s\"" % (self.wraptag(tags[0]))
-        return self.db.query("SELECT file FROM %s ORDER BY file" % (tables))
+        values = { }
+        wheres = []
+        index = 1
+        for pred in preds:
+            wheres.append("\"%s\".value" % self.wraptag(pred['tag'])
+                          + " %s " % pred['op']
+                          + "$val%s" % index)
+            values['val%s' % index] = pred['val']
+            index += 1
+        wheres = " AND ".join(wheres)
+
+        if len(wheres) > 0:
+            wheres = "WHERE " + wheres
+
+        return self.db.query("SELECT file FROM %s %s ORDER BY file" % (tables, wheres),
+                             vars=values)
 

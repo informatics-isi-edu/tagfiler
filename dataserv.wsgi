@@ -28,18 +28,25 @@ class Dispatcher:
         sys.path.append(os.path.dirname(web.ctx.env['SCRIPT_FILENAME']))
 
         # cannot import until we get the import path above!
+        import url_lex
         import url_parse
 
         urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
-        web.debug(uri)
 
         try:
             ast = urlparse(uri)
-        except:
+        except url_lex.LexicalError, te:
+            web.debug('lex error on URI %s' % uri)
             ast = None
+        except url_parse.ParseError, te:
+            web.debug('parse error on URI %s' % uri)
+            ast = None
+        except:
+            web.debug('unknown parse error on URI %s' % uri)
+            ast = None
+            raise
         if ast != None:
-            web.debug(ast)
             return (uri, ast)
         else:
             raise web.BadRequest()

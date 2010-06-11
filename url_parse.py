@@ -105,14 +105,29 @@ def p_compare_eq(p):
     """compare : '='"""
     p[0] = '='
 
-ineqmap = { 'LT' : '<', 'LEQ' : '<=', 'GT' : '>', 'GEQ' : '>=' }
+def p_compare_neq(p):
+    """compare : '!' '='"""
+    p[0] = '!='
+
+def p_compare_regex(p):
+    """compare : ':' REGEX ':'"""
+    p[0] = '~'
+
+def p_compare_nregex(p):
+    """compare : ':' '!' REGEX ':'"""
+    p[0] = '!~'
+
+ineqmap = { 'lt' : '<', 'leq' : '<=', 'gt' : '>', 'geq' : '>=',
+            'like' : 'LIKE', 'simto' : 'SIMILAR TO'}
 
 def p_compare_ineq(p):
     """compare : ':' LT ':'
                | ':' GT ':'
                | ':' LEQ ':'
-               | ':' GEQ ':'"""
-    p[0] = ineqmap[ p[2] ]
+               | ':' GEQ ':'
+               | ':' LIKE ':'
+               | ':' SIMTO ':'"""
+    p[0] = ineqmap[ p[2].lower() ]
 
 def p_queryopts(p):
     """queryopts : '?' string '=' string"""
@@ -146,13 +161,28 @@ def p_stringany(p):
               | TAGS
               | TAGDEF
               | QUERY
-              | STRING"""
+              | STRING
+              | LT
+              | LEQ
+              | GT
+              | GEQ
+              | REGEX"""
     p[0] = p[1]
 
 def p_stringplus(p):
     """string : STRING '+' STRING"""
     p[0] = p[1] + ' ' + p[3]
-    
+
+class ParseError:
+    """Exception for parse errors"""
+
+    def __init__(self):
+        pass
+
+def p_error(t):
+    raise ParseError()
+
+
 
 ################################################
 # provide wrappers to get a parser instance
