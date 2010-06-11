@@ -130,9 +130,9 @@ class Application:
             except (NotFound, BadRequest, Unauthorized, Forbidden), te:
                 t.rollback()
                 raise te
-            except psycopg2.DataError, te:
+            except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                 t.rollback()
-                raise BadRequest(data='Input data error: ' + str(te))
+                raise BadRequest(data='Logical error: ' + str(te))
             except TypeError, te:
                 t.rollback()
                 web.debug(te)
