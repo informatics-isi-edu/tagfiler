@@ -425,7 +425,8 @@ class Query (Node):
         userpred = { 'tag' : tagname, 'op' : op, 'val' : value }
 
         if self.action == 'add':
-            self.predlist.append( userpred )
+            if userpred not in self.predlist:
+                self.predlist.append( userpred )
         elif self.action == 'delete':
             self.predlist = [ pred for pred in self.predlist if pred != userpred ]
         elif self.action == 'query':
