@@ -398,21 +398,36 @@ class Query (Node):
         self.action = 'query'
 
     def qtarget(self):
-        return self.home + web.ctx.homepath + '/query/' + ';'.join([urlquote(pred['tag']) for pred in self.predlist])
+        terms = []
+        for pred in self.predlist:
+            if pred['op']:
+                terms.append(urlquote(pred['tag']) + pred['op'] + urlquote(pred['val']))
+            else:
+                terms.append(urlquote(pred['tag']))
+        return self.home + web.ctx.homepath + '/query/' + ';'.join(terms)
 
     def GET(self, uri):
         # this interface has both REST and form-based functions
         tagname = None
+        op = None
+        value = None
         try:
             self.action = self.queryopts['action']
             tagname = self.queryopts['tag']
+            op = self.queryopts['op']
+            value = self.queryopts['val']
         except:
             pass
 
+        if op == '':
+            op = None
+
+        userpred = { 'tag' : tagname, 'op' : op, 'val' : value }
+
         if self.action == 'add':
-            self.predlist.append( { 'tag' : tagname, 'op' : None, 'val' : None } )
+            self.predlist.append( userpred )
         elif self.action == 'delete':
-            self.predlist = [ pred for pred in self.predlist if pred['tag'] != tagname ]
+            self.predlist = [ pred for pred in self.predlist if pred != userpred ]
         elif self.action == 'query':
             pass
         elif self.action == 'edit':
@@ -441,7 +456,7 @@ class Query (Node):
             if len(self.predlist) == 0:
                 # render a blank starting form
                 return self.renderlist("Query by Tags",
-                                       [self.render.QueryAdd(target, self.qtarget(), alltags)])
+                                       [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops)])
 
             if self.action == 'query':
                 for acceptType in self.acceptTypesPreferedOrder():
@@ -451,12 +466,12 @@ class Query (Node):
                     elif acceptType == 'text/html':
                         break
                 return self.renderlist("Query Results",
-                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist),
+                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
                                         self.render.FileList(target, files, urlquote)])
             else:
                 return self.renderlist("Query by Tags",
-                                       [self.render.QueryAdd(target, self.qtarget(), alltags),
-                                        self.render.QueryView(self.qtarget(), self.predlist),
+                                       [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
+                                        self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
                                         self.render.FileList(target, files, urlquote)])
 
         # this only runs if we need to do a DB query

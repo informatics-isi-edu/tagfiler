@@ -111,14 +111,14 @@ def p_compare_neq(p):
 
 def p_compare_regex(p):
     """compare : ':' REGEX ':'"""
-    p[0] = '~'
+    p[0] = ':regexp:'
 
 def p_compare_nregex(p):
     """compare : ':' '!' REGEX ':'"""
-    p[0] = '!~'
+    p[0] = ':!regexp:'
 
-ineqmap = { 'lt' : '<', 'leq' : '<=', 'gt' : '>', 'geq' : '>=',
-            'like' : 'LIKE', 'simto' : 'SIMILAR TO'}
+ineqmap = { 'lt' : ':lt:', 'leq' : ':leq:', 'gt' : ':gt:', 'geq' : ':geq:',
+            'like' : ':like:', 'simto' : ':simto:'}
 
 def p_compare_ineq(p):
     """compare : ':' LT ':'
@@ -166,6 +166,8 @@ def p_stringany(p):
               | LEQ
               | GT
               | GEQ
+              | LIKE
+              | SIMTO
               | REGEX"""
     p[0] = p[1]
 

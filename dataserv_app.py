@@ -82,6 +82,30 @@ class Application:
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }
 
+        self.ops = [ ('', 'Exists (ignores value)'),
+                     ('=', 'Equal'),
+                     ('!=', 'Not equal'),
+                     (':lt:', 'Less than'),
+                     (':leq:', 'Less than or equal'),
+                     (':gt:', 'Greater than'),
+                     (':geq:', 'Greater than or equal'),
+                     (':like:', 'LIKE (SQL operator)'),
+                     (':simto:', 'SIMILAR TO (SQL operator'),
+                     (':regexp:', 'Regular expression match'),
+                     (':!regexp:', 'Negated regular expression match') ]
+
+        self.opsDB = dict([ ('', ''),
+                            ('=', '='),
+                            ('!=', '!='),
+                            (':lt:', '<'),
+                            (':leq:', '<='),
+                            (':gt:', '>'),
+                            (':geq:', '>='),
+                            (':like:', 'LIKE'),
+                            (':simto:', 'SIMILAR TO'),
+                            (':regexp:', '~'),
+                            (':!regexp:', '!~') ])
+
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
                         [self.render.Top(self.home + web.ctx.homepath, title)] + renderlist + [self.render.Bottom()]])
@@ -341,7 +365,7 @@ class Application:
         index = 1
         for pred in preds:
             wheres.append("\"%s\".value" % self.wraptag(pred['tag'])
-                          + " %s " % pred['op']
+                          + " %s " % self.opsDB[pred['op']]
                           + "$val%s" % index)
             values['val%s' % index] = pred['val']
             index += 1
