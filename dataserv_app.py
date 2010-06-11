@@ -90,7 +90,7 @@ class Application:
                      (':gt:', 'Greater than'),
                      (':geq:', 'Greater than or equal'),
                      (':like:', 'LIKE (SQL operator)'),
-                     (':simto:', 'SIMILAR TO (SQL operator'),
+                     (':simto:', 'SIMILAR TO (SQL operator)'),
                      (':regexp:', 'Regular expression match'),
                      (':!regexp:', 'Negated regular expression match') ]
 
