@@ -1,11 +1,10 @@
-$def with (apptarget, data_id, tagval, tagdefs, typenames, tagRestricted, urlquote)
+$def with (apptarget, data_id, tagval, tagdefs, typenames, tagRestricted, predefinedTags, urlquote)
 $if len(tagdefs) > 0:
 	<h2>Set a tag</h2>
 	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Apply". Multiple tags may be set at once. Any tag which is unchecked will remain unchanged.</p>
 	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
-	$ disabledTags = ['created', 'modified', 'modified by', 'owner']
 	$for tagdef in tagdefs:
-		$if tagdef.tagname not in disabledTags:
+		$if tagdef.tagname not in predefinedTags:
 			$if not tagRestricted(tagdef.tagname):
 				<fieldset>
 				  <legend>${tagdef.tagname}</legend>

@@ -1,8 +1,7 @@
-$def with (apptarget, data_id, tagvals, tagdefsdict, urlquote)
+$def with (apptarget, data_id, tagvals, tagdefsdict, predefinedTags, urlquote)
 <h2>Existing tags</h2>
 <a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(tagvals) > 0:
-	$ disabledTags = ['created', 'modified', 'modified by', 'owner']
 	$for tag, val in tagvals:
 		$ tagdef = tagdefsdict[tag]
 		<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
@@ -12,7 +11,7 @@ $if len(tagvals) > 0:
 		    	$if tagdef.typestr:
 		    		<input type="text" name="value" value="${val}" readonly />
 		    <input type="hidden" name="action" value="delete" />
-		    $if tag not in disabledTags:
+		    $if tag not in predefinedTags:
 		    	<input type="submit" value="Delete" />
 		  </fieldset>
 		</form>

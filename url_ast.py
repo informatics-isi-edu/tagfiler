@@ -298,8 +298,8 @@ class FileTags (Node):
                 except:
                     return ''
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), urlquote)])
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, urlquote),
+                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), self.predefinedTags, urlquote)])
             
         return self.dbtransact(body, postCommit)
 

@@ -78,7 +78,7 @@ class Application:
         render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
-        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point', 
+        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'integer' : 'Integer', 'float8' : 'Floating point', 
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }
 
@@ -105,6 +105,8 @@ class Application:
                             (':simto:', 'SIMILAR TO'),
                             (':regexp:', '~'),
                             (':!regexp:', '!~') ])
+
+        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes']
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 

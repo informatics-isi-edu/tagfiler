@@ -13,12 +13,13 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders', 'action', 'filetype' ]
+    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes' ]
 
     def __init__(self):
         Application.__init__(self)
         self.action = None
         self.filetype = 'file'
+        self.bytes = None
 
     def GETfile(self, uri):
 
@@ -92,6 +93,7 @@ class FileIO (Application):
             yield buf
 
         f.close()
+        self.bytes = bytes
 
     def GET(self, uri):
 
@@ -203,6 +205,13 @@ class FileIO (Application):
         except:
             t.rollback()
 
+        t = self.db.transaction()
+        try:
+            self.set_file_tag('bytes', self.bytes)
+            t.commit()
+        except:
+            t.rollback()
+
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
@@ -274,6 +283,7 @@ class FileIO (Application):
         f.close()
         self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
         self.local = True
+        self.bytes = bytes
 
         def body():
             # this may repeat in case of database races
@@ -281,7 +291,7 @@ class FileIO (Application):
             return None
 
         def postCommit(results):
-            return 'Stored %s bytes' % (bytes)
+            return 'Stored %s bytes' % (self.bytes)
 
         return self.dbtransact(body, postCommit)
 
@@ -346,6 +356,7 @@ class FileIO (Application):
                 raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
             self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
             self.local = True
+            self.bytes = bytes
 
             return self.dbtransact(putBody, putPostCommit)
 
