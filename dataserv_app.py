@@ -106,7 +106,7 @@ class Application:
                             (':regexp:', '~'),
                             (':!regexp:', '!~') ])
 
-        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes']
+        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name']
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 

@@ -191,6 +191,13 @@ class FileIO (Application):
             except:
                 t.rollback()
 
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('name', self.data_id)
+                t.commit()
+            except:
+                t.rollback()
+    
         t = self.db.transaction()
         try:
             self.set_file_tag('modified by', web.ctx.env['REMOTE_USER'])

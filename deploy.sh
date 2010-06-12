@@ -97,6 +97,7 @@ tagdef restricted
 tagdef "modified by" text
 tagdef modified timestamptz
 tagdef bytes integer
+tagdef name text
 
 EOF
 
