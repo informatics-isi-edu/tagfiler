@@ -9,7 +9,7 @@ $if len(tagvals) > 0:
 		    <legend>${tag}</legend>
 		    <input type="hidden" name="tag" value="${tag}" />
 		    	$if tagdef.typestr:
-		    		<input type="text" name="value" value="${val}" readonly />
+		    		<input type="text" name="value" value="${val}" size="${len(val)}" readonly />
 		    <input type="hidden" name="action" value="delete" />
 		    $if tag not in predefinedTags:
 		    	<input type="submit" value="Delete" />
