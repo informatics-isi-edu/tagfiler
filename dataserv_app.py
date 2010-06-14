@@ -325,7 +325,8 @@ class Application:
         else:
             whereval = ""
         return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
-                             + " WHERE file = $file" + whereval,
+                             + " WHERE file = $file" + whereval
+                             + " ORDER BY value",
                              vars=dict(file=self.data_id, value=value))
 
     def select_file_tags(self, tagname=''):
