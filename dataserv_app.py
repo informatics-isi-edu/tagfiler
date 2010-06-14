@@ -243,13 +243,13 @@ class Application:
         if owner:
             if user:
                 if user != owner:
-                    raise Forbidden(data="access to tag %s" % tag_id)
+                    raise Forbidden(data="access to tag definition %s" % tag_id)
                 else:
                     pass
             else:
-                raise Unauthorized(data="access to tag %s" % tag_id)
+                raise Unauthorized(data="access to tag definition %s" % tag_id)
         else:
-            raise Unauthorized(data="access to tag %s" % tag_id)
+            raise Forbidden(data="access to tag definition %s" % tag_id)
 
     def isFileTagRestricted(self, tag_id):
         try:
