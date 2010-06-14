@@ -91,8 +91,10 @@ class Application:
                      (':geq:', 'Greater than or equal'),
                      (':like:', 'LIKE (SQL operator)'),
                      (':simto:', 'SIMILAR TO (SQL operator)'),
-                     (':regexp:', 'Regular expression match'),
-                     (':!regexp:', 'Negated regular expression match') ]
+                     (':regexp:', 'Regular expression (case sensitive)'),
+                     (':!regexp:', 'Negated regular expression (case sensitive)'),
+                     (':ciregexp:', 'Regular expression (case insensitive)'),
+                     (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
         self.opsDB = dict([ ('', ''),
                             ('=', '='),
@@ -104,7 +106,9 @@ class Application:
                             (':like:', 'LIKE'),
                             (':simto:', 'SIMILAR TO'),
                             (':regexp:', '~'),
-                            (':!regexp:', '!~') ])
+                            (':!regexp:', '!~'),
+                            (':ciregexp:', '~*'),
+                            (':!ciregexp:', '!~*') ])
 
         self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name']
 

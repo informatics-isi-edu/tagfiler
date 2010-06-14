@@ -110,12 +110,14 @@ def p_compare_neq(p):
     p[0] = '!='
 
 def p_compare_regex(p):
-    """compare : ':' REGEX ':'"""
-    p[0] = ':regexp:'
+    """compare : ':' REGEXP ':'
+               | ':' CIREGEXP ':'"""
+    p[0] = ':' + p[2].lower() + ':'
 
 def p_compare_nregex(p):
-    """compare : ':' '!' REGEX ':'"""
-    p[0] = ':!regexp:'
+    """compare : ':' '!' REGEXP ':'
+               | ':' '!' CIREGEXP ':'"""
+    p[0] = ':!' + p[3].lower() + ':'
 
 ineqmap = { 'lt' : ':lt:', 'leq' : ':leq:', 'gt' : ':gt:', 'geq' : ':geq:',
             'like' : ':like:', 'simto' : ':simto:'}
@@ -171,7 +173,8 @@ def p_stringany(p):
               | GEQ
               | LIKE
               | SIMTO
-              | REGEX"""
+              | REGEXP
+              | CIREGEXP"""
     p[0] = p[1]
 
 def p_stringplus(p):

@@ -28,7 +28,8 @@ keywords = {
     'geq' : 'GEQ',
     'like' : 'LIKE',
     'simto' : 'SIMTO',
-    'regexp' : 'REGEX'
+    'regexp' : 'REGEXP',
+    'ciregexp' : 'CIREGEXP'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())
