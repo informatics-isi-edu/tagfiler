@@ -304,13 +304,14 @@ class FileTags (Node):
             tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
             tags = [ result.tagname for result in self.select_file_tags() ]
             tagvals = [ (tag, [str(val) for val in self.gettagvals(tag)]) for tag in tags ]
-            return (tagvals, tagdefs, tagdefsdict)
+            length = max([max( (len(x) for x in val)) for tag, val in tagvals ])
+            return (tagvals, tagdefs, tagdefsdict, length)
 
         def postCommit(results):
-            tagvals, tagdefs, tagdefsdict = results
+            tagvals, tagdefs, tagdefsdict, length = results
             apptarget = self.home + web.ctx.homepath
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, urlquote),
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, str(length), urlquote),
                                     self.render.FileTagNew(apptarget, self.data_id, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), self.predefinedTags, urlquote)])
             
         return self.dbtransact(body, postCommit)
