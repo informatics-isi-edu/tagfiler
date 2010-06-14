@@ -50,7 +50,7 @@ def p_tagdef_rest_get(p):
 
 def p_tagdef_rest_put(p):
     """tagdef : slash string slash TAGDEF slash string queryopts"""
-    # PUT queryopts supports typestr=string&restricted=true/false
+    # PUT queryopts supports typestr=string&restricted=true/false&multivalue=true/false
     p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
 
 def p_tags(p):
@@ -62,6 +62,10 @@ def p_tagsrest(p):
     """tags : slash string slash TAGS slash string slash string 
             | slash string slash TAGS slash string slash string slash"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8])
+
+def p_tagsvalrest(p):
+    """tags : slash string slash TAGS slash string slash string '=' string"""
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8], value=p[10])
 
 def p_query1(p):
     """query : slash string slash QUERY

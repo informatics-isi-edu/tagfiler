@@ -22,6 +22,10 @@ $for i in range(1,11):
 	  $for typestr in typenames.keys()[1:]:
 	      		<option value="${typestr}">${typenames[typestr]}</option>
 	  </select>
+	  <select name="multivalue-${i}">
+	    <option value="false">Files may be tagged with 0 or 1 value</option>
+	    <option value="true">Files may be tagged with 0 or more values</option>
+	  </select>
 	  <select name="restricted-${i}">
 	    <option value="false">Anybody may set tag</option>
 	    <option value="true">Only file owner may set tag</option>

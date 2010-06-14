@@ -261,13 +261,13 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def tagval(self, tagname):
+    def gettagvals(self, tagname):
         results = self.select_file_tag(tagname)
         try:
-            value = results[0].value
+            values = [ result.value for result in results ]
         except:
-            value = None
-        return value
+            values = [ ]
+        return values
 
     def select_file(self):
         results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
@@ -297,14 +297,19 @@ class Application:
         return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, owner ) VALUES ( $tag_id, $typestr, $restricted, $owner )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, owner=self.user()))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue, owner ) VALUES ( $tag_id, $typestr, $restricted, $multivalue, $owner )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, multivalue=self.multivalue, owner=self.user()))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
         if self.typestr != '':
             tabledef += ", value %s" % (self.typestr)
-        tabledef += ", UNIQUE(file) )"
+        if not self.multivalue:
+            if self.typestr != '':
+                tabledef += ", UNIQUE(file, value)"
+            else:
+                tabledef += ", UNIQUE(file)"
+        tabledef += " )"
         self.db.query(tabledef)
         return True
 
@@ -314,31 +319,60 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname):
+    def select_file_tag(self, tagname, value=''):
+        if value:
+            whereval = " AND value = $value"
+        else:
+            whereval = ""
         return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
-                             + " WHERE file = $file", vars=dict(file=self.data_id))
+                             + " WHERE file = $file" + whereval,
+                             vars=dict(file=self.data_id, value=value))
 
-    def select_file_tags(self):
-        return self.db.query("SELECT tagname FROM filetags WHERE file = $file ORDER BY tagname",
-                             vars=dict(file=self.data_id))
+    def select_file_tags(self, tagname=''):
+        if tagname:
+            where = " AND tagname = $tagname"
+        else:
+            where = ""
+        return self.db.query("SELECT tagname FROM filetags WHERE file = $file"
+                             + where
+                             + " GROUP BY tagname ORDER BY tagname",
+                             vars=dict(file=self.data_id, tagname=tagname))
 
-    def delete_file_tag(self, tagname):
-        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname)) + " WHERE file = $file",
-                      vars=dict(file=self.data_id))
-        self.db.delete("filetags", where="file = $file AND tagname = $tagname",
-                       vars=dict(file=self.data_id, tagname=tagname))
+    def delete_file_tag(self, tagname, value=''):
+        if value:
+            whereval = " AND value = $value"
+        else:
+            whereval = ""
+        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
+                      + " WHERE file = $file" + whereval,
+                      vars=dict(file=self.data_id, value=value))
+        results = self.select_file_tag(tagname)
+        if len(results) == 0:
+            # there may be other values tagged still
+            self.db.delete("filetags", where="file = $file AND tagname = $tagname",
+                           vars=dict(file=self.data_id, tagname=tagname))
 
     def set_file_tag(self, tagname, value):
         try:
             results = self.select_tagdef(tagname)
-            tagtype = results[0].typestr
+            result = results[0]
+            tagtype = result.typestr
+            multivalue = result.multivalue
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
-        results = self.select_file_tag(tagname)
-        if len(results) > 0:
-            # drop existing value so we can reinsert one standard way
-            self.delete_file_tag(tagname)
+        web.debug((self.data_id, tagname, value, multivalue))
+
+        if not multivalue:
+            results = self.select_file_tag(tagname)
+            if len(results) > 0:
+                # drop existing value so we can reinsert one standard way
+                self.delete_file_tag(tagname)
+        else:
+            results = self.select_file_tag(tagname, value)
+            if len(results) > 0:
+                # (file, tag, value) already set, so we're done
+                return
 
         if value != '' and tagtype != '':
             self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
@@ -349,9 +383,14 @@ class Application:
             self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
                           + " ( file ) VALUES ( $file )",
                           vars=dict(file=self.data_id))
-
-        self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
-                      vars=dict(file=self.data_id, tagname=tagname))
+        
+        results = self.select_file_tags(tagname)
+        if len(results) == 0:
+            self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
+                          vars=dict(file=self.data_id, tagname=tagname))
+        else:
+            # may already be reverse-indexed in multivalue case
+            pass            
 
     def select_files_by_predlist(self):
         tagdefs = {}
@@ -383,6 +422,7 @@ class Application:
         if len(wheres) > 0:
             wheres = "WHERE " + wheres
 
-        return self.db.query("SELECT file FROM %s %s ORDER BY file" % (tables, wheres),
-                             vars=values)
+        query = "SELECT file FROM %s %s GROUP BY file ORDER BY file" % (tables, wheres)
+        web.debug(query)
+        return self.db.query(query, vars=values)
 

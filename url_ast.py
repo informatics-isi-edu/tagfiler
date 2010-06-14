@@ -90,13 +90,14 @@ class FileId(Node, FileIO):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted', 'queryopts' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted', 'multivalue', 'queryopts' ]
 
     def __init__(self, appname, tag_id=None, typestr=None, queryopts={}):
         Node.__init__(self, appname)
         self.tag_id = tag_id
         self.typestr = typestr
         self.restricted = None
+        self.multivalue = None
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
         self.tagdefs = {}
@@ -115,7 +116,7 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            return [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted)
+            return [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
                      for tagdef in self.select_tagdefs() ]
 
         def postCommit(tagdefs):
@@ -141,7 +142,8 @@ class Tagdef (Node):
             try:
                 web.header('Content-Type', 'text/plain; charset=us-ascii')
                 return ('typestr=' + urlquote(tagdef.typestr) 
-                        + '&restricted=' + urlquote(unicode(tagdef.restricted)))
+                        + '&restricted=' + urlquote(unicode(tagdef.restricted))
+                        + '&multivalue=' + urlquote(unicode(tagdef.multivalue)))
             except:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
 
@@ -156,6 +158,7 @@ class Tagdef (Node):
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
+            self.enforceTagRestriction(self.tag_id)
             self.delete_tagdef()
             return ''
 
@@ -183,12 +186,22 @@ class Tagdef (Node):
         if self.restricted == None:
             try:
                 restricted = self.queryopts['restricted'].lower()
-                if restricted in [ 'true', 't', 'yes', 'y' ]:
-                    self.restricted = True
-                else:
-                    self.restricted = False
             except:
+                restricted = 'false'
+            if restricted in [ 'true', 't', 'yes', 'y' ]:
+                self.restricted = True
+            else:
                 self.restricted = False
+
+        if self.multivalue == None:
+            try:
+                multivalue = self.queryopts['multivalue'].lower()
+            except:
+                restricted = 'false'
+            if restricted in [ 'true', 't', 'yes', 'y' ]:
+                self.multivalue = True
+            else:
+                self.multivalue = False
 
         def body():
             self.insert_tagdef()
@@ -211,7 +224,8 @@ class Tagdef (Node):
                     if storage[key] != '':
                         typestr = storage['type-%s' % (key[4:])]
                         restricted = storage['restricted-%s' % (key[4:])]
-                        self.tagdefs[storage[key]] = (typestr, restricted)
+                        multivalue = storage['multivalue-%s' % (key[4:])]
+                        self.tagdefs[storage[key]] = (typestr, restricted, multivalue)
             try:
                 self.tag_id = storage.tag
             except:
@@ -224,9 +238,10 @@ class Tagdef (Node):
             if self.action == 'add':
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
-                    self.typestr, self.restricted = self.tagdefs[tagname]
+                    self.typestr, self.restricted, self.multivalue = self.tagdefs[tagname]
                     self.insert_tagdef()
             elif self.action == 'delete' or self.action == 'CancelDelete':
+                self.enforceTagRestriction(self.tag_id)
                 return None
             elif self.action == 'ConfirmDelete':
                 self.enforceTagRestriction(self.tag_id)
@@ -263,9 +278,12 @@ class FileTags (Node):
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
                 raise NotFound(data='tag definition %s' % self.tag_id)
-            results = self.select_file_tag(self.tag_id)
+            results = self.select_file_tag(self.tag_id, self.value)
             if len(results) == 0:
-                raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
+                if self.value:
+                    raise NotFound(data='tag %s = %s on dataset %s' % (self.tag_id, self.value, self.data_id))
+                else:
+                    raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
             res = results[0]
             try:
                 value = res.value
@@ -275,8 +293,7 @@ class FileTags (Node):
 
         def postCommit(value):
             # return raw value to REST client
-            # BUG?  will this ever be a non-string result?
-            return value
+            return str(value)
 
         return self.dbtransact(body, postCommit)
 
@@ -286,20 +303,15 @@ class FileTags (Node):
             tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
             tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
             tags = [ result.tagname for result in self.select_file_tags() ]
-            tagvals = [ (tag, str(self.tagval(tag))) for tag in tags ]
+            tagvals = [ (tag, [str(val) for val in self.gettagvals(tag)]) for tag in tags ]
             return (tagvals, tagdefs, tagdefsdict)
 
         def postCommit(results):
             tagvals, tagdefs, tagdefsdict = results
             apptarget = self.home + web.ctx.homepath
-            def tagval(tag):
-                try:
-                    return tagvals[tag]
-                except:
-                    return ''
             return self.renderlist("\"%s\" tags" % (self.data_id),
                                    [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, tagval, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), self.predefinedTags, urlquote)])
+                                    self.render.FileTagNew(apptarget, self.data_id, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), self.predefinedTags, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
@@ -314,9 +326,16 @@ class FileTags (Node):
         # RESTful put of exactly one tag on one file...
         if self.tag_id == '':
             raise BadRequest(data="A non-empty tag name is required.")
-        self.value = web.ctx.env['wsgi.input'].read()
+
+        if not self.value:
+            self.value = web.ctx.env['wsgi.input'].read()
+        else:
+            pass # we ignore body when value came from URI
 
         def body():
+            results = self.select_tagdef(self.tag_id)
+            if len(results) == 0:
+                raise NotFound(data='tag definition %s' % self.tag_id)
             self.enforceFileTagRestriction(self.tag_id)
             self.set_file_tag(self.tag_id, self.value)
             return None
@@ -333,7 +352,7 @@ class FileTags (Node):
         
         def body():
             self.enforceFileTagRestriction(self.tag_id)
-            self.delete_file_tag(self.tag_id)
+            self.delete_file_tag(self.tag_id, self.value)
             return None
 
         def postCommit(results):
@@ -354,7 +373,7 @@ class FileTags (Node):
 
         def deleteBody():
             self.enforceFileTagRestriction(self.tag_id)
-            self.delete_file_tag(self.tag_id)
+            self.delete_file_tag(self.tag_id, self.value)
             return None
 
         def postCommit(results):
@@ -374,6 +393,7 @@ class FileTags (Node):
                     self.tagvals[urllib.unquote(tag_id)] = value
             try:
                 self.tag_id = storage.tag
+                self.value = storage.value
             except:
                 pass
         except:
