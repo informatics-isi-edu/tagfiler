@@ -219,6 +219,13 @@ class FileIO (Application):
                 t.commit()
             except:
                 t.rollback()
+                
+            t = self.db.transaction()
+            try:
+                self.delete_file_tag('url')
+                t.commit()
+            except:
+                t.rollback()
         else:
             t = self.db.transaction()
             try:
@@ -227,6 +234,12 @@ class FileIO (Application):
             except:
                 t.rollback()
 
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('url', self.location)
+                t.commit()
+            except:
+                t.rollback()
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():

@@ -110,7 +110,7 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
-        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name']
+        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
