@@ -302,7 +302,10 @@ class Application:
         return self.db.select('tagdefs', order="tagname")
 
     def select_defined_tags(self, where):
-        return self.db.select('tagdefs', where=where, order="tagname")
+        if where:
+            return self.db.select('tagdefs', where=where, order="tagname")
+        else:
+            return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue, owner ) VALUES ( $tag_id, $typestr, $restricted, $multivalue, $owner )",
