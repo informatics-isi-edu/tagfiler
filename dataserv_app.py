@@ -319,27 +319,27 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname, value=''):
+    def select_file_tag(self, tagname, value=None):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file"
         if value:
-            whereval = " AND value = $value"
-        else:
-            whereval = ""
-        return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
-                             + " WHERE file = $file" + whereval
-                             + " ORDER BY value",
-                             vars=dict(file=self.data_id, value=value))
+            query += " AND value = $value ORDER BY VALUE"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=self.data_id, value=value))
 
     def select_file_tags(self, tagname=''):
         if tagname:
             where = " AND tagname = $tagname"
         else:
             where = ""
-        return self.db.query("SELECT tagname FROM filetags WHERE file = $file"
-                             + where
-                             + " GROUP BY tagname ORDER BY tagname",
+        query = "SELECT tagname FROM filetags WHERE file = $file" \
+                + where \
+                + " GROUP BY tagname ORDER BY tagname"
+        #web.debug(query)
+        return self.db.query(query,
                              vars=dict(file=self.data_id, tagname=tagname))
 
-    def delete_file_tag(self, tagname, value=''):
+    def delete_file_tag(self, tagname, value=None):
         if value:
             whereval = " AND value = $value"
         else:
@@ -362,9 +362,10 @@ class Application:
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
-        web.debug((self.data_id, tagname, value, multivalue))
-
         if not multivalue:
+            if tagtype == u'':
+                value = None
+
             results = self.select_file_tag(tagname)
             if len(results) > 0:
                 # drop existing value so we can reinsert one standard way
@@ -375,15 +376,16 @@ class Application:
                 # (file, tag, value) already set, so we're done
                 return
 
-        if value != '' and tagtype != '':
-            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
-                          + " ( file, value ) VALUES ( $file, $value )",
-                          vars=dict(file=self.data_id, value=value))
+        if value != None:
+            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
+                    + " ( file, value ) VALUES ( $file, $value )" 
         else:
             # insert untyped or typed w/ default value...
-            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
-                          + " ( file ) VALUES ( $file )",
-                          vars=dict(file=self.data_id))
+            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
+                    + " ( file ) VALUES ( $file )"
+
+        #web.debug(query)
+        self.db.query(query, vars=dict(file=self.data_id, value=value))
         
         results = self.select_file_tags(tagname)
         if len(results) == 0:
