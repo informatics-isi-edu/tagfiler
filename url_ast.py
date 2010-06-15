@@ -116,13 +116,18 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            return [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
-                     for tagdef in self.select_tagdefs() ]
+            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
+                     for tagdef in self.select_defined_tags('owner is null') ]
+            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
+                     for tagdef in self.select_defined_tags('owner is not null') ]
+            return (predefined, userdefined)
 
         def postCommit(tagdefs):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
+            predefined, userdefined = tagdefs
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, tagdefs, self.typenames),
+                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'Existing predefined tag definitions'),
+                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'Existing user tag definitions'),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:

@@ -1,6 +1,6 @@
-$def with (target, tagdefs, typenames)
+$def with (target, tagdefs, typenames, title)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<h2>Existing tag definitions</h2>
+<h2>${title}</h2>
 <p>
 $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
