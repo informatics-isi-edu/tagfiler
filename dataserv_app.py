@@ -78,7 +78,7 @@ class Application:
         render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
-        self.typenames = { '' : 'No content', 'int8' : 'Integer', 
+        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point',
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }
 
