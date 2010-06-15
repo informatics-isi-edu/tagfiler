@@ -67,6 +67,10 @@ def p_tagsvalrest(p):
     """tags : slash string slash TAGS slash string slash string '=' string"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8], value=p[10])
 
+def p_tagsevalrest(p):
+    """tags : slash string slash TAGS slash string slash string '='"""
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8], value='')
+
 def p_query1(p):
     """query : slash string slash QUERY
              | slash string slash QUERY slash"""

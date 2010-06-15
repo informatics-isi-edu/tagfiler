@@ -263,10 +263,15 @@ class Application:
 
     def gettagvals(self, tagname):
         results = self.select_file_tag(tagname)
-        try:
-            values = [ result.value for result in results ]
-        except:
-            values = [ ]
+        values = [ ]
+        for result in results:
+            try:
+                value = result.value
+                if value == None:
+                    value = ''
+                values.append(value)
+            except:
+                pass
         return values
 
     def select_file(self):
@@ -322,7 +327,9 @@ class Application:
     def select_file_tag(self, tagname, value=None):
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
                 + " WHERE file = $file"
-        if value:
+        if value == '':
+            query += " AND value IS NULL ORDER BY VALUE"
+        elif value:
             query += " AND value = $value ORDER BY VALUE"
         #web.debug(query)
         return self.db.query(query, vars=dict(file=self.data_id, value=value))
@@ -340,7 +347,9 @@ class Application:
                              vars=dict(file=self.data_id, tagname=tagname))
 
     def delete_file_tag(self, tagname, value=None):
-        if value:
+        if value == '':
+            whereval = " AND value IS NULL"
+        elif value:
             whereval = " AND value = $value"
         else:
             whereval = ""
@@ -363,9 +372,6 @@ class Application:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
         if not multivalue:
-            if tagtype == u'':
-                value = None
-
             results = self.select_file_tag(tagname)
             if len(results) > 0:
                 # drop existing value so we can reinsert one standard way
@@ -376,7 +382,7 @@ class Application:
                 # (file, tag, value) already set, so we're done
                 return
 
-        if value != None:
+        if value:
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
                     + " ( file, value ) VALUES ( $file, $value )" 
         else:

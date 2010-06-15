@@ -140,7 +140,7 @@ class Tagdef (Node):
 
         def postCommit(tagdef):
             try:
-                web.header('Content-Type', 'text/plain; charset=us-ascii')
+                web.header('Content-Type', 'text/uri-list')
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&restricted=' + urlquote(unicode(tagdef.restricted))
                         + '&multivalue=' + urlquote(unicode(tagdef.multivalue)))
@@ -265,7 +265,7 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id, tag_id='', value=''):
+    def __init__(self, appname, data_id, tag_id='', value=None):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
@@ -280,20 +280,28 @@ class FileTags (Node):
                 raise NotFound(data='tag definition %s' % self.tag_id)
             results = self.select_file_tag(self.tag_id, self.value)
             if len(results) == 0:
-                if self.value:
-                    raise NotFound(data='tag %s = %s on dataset %s' % (self.tag_id, self.value, self.data_id))
-                else:
+                if self.value == None:
                     raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
-            res = results[0]
-            try:
-                value = res.value
-            except:
-                value = ''
-            return value
+                elif self.value == '':
+                    raise NotFound(data='tag %s = "" on dataset %s' % (self.tag_id, self.data_id))
+                else:
+                    raise NotFound(data='tag %s = %s on dataset %s' % (self.tag_id, self.value, self.data_id))
+            values = []
+            for res in results:
+                try:
+                    value = res.value
+                    if value == None:
+                        value = ''
+                    values.append(value)
+                except:
+                    pass
+            return values
 
-        def postCommit(value):
+        def postCommit(values):
             # return raw value to REST client
-            return str(value)
+            web.header('Content-Type', 'text/uri-list')
+
+            return "&".join([(urlquote(self.tag_id) + '=' + urlquote(str(val))) for val in values])
 
         return self.dbtransact(body, postCommit)
 
