@@ -140,7 +140,7 @@ class Tagdef (Node):
 
         def postCommit(tagdef):
             try:
-                web.header('Content-Type', 'text/uri-list')
+                web.header('Content-Type', 'application/x-www-form-urlencoded')
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&restricted=' + urlquote(unicode(tagdef.restricted))
                         + '&multivalue=' + urlquote(unicode(tagdef.multivalue)))
@@ -299,7 +299,7 @@ class FileTags (Node):
 
         def postCommit(values):
             # return raw value to REST client
-            web.header('Content-Type', 'text/uri-list')
+            web.header('Content-Type', 'application/x-www-form-urlencoded')
 
             return "&".join([(urlquote(self.tag_id) + '=' + urlquote(str(val))) for val in values])
 
