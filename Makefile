@@ -19,7 +19,12 @@ TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 # turn off annoying built-ins
 .SUFFIXES:
 
-deploy:
+$(HOME)/.tagfiler.predeploy:
+	yum -y --skip-broken install httpd mod_wsgi postgresql{,-devel,-server} python{,-psycopg2,-webpy,-ply} || true
+	service postgresql initdb || true
+	touch $(HOME)/.tagfiler.predeploy
+
+deploy: $(HOME)/.tagfiler.predeploy
 	./deploy.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES)
@@ -28,6 +33,10 @@ install: $(FILES) $(TEMPLATES)
 
 restart: force install
 	service httpd restart
+
+clean: force
+	rm -rf $(INSTALLDIR)
+	rm -f $(HOME)/.tagfiler.predeploy
 
 force:
 

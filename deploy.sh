@@ -25,13 +25,8 @@ SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
 
-# we need all of this
-yum -y --skip-broken install httpd mod_wsgi \
-    postgresql{,-devel,-server} \
-    python{,-psycopg2,-webpy,-ply}
-
-# let's try this blindly in case we need it
-service postgresql initdb
+# location of platform installed file
+PGCONF=/var/lib/pgsql/data/postgresql.conf
 
 # set the services to run automatically?
 chkconfig httpd on
@@ -51,7 +46,18 @@ chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
 
 # try some blind database setup as well
-service postgresql start
+if grep -e '^extra_float_digits = 2[^0-9].*' < ${PGCONF}
+then
+    :
+else
+    # need to set extra_float_digits = 2 for proper floating point handling
+    PGCONFTMP=${PGCONF}.tmp.$$
+    runuser -c "sed -e 's|^.*\(extra_float_digits[^=]*= *\)[-0-9]*\([^#]*#.*\)|\1 2  \2|' < $PGCONF > $PGCONFTMP" - ${PGADMIN} \
+	&& mv $PGCONFTMP $PGCONF
+    chmod u=rw,og= $PGCONF
+fi
+
+service postgresql restart
 runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
 runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
 runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
