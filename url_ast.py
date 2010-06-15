@@ -314,19 +314,32 @@ class FileTags (Node):
                 return 0
         
         def body():
-            tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
+            # get predefined tags
+            tagdefs = [ tagdef for tagdef in self.select_defined_tags('owner is null') ]
             tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
-            tags = [ result.tagname for result in self.select_file_tags() ]
+            tags = [ result.tagname for result in self.select_defined_file_tags(' AND tagdefs.owner is null') ]
             tagvals = [ (tag, [str(val) for val in self.gettagvals(tag)]) for tag in tags ]
             length = [ listmax([[ len(val) for val in vals] for tag, vals in tagvals]) ]
-            # max([max( (len(x) for x in vals)) for tag, vals in tagvals ])
-            return (tagvals, tagdefs, tagdefsdict, length)
+            predefined = [ tagvals, tagdefs, tagdefsdict, length]
+            
+            # get user defined tags
+            tagdefs = [ tagdef for tagdef in self.select_defined_tags('owner is not null') ]
+            tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
+            tags = [ result.tagname for result in self.select_defined_file_tags(' AND tagdefs.owner is not null') ]
+            tagvals = [ (tag, [str(val) for val in self.gettagvals(tag)]) for tag in tags ]
+            length = [ listmax([[ len(val) for val in vals] for tag, vals in tagvals]) ]
+            userdefined = [ tagvals, tagdefs, tagdefsdict, length]
+
+            return (predefined, userdefined)
 
         def postCommit(results):
-            tagvals, tagdefs, tagdefsdict, length = results
+            predefined, userdefined = results
+            tagvals, tagdefs, tagdefsdict, length = predefined
+            usertagvals, usertagdefs, usertagdefsdict, userlength = userdefined
             apptarget = self.home + web.ctx.homepath
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, str(length), urlquote),
+                                   [self.render.FileTagExisting(apptarget, self.data_id, tagvals, tagdefsdict, self.predefinedTags, str(length), 'Predefined tags', urlquote),
+                                    self.render.FileTagExisting(apptarget, self.data_id, usertagvals, usertagdefsdict, self.predefinedTags, str(userlength), 'User defined tags', urlquote),
                                     self.render.FileTagNew(apptarget, self.data_id, tagdefs, self.typenames, lambda tag: self.isFileTagRestricted(tag), self.predefinedTags, urlquote)])
             
         return self.dbtransact(body, postCommit)

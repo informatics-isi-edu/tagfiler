@@ -301,6 +301,9 @@ class Application:
     def select_tagdefs(self):
         return self.db.select('tagdefs', order="tagname")
 
+    def select_defined_tags(self, where):
+        return self.db.select('tagdefs', where=where, order="tagname")
+
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue, owner ) VALUES ( $tag_id, $typestr, $restricted, $multivalue, $owner )",
                       vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, multivalue=self.multivalue, owner=self.user()))
@@ -345,6 +348,14 @@ class Application:
         #web.debug(query)
         return self.db.query(query,
                              vars=dict(file=self.data_id, tagname=tagname))
+
+    def select_defined_file_tags(self, where):
+        query = "SELECT tagname FROM filetags join tagdefs using (tagname) WHERE file = $file" \
+                + where \
+                + " GROUP BY tagname ORDER BY tagname"
+        #web.debug(query)
+        return self.db.query(query,
+                             vars=dict(file=self.data_id))
 
     def delete_file_tag(self, tagname, value=None):
         if value == '':
