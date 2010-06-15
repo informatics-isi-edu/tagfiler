@@ -2,6 +2,7 @@
 
 import web
 import urllib
+import re
 from dataserv_app import Application, NotFound, BadRequest, urlquote
 from rest_fileio import FileIO
 
@@ -279,7 +280,7 @@ class FileTags (Node):
 
     def mystr(self, val):
         if type(val) == type(1.0):
-            return "%.60e" % val
+            return re.sub("0*e", "0e", "%.48e" % val)
         else:
             return str(val)
             
@@ -330,7 +331,7 @@ class FileTags (Node):
                 tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
                 tags = [ result.tagname for result in self.select_defined_file_tags(where2) ]
                 tagvals = [ (tag, [self.mystr(val) for val in self.gettagvals(tag)]) for tag in tags ]
-                length = listmax([[ len(val) for val in vals] for tag, vals in tagvals])
+                length = listmax([listmax([ len(val) for val in vals]) for tag, vals in tagvals])
                 return ( self.predefinedTags, # excludes
                          tagdefs,
                          tagdefsdict,
