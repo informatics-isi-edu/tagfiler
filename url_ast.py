@@ -299,12 +299,19 @@ class FileTags (Node):
 
     def GETall(self, uri):
         # HTML get of all tags on one file...
+        def listmax(list):
+            if len(list) > 0:
+                return max(list)
+            else:
+                return 0
+        
         def body():
             tagdefs = [ tagdef for tagdef in self.select_tagdefs() ]
             tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
             tags = [ result.tagname for result in self.select_file_tags() ]
             tagvals = [ (tag, [str(val) for val in self.gettagvals(tag)]) for tag in tags ]
-            length = max([max( (len(x) for x in val)) for tag, val in tagvals ])
+            length = [ listmax([[ len(val) for val in vals] for tag, vals in tagvals]) ]
+            # max([max( (len(x) for x in vals)) for tag, vals in tagvals ])
             return (tagvals, tagdefs, tagdefsdict, length)
 
         def postCommit(results):
