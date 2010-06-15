@@ -345,6 +345,8 @@ class FileTags (Node):
         def postCommit(results):
             system, userdefined, all = results
             apptarget = self.home + web.ctx.homepath
+            all = ( all[0], all[1], all[2], all[3], all[4],
+                    max(system[5], userdefined[5]) ) # use maximum length for user input boxes
             return self.renderlist("\"%s\" tags" % (self.data_id),
                                    [self.render.FileTagExisting('Predefined tags', apptarget, self.data_id, system, urlquote),
                                     self.render.FileTagExisting('User defined tags', apptarget, self.data_id, userdefined, urlquote),

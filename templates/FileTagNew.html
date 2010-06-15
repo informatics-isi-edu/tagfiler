@@ -11,7 +11,7 @@ $if len(tagdefs) > 0:
 				  <legend>${tagdef.tagname}</legend>
 				  <input type="checkbox" name="set-${urlquote(tagdef.tagname)}" value="true" /> Set
 				$if tagdef.typestr != '':
-		  			<input type="text" name="val-${urlquote(tagdef.tagname)}" /> (${typenames[tagdef.typestr]})
+		  			<input type="text" name="val-${urlquote(tagdef.tagname)}" size="${length}" /> (${typenames[tagdef.typestr]})
 				</fieldset>
 	  <input type="hidden" name="action" value="put" />
 	  <input type="submit" value="Apply tag(s)" />
