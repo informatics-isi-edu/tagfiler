@@ -446,6 +446,6 @@ class Application:
             wheres = "WHERE " + wheres
 
         query = "SELECT file FROM %s %s GROUP BY file ORDER BY file" % (tables, wheres)
-        web.debug(query)
+        #web.debug(query)
         return self.db.query(query, vars=values)
 
