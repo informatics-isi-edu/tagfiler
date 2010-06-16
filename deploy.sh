@@ -58,13 +58,20 @@ else
 fi
 
 service postgresql restart
-runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+
+if runuser -c "psql -c 'select * from pg_user' ${PGADMIN}" - ${PGADMIN} | grep ${SVCUSER} 1>/dev/null
+then
+    :
+else
+	runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+fi
+
 runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
 runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 
 
 # create local helper scripts
-mkdir /etc/httpd/passwd
+mkdir -p /etc/httpd/passwd
 
 cat > ${HOME}/README-${SVCPREFIX} <<EOF
 This service requires passwords to be configured via:
