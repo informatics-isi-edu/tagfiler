@@ -1,6 +1,7 @@
 import web
 import sys
 import os
+import sys
 
 # need to find our other local modules
 
@@ -79,3 +80,8 @@ class Dispatcher:
 
 # this creates the WSGI app from the urls map
 application = web.application(urls, globals()).wsgifunc() 
+
+if __name__ == "__main__":
+        sys.path.append(os.path.dirname(sys.argv[0]))
+	import url_parse
+	url_parse.make_parse()
