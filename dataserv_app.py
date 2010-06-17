@@ -54,6 +54,22 @@ class BadRequest (web.HTTPError):
         data = render.Error(status, desc, data)
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
+class IntegrityError (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '500 Internal Server Error'
+        desc = 'The request execution encountered a integrity error: %s.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class RuntimeError (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '500 Internal Server Error'
+        desc = 'The request execution encountered a runtime error: %s.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
 class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames' ]
@@ -142,13 +158,13 @@ class Application:
             except TypeError, te:
                 t.rollback()
                 web.debug(te)
-                raise te
+                raise RuntimeError(data=str(te))
             except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
                     web.debug('exceeded retry limit on IntegrityError')
                     web.debug(te)
-                    raise te
+                    raise IntegrityError(data=str(te))
                 # else fall through to retry...
             except:
                 t.rollback()
