@@ -295,6 +295,17 @@ class FileIO (Application):
         return (prefix, dir)
 
 
+    def deletePrevious(self, result):
+        if result.local:
+            # previous result had local file, so free it
+            filename = self.store_path + '/' + result.location
+            dir = os.path.dirname(filename)
+            os.unlink(filename)
+
+            """delete the directory if empty"""
+            if len(os.listdir(dir)) == 0:
+                os.rmdir(dir)
+
     def PUT(self, uri):
         """store file content from client"""
 
@@ -315,10 +326,11 @@ class FileIO (Application):
 
         def body():
             # this may repeat in case of database races
-            self.insertForStore()
-            return None
+            return self.insertForStore()
 
         def postCommit(results):
+            if len(results) > 0:
+                self.deletePrevious(results[0])
             return 'Stored %s bytes' % (self.bytes)
 
         return self.dbtransact(body, postCommit)
@@ -328,23 +340,12 @@ class FileIO (Application):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
-        def deletePrevious(result):
-            if result.local:
-                # previous result had local file, so free it
-                filename = self.store_path + '/' + result.location
-                dir = os.path.dirname(filename)
-                os.unlink(filename)
-
-                """delete the directory if empty"""
-                if len(os.listdir(dir)) == 0:
-                    os.rmdir(dir)
-
         def putBody():
             return self.insertForStore()
 
         def putPostCommit(results):
             if len(results) > 0:
-                deletePrevious(results[0])
+                self.deletePrevious(results[0])
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
@@ -356,7 +357,7 @@ class FileIO (Application):
             return results[0]
 
         def deletePostCommit(result):
-            deletePrevious(result)
+            self.deletePrevious(result)
             raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
