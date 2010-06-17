@@ -54,6 +54,14 @@ class BadRequest (web.HTTPError):
         data = render.Error(status, desc, data)
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
+class Conflict (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '409 Conflict'
+        desc = 'The request conflicts with the state of the server. %s'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
 class IntegrityError (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
@@ -149,7 +157,7 @@ class Application:
                 t.commit()
                 break
             # syntax "Type as var" not supported by Python 2.4
-            except (NotFound, BadRequest, Unauthorized, Forbidden), te:
+            except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                 t.rollback()
                 raise te
             except (psycopg2.DataError, psycopg2.ProgrammingError), te:

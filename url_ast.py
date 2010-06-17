@@ -3,7 +3,7 @@
 import web
 import urllib
 import re
-from dataserv_app import Application, NotFound, BadRequest, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, urlquote
 from rest_fileio import FileIO
 
 class Node (object, Application):
@@ -210,6 +210,9 @@ class Tagdef (Node):
                 self.multivalue = False
 
         def body():
+            results = self.select_tagdef(self.tag_id)
+            if len(results) > 0:
+                raise Conflict(data="Tag %s is already defined." % self.tag_id)
             self.insert_tagdef()
             return None
 
@@ -245,6 +248,9 @@ class Tagdef (Node):
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
                     self.typestr, self.restricted, self.multivalue = self.tagdefs[tagname]
+                    results = self.select_tagdef(self.tag_id)
+                    if len(results) > 0:
+                        raise Conflict(data="Tag %s is already defined." % self.tag_id)
                     self.insert_tagdef()
             elif self.action == 'delete' or self.action == 'CancelDelete':
                 self.enforceTagRestriction(self.tag_id)
