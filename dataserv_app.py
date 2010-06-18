@@ -448,24 +448,32 @@ class Application:
             except:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
-        tags = tagdefs.keys()
-        preds = [ pred for pred in self.predlist if pred['op'] and pred['val'] ]
-        
-        tables = [ "\"%s\"" % self.wraptag(tag) for tag in tags ]
+        tables = []
+        wheres = []
+        values = {}
+        for p in range(0, len(self.predlist)):
+            pred = self.predlist[p]
+            tag = pred['tag']
+            op = pred['op']
+            vals = pred['vals']
+            if op and vals:
+                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
+                if len(vals) > 0:
+                    valpreds = []
+                    for v in range(0, len(vals)):
+                        valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
+                        values["val%s_%s" % (p, v)] = vals[v]
+                    wheres.append(" OR ".join(valpreds))
+                if tagdefs.has_key(tag):
+                    del tagdefs[tag]
+            elif tagdefs.has_key(tag):
+                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
+                del tagdefs[tag]
+            
         tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
         tables = " JOIN ".join(tables)
 
-        values = { }
-        wheres = []
-        index = 1
-        for pred in preds:
-            wheres.append("\"%s\".value" % self.wraptag(pred['tag'])
-                          + " %s " % self.opsDB[pred['op']]
-                          + "$val%s" % index)
-            values['val%s' % index] = pred['val']
-            index += 1
-        wheres = " AND ".join(wheres)
-
+        wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if len(wheres) > 0:
             wheres = "WHERE " + wheres
 

@@ -102,12 +102,21 @@ def p_predlist_grow(p):
     p[0].append(p[3])
 
 def p_pred_tag_val_comp(p):
-    """pred : string compare string"""
-    p[0] = dict([ ('tag', p[1]), ('op', p[2]), ('val', p[3]) ])
+    """pred : string compare vallist"""
+    p[0] = dict([ ('tag', p[1]), ('op', p[2]), ('vals', p[3]) ])
 
 def p_pred_tag(p):
     """pred : string"""
-    p[0] = dict([ ('tag', p[1]), ('op', None), ('val', None) ])
+    p[0] = dict([ ('tag', p[1]), ('op', None), ('vals', []) ])
+
+def p_pred_vallist(p):
+    """vallist : string"""
+    p[0] = [ p[1] ]
+
+def p_pred_vallist_grow(p):
+    """vallist : vallist ',' string"""
+    p[0] = p[1]
+    p[1].append(p[3])
 
 def p_compare_eq(p):
     """compare : '='"""
