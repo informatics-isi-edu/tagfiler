@@ -467,34 +467,48 @@ class Query (Node):
         terms = []
         for pred in self.predlist:
             if pred['op']:
-                terms.append(urlquote(pred['tag']) + pred['op'] + urlquote(pred['val']))
+                terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
             else:
                 terms.append(urlquote(pred['tag']))
         return self.home + web.ctx.homepath + '/query/' + ';'.join(terms)
 
     def GET(self, uri):
         # this interface has both REST and form-based functions
+        
+        # test if user predicate equals a predicate from predlist
+        def equals(pred, userpred):
+            return ({'tag' : pred['tag'], 'op' : pred['op'], 'vals' : str(pred['vals'])} == userpred)
+
         tagname = None
         op = None
-        value = None
+        value = []
         try:
             self.action = self.queryopts['action']
             tagname = self.queryopts['tag']
             op = self.queryopts['op']
-            value = self.queryopts['val']
+            if self.action == 'add':
+                for i in range(0,10):
+                    val = self.queryopts['val' + str(i)]
+                    if val != None:
+                        value.append(val)
+            elif self.action == 'delete':
+                value = self.queryopts['vals']
         except:
             pass
 
         if op == '':
             op = None
 
-        userpred = { 'tag' : tagname, 'op' : op, 'val' : value }
+        if op == None and self.action == 'delete':
+            value = str([])
+
+        userpred = { 'tag' : tagname, 'op' : op, 'vals' : value }
 
         if self.action == 'add':
             if userpred not in self.predlist:
                 self.predlist.append( userpred )
         elif self.action == 'delete':
-            self.predlist = [ pred for pred in self.predlist if pred != userpred ]
+            self.predlist = [ pred for pred in self.predlist if not equals(pred, userpred) ]
         elif self.action == 'query':
             pass
         elif self.action == 'edit':

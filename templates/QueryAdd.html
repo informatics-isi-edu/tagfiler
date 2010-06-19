@@ -4,16 +4,29 @@ $if len(tags) > 0:
 	<p>Select an available tag and click 'Add' to build a query:
 	</p>
 	<form enctype="application/x-www-form-urlencoded" action="${querytarget}" method="get">
-	  <select name="tag">
+	  <table><tr valign='top'>
+	  <td><select name="tag">
 		$for tag in tags:
 			<option value="${tag}">${tag}</option>
-	  </select>
-	  <select name="op">
+	  </select></td>
+	  <td><select name="op">
 	  	$for op, desc in ops:
 			<option value="${op}">${desc}</option>
-	  </select>
-	  <input type="text" name="val" />
-	  <input type="submit" value="Add to query" />
+	  </select></td>
+	  <td><table>
+		  <tr><td></td><td><input type="text" name="val0" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val1" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val2" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val3" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val4" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val5" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val6" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val7" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val8" /></td></tr>
+		  <tr><td>OR</td><td><input type="text" name="val9" /></td></tr>
+	  </table></td>
+	  <td><input type="submit" value="Add to query" />
+	  </tr></table>
 	  <input type="hidden" name="action" value="add" />
 	</form>
 $else:
