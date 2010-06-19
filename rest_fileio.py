@@ -318,6 +318,7 @@ class FileIO (Application):
             # raise LengthRequired()  # if we want to be picky
         user, path = self.getTemporary()
         fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
+        os.close(fileHandle)
         f, bytes = self.storeInput(inf, tempFileName, length=length)
         f.close()
         self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
@@ -367,6 +368,7 @@ class FileIO (Application):
             boundary1, boundaryN = self.scanFormHeader(inf)
             user, path = self.getTemporary()
             fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
+            os.close(fileHandle)
             f, bytes = self.storeInput(inf, tempFileName)
         
             # now we have to remove the trailing part boundary we
