@@ -7,14 +7,13 @@ $for pred in predlist:
 	  <fieldset>
 	    <legend>${pred['tag']}</legend>
 	    $if pred['op']:
-	    	${ops[pred['op']]} "
+	    	${ops[pred['op']]}:
 	    	$ count = 0
 	    	$for val in pred['vals']:
 	    		$if count != 0:
-	    			<b> OR </b>
-	    		${val}
+	    			OR
+	    		<tt style="color:green">${val}</tt>
 	    		$ count += 1
-	    	"
 		<input type="hidden" name="op" value="${pred['op']}" />
 		<input type="hidden" name="vals" value="${pred['vals']}" />
 	    <input type="hidden" name="tag" value="${pred['tag']}" />
