@@ -194,9 +194,17 @@ def p_stringany(p):
               | CIREGEXP"""
     p[0] = p[1]
 
-def p_stringplus(p):
+def p_stringplusstring(p):
     """string : string '+' string"""
     p[0] = p[1] + ' ' + p[3]
+
+def p_stringplus(p):
+    """string : string '+'"""
+    p[0] = p[1] + ' '
+
+def p_plusstring(p):
+    """string : '+' string"""
+    p[0] = ' ' + p[2]
 
 def p_stringplus_concat(p):
     """string : string string"""
