@@ -177,6 +177,15 @@ def p_slash(p):
              | slash '/'"""
     pass
 
+# treat any sequence of '+'+ as a space string
+def p_spacestring(p):
+    """spacestring : '+'"""
+    p[0] = ' '
+
+def p_spacestringlist(p):
+    """spacestring : spacestring '+'"""
+    p[0] = p[1] + ' '
+
 # grammatically, keywords can also be valid string values...
 def p_stringany(p):
     """string : FILE
@@ -191,20 +200,9 @@ def p_stringany(p):
               | LIKE
               | SIMTO
               | REGEXP
-              | CIREGEXP"""
+              | CIREGEXP
+              | spacestring"""
     p[0] = p[1]
-
-def p_stringplusstring(p):
-    """string : string '+' string"""
-    p[0] = p[1] + ' ' + p[3]
-
-def p_stringplus(p):
-    """string : string '+'"""
-    p[0] = p[1] + ' '
-
-def p_plusstring(p):
-    """string : '+' string"""
-    p[0] = ' ' + p[2]
 
 def p_stringplus_concat(p):
     """string : string string"""
