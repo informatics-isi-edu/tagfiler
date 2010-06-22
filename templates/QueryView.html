@@ -12,7 +12,7 @@ $for pred in predlist:
 	    	$for val in pred['vals']:
 	    		$if count != 0:
 	    			OR
-	    		<tt style="color:green">${val}</tt>
+	    		<tt style="color:green">$:{val.replace(' ', '&nbsp;')}</tt>
 	    		$ count += 1
 		<input type="hidden" name="op" value="${pred['op']}" />
 		<input type="hidden" name="vals" value="${pred['vals']}" />
