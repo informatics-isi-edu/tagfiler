@@ -136,14 +136,14 @@ class FileIO (Application):
                 if len(rangeset) == 0:
                     # range not satisfiable
                     web.ctx.status = '416 Requested Range Not Satisfiable'
-                    web.header("Content-Range", "*/%s" % length)
+                    web.header("Content-Range", "bytes */%s" % length)
                     return
                 elif len(rangeset) == 1:
                     # result is a single Content-Range body
                     first, last = rangeset[0]
                     web.ctx.status = '206 Partial Content'
                     web.header('Content-Length', last - first + 1)
-                    web.header('Content-Range', "%s-%s/%s" % (first, last, length))
+                    web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
                     for res in yieldBytes(f, first, last):
                         yield res
@@ -156,7 +156,7 @@ class FileIO (Application):
 
                     for r in range(0,len(rangeset)):
                         first, last = rangeset[r]
-                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: %s-%s/%s\r\n\r\n' \
+                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\n\r\n' \
                               % (boundary, content_type, first, last, length)
                         for res in yieldBytes(f, first, last):
                             yield res
@@ -337,16 +337,17 @@ class FileIO (Application):
 
         return results
 
-    def storeInput(self, inf, filename, length=None):
+    def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
 
-        f = open(filename, "w+b")
+        if cfirst != None:
+            f.seek(cfirst, 0)
 
         bytes = 0
         eof = False
         while not eof:
-            if length:
-                buf = inf.read(min((length - bytes), self.chunkbytes))
+            if clen != None:
+                buf = inf.read(min((clen - bytes), self.chunkbytes))
             else:
                 buf = inf.read(self.chunkbytes)
 
@@ -354,17 +355,24 @@ class FileIO (Application):
             buflen = len(buf)
             bytes = bytes + buflen
 
-            if length:
-                if length == bytes:
+            if clen != None:
+                if clen == bytes:
                     eof = True
                 elif buflen == 0:
                     f.close()
                     os.unlink(filename)
-                    raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, length)) # entity undersized
+                    raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
             elif buflen == 0:
                 eof = True
 
-        return (f, bytes)
+        if flen != None:
+            f.seek(flen,0)
+            f.truncate()
+        else:
+            f.seek(0,2)
+            flen = f.tell()
+
+        return (bytes, flen)
 
 
     def getTemporary(self):
@@ -401,29 +409,109 @@ class FileIO (Application):
         # this work happens exactly once per web request, consuming input
         inf = web.ctx.env['wsgi.input']
         try:
-            length = int(web.ctx.env['CONTENT_LENGTH'])
+            clen = int(web.ctx.env['CONTENT_LENGTH'])
         except:
-            length = None
+            clen = None
             # raise LengthRequired()  # if we want to be picky
-        user, path = self.getTemporary()
-        fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-        os.close(fileHandle)
-        f, bytes = self.storeInput(inf, tempFileName, length=length)
+
+        try:
+            content_range = web.ctx.env['HTTP_CONTENT_RANGE']
+            units, rstr = content_range.strip().split(" ")
+            rstr, lenstr = rstr.split("/")
+            if lenstr == '*':
+                flen = None
+            else:
+                flen = int(lenstr)
+            cfirst, clast = rstr.split("-")
+            cfirst = int(cfirst)
+            clast = int(clast)
+
+            if clen != None:
+                if clast - cfirst + 1 != clen:
+                    raise BadRequest(data='Range: %s does not match content-length %s' % (content_range, clen))
+            else:
+                clen = clast - cfirst + 1
+
+        except KeyError:
+            flen = clen
+            cfirst = 0
+            clast = None
+
+        # at this point we have these data:
+        # clen -- content length (body of PUT)
+        # flen -- file length (if asserted by PUT Range: header)
+        # cfirst -- first byte position of content body in file
+        # clast  -- last byte position of content body in file
+
+        def preWriteBody():
+            if self.update:
+                results = self.select_file()
+                if len(results) == 0:
+                    return None
+                self.enforceFileRestriction()
+                return results[0]
+            else:
+                return None
+
+        def preWritePostCommit(result):
+            if result != None:
+                if not result.local:
+                    raise Conflict(data="The resource %s is not a local file." % self.data_id)
+                self.location = result.location
+                filename = self.store_path + '/' + self.location
+                try:
+                    f = open(filename, 'r+b')
+                    return (f, None)
+                except:
+                    return (None, None)
+            else:
+                user, path = self.getTemporary()
+                fileHandle, filename = tempfile.mkstemp(prefix=user, dir=path)
+                os.close(fileHandle)
+                f = open(filename, 'wb')
+                return (f, filename)
+        
+        if cfirst and clast:
+            # try update-in-place if user is doing Range: partial PUT
+            self.update = True
+        else:
+            self.update = False
+
+        count = 0
+        limit = 10
+        f = None
+        insertFilename = None
+        while not f:
+            count += 1
+            if count > limit:
+                raise web.internalerror('Could not access local copy of ' + self.data_id)
+
+            # we do this in a loop in case of select/open race conditions
+            f, insertFilename = self.dbtransact(preWriteBody, preWritePostCommit)
+
+        # we only get here if we have a file to write into
+        wbytes, flen = self.storeInput(inf, f, flen, cfirst, clen)
         f.close()
-        self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
-        self.local = True
-        self.bytes = bytes
 
-        def body():
-            # this may repeat in case of database races
-            return self.insertForStore()
+        if insertFilename:
+            # the file we wrote is new so needs to go into database
+            self.location = insertFilename[len(self.store_path)+1:]
+            self.local = True
+            self.bytes = flen
+            self.wbytes = wbytes
 
-        def postCommit(results):
-            if len(results) > 0:
-                self.deletePrevious(results[0])
-            return 'Stored %s bytes' % (self.bytes)
+            def postWriteBody():
+                # this may repeat in case of database races
+                return self.insertForStore()
 
-        return self.dbtransact(body, postCommit)
+            def postWritePostCommit(results):
+                if len(results) > 0:
+                    self.deletePrevious(results[0])
+                return 'Stored %s bytes' % (self.wbytes)
+
+            return self.dbtransact(postWriteBody, postWritePostCommit)
+        else:
+            return 'Stored %s bytes' % (wbytes)
 
 
     def POST(self, uri):
@@ -458,7 +546,8 @@ class FileIO (Application):
             user, path = self.getTemporary()
             fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
             os.close(fileHandle)
-            f, bytes = self.storeInput(inf, tempFileName)
+            f = open(tempFileName, "wb")
+            wbytes, flen = self.storeInput(inf, f)
         
             # now we have to remove the trailing part boundary we
             # copied to disk by being lazy above...
