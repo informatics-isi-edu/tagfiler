@@ -2,6 +2,7 @@ import os
 import web
 import subprocess
 import tempfile
+import random
 
 from dataserv_app import Application, NotFound, BadRequest, urlquote
 
@@ -64,7 +65,6 @@ class FileIO (Application):
         # we only get here if we were able to both:
         #   a. open the file for reading its content
         #   b. obtain its content-type from /usr/bin/file test
-        web.header('Content-type', content_type)
         
         # SEEK_END attribute not supported by Python 2.4
         # f.seek(0, os.SEEK_END)
@@ -74,27 +74,108 @@ class FileIO (Application):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        # report length so browsers can show progress bar
-        web.header('Content-Length', length)
+        def yieldBytes(f, first, last):
+            """Helper function yields range of file."""
+            f.seek(first, 0)  # first from beginning (os.SEEK_SET)
+            byte = first
+            while byte <= last:
+                readbytes = min(self.chunkbytes, last - byte + 1)
+                buf = f.read(readbytes)
+
+                byte += len(buf)
+                yield buf
+                
+                if len(buf) < readbytes:
+                    break
 
         if sendBody:
-            web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
 
-            bytes = 0
-            while bytes < length:
-                buf = f.read(self.chunkbytes)
+            # parse Range: header if it exists
+            rangeset = []
+            invalid = False
+            try:
+                http_range = web.ctx.env['HTTP_RANGE']
+                units, set = http_range.split('=')
+                for r in set.split(","):
+                    try:
+                        first, last = r.split("-")
+                        if first == '' and last == '':
+                            invalid = True
+                            break
+                        elif first == '':
+                            first = length - int(last)
+                            last = length - 1
+                        elif last == '':
+                            first = int(first)
+                            last = length - 1
+                        else:
+                            first = int(first)
+                            last = int(last)
 
-                # don't exceed reported length, even if file changed under us
-                if (bytes + len(buf)) <= length:
-                    bytes += len(buf)
+                        if last < first:
+                            invalid = True
+                            break
+                    
+                        if first >= length:
+                            break
+
+                        if first < 0:
+                            first = 0
+
+                        if last >= length:
+                            last = length - 1
+
+                        rangeset.append((first, last))
+                    except:
+                        pass
+            except:
+                rangeset = None
+
+            if rangeset != None:
+
+                if len(rangeset) == 0:
+                    # range not satisfiable
+                    web.ctx.status = '416 Requested Range Not Satisfiable'
+                    web.header("Content-Range", "*/%s" % length)
+                    return
+                elif len(rangeset) == 1:
+                    # result is a single Content-Range body
+                    first, last = rangeset[0]
+                    web.ctx.status = '206 Partial Content'
+                    web.header('Content-Length', last - first + 1)
+                    web.header('Content-Range', "%s-%s/%s" % (first, last, length))
+                    web.header('Content-Type', content_type)
+                    for res in yieldBytes(f, first, last):
+                        yield res
                 else:
-                    buf = buf[0:length - bytes]
-                    bytes = length
+                    # result is a multipart/byteranges ?
+                    boundary = "%s%s%s" % (random.randrange(0, 0xFFFFFFFFL),
+                                           random.randrange(0, 0xFFFFFFFFL),
+                                           random.randrange(0, 0xFFFFFFFFL))
+                    web.header('Content-Type', 'multipart/byteranges; boundary=%s' % boundary)
 
-                # Note, it seems one cannot yield from inside a try block!
-                yield buf
-        else:
+                    for r in range(0,len(rangeset)):
+                        first, last = rangeset[r]
+                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: %s-%s/%s\r\n\r\n' \
+                              % (boundary, content_type, first, last, length)
+                        for res in yieldBytes(f, first, last):
+                            yield res
+                        if r == len(rangeset) - 1:
+                            yield '\r\n--%s--\r\n' % boundary
+                    
+            else:
+                # result is whole body
+                web.header('Content-type', content_type)
+                web.header('Content-Length', length)
+                web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
+                
+                for buf in yieldBytes(f, 0, length - 1):
+                    yield buf
+
+        else: # not sendBody...
             # we only send headers (for HTTP HEAD)
+            web.header('Content-type', content_type)
+            web.header('Content-Length', length)
             pass
 
         f.close()
