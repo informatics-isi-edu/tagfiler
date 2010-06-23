@@ -203,8 +203,8 @@ class Tagdef (Node):
             try:
                 multivalue = self.queryopts['multivalue'].lower()
             except:
-                restricted = 'false'
-            if restricted in [ 'true', 't', 'yes', 'y' ]:
+                multivalue = 'false'
+            if multivalue in [ 'true', 't', 'yes', 'y' ]:
                 self.multivalue = True
             else:
                 self.multivalue = False
