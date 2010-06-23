@@ -54,6 +54,12 @@ class Dispatcher:
 
     # is there some fancier way to do this via introspection
     # in one generic method?
+    def HEAD(self):
+        uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'HEAD'):
+            raise web.NoMethod()
+        return ast.HEAD(uri)
+
     def GET(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'GET'):

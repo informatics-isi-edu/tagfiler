@@ -21,7 +21,7 @@ class FileIO (Application):
         self.filetype = 'file'
         self.bytes = None
 
-    def GETfile(self, uri):
+    def GETfile(self, uri, sendBody=True):
 
         def body():
             results = self.select_file()
@@ -39,7 +39,7 @@ class FileIO (Application):
                 filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, "rb")
-                    p = subprocess.Popen(['/usr/bin/file', filename], stdout=subprocess.PIPE)
+                    p = subprocess.Popen(['/usr/bin/file', '-i', filename], stdout=subprocess.PIPE)
                     line = p.stdout.readline()
                     content_type = line.split(':')[1].strip()
                     return (f, content_type)
@@ -76,24 +76,32 @@ class FileIO (Application):
 
         # report length so browsers can show progress bar
         web.header('Content-Length', length)
-        web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
 
-        bytes = 0
-        while bytes < length:
-            buf = f.read(self.chunkbytes)
+        if sendBody:
+            web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
 
-            # don't exceed reported length, even if file changed under us
-            if (bytes + len(buf)) <= length:
-                bytes += len(buf)
-            else:
-                buf = buf[0:length - bytes]
-                bytes = length
+            bytes = 0
+            while bytes < length:
+                buf = f.read(self.chunkbytes)
 
-            # Note, it seems one cannot yield from inside a try block!
-            yield buf
+                # don't exceed reported length, even if file changed under us
+                if (bytes + len(buf)) <= length:
+                    bytes += len(buf)
+                else:
+                    buf = buf[0:length - bytes]
+                    bytes = length
+
+                # Note, it seems one cannot yield from inside a try block!
+                yield buf
+        else:
+            # we only send headers (for HTTP HEAD)
+            pass
 
         f.close()
-        self.bytes = bytes
+
+
+    def HEAD(self, uri):
+        return self.GETfile(uri, sendBody=False)
 
     def GET(self, uri):
 
