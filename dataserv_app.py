@@ -16,6 +16,8 @@ import os
 # see Application.__init__() and prepareDispatch() for real dispatch
 # see rules = [ ... ] for real matching rules
 
+render = None
+
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
@@ -23,7 +25,58 @@ def urlquote(url):
 class NotFound (web.HTTPError):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
-        web.HTTPError.__init__(self, 404, headers=headers, data=data)
+        status = '404 Not Found'
+        desc = 'The requested %s could not be found.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class Forbidden (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '403 Forbidden'
+        desc = 'The requested %s is forbidden.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class Unauthorized (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '401 Unauthorized'
+        desc = 'The requested %s requires authorization.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class BadRequest (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '400 Bad Request'
+        desc = 'The request is malformed. %s'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class Conflict (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '409 Conflict'
+        desc = 'The request conflicts with the state of the server. %s'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class IntegrityError (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '500 Internal Server Error'
+        desc = 'The request execution encountered a integrity error: %s.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class RuntimeError (web.HTTPError):
+    "provide an exception we can catch in our own transactions"
+    def __init__(self, data='', headers={}):
+        status = '500 Internal Server Error'
+        desc = 'The request execution encountered a runtime error: %s.'
+        data = render.Error(status, desc, data)
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
 
 class Application:
     "common parent class of all service handler classes to use db etc."
@@ -31,6 +84,7 @@ class Application:
 
     def __init__(self):
         "store common configuration data for all service classes"
+        global render
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -45,15 +99,46 @@ class Application:
         self.chunkbytes = int(getParam('chunkbytes'))
 
         self.render = web.template.render(self.template_path)
+        render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
-        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point', 
+        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point',
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }
 
+        self.ops = [ ('', 'Exists (ignores value)'),
+                     ('=', 'Equal'),
+                     ('!=', 'Not equal'),
+                     (':lt:', 'Less than'),
+                     (':leq:', 'Less than or equal'),
+                     (':gt:', 'Greater than'),
+                     (':geq:', 'Greater than or equal'),
+                     (':like:', 'LIKE (SQL operator)'),
+                     (':simto:', 'SIMILAR TO (SQL operator)'),
+                     (':regexp:', 'Regular expression (case sensitive)'),
+                     (':!regexp:', 'Negated regular expression (case sensitive)'),
+                     (':ciregexp:', 'Regular expression (case insensitive)'),
+                     (':!ciregexp:', 'Negated regular expression (case insensitive)')]
+
+        self.opsDB = dict([ ('', ''),
+                            ('=', '='),
+                            ('!=', '!='),
+                            (':lt:', '<'),
+                            (':leq:', '<='),
+                            (':gt:', '>'),
+                            (':geq:', '>='),
+                            (':like:', 'LIKE'),
+                            (':simto:', 'SIMILAR TO'),
+                            (':regexp:', '~'),
+                            (':!regexp:', '!~'),
+                            (':ciregexp:', '~*'),
+                            (':!ciregexp:', '!~*') ])
+
+        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
+
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(title)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title)] + renderlist + [self.render.Bottom()]])
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
@@ -71,96 +156,167 @@ class Application:
                 bodyval = body()
                 t.commit()
                 break
-            # syntax "as" not supported by Python 2.4
-            # except TypeError as te:
+            # syntax "Type as var" not supported by Python 2.4
+            except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
+                t.rollback()
+                raise te
+            except (psycopg2.DataError, psycopg2.ProgrammingError), te:
+                t.rollback()
+                raise BadRequest(data='Logical error: ' + str(te))
             except TypeError, te:
                 t.rollback()
-                return web.notfound()
-            # syntax "as" not supported by Python 2.4
-            # except NotFound as nf:
-            except NotFound, nf:
-                t.rollback()
-                return web.notfound(nf.data)
-            # syntax "as" not supported by Python 2.4
-            # except psycopg2.IntegrityError as e:
-            except psycopg2.IntegrityError, e:
+                web.debug(te)
+                raise RuntimeError(data=str(te))
+            except psycopg2.IntegrityError, te:
                 t.rollback()
                 if count > limit:
-                    raise web.BadRequest()
+                    web.debug('exceeded retry limit on IntegrityError')
+                    web.debug(te)
+                    raise IntegrityError(data=str(te))
                 # else fall through to retry...
             except:
                 t.rollback()
+                web.debug('got unknown exception from body in dbtransact')
                 raise
         return postCommit(bodyval)
+
+    def acceptPair(self, s):
+        parts = s.split(';')
+        q = 1.0
+        t = parts[0]
+        for p in parts[1:]:
+            fields = p.split('=')
+            if len(fields) == 2 and fields[0] == 'q':
+                q = fields[1]
+        return (q, t)
+        
+    def acceptTypesPreferedOrder(self):
+        return [ pair[1]
+                 for pair in
+                 sorted([ self.acceptPair(s) for s in web.ctx.env['HTTP_ACCEPT'].lower().split(',') ],
+                        key=lambda pair: pair[0]) ]
 
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
+    def owner(self):
+        try:
+            results = self.select_file_tag('owner')
+            if len(results) > 0:
+                return results[0].value
+            else:
+                return None
+        except:
+            return None
+
+    def user(self):
+        try:
+            user = web.ctx.env['REMOTE_USER']
+        except:
+            return None
+        return user
+
+    def restrictedFile(self):
+        try:
+            results = self.select_file_tag('restricted')
+            if len(results) > 0:
+                return True
+        except:
+            pass
+        return False
+
+    def enforceFileRestriction(self):
+        if self.restrictedFile():
+            owner = self.owner()
+            user = self.user()
+            if owner:
+                if user:
+                    if user != owner:
+                        raise Forbidden(data="access to dataset %s" % self.data_id)
+                    else:
+                        pass
+                else:
+                    raise Unauthorized(data="access to dataset %s" % self.data_id)
+            else:
+                pass
+
+    def enforceFileTagRestriction(self, tag_id):
+        results = self.select_tagdef(tag_id)
+        if len(results) == 0:
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+        if results[0].restricted:
+            owner = self.owner()
+            user = self.user()
+            if owner:
+                if user:
+                    if user != owner:
+                        raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
+                    else:
+                        pass
+                else:
+                    raise Unauthorized(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
+            else:
+                pass
+
+    def enforceTagRestriction(self, tag_id):
+        results = self.select_tagdef(tag_id)
+        if len(results) == 0:
+            raise NotFound()
+        owner = results[0].owner
+        user = self.user()
+        if owner:
+            if user:
+                if user != owner:
+                    raise Forbidden(data="access to tag definition %s" % tag_id)
+                else:
+                    pass
+            else:
+                raise Unauthorized(data="access to tag definition %s" % tag_id)
+        else:
+            raise Forbidden(data="access to tag definition %s" % tag_id)
+
+    def isFileTagRestricted(self, tag_id):
+        try:
+            self.enforceFileTagRestriction(tag_id)
+        except:
+            return True
+        return False
+      
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def tagval(self, tagname):
+    def gettagvals(self, tagname):
         results = self.select_file_tag(tagname)
-        try:
-            value = results[0].value
-        except:
-            value = None
-        return value
+        values = [ ]
+        for result in results:
+            try:
+                value = result.value
+                if value == None:
+                    value = ''
+                values.append(value)
+            except:
+                pass
+        return values
 
     def select_file(self):
         results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
-        return results[0]
+        return results
+
+    def select_files(self):
+        results = self.db.select('files', order='name')
+        return results
 
     def insert_file(self):
-        self.db.query("INSERT INTO files ( name ) VALUES ( $name )",
-                      vars=dict(name=self.data_id))
+        self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
+                      vars=dict(name=self.data_id, local=self.local, location=self.location))
 
-    def count_file_versions(self):
-        results = self.db.query("SELECT count(*) AS count "
-                                + "FROM fileversions WHERE name = $name",
-                                vars=dict(name=self.data_id))
-        return results[0].count
-
-    def select_file_version_max(self):
-        results = self.db.query("SELECT max(version) AS max_version "
-                                + "FROM fileversions WHERE name = $name",
-                                vars=dict(name=self.data_id))
-        return results[0].max_version
-
-    def select_file_version(self):
-        return self.db.select('fileversions', where="name = $name AND version = $version",
-                              vars=dict(name=self.data_id, version=self.vers_id))
+    def update_file(self):
+        self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
+                      vars=dict(name=self.data_id, location=self.location, local=self.local))
 
     def delete_file(self):
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
-
-    def delete_file_version(self):
-        self.db.delete('fileversions', where="name=$name AND version = $version",
-                       vars=dict(name=self.data_id, version=self.vers_id))
-        count = self.count_file_versions()
-        if count == 0:
-            self.delete_file()
-
-    def insert_file_version(self):
-        try:
-            self.select_file()
-        except:
-            self.insert_file()
-        if self.url:
-            self.db.query("INSERT INTO fileversions ( name, version, url ) VALUES ( $name, $version, $url )",
-                          vars=dict(name=self.data_id, version=self.vers_id, url=self.url))
-        else:
-            self.db.query("INSERT INTO fileversions ( name, version ) VALUES ( $name, $version )",
-                          vars=dict(name=self.data_id, version=self.vers_id))
-
-    def select_files_versions_max(self):
-        return self.db.query("SELECT name, max(version) AS version FROM fileversions GROUP BY name ORDER BY name")
-
-    def select_file_versions(self):
-        return self.db.query("SELECT version FROM fileversions"
-                             + " WHERE name = $name ORDER BY version",
-                             vars=dict(name=self.data_id))
 
     def select_tagdef(self, tagname):
         return self.db.select('tagdefs', where="tagname = $tagname",
@@ -169,15 +325,26 @@ class Application:
     def select_tagdefs(self):
         return self.db.select('tagdefs', order="tagname")
 
+    def select_defined_tags(self, where):
+        if where:
+            return self.db.select('tagdefs', where=where, order="tagname")
+        else:
+            return self.db.select('tagdefs', order="tagname")
+
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr ) VALUES ( $tag_id, $typestr )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue, owner ) VALUES ( $tag_id, $typestr, $restricted, $multivalue, $owner )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, multivalue=self.multivalue, owner=self.user()))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
         if self.typestr != '':
             tabledef += ", value %s" % (self.typestr)
-        tabledef += ", UNIQUE(file) )"
+        if not self.multivalue:
+            if self.typestr != '':
+                tabledef += ", UNIQUE(file, value)"
+            else:
+                tabledef += ", UNIQUE(file)"
+        tabledef += " )"
         self.db.query(tabledef)
         return True
 
@@ -187,59 +354,130 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname):
-        return self.db.query("SELECT * FROM \"%s\"" % (self.wraptag(tagname))
-                             + " WHERE file = $file", vars=dict(file=self.data_id))
+    def select_file_tag(self, tagname, value=None):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file"
+        if value == '':
+            query += " AND value IS NULL ORDER BY VALUE"
+        elif value:
+            query += " AND value = $value ORDER BY VALUE"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=self.data_id, value=value))
 
-    def select_file_tags(self):
-        return self.db.query("SELECT tagname FROM filetags WHERE file = $file ORDER BY tagname",
+    def select_file_tags(self, tagname=''):
+        if tagname:
+            where = " AND tagname = $tagname"
+        else:
+            where = ""
+        query = "SELECT tagname FROM filetags WHERE file = $file" \
+                + where \
+                + " GROUP BY tagname ORDER BY tagname"
+        #web.debug(query)
+        return self.db.query(query,
+                             vars=dict(file=self.data_id, tagname=tagname))
+
+    def select_defined_file_tags(self, where):
+        query = "SELECT tagname FROM filetags join tagdefs using (tagname) WHERE file = $file" \
+                + where \
+                + " GROUP BY tagname ORDER BY tagname"
+        #web.debug(query)
+        return self.db.query(query,
                              vars=dict(file=self.data_id))
 
-    def delete_file_tag(self, tagname):
-        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname)) + " WHERE file = $file",
-                      vars=dict(file=self.data_id))
-        self.db.delete("filetags", where="file = $file AND tagname = $tagname",
-                       vars=dict(file=self.data_id, tagname=tagname))
+    def delete_file_tag(self, tagname, value=None):
+        if value == '':
+            whereval = " AND value IS NULL"
+        elif value:
+            whereval = " AND value = $value"
+        else:
+            whereval = ""
+        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
+                      + " WHERE file = $file" + whereval,
+                      vars=dict(file=self.data_id, value=value))
+        results = self.select_file_tag(tagname)
+        if len(results) == 0:
+            # there may be other values tagged still
+            self.db.delete("filetags", where="file = $file AND tagname = $tagname",
+                           vars=dict(file=self.data_id, tagname=tagname))
 
     def set_file_tag(self, tagname, value):
         try:
             results = self.select_tagdef(tagname)
-            tagtype = results[0].typestr
+            result = results[0]
+            tagtype = result.typestr
+            multivalue = result.multivalue
         except:
-            raise web.BadRequest()
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
-        results = self.select_file_tag(tagname)
-        if len(results) > 0:
-            # drop existing value so we can reinsert one standard way
-            self.delete_file_tag(tagname)
+        if not multivalue:
+            results = self.select_file_tag(tagname)
+            if len(results) > 0:
+                # drop existing value so we can reinsert one standard way
+                self.delete_file_tag(tagname)
+        else:
+            results = self.select_file_tag(tagname, value)
+            if len(results) > 0:
+                # (file, tag, value) already set, so we're done
+                return
 
-        if value != '' and tagtype != '':
-            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
-                          + " ( file, value ) VALUES ( $file, $value )",
-                          vars=dict(file=self.data_id, value=value))
+        if value:
+            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
+                    + " ( file, value ) VALUES ( $file, $value )" 
         else:
             # insert untyped or typed w/ default value...
-            self.db.query("INSERT INTO \"%s\"" % (self.wraptag(tagname))
-                          + " ( file ) VALUES ( $file )",
-                          vars=dict(file=self.data_id))
+            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
+                    + " ( file ) VALUES ( $file )"
 
-        self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
-                      vars=dict(file=self.data_id, tagname=tagname))
-
-    def select_files_having_tagnames(self):
-        for t in self.tagnames:
-            try:
-                self.select_tagdef(t)[0]
-            except:
-                raise web.BadRequest()
-
-        tags = [ t for t in self.tagnames ]
-
-        if len(self.tagnames) > 1:
-            tables = " JOIN ".join(["\"%s\"" % (self.wraptag(tags[0])),
-                                    " JOIN ".join([ "\"%s\" USING (file)" % (self.wraptag(t))
-                                                    for t in tags[1:] ])])
+        #web.debug(query)
+        self.db.query(query, vars=dict(file=self.data_id, value=value))
+        
+        results = self.select_file_tags(tagname)
+        if len(results) == 0:
+            self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
+                          vars=dict(file=self.data_id, tagname=tagname))
         else:
-            tables = "\"%s\"" % (self.wraptag(tags[0]))
-        return self.db.query("SELECT file FROM %s ORDER BY file" % (tables))
+            # may already be reverse-indexed in multivalue case
+            pass            
+
+    def select_files_by_predlist(self):
+        tagdefs = {}
+        for pred in self.predlist:
+            try:
+                if not tagdefs.has_key(pred['tag']):
+                    tagdefs[pred['tag']] = self.select_tagdef(pred['tag'])[0]
+            except:
+                raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+
+        tables = []
+        wheres = []
+        values = {}
+        for p in range(0, len(self.predlist)):
+            pred = self.predlist[p]
+            tag = pred['tag']
+            op = pred['op']
+            vals = pred['vals']
+            if op and vals:
+                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
+                if len(vals) > 0:
+                    valpreds = []
+                    for v in range(0, len(vals)):
+                        valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
+                        values["val%s_%s" % (p, v)] = vals[v]
+                    wheres.append(" OR ".join(valpreds))
+                if tagdefs.has_key(tag):
+                    del tagdefs[tag]
+            elif tagdefs.has_key(tag):
+                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
+                del tagdefs[tag]
+            
+        tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
+        tables = " JOIN ".join(tables)
+
+        wheres = " AND ".join([ "(%s)" % where for where in wheres])
+        if len(wheres) > 0:
+            wheres = "WHERE " + wheres
+
+        query = "SELECT file FROM %s %s GROUP BY file ORDER BY file" % (tables, wheres)
+        #web.debug(query)
+        return self.db.query(query, vars=values)
 

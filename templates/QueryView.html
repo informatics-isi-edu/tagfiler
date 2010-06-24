@@ -1,12 +1,22 @@
-$def with (target, tagnames)
+$def with (target, predlist, ops)
 <h2>Current Query</h2>
 <p><a href="${target}">Permanent link to this query</a></p>
 <p>Match files tagged with all of the following tags:</p>
-$for tag in tagnames:
+$for pred in predlist:
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
 	  <fieldset>
-	    <legend>${tag}</legend>
-	    <input type="hidden" name="tag" value="${tag}" />
+	    <legend>${pred['tag']}</legend>
+	    $if pred['op']:
+	    	${ops[pred['op']]}:
+	    	$ count = 0
+	    	$for val in pred['vals']:
+	    		$if count != 0:
+	    			OR
+	    		<tt style="color:green">$:{val.replace(' ', '&nbsp;')}</tt>
+	    		$ count += 1
+		<input type="hidden" name="op" value="${pred['op']}" />
+		<input type="hidden" name="vals" value="${pred['vals']}" />
+	    <input type="hidden" name="tag" value="${pred['tag']}" />
 	    <input type="hidden" name="action" value="delete" />
 	    <input type="submit" value="Remove from query" />
 	  </fieldset>

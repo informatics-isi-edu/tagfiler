@@ -1,0 +1,12 @@
+$def with (target, predlist, ops)
+<h2>Query Terms</h2>
+<p><a href="${target}">Permanent link to this query</a></p>
+<p>Match files consistent with all of the following terms:</p>
+<ul>
+$for pred in predlist:
+	<li><b>${pred['tag']}</b>
+	$if pred['op']:
+		<i>${ops[pred['op']]}</i> "${','.join(pred['vals'])}"
+	</li>
+</ul>
+<h2>Matching Datasets</h2>

@@ -1,10 +1,16 @@
 $def with (target)
+<h2>Choose Name and Type of Data</h2>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-Enter a name for the new dataset: <input name="name" type="text" /><br />
+Enter a name for the dataset: <input name="name" type="text" /><br />
 Select a type of dataset definition: 
 <select name="type">
   <option value="file">Upload a file</option>
   <option value="url">Register a remote URL</option>
-</select>
+</select><br />
+Select an initial permissions mode:
+<select name="restricted">
+  <option value="false">Anybody may access or change</option>
+  <option value="true">Only owner may access or change</option>
+</select><br />
 <input type="submit" value="Proceed" />
 </form>

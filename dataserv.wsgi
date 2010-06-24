@@ -1,6 +1,7 @@
 import web
 import sys
 import os
+import sys
 
 # need to find our other local modules
 
@@ -28,37 +29,65 @@ class Dispatcher:
         sys.path.append(os.path.dirname(web.ctx.env['SCRIPT_FILENAME']))
 
         # cannot import until we get the import path above!
+        import url_lex
         import url_parse
-        from dataserv_app import NotFound
 
         urlparse = url_parse.make_parse()
         uri = web.ctx.env['REQUEST_URI']
-#        web.debug(uri)
 
-        ast = urlparse(uri)
+        try:
+            ast = urlparse(uri)
+        except url_lex.LexicalError, te:
+            web.debug('lex error on URI %s' % uri)
+            ast = None
+        except url_parse.ParseError, te:
+            web.debug('parse error on URI %s' % uri)
+            ast = None
+        except:
+            web.debug('unknown parse error on URI %s' % uri)
+            ast = None
+            raise
         if ast != None:
-#            web.debug(ast)
             return (uri, ast)
         else:
-            raise web.HTTPError('404 not found', {}, "URI %s not recognized." % uri)
+            raise web.BadRequest()
 
     # is there some fancier way to do this via introspection
     # in one generic method?
+    def HEAD(self):
+        uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'HEAD'):
+            raise web.NoMethod()
+        return ast.HEAD(uri)
+
     def GET(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'GET'):
+            raise web.NoMethod()
         return ast.GET(uri)
 
     def PUT(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'PUT'):
+            raise web.NoMethod()
         return ast.PUT(uri)
 
     def DELETE(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'DELETE'):
+            raise web.NoMethod()
         return ast.DELETE(uri)
 
     def POST(self):
         uri, ast = self.prepareDispatch()
+        if not hasattr(ast, 'POST'):
+            raise web.NoMethod()
         return ast.POST(uri)
 
 # this creates the WSGI app from the urls map
 application = web.application(urls, globals()).wsgifunc() 
+
+if __name__ == "__main__":
+        sys.path.append(os.path.dirname(sys.argv[0]))
+	import url_parse
+	url_parse.make_parse()

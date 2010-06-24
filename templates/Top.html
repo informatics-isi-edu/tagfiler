@@ -1,4 +1,4 @@
-$def with (title)
+$def with (home, title)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -10,4 +10,20 @@ $def with (title)
 <div class="title">
 <h1>${title}</h1>
 </div>
+<table cellpadding="10">
+  <tr>
+    <td>
+      <a href="${home}/">Home</a>
+    </td>
+    <td>
+      <a href="${home}/file?action=define">Create dataset</a>
+    </td>
+    <td>
+      <a href="${home}/tagdef">Tag definitions</a>
+    </td>
+    <td>
+      <a href="${home}/query">Query by tags</a>
+    </td>
+  </tr>
+</table>
 <div class="content">

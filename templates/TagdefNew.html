@@ -1,5 +1,4 @@
 $def with (target, tagdefs, typenames)
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <h2>Define tags</h2>
 <p>For convenience, up to ten (10) tags may be defined at once:
   <ol>
@@ -8,7 +7,6 @@ $def with (target, tagdefs, typenames)
     <li>Repeat previous steps for up to ten (10) tags</li>
     <li>Select "Define" to add these definitions</li>
   </ol>
-</p>
 <p>You may return to this page and create as many tags as desired.</p>
 <p>Warning: any error such as trying to create a tag name that already exists will cause all definitions in the same page to be abandoned. Therefore, you may define one tag at a time if you are uncertain which one is causing the error.</p>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
@@ -22,9 +20,18 @@ $for i in range(1,11):
 	  $for typestr in typenames.keys()[1:]:
 	      		<option value="${typestr}">${typenames[typestr]}</option>
 	  </select>
+	  <select name="multivalue-${i}">
+	    <option value="false">Files may be tagged with 0 or 1 value</option>
+	    <option value="true">Files may be tagged with 0 or more values</option>
+	  </select>
+	  <select name="restricted-${i}">
+	    <option value="false">Anybody may set tag</option>
+	    <option value="true">Only file owner may set tag</option>
+	  </select>
 	</fieldset>
-</table>
+<p>
 <input type="hidden" name="action" value="add" />
 <input type="submit" value="Define tag(s)" />
 <input type="reset" value="Reset form" />
+</p>
 </form>

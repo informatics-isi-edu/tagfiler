@@ -1,14 +1,25 @@
-$def with (apptarget, querytarget, tags)
+$def with (apptarget, querytarget, tags, ops)
 $if len(tags) > 0:
-	<h2>Add a Query Tag</h2>
+	<h2>Add a Query Term</h2>
 	<p>Select an available tag and click 'Add' to build a query:
 	</p>
 	<form enctype="application/x-www-form-urlencoded" action="${querytarget}" method="get">
-	  <select name="tag">
+	  <table><tr valign='top'>
+	  <td><select name="tag">
 		$for tag in tags:
 			<option value="${tag}">${tag}</option>
-	  </select>
-	  <input type="submit" value="Add to query" />
+	  </select></td>
+	  <td><select name="op">
+	  	$for op, desc in ops:
+			<option value="${op}">${desc}</option>
+	  </select></td>
+	  <td><table>
+		  <tr><td></td><td><input type="text" name="val0" /></td></tr>
+		  $for i in range(1,10):
+		  	<tr><td>OR</td><td><input type="text" name="val${i}" /></td></tr>
+	  </table></td>
+	  <td><input type="submit" value="Add to query" />
+	  </tr></table>
 	  <input type="hidden" name="action" value="add" />
 	</form>
 $else:

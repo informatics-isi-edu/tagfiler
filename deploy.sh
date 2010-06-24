@@ -25,8 +25,8 @@ SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
 
-# let's try this blindly in case we need it
-service postgresql initdb
+# location of platform installed file
+PGCONF=/var/lib/pgsql/data/postgresql.conf
 
 # set the services to run automatically?
 chkconfig httpd on
@@ -46,8 +46,27 @@ chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
 
 # try some blind database setup as well
-service postgresql start
-runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+if grep -e '^extra_float_digits = 2[^0-9].*' < ${PGCONF}
+then
+    :
+else
+    # need to set extra_float_digits = 2 for proper floating point handling
+    PGCONFTMP=${PGCONF}.tmp.$$
+    runuser -c "sed -e 's|^.*\(extra_float_digits[^=]*= *\)[-0-9]*\([^#]*#.*\)|\1 2  \2|' < $PGCONF > $PGCONFTMP" - ${PGADMIN} \
+	&& mv $PGCONFTMP $PGCONF
+    chmod u=rw,og= $PGCONF
+fi
+
+service postgresql restart
+
+if runuser -c "psql -c 'select * from pg_user' ${PGADMIN}" - ${PGADMIN} | grep ${SVCUSER} 1>/dev/null
+then
+    :
+else
+	runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+fi
+
+runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
 runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 
 
@@ -68,10 +87,36 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 
 # this script will recreate all tables, but only on a clean database
 
-psql -c "CREATE TABLE files ( name text PRIMARY KEY )"
-psql -c "CREATE TABLE fileversions ( name text REFERENCES files (name) ON DELETE CASCADE, version int NOT NULL, url text, UNIQUE (name, version) )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text )"
+psql -c "CREATE TABLE files ( name text PRIMARY KEY, local boolean default False, location text )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, restricted boolean, owner text )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
+
+# pre-establish core restricted tags used by codebase
+tagdef()
+{
+# args: tagname typestr
+psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
+if [[ -n "\$2" ]]
+then
+   if [[ "\$3" = "multival" ]]
+   then
+      psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
+   else
+      psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE( file, value) )"
+   fi
+else
+   psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
+fi
+}
+
+tagdef owner text
+tagdef created timestamptz
+tagdef restricted
+tagdef "modified by" text
+tagdef modified timestamptz
+tagdef bytes int8
+tagdef name text
+tagdef url text
 
 EOF
 
@@ -90,7 +135,6 @@ done
 
 psql -c "DROP TABLE filetags"
 psql -c "DROP TABLE tagdefs"
-psql -c "DROP TABLE fileversions"
 psql -c "DROP TABLE files"
 
 EOF
@@ -112,15 +156,14 @@ do
     fi
 done
 
-for table in filetags tagdefs fileversions files
+for table in filetags tagdefs files
 do
     echo "DUMPING TABLE \"\$table\""
     psql -c "SELECT * FROM \$table"
 done
 EOF
 
-# blindly clean and setup db tables
-runuser -c "~${SVCUSER}/dbclear.sh" - ${SVCUSER}
+# setup db tables
 runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
 
 # register our service code
@@ -143,31 +186,17 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
-    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.home http://${HOME_HOST}
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
     SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
-    # This section will be enabled for Digest authentication
-    
-    # AuthType Digest
-    # AuthName "${SVCPREFIX}"
-    # AuthDigestDomain /${SVCPREFIX}/
-    # AuthUserFile /etc/httpd/passwd/passwd
-    # Require valid-user
+    AuthType Digest
+    AuthName "${SVCPREFIX}"
+    AuthDigestDomain /${SVCPREFIX}/
+    AuthUserFile /etc/httpd/passwd/passwd
+    Require valid-user
 
-    # This section will be enabled for Crowd authentication
-    # Currently, it is enabled in the /etc/httpd/conf.d/ssl.conf file on the psoc.misd.isi.edu VM
-    # Therefore, not necessary to be enabled here 
-    
-    # AuthName subversion
-    # AuthType Basic
-    # PerlAuthenHandler Apache::CrowdAuth
-    # PerlSetVar CrowdAppName subversion
-    # PerlSetVar CrowdAppPassword $UbV3R$1oN!
-    # PerlSetVar CrowdSOAPURL https://chi:8445/crowd/services/SecurityServer
-    # require valid-user
-    
 </Directory>
 
 EOF

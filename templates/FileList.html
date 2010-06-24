@@ -3,11 +3,24 @@ $if len(files) > 0:
 	$for name in files:
 		<fieldset>
 		  <legend>${name}</legend>
-		  <a href="${target}/file/${quote(name)}">Download latest</a>,
-		  <a href="${target}/history/${quote(name)}">View revision history</a>,
+		  <table>
+		    <tr>
+		      <td>
+		  <a href="${target}/file/${quote(name)}">Download</a>,
 		  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
-		  <a href="${target}/file/${quote(name)}?action=define&type=file">Upload a file</a>, 
-		  <a href="${target}/file/${quote(name)}?action=define&type=url">Register a URL</a>
+		  <a href="${target}/file/${quote(name)}?action=define&amp;type=file">Update via file</a>, 
+		  <a href="${target}/file/${quote(name)}?action=define&amp;type=url">Update via URL</a>
+		      </td>
+		      <td>
+		  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
+		    <p>
+		    <input type="hidden" name="action" value="delete" />
+		    <input type="submit" value="Delete" />
+		    </p>
+		  </form>
+		      </td>
+		    </tr>
+		  </table>
 		</fieldset>
 $else:
 	<p>There are no files to list.</p>
