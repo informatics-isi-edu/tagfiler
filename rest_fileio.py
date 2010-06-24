@@ -546,7 +546,7 @@ class FileIO (Application):
             user, path = self.getTemporary()
             fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
             os.close(fileHandle)
-            f = open(tempFileName, "wb")
+            f = open(tempFileName, "w+b")
             wbytes, flen = self.storeInput(inf, f)
         
             # now we have to remove the trailing part boundary we
