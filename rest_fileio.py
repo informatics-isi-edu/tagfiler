@@ -227,7 +227,10 @@ class FileIO (Application):
                 
                 """delete the directory if empty"""
                 if len(os.listdir(dir)) == 0:
-                    os.rmdir(dir)
+                    try:
+                        os.rmdir(dir)
+                    except:
+                        pass
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -375,8 +378,8 @@ class FileIO (Application):
         return (bytes, flen)
 
 
-    def getTemporary(self):
-        """get the directory and the prefix for a temporary file"""
+    def getTemporary(self, mode):
+        """get a temporary file"""
 
         prefix = self.user()
         if prefix != None:
@@ -386,10 +389,24 @@ class FileIO (Application):
             
         dir = self.store_path + '/' + urlquote(self.data_id)
 
-        if not os.path.exists(dir):
-            os.makedirs(dir, mode=0755)
-
-        return (prefix, dir)
+        """posible race condition in mkdir and rmdir"""
+        count = 0
+        limit = 10
+        while True:
+            count = count + 1
+            try:
+                if not os.path.exists(dir):
+                    os.makedirs(dir, mode=0755)
+        
+                fileHandle, filename = tempfile.mkstemp(prefix=prefix, dir=dir)
+                os.close(fileHandle)
+                f = open(filename, mode)
+                break
+            except:
+                if count > limit:
+                    raise
+            
+        return (f, filename)
 
 
     def deletePrevious(self, result):
@@ -401,7 +418,10 @@ class FileIO (Application):
 
             """delete the directory if empty"""
             if len(os.listdir(dir)) == 0:
-                os.rmdir(dir)
+                try:
+                    os.rmdir(dir)
+                except:
+                    pass
 
     def PUT(self, uri):
         """store file content from client"""
@@ -465,10 +485,7 @@ class FileIO (Application):
                 except:
                     return (None, None)
             else:
-                user, path = self.getTemporary()
-                fileHandle, filename = tempfile.mkstemp(prefix=user, dir=path)
-                os.close(fileHandle)
-                f = open(filename, 'wb')
+                f, filename = self.getTemporary('wb')
                 return (f, filename)
         
         if cfirst and clast:
@@ -543,10 +560,7 @@ class FileIO (Application):
             # we only support file PUT simulation this way
             inf = web.ctx.env['wsgi.input']
             boundary1, boundaryN = self.scanFormHeader(inf)
-            user, path = self.getTemporary()
-            fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-            os.close(fileHandle)
-            f = open(tempFileName, "w+b")
+            f, tempFileName = self.getTemporary("w+b")
             wbytes, flen = self.storeInput(inf, f)
         
             # now we have to remove the trailing part boundary we
