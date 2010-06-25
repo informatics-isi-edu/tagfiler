@@ -9,7 +9,8 @@ $if len(tagdefs) > 0:
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		<input type="submit" value="Delete" />
+		$if title.find("predefined") == -1:
+			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
 		$if multivalue:
