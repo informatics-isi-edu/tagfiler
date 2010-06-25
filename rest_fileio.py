@@ -28,7 +28,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('read users')
             return results[0]
 
         def postCommit(result):
@@ -214,7 +214,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.delete_file()
             return results[0]
 
@@ -264,7 +264,7 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.update_file()
         else:
             # anybody is free to insert new uniquely named file
@@ -286,6 +286,13 @@ class FileIO (Application):
             t = self.db.transaction()
             try:
                 self.set_file_tag('name', self.data_id)
+                t.commit()
+            except:
+                t.rollback()
+    
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('read users', '*')
                 t.commit()
             except:
                 t.rollback()
@@ -468,7 +475,7 @@ class FileIO (Application):
                 results = self.select_file()
                 if len(results) == 0:
                     return None
-                self.enforceFileRestriction()
+                self.enforceFileRestriction('write users')
                 return results[0]
             else:
                 return None
@@ -547,7 +554,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.delete_file()
             return results[0]
 

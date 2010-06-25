@@ -1,7 +1,7 @@
 $def with (title, apptarget, data_id, taginfo, urlquote)
 <h2>${title}</h2>
 $ excludes, tagdefs, tagdefsdict, tags, tagvals, length = taginfo
-$if title == 'Predefined tags':
+$if title == 'System':
 	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(tagvals) > 0:
 	$for tag, vals in tagvals:

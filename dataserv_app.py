@@ -216,29 +216,27 @@ class Application:
             return None
         return user
 
-    def restrictedFile(self):
+    def restrictedFile(self, tag, user):
         try:
-            results = self.select_file_tag('restricted')
-            if len(results) > 0:
+            results = self.select_file_tag_restrictions(tag, user)
+            if len(results) == 0:
                 return True
         except:
             pass
         return False
 
-    def enforceFileRestriction(self):
-        if self.restrictedFile():
-            owner = self.owner()
-            user = self.user()
-            if owner:
-                if user:
-                    if user != owner:
+    def enforceFileRestriction(self, tag):
+        owner = self.owner()
+        user = self.user()
+        if owner:
+            if user:
+                if user != owner:
+                    if self.restrictedFile(tag, user):
                         raise Forbidden(data="access to dataset %s" % self.data_id)
-                    else:
-                        pass
-                else:
-                    raise Unauthorized(data="access to dataset %s" % self.data_id)
             else:
-                pass
+                raise Unauthorized(data="access to dataset %s" % self.data_id)
+        else:
+            pass
 
     def enforceFileTagRestriction(self, tag_id):
         results = self.select_tagdef(tag_id)
@@ -363,6 +361,12 @@ class Application:
             query += " AND value = $value ORDER BY VALUE"
         #web.debug(query)
         return self.db.query(query, vars=dict(file=self.data_id, value=value))
+
+    def select_file_tag_restrictions(self, tagname, user):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file AND (value = $value OR value = $any)"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=self.data_id, value=user, any="*"))
 
     def select_file_tags(self, tagname=''):
         if tagname:

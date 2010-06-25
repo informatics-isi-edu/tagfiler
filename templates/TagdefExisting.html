@@ -9,7 +9,7 @@ $if len(tagdefs) > 0:
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		$if title.find("predefined") == -1:
+		$if title == "User":
 			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})

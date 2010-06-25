@@ -127,8 +127,8 @@ class Tagdef (Node):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             predefined, userdefined = tagdefs
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'Existing predefined tag definitions'),
-                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'Existing user tag definitions'),
+                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System'),
+                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User'),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:
@@ -355,8 +355,8 @@ class FileTags (Node):
             all = ( all[0], all[1], all[2], all[3], all[4],
                     max(system[5], userdefined[5]) ) # use maximum length for user input boxes
             return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting('Predefined tags', apptarget, self.data_id, system, urlquote),
-                                    self.render.FileTagExisting('User defined tags', apptarget, self.data_id, userdefined, urlquote),
+                                   [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
+                                    self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
                                     self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.isFileTagRestricted(tag), urlquote)])
             
         return self.dbtransact(body, postCommit)
