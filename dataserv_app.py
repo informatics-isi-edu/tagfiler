@@ -283,8 +283,8 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def gettagvals(self, tagname):
-        results = self.select_file_tag(tagname)
+    def gettagvals(self, tagname, data_id=None):
+        results = self.select_file_tag(tagname, data_id=data_id)
         values = [ ]
         for result in results:
             try:
@@ -352,7 +352,7 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname, value=None):
+    def select_file_tag(self, tagname, value=None, data_id=None):
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
                 + " WHERE file = $file"
         if value == '':
@@ -360,7 +360,9 @@ class Application:
         elif value:
             query += " AND value = $value ORDER BY VALUE"
         #web.debug(query)
-        return self.db.query(query, vars=dict(file=self.data_id, value=value))
+        if data_id == None:
+            data_id = self.data_id
+        return self.db.query(query, vars=dict(file=data_id, value=value))
 
     def select_file_tag_restrictions(self, tagname, user):
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
@@ -381,9 +383,17 @@ class Application:
                              vars=dict(file=self.data_id, tagname=tagname))
 
     def select_defined_file_tags(self, where):
-        query = "SELECT tagname FROM filetags join tagdefs using (tagname) WHERE file = $file" \
-                + where \
-                + " GROUP BY tagname ORDER BY tagname"
+        if self.data_id:
+            wheres = "WHERE file = $file"
+            if where:
+                wheres += " AND" + where
+        else:
+            if where:
+                wheres = "WHERE" + where
+            else:
+                wheres = ""
+        query = "SELECT file, tagname FROM filetags join tagdefs using (tagname) " + wheres \
+                + " GROUP BY file, tagname ORDER BY file, tagname"
         #web.debug(query)
         return self.db.query(query,
                              vars=dict(file=self.data_id))

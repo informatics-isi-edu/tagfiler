@@ -277,7 +277,7 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id, tag_id='', value=None):
+    def __init__(self, appname, data_id=None, tag_id='', value=None):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
@@ -335,18 +335,18 @@ class FileTags (Node):
             def buildtaginfo(where1, where2):
                 tagdefs = [ tagdef for tagdef in self.select_defined_tags(where1) ]
                 tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
-                tags = [ result.tagname for result in self.select_defined_file_tags(where2) ]
-                tagvals = [ (tag, [self.mystr(val) for val in self.gettagvals(tag)]) for tag in tags ]
-                length = listmax([listmax([ len(val) for val in vals]) for tag, vals in tagvals])
+                filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
+                filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
+                length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
                 return ( self.predefinedTags, # excludes
                          tagdefs,
                          tagdefsdict,
-                         tags,
-                         tagvals,
+                         filetags,
+                         filetagvals,
                          length )
             
-            return (buildtaginfo('owner is null', ' AND tagdefs.owner is null'),         # system
-                    buildtaginfo('owner is not null', ' AND tagdefs.owner is not null'), # userdefined
+            return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
+                    buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
                     buildtaginfo('', '') )                                               # all
 
         def postCommit(results):
@@ -354,10 +354,22 @@ class FileTags (Node):
             apptarget = self.home + web.ctx.homepath
             all = ( all[0], all[1], all[2], all[3], all[4],
                     max(system[5], userdefined[5]) ) # use maximum length for user input boxes
-            return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
-                                    self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.isFileTagRestricted(tag), urlquote)])
+
+            for acceptType in self.acceptTypesPreferedOrder():
+                if acceptType == 'text/uri-list':
+                    target = self.home + web.ctx.homepath
+                    return self.render.FileTagUriList(target, all, urlquote)
+                elif acceptType == 'text/html':
+                    break
+            # render HTML result
+            if self.data_id:
+                return self.renderlist("\"%s\" tags" % (self.data_id),
+                                       [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
+                                        self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
+                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.isFileTagRestricted(tag), urlquote)])
+            else:
+                return self.renderlist("All tags for all files",
+                                       [self.render.FileTagValExisting('System and User', apptarget, self.data_id, all, urlquote)])
             
         return self.dbtransact(body, postCommit)
 
@@ -543,7 +555,7 @@ class Query (Node):
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
                         # return raw results for REST client
-                        return self.render.UriList(target, files, urlquote)
+                        return self.render.FileUriList(target, files, urlquote)
                     elif acceptType == 'text/html':
                         break
                 return self.renderlist("Query Results",

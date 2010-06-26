@@ -1,3 +1,0 @@
-$def with (target, files, urlquote)
-$for name in files:
-     ${target}/file/${urlquote(name)}
