@@ -216,14 +216,15 @@ class Application:
             return None
         return user
 
-    def restrictedFile(self, tag, user):
+    def restrictedFile(self, tag, user, owner):
         try:
             results = self.select_file_tag_restrictions(tag, user)
             if len(results) == 0:
                 return True
+            else:
+                return False
         except:
-            pass
-        return False
+            return user != owner
 
     def enforceFileRestriction(self, tag):
         owner = self.owner()
@@ -231,7 +232,7 @@ class Application:
         if owner:
             if user:
                 if user != owner:
-                    if self.restrictedFile(tag, user):
+                    if self.restrictedFile(tag, user, owner):
                         raise Forbidden(data="access to dataset %s" % self.data_id)
             else:
                 raise Unauthorized(data="access to dataset %s" % self.data_id)

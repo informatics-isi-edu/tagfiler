@@ -498,14 +498,11 @@ class FileIO (Application):
         # clast  -- last byte position of content body in file
 
         def preWriteBody():
-            if self.update:
-                results = self.select_file()
-                if len(results) == 0:
-                    return None
-                self.enforceFileRestriction('write users')
-                return results[0]
-            else:
+            results = self.select_file()
+            if len(results) == 0:
                 return None
+            self.enforceFileRestriction('write users')
+            return results[0]
 
         def preWritePostCommit(result):
             if result != None:
