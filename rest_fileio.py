@@ -3,8 +3,19 @@ import web
 import subprocess
 import tempfile
 import random
+import re
 
 from dataserv_app import Application, NotFound, BadRequest, urlquote
+
+# build a map of mime type --> primary suffix
+mime_types_suffixes = dict()
+f = open('/etc/mime.types', 'rb')
+for line in f.readlines():
+    m = re.match(r'^(?P<type>[^ \t]+)[ \t]+(?P<exts>.+)', line)
+    if m:
+        g = m.groupdict()
+        mime_types_suffixes[g['type']] = g['exts'].split(' ')[0]
+f.close()
 
 class FileIO (Application):
     """Basic bulk file I/O
@@ -23,6 +34,7 @@ class FileIO (Application):
         self.bytes = None
 
     def GETfile(self, uri, sendBody=True):
+        global mime_types_suffixes
 
         def body():
             results = self.select_file()
@@ -40,9 +52,9 @@ class FileIO (Application):
                 filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, "rb")
-                    p = subprocess.Popen(['/usr/bin/file', '-i', filename], stdout=subprocess.PIPE)
+                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                     line = p.stdout.readline()
-                    content_type = line.split(':')[1].strip()
+                    content_type = line.strip()
                     return (f, content_type)
                 except:
                     # this may happen sporadically under race condition:
@@ -65,6 +77,20 @@ class FileIO (Application):
         # we only get here if we were able to both:
         #   a. open the file for reading its content
         #   b. obtain its content-type from /usr/bin/file test
+
+        # fix up some ugliness in CentOS 'file -i -b' outputs
+        content_type = re.sub('application/x-zip', 'application/zip', content_type)
+        
+        mime_type = content_type.split(';')[0]
+        m = re.match(r'^.+\.[^.]{1,4}', self.data_id)
+        if m:
+            disposition_name = self.data_id
+        else:
+            try:
+                suffix = mime_types_suffixes[mime_type]
+                disposition_name = self.data_id + '.' + suffix
+            except:
+                disposition_name = self.data_id
         
         # SEEK_END attribute not supported by Python 2.4
         # f.seek(0, os.SEEK_END)
@@ -145,6 +171,7 @@ class FileIO (Application):
                     web.header('Content-Length', last - first + 1)
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
+                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                     for res in yieldBytes(f, first, last):
                         yield res
                 else:
@@ -156,8 +183,8 @@ class FileIO (Application):
 
                     for r in range(0,len(rangeset)):
                         first, last = rangeset[r]
-                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\n\r\n' \
-                              % (boundary, content_type, first, last, length)
+                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
+                              % (boundary, content_type, first, last, length, disposition_name)
                         for res in yieldBytes(f, first, last):
                             yield res
                         if r == len(rangeset) - 1:
@@ -167,7 +194,7 @@ class FileIO (Application):
                 # result is whole body
                 web.header('Content-type', content_type)
                 web.header('Content-Length', length)
-                web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
+                web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
                 for buf in yieldBytes(f, 0, length - 1):
                     yield buf
