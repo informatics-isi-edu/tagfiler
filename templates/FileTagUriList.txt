@@ -6,6 +6,6 @@ $code
 		s = ""
 		for file, tag, vals in filetagvals:
 			for val in vals:
-				s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "/" + urlquote(val) + "\n"
+				s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "=" + urlquote(val) + "\n"
 		return s
 ${rendertagvals(taginfo[4])[:-1]}
