@@ -517,12 +517,14 @@ class FileIO (Application):
                 filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, 'r+b')
-                    return (f, None)
+                    return f
                 except:
-                    return (None, None)
+                    return None
             else:
                 f, filename = self.getTemporary('wb')
-                return (f, filename)
+                self.location = filename[len(self.store_path)+1:]
+                self.local = True
+                return f
         
         if cfirst and clast:
             # try update-in-place if user is doing Range: partial PUT
@@ -533,38 +535,31 @@ class FileIO (Application):
         count = 0
         limit = 10
         f = None
-        insertFilename = None
         while not f:
             count += 1
             if count > limit:
                 raise web.internalerror('Could not access local copy of ' + self.data_id)
 
             # we do this in a loop in case of select/open race conditions
-            f, insertFilename = self.dbtransact(preWriteBody, preWritePostCommit)
+            f = self.dbtransact(preWriteBody, preWritePostCommit)
 
         # we only get here if we have a file to write into
         wbytes, flen = self.storeInput(inf, f, flen, cfirst, clen)
         f.close()
 
-        if insertFilename:
-            # the file we wrote is new so needs to go into database
-            self.location = insertFilename[len(self.store_path)+1:]
-            self.local = True
-            self.bytes = flen
-            self.wbytes = wbytes
+        self.bytes = flen
+        self.wbytes = wbytes
 
-            def postWriteBody():
-                # this may repeat in case of database races
-                return self.insertForStore()
+        def postWriteBody():
+            # this may repeat in case of database races
+            return self.insertForStore()
 
-            def postWritePostCommit(results):
-                if len(results) > 0:
-                    self.deletePrevious(results[0])
-                return 'Stored %s bytes' % (self.wbytes)
+        def postWritePostCommit(results):
+            if len(results) > 0:
+                self.deletePrevious(results[0])
+            return 'Stored %s bytes' % (self.wbytes)
 
-            return self.dbtransact(postWriteBody, postWritePostCommit)
-        else:
-            return 'Stored %s bytes' % (wbytes)
+        return self.dbtransact(postWriteBody, postWritePostCommit)
 
 
     def POST(self, uri):
