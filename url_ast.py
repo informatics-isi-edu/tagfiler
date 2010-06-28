@@ -539,8 +539,11 @@ class Query (Node):
             return ( files, alltags )
 
         def postCommit(results):
-            files, alltags = results
-
+            filelist, alltags = results
+            files = []
+            for name in filelist:
+                files.append((name, False))
+                
             target = self.home + web.ctx.homepath
 
             if self.action in set(['add', 'delete']):
