@@ -264,14 +264,8 @@ class FileIO (Application):
                 """delete the file"""
                 filename = self.store_path + '/' + result.location
                 dir = os.path.dirname(filename)
-                os.unlink(filename)
+                self.deleteFile(filename)
                 
-                """delete the directory if empty"""
-                if len(os.listdir(dir)) == 0:
-                    try:
-                        os.rmdir(dir)
-                    except:
-                        pass
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -411,7 +405,7 @@ class FileIO (Application):
                     eof = True
                 elif buflen == 0:
                     f.close()
-                    os.unlink(filename)
+                    self.deleteFile(filename)
                     raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
             elif buflen == 0:
                 eof = True
@@ -456,20 +450,20 @@ class FileIO (Application):
             
         return (f, filename)
 
+    def deleteFile(self, filename):
+        dir = os.path.dirname(filename)
+        os.unlink(filename)
+
+        if len(os.listdir(dir)) == 0:
+            try:
+                os.rmdir(dir)
+            except:
+                pass
 
     def deletePrevious(self, result):
         if result.local:
             # previous result had local file, so free it
-            filename = self.store_path + '/' + result.location
-            dir = os.path.dirname(filename)
-            os.unlink(filename)
-
-            """delete the directory if empty"""
-            if len(os.listdir(dir)) == 0:
-                try:
-                    os.rmdir(dir)
-                except:
-                    pass
+            self.deleteFile(self.store_path + '/' + result.location)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -580,7 +574,7 @@ class FileIO (Application):
             raise
         except:
             if filename:
-                os.unlink(filename)
+                self.deleteFile(filename)
             raise
 
     def POST(self, uri):
@@ -653,7 +647,7 @@ class FileIO (Application):
             except web.SeeOther:
                 raise
             except:
-                os.unlink(tempFileName)
+                self.deleteFile(tempFileName)
                 raise
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
