@@ -308,10 +308,10 @@ class FileIO (Application):
             try:
                 self.enforceFileRestriction('write users')
                 self.update_file()
-            except e:
+            except:
                 if self.local == True:
                     os.unlink(self.store_path + '/' + self.location)
-                raise e
+                raise
         else:
             # anybody is free to insert new uniquely named file
             self.insert_file()
@@ -524,9 +524,7 @@ class FileIO (Application):
             return results[0]
 
         def preWritePostCommit(result):
-            if result != None:
-                if not result.local:
-                    raise Conflict(data="The resource %s is not a local file." % self.data_id)
+            if result != None and self.update and self.local:
                 self.location = result.location
                 filename = self.store_path + '/' + self.location
                 try:
@@ -534,11 +532,10 @@ class FileIO (Application):
                     return f
                 except:
                     return None
+            elif result != None and self.update and not self.local:
+                raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
             else:
-                f, filename = self.getTemporary('wb')
-                self.location = filename[len(self.store_path)+1:]
-                self.local = True
-                return f
+                return None
         
         if cfirst and clast:
             # try update-in-place if user is doing Range: partial PUT
@@ -556,6 +553,12 @@ class FileIO (Application):
 
             # we do this in a loop in case of select/open race conditions
             f = self.dbtransact(preWriteBody, preWritePostCommit)
+
+        # we get here if write is not disallowed but we're not writing to existing file
+        if f == None:
+            f, filename = self.getTemporary('wb')
+            self.location = filename[len(self.store_path)+1:]
+            self.local = True
 
         # we only get here if we have a file to write into
         wbytes, flen = self.storeInput(inf, f, flen, cfirst, clen)
@@ -580,6 +583,16 @@ class FileIO (Application):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
+        def preWriteBody():
+            results = self.select_file()
+            if len(results) == 0:
+                return True
+            self.enforceFileRestriction('write users')
+            return True
+
+        def preWritePostCommit(result):
+            return None
+        
         def putBody():
             return self.insertForStore()
 
@@ -603,6 +616,10 @@ class FileIO (Application):
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
+
+            # do pre-test of permissions to abort early if possible
+            self.dbtransact(preWriteBody, preWritePostCommit)
+
             inf = web.ctx.env['wsgi.input']
             boundary1, boundaryN = self.scanFormHeader(inf)
             f, tempFileName = self.getTemporary("w+b")
