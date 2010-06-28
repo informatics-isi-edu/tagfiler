@@ -305,13 +305,8 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            try:
-                self.enforceFileRestriction('write users')
-                self.update_file()
-            except:
-                if self.local == True:
-                    os.unlink(self.store_path + '/' + self.location)
-                raise
+            self.enforceFileRestriction('write users')
+            self.update_file()
         else:
             # anybody is free to insert new uniquely named file
             self.insert_file()
