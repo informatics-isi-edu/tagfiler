@@ -509,22 +509,20 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 return None
-            self.enforceFileRestriction('write users')
-            return results[0]
-
-        def preWritePostCommit(result):
-            if result != None and self.update and self.local:
-                self.location = result.location
-                filename = self.store_path + '/' + self.location
-                try:
-                    f = open(filename, 'r+b')
-                    return f
-                except:
-                    return None
-            elif result != None and self.update and not self.local:
-                raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
             else:
-                return None
+                self.enforceFileRestriction('write users')
+                if self.update:
+                    if results[0].local:
+                        self.location = result.location
+                        filename = self.store_path + '/' + self.location
+                        return open(filename, 'r+b')
+                    else:
+                        raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
+                else:
+                    return None
+
+        def preWritePostCommit(f):
+            return f
         
         if cfirst and clast:
             # try update-in-place if user is doing Range: partial PUT
@@ -532,18 +530,10 @@ class FileIO (Application):
         else:
             self.update = False
 
-        count = 0
-        limit = 10
-        f = None
-        while not f:
-            count += 1
-            if count > limit:
-                raise web.internalerror('Could not access local copy of ' + self.data_id)
+        # this retries if a file was found but could not be opened due to races
+        f = self.dbtransact(preWriteBody, preWritePostCommit)
 
-            # we do this in a loop in case of select/open race conditions
-            f = self.dbtransact(preWriteBody, preWritePostCommit)
-
-        # we get here if write is not disallowed but we're not writing to existing file
+        # we get here if write is not disallowed
         if f == None:
             f, filename = self.getTemporary('wb')
             self.location = filename[len(self.store_path)+1:]

@@ -167,10 +167,10 @@ class Application:
                 t.rollback()
                 web.debug(te)
                 raise RuntimeError(data=str(te))
-            except psycopg2.IntegrityError, te:
+            except (psycopg2.IntegrityError, IOError), te:
                 t.rollback()
                 if count > limit:
-                    web.debug('exceeded retry limit on IntegrityError')
+                    web.debug('exceeded retry limit')
                     web.debug(te)
                     raise IntegrityError(data=str(te))
                 # else fall through to retry...
