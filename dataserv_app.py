@@ -216,6 +216,23 @@ class Application:
             return None
         return user
 
+    def restrictedUsers(self, tag, owner, file):
+        user = self.user()
+        if user:
+            if user != owner:
+                try:
+                    results = self.select_user_restrictions(tag, user, file)
+                    if len(results) == 0:
+                        return True
+                    else:
+                        return False
+                except:
+                    return True
+            else:
+                return False
+        else:
+            return True
+
     def restrictedFile(self, tag, user, owner):
         try:
             results = self.select_file_tag_restrictions(tag, user)
@@ -305,6 +322,10 @@ class Application:
         results = self.db.select('files', order='name')
         return results
 
+    def select_files_by_owner(self):
+        results = self.db.select('"_owner"', order='file')
+        return results
+    
     def insert_file(self):
         self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
                       vars=dict(name=self.data_id, local=self.local, location=self.location))
@@ -370,6 +391,12 @@ class Application:
                 + " WHERE file = $file AND (value = $value OR value = $any)"
         #web.debug(query)
         return self.db.query(query, vars=dict(file=self.data_id, value=user, any="*"))
+
+    def select_user_restrictions(self, tagname, user, file):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file AND (value = $value OR value = $any)"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=file, value=user, any="*"))
 
     def select_file_tags(self, tagname=''):
         if tagname:
