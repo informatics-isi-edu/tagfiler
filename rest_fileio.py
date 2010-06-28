@@ -554,6 +554,8 @@ class FileIO (Application):
             f, filename = self.getTemporary('wb')
             self.location = filename[len(self.store_path)+1:]
             self.local = True
+        else:
+            filename = None
 
         # we only get here if we have a file to write into
         wbytes, flen = self.storeInput(inf, f, flen, cfirst, clen)
@@ -571,8 +573,15 @@ class FileIO (Application):
                 self.deletePrevious(results[0])
             return 'Stored %s bytes' % (self.wbytes)
 
-        return self.dbtransact(postWriteBody, postWritePostCommit)
-
+        try:
+            result = self.dbtransact(postWriteBody, postWritePostCommit)
+            return result
+        except web.SeeOther:
+            raise
+        except:
+            if filename:
+                os.unlink(filename)
+            raise
 
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
@@ -618,27 +627,34 @@ class FileIO (Application):
             inf = web.ctx.env['wsgi.input']
             boundary1, boundaryN = self.scanFormHeader(inf)
             f, tempFileName = self.getTemporary("w+b")
-            wbytes, flen = self.storeInput(inf, f)
-        
-            # now we have to remove the trailing part boundary we
-            # copied to disk by being lazy above...
-            # SEEK_END attribute not supported by Python 2.4
-            # f.seek(0 - len(boundaryN), os.SEEK_END)
-            f.seek(0 - len(boundaryN), 2)
-            buf = f.read(len(boundaryN))
-            f.seek(0 - len(boundaryN), 2)
-            f.truncate() # truncate to current seek location
-            bytes = f.tell()
-            f.close()
-            if buf != boundaryN:
-                # we did not get an entire multipart body apparently
-                os.unlink(tempFileName)
-                raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
-            self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
-            self.local = True
-            self.bytes = bytes
 
-            return self.dbtransact(putBody, putPostCommit)
+            try:
+                wbytes, flen = self.storeInput(inf, f)
+        
+                # now we have to remove the trailing part boundary we
+                # copied to disk by being lazy above...
+                # SEEK_END attribute not supported by Python 2.4
+                # f.seek(0 - len(boundaryN), os.SEEK_END)
+                f.seek(0 - len(boundaryN), 2)
+                buf = f.read(len(boundaryN))
+                f.seek(0 - len(boundaryN), 2)
+                f.truncate() # truncate to current seek location
+                bytes = f.tell()
+                f.close()
+                if buf != boundaryN:
+                    # we did not get an entire multipart body apparently
+                    raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
+                self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
+                self.local = True
+                self.bytes = bytes
+
+                result = self.dbtransact(putBody, putPostCommit)
+                return result
+            except web.SeeOther:
+                raise
+            except:
+                os.unlink(tempFileName)
+                raise
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()
