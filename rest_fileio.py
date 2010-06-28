@@ -226,12 +226,26 @@ class FileIO (Application):
             pass
 
         target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
-        if self.action == 'define' and self.filetype == 'file':
-            return self.renderlist("Upload data file",
-                                   [self.render.FileForm(target)])
-        elif self.action == 'define' and self.filetype == 'url':
-            return self.renderlist("Register a remote URL",
-                                   [self.render.UrlForm(target)])
+        if self.action == 'define':
+
+            def body():
+                results = self.select_file()
+                if len(results) == 0:
+                    return None
+                self.enforceFileRestriction('write users')
+                return None
+
+            def postCommit(results):
+                if self.filetype == 'file':
+                    return self.renderlist("Upload data file",
+                                           [self.render.FileForm(target)])
+                elif self.filetype == 'url':
+                    return self.renderlist("Register a remote URL",
+                                           [self.render.UrlForm(target)])
+                else:
+                    raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
+
+            return self.dbtransact(body, postCommit)
         else:
             return self.GETfile(uri)
 
