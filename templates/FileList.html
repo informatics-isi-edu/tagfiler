@@ -9,8 +9,8 @@ $if len(files) > 0:
 			  <a href="${target}/file/${quote(name)}">Download</a>,
 		  $if restricted == False:
 			  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
-			  <a href="${target}/file/${quote(name)}?action=define&type=file">Update via file</a>, 
-			  <a href="${target}/file/${quote(name)}?action=define&type=url">Update via URL</a>
+			  <a href="${target}/file/${quote(name)}?action=define&amp;type=file">Update via file</a>, 
+			  <a href="${target}/file/${quote(name)}?action=define&amp;type=url">Update via URL</a>
 		  $else:
 			  <a href="${target}/tags/${quote(name)}">View or set tags</a>
 		  </td>
