@@ -514,12 +514,13 @@ class Application:
             
         tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
         tables = " JOIN ".join(tables)
+        tables += ' JOIN "_owner" USING (file) '
 
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if len(wheres) > 0:
             wheres = "WHERE " + wheres
 
-        query = "SELECT file FROM %s %s GROUP BY file ORDER BY file" % (tables, wheres)
+        query = 'SELECT file, "_owner".value FROM %s %s GROUP BY file, "_owner".value ORDER BY file' % (tables, wheres)
         #web.debug(query)
         return self.db.query(query, vars=values)
 

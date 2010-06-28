@@ -532,17 +532,17 @@ class Query (Node):
 
         def body():
             if len(self.predlist) > 0:
-                files = [ res.file for res in self.select_files_by_predlist() ]
+                files = [ (res.file , res.value) for res in self.select_files_by_predlist() ]
             else:
                 files = []
             alltags = [ tagdef.tagname for tagdef in self.select_tagdefs() ]
             return ( files, alltags )
 
         def postCommit(results):
-            filelist, alltags = results
+            allfiles, alltags = results
             files = []
-            for name in filelist:
-                files.append((name, False))
+            for name, owner in allfiles:
+                files.append((name, self.restrictedUsers('write users', owner, name)))
                 
             target = self.home + web.ctx.homepath
 
