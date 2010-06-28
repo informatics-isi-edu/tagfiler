@@ -490,7 +490,7 @@ class Application:
             except:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
-        tables = []
+        tables = ['_owner']
         wheres = []
         values = {}
         for p in range(0, len(self.predlist)):
@@ -514,13 +514,12 @@ class Application:
             
         tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
         tables = " JOIN ".join(tables)
-        tables += ' JOIN "_owner" USING (file) '
 
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if len(wheres) > 0:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT file, "_owner".value FROM %s %s GROUP BY file, "_owner".value ORDER BY file' % (tables, wheres)
+        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner ORDER BY file' % (tables, wheres)
         #web.debug(query)
         return self.db.query(query, vars=values)
 
