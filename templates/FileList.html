@@ -18,7 +18,8 @@ $if len(files) > 0:
 		  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
 		    <div>>
 		    <input type="hidden" name="action" value="delete" />
-		    <input type="submit" value="Delete" />
+		    $if restricted == False:
+		    	<input type="submit" value="Delete" />
 		    </div>
 		  </form>
 		      </td>
