@@ -119,9 +119,9 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
+            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue, None)
                      for tagdef in self.select_defined_tags('owner is null') ]
-            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue)
+            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue, tagdef.owner)
                      for tagdef in self.select_defined_tags('owner is not null') ]
             return (predefined, userdefined)
 
@@ -129,8 +129,8 @@ class Tagdef (Node):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             predefined, userdefined = tagdefs
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System'),
-                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User'),
+                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', self.user()),
+                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', self.user()),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:

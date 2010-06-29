@@ -1,15 +1,15 @@
-$def with (target, tagdefs, typenames, title)
+$def with (target, tagdefs, typenames, title, user)
 <h2>${title}</h2>
 <p>
 $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
-		$ tagname, typestr, restricted, multivalue = tagdef
+		$ tagname, typestr, restricted, multivalue, owner = tagdef
 		<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 		  <fieldset>
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		$if title == "User":
+		$if title == "User" and (owner == user or not restricted):
 			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
