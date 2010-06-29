@@ -236,7 +236,7 @@ class Application:
     def restrictedFile(self, tag, user, owner):
         try:
             results = self.select_file_tag_restrictions(tag, user)
-            if len(results) == 0:
+            if len(results) == 0 and user != owner:
                 return True
             else:
                 return False
@@ -256,7 +256,10 @@ class Application:
         else:
             pass
 
-    def enforceFileTagRestriction(self, tag_id):
+    def enforceFileTagRestriction(self, tag_id, policy_tag='write users'):
+        results = self.select_file()
+        if len(results) == 0:
+            raise NotFound(data="dataset %s" % self.data_id)
         results = self.select_tagdef(tag_id)
         if len(results) == 0:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
@@ -265,7 +268,7 @@ class Application:
             user = self.user()
             if owner:
                 if user:
-                    if user != owner:
+                    if self.restrictedFile(policy_tag, user, owner):
                         raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
                     else:
                         pass
