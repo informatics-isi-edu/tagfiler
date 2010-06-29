@@ -366,8 +366,8 @@ class FileTags (Node):
             # render HTML result
             if self.data_id:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
-                                        self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
+                                       [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote, self.user(), self.owner()),
+                                        self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote, self.user(), self.owner()),
                                         self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.isFileTagRestricted(tag), urlquote)])
             else:
                 return self.renderlist("All tags for all files",

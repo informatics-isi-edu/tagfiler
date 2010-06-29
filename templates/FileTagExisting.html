@@ -1,4 +1,4 @@
-$def with (title, apptarget, data_id, taginfo, urlquote)
+$def with (title, apptarget, data_id, taginfo, urlquote, user, fileowner)
 <h2>${title}</h2>
 $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
 $if title == 'System' and data_id:
@@ -14,7 +14,7 @@ $if len(filetagvals) > 0:
 					<input type="hidden" name="tag" value="${tag}" />
 					<input type="text" name="value" value="${val}" size="${length}" readonly />
 					<input type="hidden" name="action" value="delete" />
-					$if tag not in excludes:
+					$if tag not in excludes and (not tagdef.restricted or user == fileowner):
 						<input type="submit" value="Delete" />
 					</form>
 			$else:
