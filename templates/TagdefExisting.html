@@ -3,13 +3,13 @@ $def with (target, tagdefs, typenames, title, user)
 <p>
 $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
-		$ tagname, typestr, restricted, multivalue, owner = tagdef
+		$ tagname, typestr, writers, multivalue, owner = tagdef
 		<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 		  <fieldset>
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		$if title == "User" and (owner == user or not restricted):
+		$if title == "User" and (owner == user or writers == '*'):
 			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
@@ -17,8 +17,10 @@ $if len(tagdefs) > 0:
 			0 or more values allowed.
 		$else:
 			0 or 1 values allowed.	
-		$if restricted:
+		$if writers == 'owner':
 			Tagging restricted to file owner.
+		$elif writers == 'writers':
+			Tagging restricted to file writers.
 		</fieldset>
 		</form>
 $else:

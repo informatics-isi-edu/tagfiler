@@ -30,9 +30,10 @@ $for i in range(1,11):
 	    <option value="false">Files may be tagged with 0 or 1 value</option>
 	    <option value="true">Files may be tagged with 0 or more values</option>
 	  </select>
-	  <select name="restricted-${i}">
-	    <option value="false">Anybody may modify tag</option>
-	    <option value="true">Only file writers may modify tag</option>
+	  <select name="writers-${i}">
+	    <option value="*">Anybody may modify tag</option>
+	    <option value="owner">Only the owner may modify tag</option>
+	    <option value="writers">Only file writers may modify tag</option>
 	  </select>
 	</fieldset>
 <p>

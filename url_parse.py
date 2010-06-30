@@ -50,7 +50,7 @@ def p_tagdef_rest_get(p):
 
 def p_tagdef_rest_put(p):
     """tagdef : slash string slash TAGDEF slash string queryopts"""
-    # PUT queryopts supports typestr=string&restricted=true/false&multivalue=true/false
+    # PUT queryopts supports typestr=string&writers=owner/writers/*&multivalue=true/false
     p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
 
 def p_tags_all(p):

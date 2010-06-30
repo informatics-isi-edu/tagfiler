@@ -218,14 +218,10 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
-            if storage.restricted.lower() == 'true':
-                suffix = '?restricted'
-            else:
-                suffix = ''
         except:
             pass
 
-        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
+        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
         if self.action == 'define':
 
             def body():

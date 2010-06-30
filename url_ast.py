@@ -39,7 +39,7 @@ class FileList (Node):
             target = self.home + web.ctx.homepath
             files = []
             for name, owner in [(result.file, result.value) for result in results]:
-                files.append((name, self.restrictedUsers('write users', owner, name)))
+                files.append((name, self.userAccess('write users', owner, name)))
             return self.renderlist("Repository Summary",
                                    [self.render.Commands(target),
                                     self.render.FileList(target, files, urlquote)])
@@ -64,15 +64,14 @@ class FileList (Node):
         try:
             name = storage.name
             filetype = storage.type
-            restricted = storage.restricted
         except:
-            raise BadRequest(data="Missing one of the required form fields (name, filetype, restricted).")
+            raise BadRequest(data="Missing one of the required form fields (name, filetype).")
 
         if name == '':
             raise BadRequest(data="The form field name must not be empty.")
         else:
             raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
-                               + '?type=' + urlquote(filetype) + '&action=define' + '&restricted=' + urlquote(restricted))
+                               + '?type=' + urlquote(filetype) + '&action=define')
         
 
 class FileId(Node, FileIO):
@@ -93,13 +92,13 @@ class FileId(Node, FileIO):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'restricted', 'multivalue', 'queryopts' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writers', 'multivalue', 'queryopts' ]
 
     def __init__(self, appname, tag_id=None, typestr=None, queryopts={}):
         Node.__init__(self, appname)
         self.tag_id = tag_id
         self.typestr = typestr
-        self.restricted = None
+        self.writers = None
         self.multivalue = None
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
@@ -119,10 +118,11 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue, None)
+            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.writers, tagdef.multivalue, None)
                      for tagdef in self.select_defined_tags('owner is null') ]
-            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.restricted, tagdef.multivalue, tagdef.owner)
+            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.writers, tagdef.multivalue, tagdef.owner)
                      for tagdef in self.select_defined_tags('owner is not null') ]
+            
             return (predefined, userdefined)
 
         def postCommit(tagdefs):
@@ -150,7 +150,7 @@ class Tagdef (Node):
             try:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 return ('typestr=' + urlquote(tagdef.typestr) 
-                        + '&restricted=' + urlquote(unicode(tagdef.restricted))
+                        + '&writers=' + urlquote(unicode(tagdef.writers))
                         + '&multivalue=' + urlquote(unicode(tagdef.multivalue)))
             except:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
@@ -183,7 +183,7 @@ class Tagdef (Node):
         if self.tag_id == None:
             raise BadRequest(data="Tag definitions require a non-empty tag name.")
 
-        # self.typestr and self.restricted take precedence over queryopts...
+        # self.typestr and self.writers take precedence over queryopts...
 
         if self.typestr == None:
             try:
@@ -191,15 +191,11 @@ class Tagdef (Node):
             except:
                 self.typestr = ''
 
-        if self.restricted == None:
+        if self.writers == None:
             try:
-                restricted = self.queryopts['restricted'].lower()
+                self.writers = self.queryopts['writers'].lower()
             except:
-                restricted = 'false'
-            if restricted in [ 'true', 't', 'yes', 'y' ]:
-                self.restricted = True
-            else:
-                self.restricted = False
+                self.writers = 'owner'
 
         if self.multivalue == None:
             try:
@@ -234,9 +230,9 @@ class Tagdef (Node):
                 if key[0:4] == 'tag-':
                     if storage[key] != '':
                         typestr = storage['type-%s' % (key[4:])]
-                        restricted = storage['restricted-%s' % (key[4:])]
+                        writers = storage['writers-%s' % (key[4:])]
                         multivalue = storage['multivalue-%s' % (key[4:])]
-                        self.tagdefs[storage[key]] = (typestr, restricted, multivalue)
+                        self.tagdefs[storage[key]] = (typestr, writers, multivalue)
             try:
                 self.tag_id = storage.tag
             except:
@@ -249,7 +245,7 @@ class Tagdef (Node):
             if self.action == 'add':
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
-                    self.typestr, self.restricted, self.multivalue = self.tagdefs[tagname]
+                    self.typestr, self.writers, self.multivalue = self.tagdefs[tagname]
                     results = self.select_tagdef(self.tag_id)
                     if len(results) > 0:
                         raise Conflict(data="Tag %s is already defined." % self.tag_id)
@@ -336,6 +332,7 @@ class FileTags (Node):
         def body():
             def buildtaginfo(where1, where2):
                 tagdefs = [ tagdef for tagdef in self.select_defined_tags(where1) ]
+                writeusers = [ result.value for result in self.select_users_access('write users', self.data_id)]
                 tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
                 filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
                 filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
@@ -345,7 +342,8 @@ class FileTags (Node):
                          tagdefsdict,
                          filetags,
                          filetagvals,
-                         length )
+                         length,
+                         writeusers )
             
             return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                     buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
@@ -542,7 +540,7 @@ class Query (Node):
             allfiles, alltags = results
             files = []
             for name, owner in allfiles:
-                files.append((name, self.restrictedUsers('write users', owner, name)))
+                files.append((name, self.userAccess('write users', owner, name)))
                 
             target = self.home + web.ctx.homepath
 

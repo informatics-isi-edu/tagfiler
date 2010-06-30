@@ -88,7 +88,7 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 # this script will recreate all tables, but only on a clean database
 
 psql -c "CREATE TABLE files ( name text PRIMARY KEY, local boolean default False, location text )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, restricted boolean, owner text )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, writers text, owner text )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
 # pre-establish core restricted tags used by codebase
@@ -100,10 +100,10 @@ if [[ -n "\$2" ]]
 then
    if [[ "\$3" = "multival" ]]
    then
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue ) VALUES ( '\$1', '\$2', TRUE, TRUE )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers, multivalue ) VALUES ( '\$1', '\$2', 'owner', TRUE )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
    else
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers ) VALUES ( '\$1', '\$2', 'owner' )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE( file, value) )"
    fi
 else
@@ -194,11 +194,11 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
-    #AuthType Digest
-    #AuthName "${SVCPREFIX}"
-    #AuthDigestDomain /${SVCPREFIX}/
-    #AuthUserFile /etc/httpd/passwd/passwd
-    #Require valid-user
+    AuthType Digest
+    AuthName "${SVCPREFIX}"
+    AuthDigestDomain /${SVCPREFIX}/
+    AuthUserFile /etc/httpd/passwd/passwd
+    Require valid-user
 
 </Directory>
 

@@ -1,13 +1,13 @@
 $def with (target, files, quote)
 $if len(files) > 0:
-	$for name, restricted in files:
+	$for name, writers in files:
 		<fieldset>
 		  <legend>${name}</legend>
 		  <table>
 		    <tr>
 		      <td>
 			  <a href="${target}/file/${quote(name)}">Download</a>,
-		  $if restricted == False:
+		  $if writers == True:
 			  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
 			  <a href="${target}/file/${quote(name)}?action=define&amp;type=file">Update via file</a>, 
 			  <a href="${target}/file/${quote(name)}?action=define&amp;type=url">Update via URL</a>
@@ -18,7 +18,7 @@ $if len(files) > 0:
 		  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
 		    <div>
 		    <input type="hidden" name="action" value="delete" />
-		    $if restricted == False:
+		    $if writers == True:
 		    	<input type="submit" value="Delete" />
 		    </div>
 		  </form>

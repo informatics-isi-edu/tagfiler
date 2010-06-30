@@ -135,6 +135,7 @@ class Application:
                             (':!ciregexp:', '!~*') ])
 
         self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
+        self.accessTags = ['read users', 'write users']
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
@@ -216,22 +217,22 @@ class Application:
             return None
         return user
 
-    def restrictedUsers(self, tag, owner, file):
+    def userAccess(self, tag, owner, file):
         user = self.user()
         if user:
             if user != owner:
                 try:
                     results = self.select_user_restrictions(tag, user, file)
                     if len(results) == 0:
-                        return True
-                    else:
                         return False
+                    else:
+                        return True
                 except:
-                    return True
+                    return False
             else:
-                return False
+                return True
         else:
-            return True
+            return False
 
     def restrictedFile(self, tag, user, owner):
         try:
@@ -263,12 +264,15 @@ class Application:
         results = self.select_tagdef(tag_id)
         if len(results) == 0:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
-        if results[0].restricted:
+        tag_writer = results[0].writers
+        if tag_writer != '*':
             owner = self.owner()
             user = self.user()
             if owner:
                 if user:
-                    if self.restrictedFile(policy_tag, user, owner):
+                    if user == owner:
+                        pass
+                    elif tag_writer == 'owner' or self.restrictedFile(policy_tag, user, owner):
                         raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
                     else:
                         pass
@@ -297,6 +301,8 @@ class Application:
     def isFileTagRestricted(self, tag_id):
         try:
             self.enforceFileTagRestriction(tag_id)
+            if tag_id in self.accessTags and self.owner() != self.user():
+                return True
         except:
             return True
         return False
@@ -355,8 +361,8 @@ class Application:
             return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue, owner ) VALUES ( $tag_id, $typestr, $restricted, $multivalue, $owner )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, restricted=self.restricted, multivalue=self.multivalue, owner=self.user()))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, writers, multivalue, owner ) VALUES ( $tag_id, $typestr, $writers, $multivalue, $owner )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, writers=self.writers, multivalue=self.multivalue, owner=self.user()))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
@@ -400,6 +406,12 @@ class Application:
                 + " WHERE file = $file AND (value = $value OR value = $any)"
         #web.debug(query)
         return self.db.query(query, vars=dict(file=file, value=user, any="*"))
+
+    def select_users_access(self, tagname, file):
+        query = "SELECT value FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=file))
 
     def select_file_tags(self, tagname=''):
         if tagname:

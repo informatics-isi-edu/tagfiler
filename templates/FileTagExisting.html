@@ -1,6 +1,6 @@
 $def with (title, apptarget, data_id, taginfo, urlquote, user, fileowner)
 <h2>${title}</h2>
-$ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
+$ excludes, tagdefs, tagdefsdict, tags, filetagvals, length, writeusers = taginfo
 $if title == 'System' and data_id:
 	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(filetagvals) > 0:
@@ -14,7 +14,7 @@ $if len(filetagvals) > 0:
 					<input type="hidden" name="tag" value="${tag}" />
 					<input type="text" name="value" value="${val}" size="${length}" readonly />
 					<input type="hidden" name="action" value="delete" />
-					$if tag not in excludes and (not tagdef.restricted or user == fileowner):
+					$if tag not in excludes and (user == fileowner or tagdef.writers == '*' or tagdef.writers == 'writers' and user in writeusers):
 						<input type="submit" value="Delete" />
 					</form>
 			$else:
