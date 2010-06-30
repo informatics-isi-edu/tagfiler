@@ -192,6 +192,7 @@ class FileIO (Application):
                     
             else:
                 # result is whole body
+                web.ctx.status = '200 OK'
                 web.header('Content-type', content_type)
                 web.header('Content-Length', length)
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
@@ -551,7 +552,15 @@ class FileIO (Application):
         def postWritePostCommit(results):
             if len(results) > 0:
                 self.deletePrevious(results[0])
-            return 'Stored %s bytes' % (self.wbytes)
+            uri = self.home + self.store_path + '/' + urlquote(self.data_id)
+            web.header('Location', uri)
+            if filename:
+                web.ctx.status = '201 Created'
+                res = uri
+            else:
+                web.ctx.status = '204 No Content'
+                res = ''
+            return res
 
         try:
             result = self.dbtransact(postWriteBody, postWritePostCommit)
