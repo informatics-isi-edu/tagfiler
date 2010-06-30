@@ -53,6 +53,11 @@ def p_tagdef_rest_put(p):
     # PUT queryopts supports typestr=string&restricted=true/false&multivalue=true/false
     p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
 
+def p_tags_all(p):
+    """tags : slash string slash TAGS
+            | slash string slash TAGS slash"""
+    p[0] = url_ast.FileTags(appname=p[2])
+
 def p_tags(p):
     """tags : slash string slash TAGS slash string 
             | slash string slash TAGS slash string slash"""

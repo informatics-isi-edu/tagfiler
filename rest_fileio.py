@@ -3,8 +3,19 @@ import web
 import subprocess
 import tempfile
 import random
+import re
 
 from dataserv_app import Application, NotFound, BadRequest, urlquote
+
+# build a map of mime type --> primary suffix
+mime_types_suffixes = dict()
+f = open('/etc/mime.types', 'rb')
+for line in f.readlines():
+    m = re.match(r'^(?P<type>[^ \t]+)[ \t]+(?P<exts>.+)', line)
+    if m:
+        g = m.groupdict()
+        mime_types_suffixes[g['type']] = g['exts'].split(' ')[0]
+f.close()
 
 class FileIO (Application):
     """Basic bulk file I/O
@@ -23,12 +34,13 @@ class FileIO (Application):
         self.bytes = None
 
     def GETfile(self, uri, sendBody=True):
+        global mime_types_suffixes
 
         def body():
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('read users')
             return results[0]
 
         def postCommit(result):
@@ -40,9 +52,9 @@ class FileIO (Application):
                 filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, "rb")
-                    p = subprocess.Popen(['/usr/bin/file', '-i', filename], stdout=subprocess.PIPE)
+                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                     line = p.stdout.readline()
-                    content_type = line.split(':')[1].strip()
+                    content_type = line.strip()
                     return (f, content_type)
                 except:
                     # this may happen sporadically under race condition:
@@ -65,6 +77,20 @@ class FileIO (Application):
         # we only get here if we were able to both:
         #   a. open the file for reading its content
         #   b. obtain its content-type from /usr/bin/file test
+
+        # fix up some ugliness in CentOS 'file -i -b' outputs
+        content_type = re.sub('application/x-zip', 'application/zip', content_type)
+        
+        mime_type = content_type.split(';')[0]
+        m = re.match(r'^.+\.[^.]{1,4}', self.data_id)
+        if m:
+            disposition_name = self.data_id
+        else:
+            try:
+                suffix = mime_types_suffixes[mime_type]
+                disposition_name = self.data_id + '.' + suffix
+            except:
+                disposition_name = self.data_id
         
         # SEEK_END attribute not supported by Python 2.4
         # f.seek(0, os.SEEK_END)
@@ -145,6 +171,7 @@ class FileIO (Application):
                     web.header('Content-Length', last - first + 1)
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
+                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                     for res in yieldBytes(f, first, last):
                         yield res
                 else:
@@ -156,8 +183,8 @@ class FileIO (Application):
 
                     for r in range(0,len(rangeset)):
                         first, last = rangeset[r]
-                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\n\r\n' \
-                              % (boundary, content_type, first, last, length)
+                        yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
+                              % (boundary, content_type, first, last, length, disposition_name)
                         for res in yieldBytes(f, first, last):
                             yield res
                         if r == len(rangeset) - 1:
@@ -167,7 +194,7 @@ class FileIO (Application):
                 # result is whole body
                 web.header('Content-type', content_type)
                 web.header('Content-Length', length)
-                web.header('Content-Disposition', 'attachment; filename="%s"' % (self.data_id))
+                web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
                 for buf in yieldBytes(f, 0, length - 1):
                     yield buf
@@ -199,12 +226,26 @@ class FileIO (Application):
             pass
 
         target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
-        if self.action == 'define' and self.filetype == 'file':
-            return self.renderlist("Upload data file",
-                                   [self.render.FileForm(target)])
-        elif self.action == 'define' and self.filetype == 'url':
-            return self.renderlist("Register a remote URL",
-                                   [self.render.UrlForm(target)])
+        if self.action == 'define':
+
+            def body():
+                results = self.select_file()
+                if len(results) == 0:
+                    return None
+                self.enforceFileRestriction('write users')
+                return None
+
+            def postCommit(results):
+                if self.filetype == 'file':
+                    return self.renderlist("Upload data file",
+                                           [self.render.FileForm(target)])
+                elif self.filetype == 'url':
+                    return self.renderlist("Register a remote URL",
+                                           [self.render.UrlForm(target)])
+                else:
+                    raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
+
+            return self.dbtransact(body, postCommit)
         else:
             return self.GETfile(uri)
 
@@ -214,7 +255,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.delete_file()
             return results[0]
 
@@ -223,11 +264,8 @@ class FileIO (Application):
                 """delete the file"""
                 filename = self.store_path + '/' + result.location
                 dir = os.path.dirname(filename)
-                os.unlink(filename)
+                self.deleteFile(filename)
                 
-                """delete the directory if empty"""
-                if len(os.listdir(dir)) == 0:
-                    os.rmdir(dir)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -261,7 +299,7 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.update_file()
         else:
             # anybody is free to insert new uniquely named file
@@ -283,6 +321,13 @@ class FileIO (Application):
             t = self.db.transaction()
             try:
                 self.set_file_tag('name', self.data_id)
+                t.commit()
+            except:
+                t.rollback()
+    
+            t = self.db.transaction()
+            try:
+                self.set_file_tag('read users', '*')
                 t.commit()
             except:
                 t.rollback()
@@ -360,7 +405,7 @@ class FileIO (Application):
                     eof = True
                 elif buflen == 0:
                     f.close()
-                    os.unlink(filename)
+                    self.deleteFile(filename)
                     raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
             elif buflen == 0:
                 eof = True
@@ -375,8 +420,8 @@ class FileIO (Application):
         return (bytes, flen)
 
 
-    def getTemporary(self):
-        """get the directory and the prefix for a temporary file"""
+    def getTemporary(self, mode):
+        """get a temporary file"""
 
         prefix = self.user()
         if prefix != None:
@@ -386,22 +431,39 @@ class FileIO (Application):
             
         dir = self.store_path + '/' + urlquote(self.data_id)
 
-        if not os.path.exists(dir):
-            os.makedirs(dir, mode=0755)
+        """posible race condition in mkdir and rmdir"""
+        count = 0
+        limit = 10
+        while True:
+            count = count + 1
+            try:
+                if not os.path.exists(dir):
+                    os.makedirs(dir, mode=0755)
+        
+                fileHandle, filename = tempfile.mkstemp(prefix=prefix, dir=dir)
+                os.close(fileHandle)
+                f = open(filename, mode)
+                break
+            except:
+                if count > limit:
+                    raise
+            
+        return (f, filename)
 
-        return (prefix, dir)
+    def deleteFile(self, filename):
+        dir = os.path.dirname(filename)
+        os.unlink(filename)
 
+        if len(os.listdir(dir)) == 0:
+            try:
+                os.rmdir(dir)
+            except:
+                pass
 
     def deletePrevious(self, result):
         if result.local:
             # previous result had local file, so free it
-            filename = self.store_path + '/' + result.location
-            dir = os.path.dirname(filename)
-            os.unlink(filename)
-
-            """delete the directory if empty"""
-            if len(os.listdir(dir)) == 0:
-                os.rmdir(dir)
+            self.deleteFile(self.store_path + '/' + result.location)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -444,32 +506,23 @@ class FileIO (Application):
         # clast  -- last byte position of content body in file
 
         def preWriteBody():
-            if self.update:
-                results = self.select_file()
-                if len(results) == 0:
-                    return None
-                self.enforceFileRestriction()
-                return results[0]
-            else:
+            results = self.select_file()
+            if len(results) == 0:
                 return None
-
-        def preWritePostCommit(result):
-            if result != None:
-                if not result.local:
-                    raise Conflict(data="The resource %s is not a local file." % self.data_id)
-                self.location = result.location
-                filename = self.store_path + '/' + self.location
-                try:
-                    f = open(filename, 'r+b')
-                    return (f, None)
-                except:
-                    return (None, None)
             else:
-                user, path = self.getTemporary()
-                fileHandle, filename = tempfile.mkstemp(prefix=user, dir=path)
-                os.close(fileHandle)
-                f = open(filename, 'wb')
-                return (f, filename)
+                self.enforceFileRestriction('write users')
+                if self.update:
+                    if results[0].local:
+                        self.location = result.location
+                        filename = self.store_path + '/' + self.location
+                        return open(filename, 'r+b')
+                    else:
+                        raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
+                else:
+                    return None
+
+        def preWritePostCommit(f):
+            return f
         
         if cfirst and clast:
             # try update-in-place if user is doing Range: partial PUT
@@ -477,47 +530,57 @@ class FileIO (Application):
         else:
             self.update = False
 
-        count = 0
-        limit = 10
-        f = None
-        insertFilename = None
-        while not f:
-            count += 1
-            if count > limit:
-                raise web.internalerror('Could not access local copy of ' + self.data_id)
+        # this retries if a file was found but could not be opened due to races
+        f = self.dbtransact(preWriteBody, preWritePostCommit)
 
-            # we do this in a loop in case of select/open race conditions
-            f, insertFilename = self.dbtransact(preWriteBody, preWritePostCommit)
+        # we get here if write is not disallowed
+        if f == None:
+            f, filename = self.getTemporary('wb')
+            self.location = filename[len(self.store_path)+1:]
+            self.local = True
+        else:
+            filename = None
 
         # we only get here if we have a file to write into
         wbytes, flen = self.storeInput(inf, f, flen, cfirst, clen)
         f.close()
 
-        if insertFilename:
-            # the file we wrote is new so needs to go into database
-            self.location = insertFilename[len(self.store_path)+1:]
-            self.local = True
-            self.bytes = flen
-            self.wbytes = wbytes
+        self.bytes = flen
+        self.wbytes = wbytes
 
-            def postWriteBody():
-                # this may repeat in case of database races
-                return self.insertForStore()
+        def postWriteBody():
+            # this may repeat in case of database races
+            return self.insertForStore()
 
-            def postWritePostCommit(results):
-                if len(results) > 0:
-                    self.deletePrevious(results[0])
-                return 'Stored %s bytes' % (self.wbytes)
+        def postWritePostCommit(results):
+            if len(results) > 0:
+                self.deletePrevious(results[0])
+            return 'Stored %s bytes' % (self.wbytes)
 
-            return self.dbtransact(postWriteBody, postWritePostCommit)
-        else:
-            return 'Stored %s bytes' % (wbytes)
-
+        try:
+            result = self.dbtransact(postWriteBody, postWritePostCommit)
+            return result
+        except web.SeeOther:
+            raise
+        except:
+            if filename:
+                self.deleteFile(filename)
+            raise
 
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
+        def preWriteBody():
+            results = self.select_file()
+            if len(results) == 0:
+                return True
+            self.enforceFileRestriction('write users')
+            return True
+
+        def preWritePostCommit(result):
+            return None
+        
         def putBody():
             return self.insertForStore()
 
@@ -530,7 +593,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction()
+            self.enforceFileRestriction('write users')
             self.delete_file()
             return results[0]
 
@@ -541,33 +604,41 @@ class FileIO (Application):
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
+
+            # do pre-test of permissions to abort early if possible
+            self.dbtransact(preWriteBody, preWritePostCommit)
+
             inf = web.ctx.env['wsgi.input']
             boundary1, boundaryN = self.scanFormHeader(inf)
-            user, path = self.getTemporary()
-            fileHandle, tempFileName = tempfile.mkstemp(prefix=user, dir=path)
-            os.close(fileHandle)
-            f = open(tempFileName, "w+b")
-            wbytes, flen = self.storeInput(inf, f)
-        
-            # now we have to remove the trailing part boundary we
-            # copied to disk by being lazy above...
-            # SEEK_END attribute not supported by Python 2.4
-            # f.seek(0 - len(boundaryN), os.SEEK_END)
-            f.seek(0 - len(boundaryN), 2)
-            buf = f.read(len(boundaryN))
-            f.seek(0 - len(boundaryN), 2)
-            f.truncate() # truncate to current seek location
-            bytes = f.tell()
-            f.close()
-            if buf != boundaryN:
-                # we did not get an entire multipart body apparently
-                os.unlink(tempFileName)
-                raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
-            self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
-            self.local = True
-            self.bytes = bytes
+            f, tempFileName = self.getTemporary("w+b")
 
-            return self.dbtransact(putBody, putPostCommit)
+            try:
+                wbytes, flen = self.storeInput(inf, f)
+        
+                # now we have to remove the trailing part boundary we
+                # copied to disk by being lazy above...
+                # SEEK_END attribute not supported by Python 2.4
+                # f.seek(0 - len(boundaryN), os.SEEK_END)
+                f.seek(0 - len(boundaryN), 2)
+                buf = f.read(len(boundaryN))
+                f.seek(0 - len(boundaryN), 2)
+                f.truncate() # truncate to current seek location
+                bytes = f.tell()
+                f.close()
+                if buf != boundaryN:
+                    # we did not get an entire multipart body apparently
+                    raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
+                self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
+                self.local = True
+                self.bytes = bytes
+
+                result = self.dbtransact(putBody, putPostCommit)
+                return result
+            except web.SeeOther:
+                raise
+            except:
+                self.deleteFile(tempFileName)
+                raise
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()

@@ -8,9 +8,10 @@ FILES=dataserv.wsgi \
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
-	FileList.html UriList.txt ConfirmForm.html \
+	FileList.html FileUriList.txt ConfirmForm.html \
 	TagdefExisting.html TagdefNew.html \
-	FileTagExisting.html FileTagNew.html \
+	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
+	FileTagNew.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
 	Error.html
 

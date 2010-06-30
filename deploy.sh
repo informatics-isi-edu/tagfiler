@@ -94,14 +94,16 @@ psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CAS
 # pre-establish core restricted tags used by codebase
 tagdef()
 {
-# args: tagname typestr
-psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
+# args: tagname typestr multivalue
+
 if [[ -n "\$2" ]]
 then
    if [[ "\$3" = "multival" ]]
    then
-      psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted, multivalue ) VALUES ( '\$1', '\$2', TRUE, TRUE )"
+      psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
    else
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, restricted ) VALUES ( '\$1', '\$2', TRUE )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE( file, value) )"
    fi
 else
@@ -111,7 +113,8 @@ fi
 
 tagdef owner text
 tagdef created timestamptz
-tagdef restricted
+tagdef "read users" text multival
+tagdef "write users" text multival
 tagdef "modified by" text
 tagdef modified timestamptz
 tagdef bytes int8
@@ -186,16 +189,16 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
-    SetEnv ${SVCPREFIX}.home http://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
     SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
-    AuthType Digest
-    AuthName "${SVCPREFIX}"
-    AuthDigestDomain /${SVCPREFIX}/
-    AuthUserFile /etc/httpd/passwd/passwd
-    Require valid-user
+    #AuthType Digest
+    #AuthName "${SVCPREFIX}"
+    #AuthDigestDomain /${SVCPREFIX}/
+    #AuthUserFile /etc/httpd/passwd/passwd
+    #Require valid-user
 
 </Directory>
 

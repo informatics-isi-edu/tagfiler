@@ -167,10 +167,10 @@ class Application:
                 t.rollback()
                 web.debug(te)
                 raise RuntimeError(data=str(te))
-            except psycopg2.IntegrityError, te:
+            except (psycopg2.IntegrityError, IOError), te:
                 t.rollback()
                 if count > limit:
-                    web.debug('exceeded retry limit on IntegrityError')
+                    web.debug('exceeded retry limit')
                     web.debug(te)
                     raise IntegrityError(data=str(te))
                 # else fall through to retry...
@@ -216,31 +216,50 @@ class Application:
             return None
         return user
 
-    def restrictedFile(self):
-        try:
-            results = self.select_file_tag('restricted')
-            if len(results) > 0:
-                return True
-        except:
-            pass
-        return False
-
-    def enforceFileRestriction(self):
-        if self.restrictedFile():
-            owner = self.owner()
-            user = self.user()
-            if owner:
-                if user:
-                    if user != owner:
-                        raise Forbidden(data="access to dataset %s" % self.data_id)
+    def restrictedUsers(self, tag, owner, file):
+        user = self.user()
+        if user:
+            if user != owner:
+                try:
+                    results = self.select_user_restrictions(tag, user, file)
+                    if len(results) == 0:
+                        return True
                     else:
-                        pass
-                else:
-                    raise Unauthorized(data="access to dataset %s" % self.data_id)
+                        return False
+                except:
+                    return True
             else:
-                pass
+                return False
+        else:
+            return True
 
-    def enforceFileTagRestriction(self, tag_id):
+    def restrictedFile(self, tag, user, owner):
+        try:
+            results = self.select_file_tag_restrictions(tag, user)
+            if len(results) == 0 and user != owner:
+                return True
+            else:
+                return False
+        except:
+            return user != owner
+
+    def enforceFileRestriction(self, tag):
+        owner = self.owner()
+        user = self.user()
+        if owner:
+            if user:
+                if user != owner:
+                    if self.restrictedFile(tag, user, owner):
+                        raise Forbidden(data="access to dataset %s" % self.data_id)
+            else:
+                raise Unauthorized(data="access to dataset %s" % self.data_id)
+        else:
+            pass
+
+    def enforceFileTagRestriction(self, tag_id, policy_tag='write users'):
+        results = self.select_file()
+        if len(results) == 0:
+            raise NotFound(data="dataset %s" % self.data_id)
         results = self.select_tagdef(tag_id)
         if len(results) == 0:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
@@ -249,7 +268,7 @@ class Application:
             user = self.user()
             if owner:
                 if user:
-                    if user != owner:
+                    if self.restrictedFile(policy_tag, user, owner):
                         raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
                     else:
                         pass
@@ -285,8 +304,8 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def gettagvals(self, tagname):
-        results = self.select_file_tag(tagname)
+    def gettagvals(self, tagname, data_id=None):
+        results = self.select_file_tag(tagname, data_id=data_id)
         values = [ ]
         for result in results:
             try:
@@ -306,6 +325,10 @@ class Application:
         results = self.db.select('files', order='name')
         return results
 
+    def select_files_by_owner(self):
+        results = self.db.select('"_owner"', order='file')
+        return results
+    
     def insert_file(self):
         self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
                       vars=dict(name=self.data_id, local=self.local, location=self.location))
@@ -354,7 +377,7 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname, value=None):
+    def select_file_tag(self, tagname, value=None, data_id=None):
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
                 + " WHERE file = $file"
         if value == '':
@@ -362,7 +385,21 @@ class Application:
         elif value:
             query += " AND value = $value ORDER BY VALUE"
         #web.debug(query)
-        return self.db.query(query, vars=dict(file=self.data_id, value=value))
+        if data_id == None:
+            data_id = self.data_id
+        return self.db.query(query, vars=dict(file=data_id, value=value))
+
+    def select_file_tag_restrictions(self, tagname, user):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file AND (value = $value OR value = $any)"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=self.data_id, value=user, any="*"))
+
+    def select_user_restrictions(self, tagname, user, file):
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
+                + " WHERE file = $file AND (value = $value OR value = $any)"
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=file, value=user, any="*"))
 
     def select_file_tags(self, tagname=''):
         if tagname:
@@ -377,9 +414,17 @@ class Application:
                              vars=dict(file=self.data_id, tagname=tagname))
 
     def select_defined_file_tags(self, where):
-        query = "SELECT tagname FROM filetags join tagdefs using (tagname) WHERE file = $file" \
-                + where \
-                + " GROUP BY tagname ORDER BY tagname"
+        if self.data_id:
+            wheres = "WHERE file = $file"
+            if where:
+                wheres += " AND" + where
+        else:
+            if where:
+                wheres = "WHERE" + where
+            else:
+                wheres = ""
+        query = "SELECT file, tagname FROM filetags join tagdefs using (tagname) " + wheres \
+                + " GROUP BY file, tagname ORDER BY file, tagname"
         #web.debug(query)
         return self.db.query(query,
                              vars=dict(file=self.data_id))
@@ -448,7 +493,7 @@ class Application:
             except:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
-        tables = []
+        tables = ['_owner']
         wheres = []
         values = {}
         for p in range(0, len(self.predlist)):
@@ -477,7 +522,7 @@ class Application:
         if len(wheres) > 0:
             wheres = "WHERE " + wheres
 
-        query = "SELECT file FROM %s %s GROUP BY file ORDER BY file" % (tables, wheres)
+        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner ORDER BY file' % (tables, wheres)
         #web.debug(query)
         return self.db.query(query, vars=values)
 
