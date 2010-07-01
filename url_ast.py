@@ -64,6 +64,7 @@ class FileList (Node):
         try:
             name = storage.name
             filetype = storage.type
+            readers = storage.readers
         except:
             raise BadRequest(data="Missing one of the required form fields (name, filetype).")
 
@@ -71,7 +72,7 @@ class FileList (Node):
             raise BadRequest(data="The form field name must not be empty.")
         else:
             raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
-                               + '?type=' + urlquote(filetype) + '&action=define')
+                               + '?type=' + urlquote(filetype) + '&action=define' + '&readers=' + urlquote(readers))
         
 
 class FileId(Node, FileIO):

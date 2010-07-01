@@ -219,10 +219,12 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
+            if storage.readers == '*':
+                suffix = '?read users=*'
         except:
             pass
 
-        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id)
+        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
         if self.action == 'define':
 
             def body():
@@ -318,13 +320,6 @@ class FileIO (Application):
             t = self.db.transaction()
             try:
                 self.set_file_tag('name', self.data_id)
-                t.commit()
-            except:
-                t.rollback()
-    
-            t = self.db.transaction()
-            try:
-                self.set_file_tag('read users', '*')
                 t.commit()
             except:
                 t.rollback()
