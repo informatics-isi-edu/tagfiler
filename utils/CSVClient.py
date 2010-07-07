@@ -209,16 +209,6 @@ class CSVClient:
             self.curl.perform()
             return self.response
 
-        def addTagPut(self, dataset, tag):
-            """PUT tags to a dataset - currently is not working"""
-            url = self.http + '/tags/' + dataset + '/' + tag
-            #print url
-            self.curl.setopt(pycurl.URL, url)
-            self.curl.setopt(pycurl.PUT, 1)
-            self.response = None
-            self.curl.perform()
-            return self.response
-
         def addTag(self, dataset, tag, value):
             """POST a tag value to a dataset"""
             url = self.http + '/tags/' + urlquote(dataset)
