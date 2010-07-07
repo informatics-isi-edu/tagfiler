@@ -55,7 +55,7 @@ class CSVClient:
         for tag in self.tags:
             self.curlclient.getTagdef(tag)
             if self.curlclient.status != 200:
-                print 'Can not get definition for tag \'' + tag + '\''
+                print 'ERROR: Can not get definition for tag \'' + tag + '\'.'
                 self.status = self.curlclient.status
                 continue
             tagdef = self.curlclient.getResponse()
@@ -78,7 +78,7 @@ class CSVClient:
     def readDataset(self, row):
         """Check file exists"""
         if os.path.isfile(row[0]) == False:
-            print 'File \'' + row[0] + '\' does not exist'
+            print 'ERROR: File \'' + row[0] + '\' does not exist.'
             self.status = 1
             """Ignore this dataset"""
             while True:
@@ -113,7 +113,7 @@ class CSVClient:
         for dataset, datasetdefs in self.datasets.iteritems():
             for tag, tagvalues in datasetdefs.iteritems():
                 if len(tagvalues) > 1 and self.tagdefs[tag]['multivalue'] == 'False':
-                    print 'Tag \'' + tag + '\' in dataset \'' + dataset + '\' is not allowed to have multiple values.'
+                    print 'ERROR: Tag \'' + tag + '\' in dataset \'' + dataset + '\' is not allowed to have multiple values.'
                     self.status = 1
         
     def postDatasets(self):
