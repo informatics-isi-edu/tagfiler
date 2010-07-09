@@ -1,0 +1,3 @@
+export SVCDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/%{name}
+%{__chmod} +x ${SVCDIR}/*.sh
+${SVCDIR}/postinstall.sh tagfiler
