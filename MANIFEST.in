@@ -1,5 +1,5 @@
-include *.sh
-include __init__.py
 exclude INSTALL
 exclude utils/*
 exclude test/*
+exclude psoc.spec
+exclude MANIFEST.in
