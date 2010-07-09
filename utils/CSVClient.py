@@ -4,6 +4,7 @@ import csv
 import sys
 import pycurl
 import os
+import traceback
 import urllib
 from optparse import OptionParser
 
@@ -147,6 +148,7 @@ class CSVClient:
             except:
                 print 'Can not open file ' + csvname
                 traceback.print_stack()
+                sys.exit()
                 
         def readline(self):
             """Get the next non empty line"""
