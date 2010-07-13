@@ -107,6 +107,7 @@ class Application:
                            'text' : 'Text' }
 
         self.ops = [ ('', 'Exists (ignores value)'),
+                     ('!', 'Not Exists'),
                      ('=', 'Equal'),
                      ('!=', 'Not equal'),
                      (':lt:', 'Less than'),
@@ -121,6 +122,7 @@ class Application:
                      (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
         self.opsDB = dict([ ('', ''),
+                            ('!', '!'),
                             ('=', '='),
                             ('!=', '!='),
                             (':lt:', '<'),
@@ -523,6 +525,9 @@ class Application:
                     wheres.append(" OR ".join(valpreds))
                 if tagdefs.has_key(tag):
                     del tagdefs[tag]
+            elif op == '!' and tagdefs.has_key(tag):
+                wheres.append("file NOT IN (SELECT file from filetags where tagname = '%s')" % tag)
+                del tagdefs[tag]
             elif tagdefs.has_key(tag):
                 tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
                 del tagdefs[tag]
