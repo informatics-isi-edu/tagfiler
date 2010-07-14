@@ -14,8 +14,8 @@ def urlquote(url):
 
 class CSVClient:
     """Class for uploading datasets from CSV files"""
-    __slots__ = [ 'csvname', 'user', 'password', 'host', 'authentication', 'csvreader', 'curlclient', 'tags', 'tagdefs', 'tagindex', 'datasetindex', 'fileindex', 'datasets', 'status' ] 
-
+    __slots__ = [ 'csvname', 'user', 'password', 'host', 'authentication', 'csvreader', 'curlclient', 'tags', 'tagdefs', 'tagindex', 'datasetindex', 'fileindex', 'datasets', 'status', 'files' ]
+    
     def __init__(self, csvname, user, password, host='psoc.isi.edu', authentication='basic', tagindex=2, fileindex=0, datasetindex=1):
         self.csvname = csvname
         self.user = user
@@ -27,6 +27,7 @@ class CSVClient:
         self.fileindex = fileindex
         self.datasets = {}
         self.tags = []
+        self.files = []
         self.tagdefs = {}
         self.status = 0
         self.csvreader = self.CSVReader(self.csvname)
@@ -54,9 +55,7 @@ class CSVClient:
     def readTagdefs(self):
         """Read the tag definitions"""
         for tag in self.tags:
-            self.curlclient.getTagdef(tag)
-            if self.curlclient.status != 200:
-                print 'ERROR: Can not get definition for tag \'' + tag + '\'.'
+            if self.curlclient.getTagdef(tag) != 0:
                 self.status = self.curlclient.status
                 continue
             tagdef = self.curlclient.getResponse()
@@ -78,8 +77,8 @@ class CSVClient:
         
     def readDataset(self, row):
         """Check file exists"""
-        if os.path.isfile(row[0]) == False:
-            print 'ERROR: File \'' + row[0] + '\' does not exist.'
+        if not os.path.isfile(row[0]) and not os.path.isdir(row[0]):
+            print "ERROR: File '%s' does not exist." % row[0]
             self.status = 1
             """Ignore this dataset"""
             while True:
@@ -90,13 +89,20 @@ class CSVClient:
                 except:
                     return None
         else:
-            """Set the dataset name"""
+            """Get the dataset name"""
+            self.files.append(row[0])
+            
             if row[self.datasetindex] != '':
                 name = row[self.datasetindex]
             else:
                 name = os.path.basename(row[0])
-            dataset = self.Dataset(name, row[0])
-            self.datasets[name] = dataset
+                
+            if os.path.isfile(row[0]):
+                isfile = True
+            else:
+                isfile = False
+                
+            dataset = self.Dataset(name, row[0], {}, 0, False)
             """Set the dataset tags"""
             while True:
                 for i in range(self.tagindex,len(row)):
@@ -105,33 +111,73 @@ class CSVClient:
                 try:
                     row = self.csvreader.readline()
                     if row[0] and row[0] != '':
-                        return row
+                        break
                 except:
-                    return None
+                    row = None
+                    break
+                
+            self.datasets[name] = dataset
+            
+            if not isfile:
+                dataset.isdir = True
+                self.readDatasetTree(dataset)
+                
+            return row
+
+    def readDatasetTree(self, dataset):
+        """Read a dataset directory"""
+        for file in os.listdir(dataset.file):
+            subdataset = self.Dataset("%s\\%s" % (dataset.name, file), "%s/%s" % (dataset.file, file), dataset.tags, dataset.level+1, False)
+            self.datasets[subdataset.name] = subdataset
+            if not os.path.isfile(subdataset.file):
+                subdataset.isdir = True
+                self.readDatasetTree(subdataset)
 
     def validateTagsValues(self):
         """Validate tags values"""
         for dataset, datasetdefs in self.datasets.iteritems():
             for tag, tagvalues in datasetdefs.iteritems():
-                if len(tagvalues) > 1 and self.tagdefs[tag]['multivalue'] == 'False':
-                    print 'ERROR: Tag \'' + tag + '\' in dataset \'' + dataset + '\' is not allowed to have multiple values.'
+                if len(tagvalues) > 1 and self.tagdefs[tag]['multivalue'] == 'False' and datasetdefs.file in self.files:
+                    print "ERROR: Tag '%s\' in dataset '%s' is not allowed to have multiple values." % (tag, dataset)
                     self.status = 1
         
     def postDatasets(self):
         """Post the datasets"""
         for dataset, datasetdefs in self.datasets.iteritems():
-            """Upload the dataset file"""
-            self.curlclient.upload(dataset, datasetdefs.file)
-            """Post the dataset tags"""
+            if not datasetdefs.isdir:
+                """Upload the dataset file"""
+                self.status = self.curlclient.upload(dataset, datasetdefs.file)
+            else:
+                """Register directory"""
+                self.status = self.curlclient.register(dataset, datasetdefs.file)
+                
+            if self.status != 0:
+                return
+                
+            """Post the dataset system tags"""
+            try:
+                self.curlclient.addTag(dataset, 'Level', str(datasetdefs.level))
+                if datasetdefs.isdir:
+                    self.curlclient.addTag(dataset, 'Directory', None)
+            except:
+                pass
+                
+            """Post the dataset system tags"""
             for tag, tagvalues in datasetdefs.iteritems():
                 try:
                     self.tagdefs[tag]['typestr']
                     """Tag with values"""
                     for value in tagvalues:
-                        self.curlclient.addTag(dataset, tag, value)
+                        self.status = self.curlclient.addTag(dataset, tag, value)
+                        if self.status != 0:
+                            print "ERROR: %s, Can not add value '%s' to tag '%s' in dataset '%s'" % (self.status, value, tag, dataset)
+                            return
                 except:
                     """Tag without values"""
-                    self.curlclient.addTag(dataset, tag, None)
+                    self.status = self.curlclient.addTag(dataset, tag, None)
+                    if self.status != 0:
+                        print "ERROR: %s, Can not add tag '%s' in dataset '%s'" % (self.status, tag, dataset)
+                        return
         
     def trace(self):
         print self.tags
@@ -146,7 +192,7 @@ class CSVClient:
             try:
                 self.reader = csv.reader(open(csvname))
             except:
-                print 'Can not open file ' + csvname
+                print "Can not open file '%s'" % csvname
                 traceback.print_stack()
                 sys.exit()
                 
@@ -164,18 +210,19 @@ class CSVClient:
 
     class CURLClient:
         """Client for communicating with the web server"""
-        __slots__ = [ 'curl', 'http', 'user', 'password', 'authentication', 'response', 'status' ] 
+        __slots__ = [ 'curl', 'http', 'user', 'password', 'authentication', 'response', 'status' , 'success'] 
 
         def __init__(self, user, password, authentication='basic', host='psoc.isi.edu'):
-            self.http = 'http://' + host + '/tagfiler'
+            self.http = "http://%s/tagfiler" % host
             self.user = user
             self.password = password
             self.authentication = authentication
             self.response = None
             self.status = 200
+            self.success = [ 200, 303 ]
             
             self.curl = pycurl.Curl()
-            self.curl.setopt(pycurl.USERPWD, self.user + ':' + self.password)
+            self.curl.setopt(pycurl.USERPWD, "%s:%s" % (self.user, self.password))
             self.curl.setopt(pycurl.WRITEFUNCTION, self.writecallback)
             
             if authentication == 'basic':
@@ -183,6 +230,7 @@ class CSVClient:
             elif authentication == 'digest':
                 self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_DIGEST)
                 
+            
         def writecallback(self, buf):
             self.response = buf
 
@@ -194,46 +242,88 @@ class CSVClient:
 
         def getTagdef(self, tag):
             """Get the tag definition"""
-            self.curl.setopt(pycurl.URL, self.http + '/tagdef/' + urlquote(tag))
+            self.curl.setopt(pycurl.URL, "%s/tagdef/%s" % (self.http, urlquote(tag)))
             self.curl.setopt(pycurl.HTTPGET, 1)
             self.response = None
             self.curl.perform()
             self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            
+            if self.status not in self.success:
+                print "ERROR: %s, Can not get definition for tag '%s'" % (self.status, tag)
+                return self.status
+            else:
+                return 0
 
         def upload(self, dataset, file):
             """Upload the dataset file"""
-            print 'Dataset \'' + dataset + '\': [Uploading \'' + file +'\']'
-            url = self.http + '/file/' + urlquote(dataset)
+            print "Dataset '%s': [Uploading '%s']" % (dataset, file)
+            url = "%s/file/%s" % (self.http, urlquote(dataset))
             self.curl.setopt(pycurl.URL, url)
             self.curl.setopt(pycurl.POST, 1)
             self.curl.setopt(pycurl.HTTPPOST, [('file1', (pycurl.FORM_FILE, file))])
             self.response = None
             self.curl.perform()
-            return self.response
+            self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            
+            if self.status not in self.success:
+                print "ERROR: %s, Can not post dataset '%s'" % (self.status, dataset)
+                return self.status
+            else:
+                return 0
 
-        def addTag(self, dataset, tag, value):
-            """POST a tag value to a dataset"""
-            url = self.http + '/tags/' + urlquote(dataset)
+        def register(self, dataset, file):
+            """Register a directory"""
+            print "Dataset '%s': [Registering '%s']" % (dataset, file)
+            url = "%s/file/%s" % (self.http, urlquote(dataset))
             self.curl.setopt(pycurl.URL, url)
             self.curl.setopt(pycurl.POST, 1)
             pf = []
             pf.append(('action', 'put'))
-            pf.append(('set-'+tag, 'true'))
-            if value:
-                pf.append(('val-'+tag, value))
+            pf.append(('url', file))
             self.curl.setopt(pycurl.HTTPPOST, pf)
             self.response = None
             self.curl.perform()
-            return self.response
+            self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            
+            if self.status not in self.success:
+                print "ERROR: %s, Can not post dataset %s" % (self.status, dataset)
+                return self.status
+            else:
+                return 0
+
+        def addTag(self, dataset, tag, value):
+            """POST a tag value to a dataset"""
+            url = "%s/tags/%s" % (self.http, urlquote(dataset))
+            self.curl.setopt(pycurl.URL, url)
+            self.curl.setopt(pycurl.POST, 1)
+            pf = []
+            pf.append(('action', 'put'))
+            pf.append(("set-%s" % tag, 'true'))
+            if value:
+                pf.append(("val-%s" % tag, value))
+            self.curl.setopt(pycurl.HTTPPOST, pf)
+            self.response = None
+            self.curl.perform()
+            self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            #print 'Exit'
+            #sys.exit()
+            #print 'After Exit'
+            
+            if self.status not in self.success:
+                return self.status
+            else:
+                return 0
 
     class Dataset:
         """Class for dataset propertiies"""
         __slots__ = [ 'name' ,'file' ,'tags' ] 
 
-        def __init__(self, name, file):
+        def __init__(self, name, file, tags, level, isdir):
             self.name = name
             self.file = file
-            self.tags = {}
+            self.tags = tags
+            self.level = level
+            self.isdir = isdir
 
         def add(self, tag, value):
             """Add a tag"""
@@ -245,10 +335,11 @@ class CSVClient:
             return self.tags.iteritems()
         
         def __repr__(self):
-            return '{\'file\': \'' + self.file + '\', \'Tags\': ' + str(self.tags) + '}'
+            """String representation"""
+            return "{name: '%s', file: '%s', Tags: %s}" % (self.name, self.file, str(self.tags))
 
 def main(argv):
-    """Extract parameters from commandline"""
+    """Extract parameters from command line"""
     
     parser = OptionParser()
     parser.add_option('-u', '--user', action='store', dest='user', type='string', default='anonymous', help='user for web server authentication (default: \'%default\')')
@@ -262,6 +353,10 @@ def main(argv):
     """Upload the files"""
     csvclient = CSVClient(options.file, options.user, options.password, host=options.host, authentication=options.authentication)
     csvclient.upload()
+    
+    if csvclient.status == 0:
+        print "\nSuccessfully uploaded the files from '%s'." % options.file
+        
     #csvclient.trace()
 
 
