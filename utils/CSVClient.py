@@ -102,7 +102,7 @@ class CSVClient:
             else:
                 isfile = False
                 
-            dataset = self.Dataset(name, row[0], {}, 0, False)
+            dataset = self.Dataset(name, row[0], {})
             """Set the dataset tags"""
             while True:
                 for i in range(self.tagindex,len(row)):
@@ -116,10 +116,9 @@ class CSVClient:
                     row = None
                     break
                 
-            self.datasets[name] = dataset
-            
-            if not isfile:
-                dataset.isdir = True
+            if isfile:
+                self.datasets[name] = dataset
+            else:
                 self.readDatasetTree(dataset)
                 
             return row
@@ -127,11 +126,12 @@ class CSVClient:
     def readDatasetTree(self, dataset):
         """Read a dataset directory"""
         for file in os.listdir(dataset.file):
-            subdataset = self.Dataset("%s\\%s" % (dataset.name, file), "%s/%s" % (dataset.file, file), dataset.tags, dataset.level+1, False)
-            self.datasets[subdataset.name] = subdataset
-            if not os.path.isfile(subdataset.file):
-                subdataset.isdir = True
+            subdataset = self.Dataset("%s/%s" % (dataset.name, file), "%s/%s" % (dataset.file, file), dataset.tags)
+            if os.path.isfile(subdataset.file):
+                self.datasets[subdataset.name] = subdataset
+            else:
                 self.readDatasetTree(subdataset)
+                
 
     def validateTagsValues(self):
         """Validate tags values"""
@@ -144,25 +144,12 @@ class CSVClient:
     def postDatasets(self):
         """Post the datasets"""
         for dataset, datasetdefs in self.datasets.iteritems():
-            if not datasetdefs.isdir:
-                """Upload the dataset file"""
-                self.status = self.curlclient.upload(dataset, datasetdefs.file)
-            else:
-                """Register directory"""
-                self.status = self.curlclient.register(dataset, datasetdefs.file)
+            """Upload the dataset file"""
+            self.status = self.curlclient.upload(dataset, datasetdefs.file)
                 
             if self.status != 0:
                 return
                 
-            """Post the dataset system tags"""
-            try:
-                self.curlclient.addTag(dataset, 'Level', str(datasetdefs.level))
-                if datasetdefs.isdir:
-                    self.curlclient.addTag(dataset, 'Directory', None)
-            except:
-                pass
-                
-            """Post the dataset system tags"""
             for tag, tagvalues in datasetdefs.iteritems():
                 try:
                     self.tagdefs[tag]['typestr']
@@ -318,12 +305,10 @@ class CSVClient:
         """Class for dataset propertiies"""
         __slots__ = [ 'name' ,'file' ,'tags' ] 
 
-        def __init__(self, name, file, tags, level, isdir):
+        def __init__(self, name, file, tags):
             self.name = name
             self.file = file
             self.tags = tags
-            self.level = level
-            self.isdir = isdir
 
         def add(self, tag, value):
             """Add a tag"""
