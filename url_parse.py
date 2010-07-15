@@ -115,8 +115,8 @@ def p_pred_tag(p):
     p[0] = dict([ ('tag', p[1]), ('op', None), ('vals', []) ])
 
 def p_pred_not_tag(p):
-    """pred : string '!'"""
-    p[0] = dict([ ('tag', p[1]), ('op', '!'), ('vals', []) ])
+    """pred : string ':' NOT ':'"""
+    p[0] = dict([ ('tag', p[1]), ('op', ':not:'), ('vals', []) ])
 
 def p_pred_vallist(p):
     """vallist : string"""

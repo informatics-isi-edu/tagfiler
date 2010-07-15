@@ -107,7 +107,7 @@ class Application:
                            'text' : 'Text' }
 
         self.ops = [ ('', 'Exists (ignores value)'),
-                     ('!', 'Not Exists'),
+                     (':not:', 'Does not exists'),
                      ('=', 'Equal'),
                      ('!=', 'Not equal'),
                      (':lt:', 'Less than'),
@@ -121,9 +121,7 @@ class Application:
                      (':ciregexp:', 'Regular expression (case insensitive)'),
                      (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
-        self.opsDB = dict([ ('', ''),
-                            ('!', '!'),
-                            ('=', '='),
+        self.opsDB = dict([ ('=', '='),
                             ('!=', '!='),
                             (':lt:', '<'),
                             (':leq:', '<='),
@@ -508,6 +506,7 @@ class Application:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
         tables = ['_owner']
+        notags = []
         wheres = []
         values = {}
         for p in range(0, len(self.predlist)):
@@ -525,8 +524,8 @@ class Application:
                     wheres.append(" OR ".join(valpreds))
                 if tagdefs.has_key(tag):
                     del tagdefs[tag]
-            elif op == '!' and tagdefs.has_key(tag):
-                wheres.append("file NOT IN (SELECT file from filetags where tagname = '%s')" % tag)
+            elif op == ':not:' and tagdefs.has_key(tag):
+                notags.append(tag)
                 del tagdefs[tag]
             elif tagdefs.has_key(tag):
                 tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
@@ -535,6 +534,10 @@ class Application:
         tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
         tables = " JOIN ".join(tables)
 
+        if len(notags) > 0:
+            orpred = " OR ".join(["tagname = '%s'" % tag for tag in notags])
+            wheres.append("file NOT IN (SELECT file from filetags where %s)" % orpred)
+            
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if len(wheres) > 0:
             wheres = "WHERE " + wheres

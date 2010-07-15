@@ -29,7 +29,8 @@ keywords = {
     'like' : 'LIKE',
     'simto' : 'SIMTO',
     'regexp' : 'REGEXP',
-    'ciregexp' : 'CIREGEXP'
+    'ciregexp' : 'CIREGEXP',
+    'not' : 'NOT'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())
