@@ -31,20 +31,20 @@ AllowEncodedSlashes On
 
 WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 
-WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
+WSGIScriptAlias /${SVCPREFIX} ${PSOCDIR}/dataserv.wsgi
 
 WSGISocketPrefix ${RUNDIR}/wsgi
 
-<Directory ${SVCDIR}>
+<Directory ${PSOCDIR}>
 
     WSGIProcessGroup ${SVCPREFIX}
 
-    SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
+    SetEnv ${SVCPREFIX}.source_path ${PSOCDIR}
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
     SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
-    SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
+    SetEnv ${SVCPREFIX}.template_path ${PSOCDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
 </Directory>
@@ -61,6 +61,7 @@ then
 	# insert crowd authentication in the <VirtualHost> section
 	TMPFILE=`mktemp $CONFFILE.XXXXXX`
 	cat $CONFFILE | sed 's/<\/VirtualHost>/\
+	AllowEncodedSlashes On\
     AuthName psoc-demo\
     AuthType Basic\
     PerlAuthenHandler Apache::CrowdAuth\

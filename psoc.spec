@@ -33,9 +33,10 @@ python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUIL
 rm -rf $RPM_BUILD_ROOT
 
 %post
-export SVCDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/%{name}
-%{__chmod} +x ${SVCDIR}/*.sh
-${SVCDIR}/postinstall.sh tagfiler
+PSOCDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/%{name}
+export SVCDIR=/var/www
+%{__chmod} +x ${PSOCDIR}/*.sh
+${PSOCDIR}/postinstall.sh tagfiler
 
 
 %files -f INSTALLED_FILES

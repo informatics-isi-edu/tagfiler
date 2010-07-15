@@ -1,6 +1,7 @@
 #!/bin/sh
 
 export SVCPREFIX=${1}
+export PSOCDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/psoc
 export SVCUSER=${SVCPREFIX}
 export DATADIR=${SVCDIR}/${SVCPREFIX}-data
 export RUNDIR=/var/run/wsgi
@@ -18,13 +19,13 @@ fi
 	
 if ! test -e ${HOME}/.${SVCPREFIX}.deploydb
 then
-	${SVCDIR}/deploydb.sh
+	${PSOCDIR}/deploydb.sh
 	touch $(HOME)/.${SVCPREFIX}.deploydb
 fi
 
 if ! test -e ${HOME}/.${SVCPREFIX}.deployhttpd
 then
-	${SVCDIR}/deployhttpd.sh
+	${PSOCDIR}/deployhttpd.sh
 	touch $(HOME)/.${SVCPREFIX}.deployhttpd
 fi
 
