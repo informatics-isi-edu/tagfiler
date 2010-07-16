@@ -126,7 +126,7 @@ class CSVClient:
     def readDatasetTree(self, dataset):
         """Read a dataset directory"""
         for file in os.listdir(dataset.file):
-            subdataset = self.Dataset("%s/%s" % (dataset.name, file), "%s/%s" % (dataset.file, file), dataset.tags)
+            subdataset = self.Dataset("%s%s%s" % (dataset.name, os.sep, file), "%s%s%s" % (dataset.file, os.sep, file), dataset.tags)
             if os.path.isfile(subdataset.file):
                 self.datasets[subdataset.name] = subdataset
             else:
@@ -211,6 +211,7 @@ class CSVClient:
             self.curl = pycurl.Curl()
             self.curl.setopt(pycurl.USERPWD, "%s:%s" % (self.user, self.password))
             self.curl.setopt(pycurl.WRITEFUNCTION, self.writecallback)
+            self.curl.setopt(pycurl.READFUNCTION, self.readcallback)
             
             if authentication == 'basic':
                 self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_BASIC)
@@ -269,7 +270,6 @@ class CSVClient:
             fs = os.path.getsize(file)
             url = "%s/file/%s" % (self.http, urlquote(dataset))
             self.curl.setopt(pycurl.URL, url)
-            self.curl.setopt(pycurl.READFUNCTION, self.readcallback)
             self.curl.setopt(pycurl.INFILESIZE, int(fs))
             self.curl.setopt(pycurl.UPLOAD, 1)
             self.response = None
@@ -347,7 +347,7 @@ class CSVClient:
         
         def __repr__(self):
             """String representation"""
-            return "{name: '%s', file: '%s', Tags: %s}" % (self.name, self.file, str(self.tags))
+            return "{name: '%s', file: '%s', Tags: %s}" % (self.name, self.file, self.tags)
 
 def main(argv):
     """Extract parameters from command line"""
