@@ -382,22 +382,53 @@ class FileTags (Node):
             return self.GETall(uri)
 
     def PUT(self, uri):
-        # RESTful put of exactly one tag on one file...
-        if self.tag_id == '':
-            raise BadRequest(data="A non-empty tag name is required.")
+        if self.value == None:
+            try:
+                content_type = web.ctx.env['CONTENT_TYPE'].lower()
+            except:
+                content_type = 'text/plain'
 
-        if not self.value:
-            self.value = web.ctx.env['wsgi.input'].read()
+            content = web.ctx.env['wsgi.input'].read()
+            if content_type == 'application/x-www-form-urlencoded':
+                # handle same entity body format we output in GETtag()
+                #  tag=val&tag=val...
+                for tagval in content.strip().split('&'):
+                    tag, val = tagval.split('=')
+                    tag = urllib.unquote(tag)
+                    val = urllib.unquote(val)
+
+                    if tag == '':
+                        raise BadRequest(data="A non-empty tag name is required.")
+
+                    if self.tag_id != '':
+                        if tag != self.tag_id:
+                            raise Conflict(data="Tag name %s does not match tag name %s from URI." % (tag, self.tag_id))
+
+                    try:
+                        vals = self.tagvals[tag]
+                    except:
+                        self.tagvals[tag] = []
+                        vals = self.tagvals[tag]
+                    vals.append(val)
+                
+            else:
+                if self.tag_id == '':
+                    raise BadRequest(data="A non-empty tag name is required.")
+
+                self.tagvals[self.tag_id] = [ content ]
+
         else:
-            pass # we ignore body when value came from URI
+            self.tagvals[self.tag_id] = [ self.value ]
 
         def body():
-            results = self.select_tagdef(self.tag_id)
-            if len(results) == 0:
-                raise NotFound(data='tag definition %s' % self.tag_id)
-            self.enforceFileTagRestriction(self.tag_id)
-            self.set_file_tag(self.tag_id, self.value)
-            return None
+            for tag_id in self.tagvals.keys():
+                results = self.select_tagdef(tag_id)
+                if len(results) == 0:
+                    raise NotFound(data='tag definition %s' % tag_id)
+                self.enforceFileTagRestriction(tag_id)
+                for value in self.tagvals[tag_id]:
+                    self.set_file_tag(tag_id, value)
+                return None
 
         def postCommit(results):
             return ''
