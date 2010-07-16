@@ -23,10 +23,16 @@ then
 	touch $(HOME)/.${SVCPREFIX}.deploydb
 fi
 
-if ! test -e ${HOME}/.${SVCPREFIX}.deployhttpd
+if ! test -e /root/.deployhttpd
 then
 	${PSOCDIR}/deployhttpd.sh
-	touch $(HOME)/.${SVCPREFIX}.deployhttpd
+	touch /root/.deployhttpd
+fi
+
+if ! test -e ${HOME}/.${SVCPREFIX}.deploywsgi
+then
+	${PSOCDIR}/deploywsgi.sh
+	touch $(HOME)/.${SVCPREFIX}.deploywsgi
 fi
 
 service httpd restart
