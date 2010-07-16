@@ -197,7 +197,7 @@ class CSVClient:
 
     class CURLClient:
         """Client for communicating with the web server"""
-        __slots__ = [ 'curl', 'http', 'user', 'password', 'authentication', 'response', 'status' , 'success'] 
+        __slots__ = [ 'curl', 'http', 'user', 'password', 'authentication', 'response', 'status' , 'success', 'f'] 
 
         def __init__(self, user, password, authentication='basic', host='psoc.isi.edu'):
             self.http = "http://%s/tagfiler" % host
@@ -206,7 +206,7 @@ class CSVClient:
             self.authentication = authentication
             self.response = None
             self.status = 200
-            self.success = [ 200, 303 ]
+            self.success = [ 200, 201, 303 ]
             
             self.curl = pycurl.Curl()
             self.curl.setopt(pycurl.USERPWD, "%s:%s" % (self.user, self.password))
@@ -220,6 +220,10 @@ class CSVClient:
             
         def writecallback(self, buf):
             self.response = buf
+
+        def readcallback(self, size):
+            buf = self.f.read(size)
+            return buf
 
         def getResponse(self):
             return self.response
@@ -241,7 +245,7 @@ class CSVClient:
             else:
                 return 0
 
-        def upload(self, dataset, file):
+        def uploadPOST(self, dataset, file):
             """Upload the dataset file"""
             print "Dataset '%s': [Uploading '%s']" % (dataset, file)
             url = "%s/file/%s" % (self.http, urlquote(dataset))
@@ -250,6 +254,28 @@ class CSVClient:
             self.curl.setopt(pycurl.HTTPPOST, [('file1', (pycurl.FORM_FILE, file))])
             self.response = None
             self.curl.perform()
+            self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            
+            if self.status not in self.success:
+                print "ERROR: %s, Can not post dataset '%s'" % (self.status, dataset)
+                return self.status
+            else:
+                return 0
+
+        def upload(self, dataset, file):
+            """Upload the dataset file"""
+            print "Dataset '%s': [Uploading '%s']" % (dataset, file)
+            self.f = open(file, 'rb')
+            fs = os.path.getsize(file)
+            url = "%s/file/%s" % (self.http, urlquote(dataset))
+            self.curl.setopt(pycurl.URL, url)
+            self.curl.setopt(pycurl.READFUNCTION, self.readcallback)
+            self.curl.setopt(pycurl.INFILESIZE, int(fs))
+            self.curl.setopt(pycurl.UPLOAD, 1)
+            self.response = None
+            self.curl.perform()
+            self.f.close()
+            self.curl.setopt(pycurl.UPLOAD, 0)
             self.status = self.curl.getinfo(pycurl.HTTP_CODE)
             
             if self.status not in self.success:
@@ -340,7 +366,7 @@ def main(argv):
     csvclient.upload()
     
     if csvclient.status == 0:
-        print "\nSuccessfully uploaded the files from '%s'." % options.file
+        print "\nSuccessfully uploaded %s file(s) from '%s'." % (len(csvclient.datasets), options.file)
         
     #csvclient.trace()
 
