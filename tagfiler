@@ -36,6 +36,8 @@ chkconfig postgresql on
 mkdir -p ${SVCDIR}
 mkdir -p ${DATADIR}
 
+cp /usr/share/tagfiler/dataserv.wsgi ${SVCDIR}
+
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
     useradd -m -r ${SVCUSER}
@@ -199,3 +201,4 @@ WSGISocketPrefix ${RUNDIR}/wsgi
 
 EOF
 
+service httpd restart

@@ -44,3 +44,5 @@ then
 	
 	mv -f $TMPFILE $CONFFILE
 fi
+
+service httpd restart

@@ -1,7 +1,8 @@
 TAGFILERDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/%{name}
 %{__chmod} +x ${TAGFILERDIR}/tagfiler ${TAGFILERDIR}/tagfiler-httpd 
-mv -R ${TAGFILERDIR}/templates /usr/share/tagfiler/
-mv -R ${TAGFILERDIR}/dataserv.wsgi /usr/share/tagfiler/
+mkdir -p /usr/share/tagfiler
+mv ${TAGFILERDIR}/templates /usr/share/tagfiler
+mv ${TAGFILERDIR}/dataserv.wsgi /usr/share/tagfiler/
 mv ${TAGFILERDIR}/tagfiler /usr/sbin/
 mv ${TAGFILERDIR}/tagfiler-httpd /usr/sbin/
 
