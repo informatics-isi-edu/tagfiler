@@ -360,6 +360,13 @@ class FileTags (Node):
                 if acceptType == 'text/uri-list':
                     target = self.home + web.ctx.homepath
                     return self.render.FileTagUriList(target, all, urlquote)
+                elif acceptType == 'application/x-www-form-urlencoded':
+                    web.header('Content-Type', 'application/x-www-form-urlencoded')
+                    body = []
+                    for file, tag, vals in all[4]:
+                        for val in vals:
+                            body.append("%s=%s" % (urlquote(tag), urlquote(val)))
+                    return '&'.join(body)
                 elif acceptType == 'text/html':
                     break
             # render HTML result
