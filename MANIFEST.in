@@ -1,5 +1,8 @@
 exclude INSTALL
 exclude utils/*
 exclude test/*
-exclude psoc.spec
+exclude tagfiler.spec
 exclude MANIFEST.in
+exclude Makefile
+exclude deploy.sh
+exclude post-script

@@ -1,7 +1,30 @@
 #!/bin/sh
 
+if [ $# -lt 1 ]
+then
+	echo ERROR: Missing instance name argument.
+	exit 1
+fi
+
+# this is the URL base path of the service
+SVCPREFIX=${1}
+
+# you can set this to override...
+HOME_HOST=
+
+# default to `hostname` setting
+HOST=$(hostname)
+HOME_HOST=${HOME_HOST:-$HOST}
+
 # this is the privileged postgresql user for createdb etc.
 PGADMIN=postgres
+
+# this is the service daemon account
+SVCUSER=${SVCPREFIX}
+
+SVCDIR=/var/www/${SVCPREFIX}
+DATADIR=${SVCDIR}-data
+RUNDIR=/var/run/wsgi
 
 # location of platform installed file
 PGCONF=/var/lib/pgsql/data/postgresql.conf
@@ -9,10 +32,17 @@ PGCONF=/var/lib/pgsql/data/postgresql.conf
 # set the services to run automatically?
 chkconfig postgresql on
 
+# finish initializing system for our service
+mkdir -p ${SVCDIR}
+mkdir -p ${DATADIR}
+
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
     useradd -m -r ${SVCUSER}
 fi
+
+chown ${SVCUSER}: ${DATADIR}
+chmod og=rx ${DATADIR}
 
 # try some blind database setup as well
 if grep -e '^extra_float_digits = 2[^0-9].*' < ${PGCONF}
@@ -37,6 +67,16 @@ fi
 
 runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
 runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
+
+
+cat > ${HOME}/README-${SVCPREFIX} <<EOF
+This service requires passwords to be configured via:
+
+  htdigest /etc/httpd/passwd/passwd "${SVCUSER}" username
+
+for each user you wish to add.
+
+EOF
 
 cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 #!/bin/sh
@@ -124,3 +164,38 @@ EOF
 
 # setup db tables
 runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}
+
+# register our service code
+cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
+# this file must be loaded (alphabetically) after wsgi.conf
+
+# need this for some of the RESTful URIs we can generate
+AllowEncodedSlashes On
+
+WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
+
+WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
+
+WSGISocketPrefix ${RUNDIR}/wsgi
+
+<Directory ${SVCDIR}>
+
+    WSGIProcessGroup ${SVCPREFIX}
+
+    SetEnv ${SVCPREFIX}.dbnstr postgres
+    SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
+    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
+    SetEnv ${SVCPREFIX}.template_path /usr/share/tagfiler/templates
+    SetEnv ${SVCPREFIX}.chunkbytes 1048576
+
+    AuthType Digest
+    AuthName "${SVCPREFIX}"
+    AuthDigestDomain /${SVCPREFIX}/
+    AuthUserFile /etc/httpd/passwd/passwd
+    Require valid-user
+
+</Directory>
+
+EOF
+
