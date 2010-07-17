@@ -63,18 +63,36 @@ def p_tags(p):
             | slash string slash TAGS slash string slash"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
 
-def p_tagsrest(p):
-    """tags : slash string slash TAGS slash string slash string 
-            | slash string slash TAGS slash string slash string slash"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8])
-
 def p_tagsvalrest(p):
-    """tags : slash string slash TAGS slash string slash string '=' string"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8], value=p[10])
+    """tags : slash string slash TAGS slash string slash tagvals"""
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tagvals=p[8])
 
-def p_tagsevalrest(p):
-    """tags : slash string slash TAGS slash string slash string '='"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tag_id=p[8], value='')
+def p_tagvals(p):
+    """tagvals : tagval"""
+    p[0] = {}
+    tag = p[1][0]
+    vallist = p[1][1]
+    p[0][tag] = vallist
+
+def p_tagvallist_grow(p):
+    """tagvals : tagvals ';' tagval"""
+    p[0] = p[1]
+    tag = p[3][0]
+    vallist = p[3][1]
+    try:
+        vals = p[0][tag]
+        for val in vallist:
+            vals.append(val)
+    except:
+        p[0][tag] = vallist
+
+def p_tagval(p):
+    """tagval : string '=' vallist"""
+    p[0] = ( p[1], p[3] )
+
+def p_tag(p):
+    """tagval : string"""
+    p[0] = ( p[1], [ ] )
 
 def p_query1(p):
     """query : slash string slash QUERY
@@ -235,7 +253,7 @@ def make_parser():
     # use this to shut it up: errorlog=yacc.NullLogger()
     # NullLogger attribute not supported by Python 2.4
     # return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
-    return yacc.yacc(debug=False)
+    return yacc.yacc(debug=True)
 #    return yacc.yacc()
 
 def make_parse():

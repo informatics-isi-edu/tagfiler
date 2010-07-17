@@ -276,12 +276,12 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id=None, tag_id='', value=None):
+    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals={}):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
-        self.tagvals = {}
+        self.tagvals = tagvals
 
     def mystr(self, val):
         if type(val) == type(1.0):
@@ -383,50 +383,45 @@ class FileTags (Node):
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
-        if self.tag_id != '':
+        keys = self.tagvals.keys()
+        if len(keys) == 1:
+            self.tag_id = keys[0]
+            vals = self.tagvals[self.tag_id]
+            if len(vals) == 1:
+                self.value = vals[0]
+            elif len(vals) > 1:
+                raise BadRequest(data="GET does not support multiple values in the URI.")
             return self.GETtag(uri)
+        elif len(keys) > 1:
+            raise BadRequest(data="GET does not support multiple tag names in the URI.")
         else:
             return self.GETall(uri)
 
     def PUT(self, uri):
-        if self.value == None:
-            try:
-                content_type = web.ctx.env['CONTENT_TYPE'].lower()
-            except:
-                content_type = 'text/plain'
+        try:
+            content_type = web.ctx.env['CONTENT_TYPE'].lower()
+        except:
+            content_type = 'text/plain'
 
-            content = web.ctx.env['wsgi.input'].read()
-            if content_type == 'application/x-www-form-urlencoded':
-                # handle same entity body format we output in GETtag()
-                #  tag=val&tag=val...
-                for tagval in content.strip().split('&'):
-                    tag, val = tagval.split('=')
-                    tag = urllib.unquote(tag)
-                    val = urllib.unquote(val)
+        content = web.ctx.env['wsgi.input'].read()
+        if content_type == 'application/x-www-form-urlencoded':
+            # handle same entity body format we output in GETtag()
+            #  tag=val&tag=val...
+            for tagval in content.strip().split('&'):
+                tag, val = tagval.split('=')
+                tag = urllib.unquote(tag)
+                val = urllib.unquote(val)
 
-                    if tag == '':
-                        raise BadRequest(data="A non-empty tag name is required.")
-
-                    if self.tag_id != '':
-                        if tag != self.tag_id:
-                            raise Conflict(data="Tag name %s does not match tag name %s from URI." % (tag, self.tag_id))
-
-                    try:
-                        vals = self.tagvals[tag]
-                    except:
-                        self.tagvals[tag] = []
-                        vals = self.tagvals[tag]
-                    vals.append(val)
-                
-            else:
-                if self.tag_id == '':
+                if tag == '':
                     raise BadRequest(data="A non-empty tag name is required.")
 
-                self.tagvals[self.tag_id] = [ content ]
-
-        else:
-            self.tagvals[self.tag_id] = [ self.value ]
-
+                try:
+                    vals = self.tagvals[tag]
+                except:
+                    self.tagvals[tag] = []
+                    vals = self.tagvals[tag]
+                vals.append(val)
+                
         def body():
             for tag_id in self.tagvals.keys():
                 results = self.select_tagdef(tag_id)
@@ -444,6 +439,17 @@ class FileTags (Node):
 
     def DELETE(self, uri):
         # RESTful delete of exactly one tag on one file...
+        keys = self.tagvals.keys()
+        if len(keys) == 1:
+            self.tag_id = keys[0]
+            vals = self.tagvals[self.tag_id]
+            if len(vals) == 1:
+                self.value = vals[0]
+            elif len(vals) > 1:
+                raise BadRequest(data="DELETE does not support multiple values in the URI.")
+        elif len(keys) > 1:
+            raise BadRequest(data="DELETE does not support multiple tag names in the URI.")
+
         if self.tag_id == '':
             raise BadRequest(data="A non-empty tag name is required.")
         
