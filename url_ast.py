@@ -430,7 +430,7 @@ class FileTags (Node):
                 self.enforceFileTagRestriction(tag_id)
                 for value in self.tagvals[tag_id]:
                     self.set_file_tag(tag_id, value)
-                return None
+            return None
 
         def postCommit(results):
             return ''
