@@ -69,10 +69,10 @@ def p_tagsvalrest(p):
 
 def p_tagvals(p):
     """tagvals : tagval"""
-    p[0] = {}
+    p[0] = dict()
     tag = p[1][0]
     vallist = p[1][1]
-    p[0][tag] = vallist
+    p[0][tag] = list(vallist)
 
 def p_tagvallist_grow(p):
     """tagvals : tagvals ';' tagval"""
@@ -84,7 +84,7 @@ def p_tagvallist_grow(p):
         for val in vallist:
             vals.append(val)
     except:
-        p[0][tag] = vallist
+        p[0][tag] = list(vallist)
 
 def p_tagval(p):
     """tagval : string '=' vallist"""
@@ -92,7 +92,7 @@ def p_tagval(p):
 
 def p_tag(p):
     """tagval : string"""
-    p[0] = ( p[1], [ ] )
+    p[0] = ( p[1], list() )
 
 def p_query1(p):
     """query : slash string slash QUERY
@@ -117,7 +117,7 @@ def p_query4(p):
 
 def p_predlist(p):
     """predlist : pred"""
-    p[0] = [ p[1] ]
+    p[0] = list([ p[1] ])
 
 def p_predlist_grow(p):
     """predlist : predlist ';' pred"""
@@ -138,7 +138,7 @@ def p_pred_not_tag(p):
 
 def p_pred_vallist(p):
     """vallist : string"""
-    p[0] = [ p[1] ]
+    p[0] = list([ p[1] ])
 
 def p_pred_vallist_grow(p):
     """vallist : vallist ',' string"""

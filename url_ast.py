@@ -276,12 +276,15 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals={}):
+    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
-        self.tagvals = tagvals
+        if tagvals:
+            self.tagvals = tagvals
+        else:
+            self.tagvals = dict()
 
     def mystr(self, val):
         if type(val) == type(1.0):
@@ -390,9 +393,11 @@ class FileTags (Node):
             if len(vals) == 1:
                 self.value = vals[0]
             elif len(vals) > 1:
+                web.debug(self.tagvals)
                 raise BadRequest(data="GET does not support multiple values in the URI.")
             return self.GETtag(uri)
         elif len(keys) > 1:
+            web.debug(self.tagvals)
             raise BadRequest(data="GET does not support multiple tag names in the URI.")
         else:
             return self.GETall(uri)
