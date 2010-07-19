@@ -7,6 +7,7 @@ import os
 import traceback
 import urllib
 from optparse import OptionParser
+import StringIO
 
 def urlquote(url):
     """define common URL quote mechanism for registry URL value embeddings"""
@@ -150,21 +151,27 @@ class CSVClient:
             if self.status != 0:
                 return
                 
-            for tag, tagvalues in datasetdefs.iteritems():
-                try:
-                    self.tagdefs[tag]['typestr']
-                    """Tag with values"""
-                    for value in tagvalues:
-                        self.status = self.curlclient.addTag(dataset, tag, value)
-                        if self.status != 0:
-                            print "ERROR: %s, Can not add value '%s' to tag '%s' in dataset '%s'" % (self.status, value, tag, dataset)
-                            return
-                except:
-                    """Tag without values"""
-                    self.status = self.curlclient.addTag(dataset, tag, None)
-                    if self.status != 0:
-                        print "ERROR: %s, Can not add tag '%s' in dataset '%s'" % (self.status, tag, dataset)
-                        return
+            """Upload the dataset tags"""
+            values = self.tagsToString(datasetdefs)
+            if len(values) > 0:
+                   self.status = self.curlclient.addTags(dataset, values)
+                   
+            if self.status != 0:
+                print "ERROR: %s, Can not add tags in dataset '%s'" % (self.status, dataset)
+                return
+        
+    def tagsToString(self, datasetdefs):
+        values = []
+        for tag, tagvalues in datasetdefs.iteritems():
+            try:
+                self.tagdefs[tag]['typestr']
+                """Tag with values"""
+                values.extend(["%s=%s" % (urlquote(tag), urlquote(value)) for value in tagvalues])
+            except:
+                """Tag without values"""
+                values.append("%s=" % urlquote(tag))
+                
+        return "&".join([value for value in values])
         
     def trace(self):
         print self.tags
@@ -211,7 +218,6 @@ class CSVClient:
             self.curl = pycurl.Curl()
             self.curl.setopt(pycurl.USERPWD, "%s:%s" % (self.user, self.password))
             self.curl.setopt(pycurl.WRITEFUNCTION, self.writecallback)
-            self.curl.setopt(pycurl.READFUNCTION, self.readcallback)
             
             if authentication == 'basic':
                 self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_BASIC)
@@ -268,6 +274,7 @@ class CSVClient:
             print "Dataset '%s': [Uploading '%s']" % (dataset, file)
             self.f = open(file, 'rb')
             fs = os.path.getsize(file)
+            self.curl.setopt(pycurl.READFUNCTION, self.readcallback)
             url = "%s/file/%s" % (self.http, urlquote(dataset))
             self.curl.setopt(pycurl.URL, url)
             self.curl.setopt(pycurl.INFILESIZE, int(fs))
@@ -321,6 +328,26 @@ class CSVClient:
             #print 'Exit'
             #sys.exit()
             #print 'After Exit'
+            
+            if self.status not in self.success:
+                return self.status
+            else:
+                return 0
+
+        def addTags(self, dataset, values):
+            """PUT tags to a dataset"""
+            body = StringIO.StringIO(values)
+            self.curl.setopt(pycurl.READFUNCTION, body.read)
+            url = "%s/tags/%s" % (self.http, urlquote(dataset))
+            self.curl.setopt(pycurl.URL, url)
+            self.curl.setopt(pycurl.UPLOAD, 1)
+            self.curl.setopt(pycurl.HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded'])
+            self.curl.setopt(pycurl.INFILESIZE, len(values))
+            self.response = None
+            self.curl.perform()
+            self.status = self.curl.getinfo(pycurl.HTTP_CODE)
+            self.curl.setopt(pycurl.UPLOAD, 0)
+            self.curl.setopt(pycurl.HTTPHEADER, [])
             
             if self.status not in self.success:
                 return self.status
