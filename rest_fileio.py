@@ -264,6 +264,7 @@ class FileIO (Application):
                 filename = self.store_path + '/' + result.location
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
+                web.ctx.status = '204 No Content'
                 
             return ''
 
