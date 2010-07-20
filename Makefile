@@ -1,3 +1,4 @@
+RELEASE=$(shell svn info  | grep "Revision:" | awk  '{print $$2}')
 
 INSTALLSVC=tagfiler
 INSTALLDIR=/var/www/$(INSTALLSVC)
@@ -41,3 +42,9 @@ clean: force
 
 force:
 
+rpm_build:
+	rm -fR build dist tagfiler.egg-info
+	python setup.py bdist_rpm --binary-only --release $(RELEASE) --post-install post-script
+	
+rpm: rpm_build
+	rpm -Uvh --noscripts --notriggers $(shell find . -name '*.rpm')
