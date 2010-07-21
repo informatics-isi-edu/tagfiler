@@ -47,4 +47,4 @@ rpm_build:
 	python setup.py bdist_rpm --binary-only --release $(RELEASE) --post-install post-script
 	
 rpm: rpm_build
-	rpm -Uvh --noscripts --notriggers $(shell find . -name '*.rpm')
+	rpm -Uvh $(shell find . -name '*.rpm')
