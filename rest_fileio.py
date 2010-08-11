@@ -219,8 +219,13 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
-            if storage.readers == '*':
-                suffix = '?read users=*'
+            params = []
+            if storage['read users'] == '*':
+                params.append('read users=*')
+            if storage['write users'] == '*':
+                params.append('write users=*')
+            if len(params) > 0:
+                suffix = '?' + '&'.join(params)
         except:
             pass
 

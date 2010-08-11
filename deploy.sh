@@ -94,16 +94,16 @@ psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CAS
 # pre-establish core restricted tags used by codebase
 tagdef()
 {
-# args: tagname typestr multivalue
+# args: tagname typestr owner multivalue
 
 if [[ -n "\$2" ]]
 then
-   if [[ "\$3" = "multival" ]]
+   if [[ "\$4" = "multival" ]]
    then
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers, multivalue ) VALUES ( '\$1', '\$2', 'owner', TRUE )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers, multivalue ) VALUES ( '\$1', '\$2', '\$3', TRUE )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
    else
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers ) VALUES ( '\$1', '\$2', 'owner' )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers ) VALUES ( '\$1', '\$2', '\$3' )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE( file, value) )"
    fi
 else
@@ -111,15 +111,15 @@ else
 fi
 }
 
-tagdef owner text
-tagdef created timestamptz
-tagdef "read users" text multival
-tagdef "write users" text multival
-tagdef "modified by" text
-tagdef modified timestamptz
-tagdef bytes int8
-tagdef name text
-tagdef url text
+tagdef owner text owner
+tagdef created timestamptz system
+tagdef "read users" text owner multival
+tagdef "write users" text owner multival
+tagdef "modified by" text system
+tagdef modified timestamptz system
+tagdef bytes int8 system
+tagdef name text system
+tagdef url text system
 
 EOF
 

@@ -9,7 +9,7 @@ $if len(tagdefs) > 0:
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		$if title == "User" and (owner == user or writers == '*'):
+		$if title == "User" and (owner == user or writers == 'users'):
 			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
@@ -17,10 +17,12 @@ $if len(tagdefs) > 0:
 			0 or more values allowed.
 		$else:
 			0 or 1 values allowed.	
-		$if writers == 'owner':
-			Tagging restricted to file owner.
+		$if writers == 'system':
+			Tagging restricted to the system.
+		$elif writers == 'owner':
+			Tagging restricted to the file owner.
 		$elif writers == 'writers':
-			Tagging restricted to file writers.
+			Tagging restricted to the file writers.
 		</fieldset>
 		</form>
 $else:

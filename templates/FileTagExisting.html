@@ -14,14 +14,14 @@ $if len(filetagvals) > 0:
 					<input type="hidden" name="tag" value="${tag}" />
 					<input type="text" name="value" value="${val}" size="${length}" readonly />
 					<input type="hidden" name="action" value="delete" />
-					$if tag not in excludes and (user == fileowner or tagdef.writers == '*' or tagdef.writers == 'writers' and user in writeusers):
+					$if tag not in excludes and (user == fileowner or tagdef.writers == 'users' or tagdef.writers == 'writers' and ('*' in writeusers  or user in writeusers)):
 						<input type="submit" value="Delete" />
 					</form>
 			$else:
 				<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
 				<input type="hidden" name="tag" value="${tag}" />
 				<input type="hidden" name="action" value="delete" />
-				$if tag not in excludes:
+				$if tag not in excludes and (user == fileowner or tagdef.writers == 'users' or tagdef.writers == 'writers' and ('*' in writeusers  or user in writeusers)):
 					<input type="submit" value="Delete" />
 				</form>
 		</fieldset>

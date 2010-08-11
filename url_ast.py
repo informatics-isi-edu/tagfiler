@@ -65,14 +65,16 @@ class FileList (Node):
             name = storage.name
             filetype = storage.type
             readers = storage.readers
+            writers = storage.writers
         except:
             raise BadRequest(data="Missing one of the required form fields (name, filetype).")
 
         if name == '':
             raise BadRequest(data="The form field name must not be empty.")
         else:
-            raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name)
-                               + '?type=' + urlquote(filetype) + '&action=define' + '&readers=' + urlquote(readers))
+            raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name) 
+                               + '?type=' + urlquote(filetype) + '&action=define' 
+                               + '&read users=' + urlquote(readers) + '&write users=' + urlquote(writers))
         
 
 class FileId(Node, FileIO):
@@ -341,7 +343,7 @@ class FileTags (Node):
                 filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
                 filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
                 length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
-                return ( self.predefinedTags, # excludes
+                return ( self.systemTags, # excludes
                          tagdefs,
                          tagdefsdict,
                          filetags,
@@ -377,7 +379,7 @@ class FileTags (Node):
                 return self.renderlist("\"%s\" tags" % (self.data_id),
                                        [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote, self.user(), self.owner()),
                                         self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote, self.user(), self.owner()),
-                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.isFileTagRestricted(tag), urlquote)])
+                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.fileTagAccess(tag), urlquote)])
             else:
                 return self.renderlist("All tags for all files",
                                        [self.render.FileTagValExisting('System and User', apptarget, self.data_id, all, urlquote)])

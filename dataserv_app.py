@@ -134,8 +134,8 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
-        self.predefinedTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
-        self.accessTags = ['read users', 'write users']
+        self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
+        self.ownerTags = ['read users', 'write users']
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
@@ -234,15 +234,30 @@ class Application:
         else:
             return False
 
-    def restrictedFile(self, tag, user, owner):
+    def fileAccess(self, tag, user, owner):
         try:
             results = self.select_file_tag_restrictions(tag, user)
             if len(results) == 0 and user != owner:
-                return True
-            else:
                 return False
+            else:
+                return True
         except:
-            return user != owner
+            return user == owner
+
+    def tagAccess(self, tag, user, tag_writer):
+        """ The tag must have 'users' access or the user must be in the 'writers' list """ 
+        if tag_writer == 'users':
+            return True
+        elif tag_writer != 'writers':
+            return False
+        try:
+            results = self.select_file_tag_restrictions(tag, user)
+            if len(results) == 0:
+                return False
+            else:
+                return True
+        except:
+            return False
 
     def enforceFileRestriction(self, tag):
         owner = self.owner()
@@ -250,7 +265,7 @@ class Application:
         if owner:
             if user:
                 if user != owner:
-                    if self.restrictedFile(tag, user, owner):
+                    if not self.fileAccess(tag, user, owner):
                         raise Forbidden(data="access to dataset %s" % self.data_id)
             else:
                 raise Unauthorized(data="access to dataset %s" % self.data_id)
@@ -265,14 +280,14 @@ class Application:
         if len(results) == 0:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
         tag_writer = results[0].writers
-        if tag_writer != '*':
+        if tag_writer != 'users':
             owner = self.owner()
             user = self.user()
             if owner:
                 if user:
                     if user == owner:
                         pass
-                    elif tag_writer == 'owner' or self.restrictedFile(policy_tag, user, owner):
+                    elif not self.tagAccess(policy_tag, user, tag_writer):
                         raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
                     else:
                         pass
@@ -285,11 +300,15 @@ class Application:
         results = self.select_tagdef(tag_id)
         if len(results) == 0:
             raise NotFound()
-        owner = results[0].owner
+        result = results[0]
+        writers = result.writers
+        owner = result.owner
         user = self.user()
         if owner:
             if user:
-                if user != owner:
+                if user == owner:
+                    pass
+                elif not self.tagAccess(tag_id, user, writers):
                     raise Forbidden(data="access to tag definition %s" % tag_id)
                 else:
                     pass
@@ -298,14 +317,14 @@ class Application:
         else:
             raise Forbidden(data="access to tag definition %s" % tag_id)
 
-    def isFileTagRestricted(self, tag_id):
+    def fileTagAccess(self, tag_id):
         try:
             self.enforceFileTagRestriction(tag_id)
-            if tag_id in self.accessTags and self.owner() != self.user():
-                return True
+            if tag_id in self.ownerTags and self.owner() != self.user():
+                return False
         except:
-            return True
-        return False
+            return False
+        return True
       
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
@@ -375,7 +394,6 @@ class Application:
                 tabledef += ", UNIQUE(file)"
         tabledef += " )"
         self.db.query(tabledef)
-        return True
 
     def delete_tagdef(self):
         self.db.query("DELETE FROM tagdefs WHERE tagname = $tag_id",
