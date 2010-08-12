@@ -34,14 +34,13 @@ class FileList (Node):
 
         def body():
             self.predlist=[]
-            return self.select_files_by_predlist()
+            return [ (res.file,
+                      self.userAccess('write users', res.owner, res.file) )
+                      for res in self.select_files_by_predlist() ]
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
-            files = []
-            for name, owner in [(result.file, result.owner) for result in results]:
-                if self.userAccess('read users', owner, name) == True: 
-                    files.append((name, self.userAccess('write users', owner, name)))
+            files = results
             return self.renderlist("Repository Summary",
                                    [self.render.Commands(target),
                                     self.render.FileList(target, files, urlquote)])
@@ -268,7 +267,7 @@ class Tagdef (Node):
         def postCommit(results):
             if self.action == 'delete':
                 return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, urlquote)])
+                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, urlquote)])
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
@@ -584,24 +583,21 @@ class Query (Node):
 
         def body():
             if len(self.predlist) > 0:
-                files = [ (res.file , res.owner) for res in self.select_files_by_predlist() ]
+                files = [ (res.file,
+                           self.userAccess('write users', res.owner, res.file) )
+                          for res in self.select_files_by_predlist() ]
             else:
                 files = []
             alltags = [ tagdef.tagname for tagdef in self.select_tagdefs() ]
             return ( files, alltags )
 
         def postCommit(results):
-            allfiles, alltags = results
-            files = []
-            for name, owner in allfiles:
-                files.append((name, self.userAccess('write users', owner, name)))
-                
+            files, alltags = results
             target = self.home + web.ctx.homepath
+            apptarget = self.home + web.ctx.homepath
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
-
-            apptarget = self.home + web.ctx.homepath
 
             if len(self.predlist) == 0:
                 # render a blank starting form
