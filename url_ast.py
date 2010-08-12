@@ -39,7 +39,8 @@ class FileList (Node):
             target = self.home + web.ctx.homepath
             files = []
             for name, owner in [(result.file, result.value) for result in results]:
-                files.append((name, self.userAccess('write users', owner, name)))
+                if self.userAccess('read users', owner, name) == True: 
+                    files.append((name, self.userAccess('write users', owner, name)))
             return self.renderlist("Repository Summary",
                                    [self.render.Commands(target),
                                     self.render.FileList(target, files, urlquote)])
