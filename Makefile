@@ -22,7 +22,8 @@ TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 .SUFFIXES:
 
 $(HOME)/.tagfiler.predeploy:
-	yum -y --skip-broken install httpd mod_wsgi postgresql{,-devel,-server} python{,-psycopg2,-webpy,-ply} || true
+	yum -y --skip-broken install postgresql{,-devel,-server} || true
+	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply} || true
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
 
@@ -45,6 +46,6 @@ force:
 rpm_build:
 	rm -fR build dist tagfiler.egg-info
 	python setup.py bdist_rpm --binary-only --release $(RELEASE) --post-install post-script
-	
+
 rpm: rpm_build
 	rpm -Uvh $(shell find . -name '*.rpm')
