@@ -346,14 +346,6 @@ class Application:
         results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
         return results
 
-    def select_files(self):
-        results = self.db.select('files', order='name')
-        return results
-
-    def select_files_by_owner(self):
-        results = self.db.select('"_owner"', order='file')
-        return results
-    
     def insert_file(self):
         self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
                       vars=dict(name=self.data_id, local=self.local, location=self.location))
@@ -515,6 +507,7 @@ class Application:
             pass            
 
     def select_files_by_predlist(self):
+
         for pred in self.predlist:
             results = self.select_tagdef(pred['tag'])
             if len(results) == 0:
@@ -522,9 +515,8 @@ class Application:
 
         tables = ['_owner']
         excepttables = ['_owner']
-        notags = []
         wheres = []
-        values = {}
+        values = dict()
 
         for p in range(0, len(self.predlist)):
             pred = self.predlist[p]
@@ -543,6 +535,9 @@ class Application:
                     wheres.append(" OR ".join(valpreds))
             
         tables = " JOIN ".join(tables)
+        tables += ' LEFT OUTER JOIN "_read users" USING (file)'
+        wheres.append('_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'')
+        values["client"] = self.user()
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
             wheres = "WHERE " + wheres

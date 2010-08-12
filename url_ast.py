@@ -33,12 +33,13 @@ class FileList (Node):
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
 
         def body():
-            return self.select_files_by_owner()
+            self.predlist=[]
+            return self.select_files_by_predlist()
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = []
-            for name, owner in [(result.file, result.value) for result in results]:
+            for name, owner in [(result.file, result.owner) for result in results]:
                 if self.userAccess('read users', owner, name) == True: 
                     files.append((name, self.userAccess('write users', owner, name)))
             return self.renderlist("Repository Summary",
