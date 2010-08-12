@@ -515,52 +515,47 @@ class Application:
             pass            
 
     def select_files_by_predlist(self):
-        tagdefs = {}
         for pred in self.predlist:
-            try:
-                if not tagdefs.has_key(pred['tag']):
-                    tagdefs[pred['tag']] = self.select_tagdef(pred['tag'])[0]
-            except:
+            results = self.select_tagdef(pred['tag'])
+            if len(results) == 0:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
 
         tables = ['_owner']
+        excepttables = ['_owner']
         notags = []
         wheres = []
         values = {}
+
         for p in range(0, len(self.predlist)):
             pred = self.predlist[p]
             tag = pred['tag']
             op = pred['op']
             vals = pred['vals']
-            if op and vals:
-                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
-                if len(vals) > 0:
+            if op == ':not:':
+                excepttables.append("\"%s\" USING (file)" % self.wraptag(tag))
+            else:
+                tables.append("\"%s\" AS t%s USING (file)" % (self.wraptag(tag), p))
+                if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
                         valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
                         values["val%s_%s" % (p, v)] = vals[v]
                     wheres.append(" OR ".join(valpreds))
-                if tagdefs.has_key(tag):
-                    del tagdefs[tag]
-            elif op == ':not:' and tagdefs.has_key(tag):
-                notags.append(tag)
-                del tagdefs[tag]
-            elif tagdefs.has_key(tag):
-                tables.append("\"%s\" AS t%s" % (self.wraptag(tag), p))
-                del tagdefs[tag]
             
-        tables = tables[0:1] + [ "%s USING (file)" % table for table in tables[1:] ]
         tables = " JOIN ".join(tables)
-
-        if len(notags) > 0:
-            orpred = " OR ".join(["tagname = '%s'" % tag for tag in notags])
-            wheres.append("file NOT IN (SELECT file from filetags where %s)" % orpred)
-            
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
-        if len(wheres) > 0:
+        if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner ORDER BY file' % (tables, wheres)
+        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner' % (tables, wheres)
+
+        if len(excepttables) > 1:
+            excepttables = " JOIN ".join(excepttables)
+            query2 = 'SELECT file, _owner.value AS owner FROM %s GROUP BY file, owner' % excepttables
+            query = '(%s) EXCEPT (%s)' % (query, query2)
+
+        query += " ORDER BY file"
+        
         #web.debug(query)
         return self.db.query(query, vars=values)
 
