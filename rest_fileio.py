@@ -17,6 +17,19 @@ for line in f.readlines():
         mime_types_suffixes[g['type']] = g['exts'].split(' ')[0]
 f.close()
 
+# we want .txt not .asc!
+mime_types_suffixes['text/plain'] = 'txt'
+
+def choose_content_type(clientval, guessedval):
+    """Hueristic choice between client-supplied and guessed Content-Type.
+
+       TODO: expand this with practical experience of bogus browser
+           values and abnormal guessed values."""
+    if clientval and clientval not in [ 'application/octet-stream' ]:
+        return clientval
+    else:
+        return guessedval
+
 class FileIO (Application):
     """Basic bulk file I/O
 
@@ -25,7 +38,7 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes' ]
+    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type' ]
 
     def __init__(self):
         Application.__init__(self)
@@ -37,14 +50,20 @@ class FileIO (Application):
         global mime_types_suffixes
 
         def body():
-            results = self.select_file()
-            if len(results) == 0:
+            fresults = self.select_file()
+            if len(fresults) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             self.enforceFileRestriction('read users')
-            return results[0]
+            tresults = self.select_file_tag('content-type')
+            if len(tresults) > 0:
+                content_type = tresults[0].value
+            else:
+                content_type = None
+            return (fresults[0], content_type)
 
         def postCommit(result):
             # if the dataset is a remote URL, just redirect client
+            result, content_type = result
             if not result.local:
                 raise web.seeother(result.location)
             else:
@@ -52,9 +71,10 @@ class FileIO (Application):
                 filename = self.store_path + '/' + self.location
                 try:
                     f = open(filename, "rb")
-                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
-                    line = p.stdout.readline()
-                    content_type = line.strip()
+                    if content_type == None:
+                        p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                        line = p.stdout.readline()
+                        content_type = line.strip()
                     return (f, content_type)
                 except:
                     # this may happen sporadically under race condition:
@@ -293,9 +313,9 @@ class FileIO (Application):
             else:
                 parts = buf[0:-2].split(':')
                 try:
-                    self.formHeaders[parts[0]] = parts[1].strip()
+                    self.formHeaders[parts[0].lower()] = parts[1].strip()
                 except:
-                    self.formHeaders[parts[0]] = None
+                    self.formHeaders[parts[0].lower()] = None
 
         return (boundary1, boundaryN)
 
@@ -358,6 +378,28 @@ class FileIO (Application):
                 t.commit()
             except:
                 t.rollback()
+                
+            content_types = self.select_file_tag('content-type')
+            if len(content_types) == 0:
+                # only attempt auto-tag of content-type when missing
+                try:
+                    filename = self.store_path + '/' + self.location
+                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                    line = p.stdout.readline()
+                    guessed_content_type = line.strip()
+                except:
+                    guessed_content_type = None
+
+                content_type = choose_content_type(self.client_content_type, guessed_content_type)
+
+                if content_type:
+                    t = self.db.transaction()
+                    try:
+                        self.set_file_tag('content-type', content_type)
+                        t.commit()
+                    except:
+                        t.rollback()
+
         else:
             t = self.db.transaction()
             try:
@@ -368,10 +410,18 @@ class FileIO (Application):
 
             t = self.db.transaction()
             try:
+                self.delete_file_tag('content-type')
+                t.commit()
+            except:
+                t.rollback()
+
+            t = self.db.transaction()
+            try:
                 self.set_file_tag('url', self.location)
                 t.commit()
             except:
                 t.rollback()
+
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
@@ -548,6 +598,11 @@ class FileIO (Application):
 
         def postWriteBody():
             # this may repeat in case of database races
+            try:
+                self.client_content_type = web.ctx.env['CONTENT_TYPE'].lower()
+            except:
+                self.client_content_type = None
+
             return self.insertForStore()
 
         def postWritePostCommit(results):
@@ -617,6 +672,11 @@ class FileIO (Application):
             inf = web.ctx.env['wsgi.input']
             boundary1, boundaryN = self.scanFormHeader(inf)
             f, tempFileName = self.getTemporary("w+b")
+
+            try:
+                self.client_content_type = self.formHeaders['content-type']
+            except:
+                self.client_content_type = None
 
             try:
                 wbytes, flen = self.storeInput(inf, f)

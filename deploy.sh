@@ -120,6 +120,7 @@ tagdef modified timestamptz system
 tagdef bytes int8 system
 tagdef name text system
 tagdef url text system
+tagdef content-type text writers
 
 EOF
 
