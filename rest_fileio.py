@@ -20,15 +20,35 @@ f.close()
 # we want .txt not .asc!
 mime_types_suffixes['text/plain'] = 'txt'
 
-def choose_content_type(clientval, guessedval):
+def choose_content_type(clientval, guessedval, taggedval):
     """Hueristic choice between client-supplied and guessed Content-Type.
 
        TODO: expand this with practical experience of bogus browser
            values and abnormal guessed values."""
-    if clientval and clientval not in [ 'application/octet-stream' ]:
-        return clientval
+    def basetype(typestr):
+        if typestr:
+            return typestr.split(';')[0]
+        else:
+            return None
+
+    bclientval = basetype(clientval)
+    bguessedval = basetype(guessedval)
+    btaggedval = basetype(taggedval)
+    
+    if bclientval in [ 'application/octet-stream' ]:
+        clientval = None
+        bclientval = None
+
+    if taggedval:
+        if btaggedval in [ bclientval, bguessedval ]:
+            return taggedval
+        elif bguessedval == bclientval:
+            return guessedval
+        return taggedval
     else:
-        return guessedval
+        if clientval:
+            return clientval
+    return guessedval
 
 class FileIO (Application):
     """Basic bulk file I/O
@@ -380,25 +400,30 @@ class FileIO (Application):
                 t.rollback()
                 
             content_types = self.select_file_tag('content-type')
-            if len(content_types) == 0:
-                # only attempt auto-tag of content-type when missing
+            if len(content_types) > 0:
+                tagged_content_type = content_types[0].value
+            else:
+                tagged_content_type = None
+                
+            try:
+                filename = self.store_path + '/' + self.location
+                p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                line = p.stdout.readline()
+                guessed_content_type = line.strip()
+            except:
+                guessed_content_type = None
+
+            content_type = choose_content_type(self.client_content_type,
+                                               guessed_content_type,
+                                               tagged_content_type)
+
+            if content_type:
+                t = self.db.transaction()
                 try:
-                    filename = self.store_path + '/' + self.location
-                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
-                    line = p.stdout.readline()
-                    guessed_content_type = line.strip()
+                    self.set_file_tag('content-type', content_type)
+                    t.commit()
                 except:
-                    guessed_content_type = None
-
-                content_type = choose_content_type(self.client_content_type, guessed_content_type)
-
-                if content_type:
-                    t = self.db.transaction()
-                    try:
-                        self.set_file_tag('content-type', content_type)
-                        t.commit()
-                    except:
-                        t.rollback()
+                    t.rollback()
 
         else:
             t = self.db.transaction()
