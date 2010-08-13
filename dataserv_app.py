@@ -215,9 +215,9 @@ class Application:
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
-    def owner(self):
+    def owner(self, data_id=None):
         try:
-            results = self.select_file_tag('owner')
+            results = self.select_file_tag('owner', data_id=data_id)
             if len(results) > 0:
                 return results[0].value
             else:
@@ -232,115 +232,146 @@ class Application:
             return None
         return user
 
-    def userAccess(self, tag, owner, file):
+    def test_file_authz(self, mode, data_id=None, owner=None):
+        """Check whether access is allowed to user given mode and owner.
+
+           True: access allowed
+           False: access forbidden
+           None: user needs to authenticate to be sure"""
         user = self.user()
-        if user:
-            if user != owner:
-                try:
-                    results = self.select_user_restrictions(tag, user, file)
-                    if len(results) == 0:
-                        return False
-                    else:
-                        return True
-                except:
-                    return False
-            else:
-                return True
-        else:
-            return False
-
-    def fileAccess(self, tag, user, owner):
-        try:
-            results = self.select_file_tag_restrictions(tag, user)
-            if len(results) == 0 and user != owner:
-                return False
-            else:
-                return True
-        except:
-            return user == owner
-
-    def tagAccess(self, tag, user, tag_writer):
-        """ The tag must have 'users' access or the user must be in the 'writers' list """ 
-        if tag_writer == 'users':
+        if data_id == None:
+            data_id = self.data_id
+        if owner == None:
+            owner = self.owner(data_id=data_id)
+        if owner and user == owner:
             return True
-        elif tag_writer != 'writers':
-            return False
         try:
-            results = self.select_file_tag_restrictions(tag, user)
-            if len(results) == 0:
-                return False
-            else:
-                return True
+            results = [ res.value for res in self.select_file_acl(mode, user, data_id) ]
         except:
+            results = []
+            
+        if user in results or '*' in results:
+            return True
+        elif user:
             return False
+        else:
+            return None
 
-    def enforceFileRestriction(self, tag):
-        owner = self.owner()
-        user = self.user()
-        if owner:
+    def test_tag_authz(self, mode, tagname=None, user=None, fowner=None):
+        """Check whether access is allowed to user given policy_tag and owner.
+
+           True: access allowed
+           False: access forbidden
+           None: user needs to authenticate to be sure"""
+        if tagname == None:
+            tagname = self.tag_id
+        if user == None:
+            user = self.user()
+        if fowner == None:
+            fowner = self.owner()
+        
+        try:
+            tagdef = self.select_tagdef(tagname)[0]
+        except:
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+
+        # lookup policy model based on access mode we are checking
+        column = dict(read='readpolicy', write='writepolicy')
+        try:
+            model = tagdef[column[mode]]
+        except:
+            # temporary compatibility hack for old deployment schema
+            if tagdef.writers == 'owner':
+                model = 'fowner'
+            elif tagdef.writers == 'writers':
+                model = 'file'
+        # model is in [ anonymous, users, file, fowner, tag, system ]
+
+        if model == 'anonymous':
+            return True
+        elif model == 'users' and user:
+            return True
+        elif model == 'file':
+            owner = fowner
+            try:
+                results = [ res.value for res in self.select_file_acl(mode, user, data_id) ]
+            except:
+                results = []
+        elif model == 'tag':
+            owner = tagdef.owner
+            try:
+                results = [ res.value for res in self.select_tag_acl(tagname, mode, user) ]
+            except:
+                results = []
+        elif model == 'fowner':
+            owner = fowner
+            results = []
+        elif model == 'system':
+            return False
+            
+        if owner and user == owner:
+            return True
+        elif user in results or '*' in results:
+            return True
+        elif user:
+            return False
+        else:
+            return None
+
+    def test_tagdef_authz(self, mode, tagname, user):
+        """Check whether access is allowed."""
+        try:
+            tagdef = self.select_tagdef(tagname)[0]
+        except:
+            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+        if mode == 'write':
             if user:
-                if user != owner:
-                    if not self.fileAccess(tag, user, owner):
-                        raise Forbidden(data="access to dataset %s" % self.data_id)
+                return user == tagdef.owner
             else:
-                raise Unauthorized(data="access to dataset %s" % self.data_id)
+                return None
+        else:
+            return True
+
+    def enforce_file_authz(self, mode):
+        """Check whether access is allowed and throw web exception if not."""
+        allow = self.test_file_authz(mode)
+        if allow == False:
+            raise Forbidden(data="access to dataset %s" % self.data_id)
+        elif allow == None:
+            raise Unauthorized(data="access to dataset %s" % self.data_id)
         else:
             pass
 
-    def enforceFileTagRestriction(self, tag_id, policy_tag='write users'):
+    def enforce_tag_authz(self, mode, tagname=None):
+        """Check whether access is allowed and throw web exception if not."""
+        fowner = self.owner()
+        user = self.user()
         results = self.select_file()
+        if tagname == None:
+            tagname = self.tag_id
         if len(results) == 0:
             raise NotFound(data="dataset %s" % self.data_id)
-        results = self.select_tagdef(tag_id)
-        if len(results) == 0:
-            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
-        tag_writer = results[0].writers
-        if tag_writer != 'users':
-            owner = self.owner()
-            user = self.user()
-            if owner:
-                if user:
-                    if user == owner:
-                        pass
-                    elif not self.tagAccess(policy_tag, user, tag_writer):
-                        raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
-                    else:
-                        pass
-                else:
-                    raise Unauthorized(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
-            else:
-                pass
-
-    def enforceTagRestriction(self, tag_id):
-        results = self.select_tagdef(tag_id)
-        if len(results) == 0:
-            raise NotFound()
-        result = results[0]
-        writers = result.writers
-        owner = result.owner
-        user = self.user()
-        if owner:
-            if user:
-                if user == owner:
-                    pass
-                elif not self.tagAccess(tag_id, user, writers):
-                    raise Forbidden(data="access to tag definition %s" % tag_id)
-                else:
-                    pass
-            else:
-                raise Unauthorized(data="access to tag definition %s" % tag_id)
+        allow = self.test_tag_authz(mode, tagname, user, fowner)
+        if allow == False:
+            raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
+        elif allow == None:
+            raise Unauthorized(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
         else:
-            raise Forbidden(data="access to tag definition %s" % tag_id)
+            pass
 
-    def fileTagAccess(self, tag_id):
-        try:
-            self.enforceFileTagRestriction(tag_id)
-            if tag_id in self.ownerTags and self.owner() != self.user():
-                return False
-        except:
-            return False
-        return True
-      
+    def enforce_tagdef_authz(self, mode, tag_id=None):
+        """Check whether access is allowed and throw web exception if not."""
+        if tag_id == None:
+            tag_id = self.tag_id
+        user = self.user()
+        allow = self.test_tagdef_authz(mode, tag_id, user)
+        if allow == False:
+            raise Forbidden(data="access to tag definition %s" % tag_id)
+        elif allow == None:
+            raise Unauthorized(data="access to tag definition %s" % tag_id)
+        else:
+            pass
+
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
@@ -420,23 +451,14 @@ class Application:
             data_id = self.data_id
         return self.db.query(query, vars=dict(file=data_id, value=value))
 
-    def select_file_tag_restrictions(self, tagname, user):
+    def select_file_acl(self, mode, user, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
+        tagname = dict(read='read users', write='write users')[mode]
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
                 + " WHERE file = $file AND (value = $value OR value = $any)"
         #web.debug(query)
-        return self.db.query(query, vars=dict(file=self.data_id, value=user, any="*"))
-
-    def select_user_restrictions(self, tagname, user, file):
-        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file AND (value = $value OR value = $any)"
-        #web.debug(query)
-        return self.db.query(query, vars=dict(file=file, value=user, any="*"))
-
-    def select_users_access(self, tagname, file):
-        query = "SELECT value FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file"
-        #web.debug(query)
-        return self.db.query(query, vars=dict(file=file))
+        return self.db.query(query, vars=dict(file=data_id, value=user, any="*"))
 
     def select_file_tags(self, tagname=''):
         if tagname:

@@ -88,39 +88,43 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 # this script will recreate all tables, but only on a clean database
 
 psql -c "CREATE TABLE files ( name text PRIMARY KEY, local boolean default False, location text )"
-psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, writers text, owner text )"
+psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, readpolicy text, writepolicy text, owner text )"
+psql -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL )"
+psql -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
 # pre-establish core restricted tags used by codebase
 tagdef()
 {
-# args: tagname typestr owner multivalue
+   # args: tagname typestr owner readpolicy writepolicy multivalue
 
-if [[ -n "\$2" ]]
-then
-   if [[ "\$4" = "multival" ]]
+   # policy is one of:
+   #   anonymous  -- any client can access
+   #   users  -- any authenticated user can access
+   #   file  -- file access rule is observed for tag access
+   #   fowner  -- only file owner can access
+   #   tag -- tag access rule is observed for tag access
+   #   system  -- no client can access
+
+   psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$3', '\$4', \$5 )"
+   if [[ -n "\$2" ]]
    then
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers, multivalue ) VALUES ( '\$1', '\$2', '\$3', TRUE )"
       psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
    else
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, writers ) VALUES ( '\$1', '\$2', '\$3' )"
-      psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE( file, value) )"
+      psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
    fi
-else
-   psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
-fi
 }
 
-tagdef owner text owner
-tagdef created timestamptz system
-tagdef "read users" text owner multival
-tagdef "write users" text owner multival
-tagdef "modified by" text system
-tagdef modified timestamptz system
-tagdef bytes int8 system
-tagdef name text system
-tagdef url text system
-tagdef content-type text writers
+tagdef owner text anonymous owner false
+tagdef created timestamptz anonymous system false
+tagdef "read users" text anonymous owner true
+tagdef "write users" text anonymous owner true
+tagdef "modified by" text anonymous system false
+tagdef modified timestamptz anonymous system false
+tagdef bytes int8 anonymous system false
+tagdef name text anonymous system false
+tagdef url text anonymous system false
+tagdef content-type text anonymous writers false
 
 EOF
 

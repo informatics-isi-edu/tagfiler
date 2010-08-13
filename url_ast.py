@@ -35,7 +35,7 @@ class FileList (Node):
         def body():
             self.predlist=[]
             return [ (res.file,
-                      self.userAccess('write users', res.owner, res.file) )
+                      self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                       for res in self.select_files_by_predlist() ]
 
         def postCommit(results):
@@ -170,7 +170,7 @@ class Tagdef (Node):
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
-            self.enforceTagRestriction(self.tag_id)
+            self.enforce_tagdef_authz('write')
             self.delete_tagdef()
             return ''
 
@@ -258,10 +258,10 @@ class Tagdef (Node):
                     self.insert_tagdef()
                     self.log('CREATE', tag=self.tag_id)
             elif self.action == 'delete' or self.action == 'CancelDelete':
-                self.enforceTagRestriction(self.tag_id)
+                self.enforce_tagdef_authz('write')
                 return None
             elif self.action == 'ConfirmDelete':
-                self.enforceTagRestriction(self.tag_id)
+                self.enforce_tagdef_authz('write')
                 self.delete_tagdef()
                 self.log('DELETE', tag=self.tag_id)
             else:
@@ -343,7 +343,7 @@ class FileTags (Node):
         def body():
             def buildtaginfo(where1, where2):
                 tagdefs = [ tagdef for tagdef in self.select_defined_tags(where1) ]
-                writeusers = [ result.value for result in self.select_users_access('write users', self.data_id)]
+                filewriteok = self.test_file_authz('write')
                 tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
                 filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
                 filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
@@ -354,7 +354,7 @@ class FileTags (Node):
                          filetags,
                          filetagvals,
                          length,
-                         writeusers )
+                         filewriteok )
             
             return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                     buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
@@ -382,9 +382,9 @@ class FileTags (Node):
             # render HTML result
             if self.data_id:
                 return self.renderlist("\"%s\" tags" % (self.data_id),
-                                       [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote, self.user(), self.owner()),
-                                        self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote, self.user(), self.owner()),
-                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.fileTagAccess(tag), urlquote)])
+                                       [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
+                                        self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
+                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.test_tag_authz('write', tag), urlquote)])
             else:
                 return self.renderlist("All tags for all files",
                                        [self.render.FileTagValExisting('System and User', apptarget, self.data_id, all, urlquote)])
@@ -439,7 +439,7 @@ class FileTags (Node):
                 results = self.select_tagdef(tag_id)
                 if len(results) == 0:
                     raise NotFound(data='tag definition %s' % tag_id)
-                self.enforceFileTagRestriction(tag_id)
+                self.enforce_tag_authz('write', tag_id)
                 for value in self.tagvals[tag_id]:
                     self.set_file_tag(tag_id, value)
                 self.log('SET', dataset=self.data_id, tag=tag_id)
@@ -467,7 +467,7 @@ class FileTags (Node):
             raise BadRequest(data="A non-empty tag name is required.")
         
         def body():
-            self.enforceFileTagRestriction(self.tag_id)
+            self.enforce_tag_authz('write')
             self.delete_file_tag(self.tag_id, self.value)
             return None
 
@@ -484,13 +484,13 @@ class FileTags (Node):
 
         def putBody():
             for tag_id in self.tagvals:
-                self.enforceFileTagRestriction(tag_id)
+                self.enforce_tag_authz('write', tag_id)
                 self.set_file_tag(tag_id, self.tagvals[tag_id])
                 self.log('SET', dataset=self.data_id, tag=tag_id)
             return None
 
         def deleteBody():
-            self.enforceFileTagRestriction(self.tag_id)
+            self.enforce_tag_authz('write')
             self.delete_file_tag(self.tag_id, self.value)
             self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
             return None
@@ -592,7 +592,7 @@ class Query (Node):
         def body():
             if len(self.predlist) > 0:
                 files = [ (res.file,
-                           self.userAccess('write users', res.owner, res.file) )
+                           self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                           for res in self.select_files_by_predlist() ]
             else:
                 files = []

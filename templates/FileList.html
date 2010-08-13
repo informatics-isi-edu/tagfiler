@@ -1,24 +1,21 @@
 $def with (target, files, quote)
 $if len(files) > 0:
-	$for name, writers in files:
+	$for name, writeok in files:
+		$ tags = [ '<a href="%s/file/%s">Download</a>' % (target, quote(name)), '<a href="%s/tags/%s">View or set tags</a>' % (target, quote(name)) ]
+		$if writeok:
+			$ tags += [ '<a href="%s/file/%s?action=define&amp;type=file">Update via file</a>' % (target, quote(name)), '<a href="%s/file/%s?action=define&amp;type=url">Update via URL</a>' % (target, quote(name)) ]
 		<fieldset>
 		  <legend>${name}</legend>
 		  <table>
-		    <tr>
-		      <td>
-			  <a href="${target}/file/${quote(name)}">Download</a>,
-		  $if writers == True:
-			  <a href="${target}/tags/${quote(name)}">View or set tags</a>,
-			  <a href="${target}/file/${quote(name)}?action=define&amp;type=file">Update via file</a>, 
-			  <a href="${target}/file/${quote(name)}?action=define&amp;type=url">Update via URL</a>
-		  $else:
-			  <a href="${target}/tags/${quote(name)}">View or set tags</a>
+		  <tr>
+		  <td>
+			  $:{', '.join(tags)}
 		  </td>
 		  <td>
 		  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
 		    <div>
 		    <input type="hidden" name="action" value="delete" />
-		    $if writers == True:
+		    $if writeok:
 		    	<input type="submit" value="Delete" />
 		    </div>
 		  </form>

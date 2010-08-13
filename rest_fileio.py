@@ -73,7 +73,7 @@ class FileIO (Application):
             fresults = self.select_file()
             if len(fresults) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction('read users')
+            self.enforce_file_authz('read')
             tresults = self.select_file_tag('content-type')
             if len(tresults) > 0:
                 content_type = tresults[0].value
@@ -276,7 +276,7 @@ class FileIO (Application):
                 results = self.select_file()
                 if len(results) == 0:
                     return None
-                self.enforceFileRestriction('write users')
+                self.enforce_file_authz('write')
                 return None
 
             def postCommit(results):
@@ -299,7 +299,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction('write users')
+            self.enforce_file_authz('write')
             self.delete_file()
             return results[0]
 
@@ -346,7 +346,7 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            self.enforceFileRestriction('write users')
+            self.enforce_file_authz('write')
             remote = not results[0].local
             self.update_file()
         else:
@@ -457,7 +457,7 @@ class FileIO (Application):
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
-            self.enforceFileTagRestriction(tagname)
+            self.enforce_tag_authz('write', tagname)
             self.set_file_tag(tagname, self.queryopts[tagname])
 
         return results
@@ -592,7 +592,7 @@ class FileIO (Application):
             if len(results) == 0:
                 return None
             else:
-                self.enforceFileRestriction('write users')
+                self.enforce_file_authz('write')
                 if self.update:
                     if results[0].local:
                         self.location = result.location
@@ -671,7 +671,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 return True
-            self.enforceFileRestriction('write users')
+            self.enforce_file_authz('write')
             return True
 
         def preWritePostCommit(result):
@@ -690,7 +690,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforceFileRestriction('write users')
+            self.enforce_file_authz('write')
             self.delete_file()
             return results[0]
 
