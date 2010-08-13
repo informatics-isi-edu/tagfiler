@@ -122,9 +122,9 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.writers, tagdef.multivalue, None)
+            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, None)
                      for tagdef in self.select_defined_tags('owner is null') ]
-            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.writers, tagdef.multivalue, tagdef.owner)
+            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
                      for tagdef in self.select_defined_tags('owner is not null') ]
             
             return (predefined, userdefined)
@@ -133,8 +133,8 @@ class Tagdef (Node):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             predefined, userdefined = tagdefs
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', self.user()),
-                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', self.user()),
+                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', lambda mode, tag: self.test_tagdef_authz(mode, tag)),
+                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', lambda mode, tag: self.test_tagdef_authz(mode, tag)),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:
@@ -154,8 +154,10 @@ class Tagdef (Node):
             try:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 return ('typestr=' + urlquote(tagdef.typestr) 
-                        + '&writers=' + urlquote(unicode(tagdef.writers))
-                        + '&multivalue=' + urlquote(unicode(tagdef.multivalue)))
+                        + '&readpolicy=' + urlquote(unicode(tagdef.readpolicy))
+                        + '&writepolicy=' + urlquote(unicode(tagdef.writepolicy))
+                        + '&multivalue=' + urlquote(unicode(tagdef.multivalue))
+                        + '&owner=' + urlquote(unicode(tagdef.owner)))
             except:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
 
@@ -196,11 +198,17 @@ class Tagdef (Node):
             except:
                 self.typestr = ''
 
-        if self.writers == None:
+        if self.readpolicy == None:
             try:
-                self.writers = self.queryopts['writers'].lower()
+                self.readpolicy = self.queryopts['readpolicy'].lower()
             except:
-                self.writers = 'owner'
+                self.readpolicy = 'owner'
+
+        if self.writepolicy == None:
+            try:
+                self.writepolicy = self.queryopts['writepolicy'].lower()
+            except:
+                self.writepolicy = 'owner'
 
         if self.multivalue == None:
             try:
@@ -236,9 +244,10 @@ class Tagdef (Node):
                 if key[0:4] == 'tag-':
                     if storage[key] != '':
                         typestr = storage['type-%s' % (key[4:])]
-                        writers = storage['writers-%s' % (key[4:])]
+                        readpolicy = storage['readpolicy-%s' % (key[4:])]
+                        writepolicy = storage['writepolicy-%s' % (key[4:])]
                         multivalue = storage['multivalue-%s' % (key[4:])]
-                        self.tagdefs[storage[key]] = (typestr, writers, multivalue)
+                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, multivalue)
             try:
                 self.tag_id = storage.tag
             except:
@@ -251,7 +260,7 @@ class Tagdef (Node):
             if self.action == 'add':
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
-                    self.typestr, self.writers, self.multivalue = self.tagdefs[tagname]
+                    self.typestr, self.readpolicy, self.writepolicy, self.multivalue = self.tagdefs[tagname]
                     results = self.select_tagdef(self.tag_id)
                     if len(results) > 0:
                         raise Conflict(data="Tag %s is already defined." % self.tag_id)

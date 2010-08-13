@@ -277,14 +277,7 @@ class Application:
 
         # lookup policy model based on access mode we are checking
         column = dict(read='readpolicy', write='writepolicy')
-        try:
-            model = tagdef[column[mode]]
-        except:
-            # temporary compatibility hack for old deployment schema
-            if tagdef.writers == 'owner':
-                model = 'fowner'
-            elif tagdef.writers == 'writers':
-                model = 'file'
+        model = tagdef[column[mode]]
         # model is in [ anonymous, users, file, fowner, tag, system ]
 
         if model == 'anonymous':
@@ -294,7 +287,7 @@ class Application:
         elif model == 'file':
             owner = fowner
             try:
-                results = [ res.value for res in self.select_file_acl(mode, user, data_id) ]
+                results = [ res.value for res in self.select_file_acl(mode, user) ]
             except:
                 results = []
         elif model == 'tag':
@@ -308,7 +301,7 @@ class Application:
             results = []
         elif model == 'system':
             return False
-            
+
         if owner and user == owner:
             return True
         elif user in results or '*' in results:
@@ -318,8 +311,10 @@ class Application:
         else:
             return None
 
-    def test_tagdef_authz(self, mode, tagname, user):
+    def test_tagdef_authz(self, mode, tagname, user=None):
         """Check whether access is allowed."""
+        if user == None:
+            user = self.user()
         try:
             tagdef = self.select_tagdef(tagname)[0]
         except:
@@ -418,8 +413,8 @@ class Application:
             return self.db.select('tagdefs', order="tagname")
 
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr, writers, multivalue, owner ) VALUES ( $tag_id, $typestr, $writers, $multivalue, $owner )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, writers=self.writers, multivalue=self.multivalue, owner=self.user()))
+        self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.user()))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
@@ -457,8 +452,8 @@ class Application:
         tagname = dict(read='read users', write='write users')[mode]
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
                 + " WHERE file = $file AND (value = $value OR value = $any)"
-        #web.debug(query)
-        return self.db.query(query, vars=dict(file=data_id, value=user, any="*"))
+        vars=dict(file=data_id, value=user, any="*")
+        return self.db.query(query, vars=vars)
 
     def select_file_tags(self, tagname=''):
         if tagname:

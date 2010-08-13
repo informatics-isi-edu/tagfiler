@@ -115,16 +115,16 @@ tagdef()
    fi
 }
 
-tagdef owner text anonymous owner false
+tagdef owner text anonymous fowner false
 tagdef created timestamptz anonymous system false
-tagdef "read users" text anonymous owner true
-tagdef "write users" text anonymous owner true
+tagdef "read users" text anonymous fowner true
+tagdef "write users" text anonymous fowner true
 tagdef "modified by" text anonymous system false
 tagdef modified timestamptz anonymous system false
 tagdef bytes int8 anonymous system false
 tagdef name text anonymous system false
 tagdef url text anonymous system false
-tagdef content-type text anonymous writers false
+tagdef content-type text anonymous file false
 
 EOF
 

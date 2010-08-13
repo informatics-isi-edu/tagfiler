@@ -1,28 +1,38 @@
-$def with (target, tagdefs, typenames, title, user)
+$def with (target, tagdefs, typenames, title, test_tagdef_authz)
+$# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
+$for foo in [ 0 ]:
+$code
+	def tagpolicy(policy, mode):
+		m = dict(anonymous=None, users='any authenticated user', file=('same clients who can %s file content' % mode), fowner='owner of file', tag=('"%s" and clients in tagdef ACL' % owner), system='system')
+		r = m[policy]
+		if r:
+			return 'Tag %s restricted to %s.' % (mode, r)
+		else:
+			return ''
 <h2>${title}</h2>
 <p>
 $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
-		$ tagname, typestr, writers, multivalue, owner = tagdef
+		$ tagname, typestr, multivalue, readpolicy, writepolicy, owner = tagdef
 		<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 		  <fieldset>
 		    <legend>${tagname}</legend>
 		<input type="hidden" name="tag" value="${tagname}" />
 		<input type="hidden" name="action" value="delete" />
-		$if title == "User" and (owner == user or writers == 'users'):
+		$if test_tagdef_authz('write', tagname):
 			<input type="submit" value="Delete" />
 		$if typestr != '':
 			(${typenames[typestr]})
 		$if multivalue:
 			0 or more values allowed.
 		$else:
-			0 or 1 values allowed.	
-		$if writers == 'system':
-			Tagging restricted to the system.
-		$elif writers == 'owner':
-			Tagging restricted to the file owner.
-		$elif writers == 'writers':
-			Tagging restricted to the file writers.
+			0 or 1 values allowed.
+		$ readrestriction = tagpolicy(readpolicy, 'read')
+		$if readrestriction:
+			$readrestriction
+		$ writerestriction = tagpolicy(writepolicy, 'write')
+		$if writerestriction:
+			$writerestriction
 		</fieldset>
 		</form>
 $else:
