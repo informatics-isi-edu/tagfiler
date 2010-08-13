@@ -96,13 +96,14 @@ class FileId(Node, FileIO):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writers', 'multivalue', 'queryopts' ]
+    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writepolicy', 'readpolicy', 'multivalue', 'queryopts' ]
 
     def __init__(self, appname, tag_id=None, typestr=None, queryopts={}):
         Node.__init__(self, appname)
         self.tag_id = tag_id
         self.typestr = typestr
-        self.writers = None
+        self.writepolicy = None
+        self.readpolicy = None
         self.multivalue = None
         self.target = self.home + web.ctx.homepath + '/tagdef'
         self.action = None
@@ -190,7 +191,7 @@ class Tagdef (Node):
         if self.tag_id == None:
             raise BadRequest(data="Tag definitions require a non-empty tag name.")
 
-        # self.typestr and self.writers take precedence over queryopts...
+        # self.typestr and self.writepolicy take precedence over queryopts...
 
         if self.typestr == None:
             try:
@@ -202,13 +203,13 @@ class Tagdef (Node):
             try:
                 self.readpolicy = self.queryopts['readpolicy'].lower()
             except:
-                self.readpolicy = 'owner'
+                self.readpolicy = 'fowner'
 
         if self.writepolicy == None:
             try:
                 self.writepolicy = self.queryopts['writepolicy'].lower()
             except:
-                self.writepolicy = 'owner'
+                self.writepolicy = 'fowner'
 
         if self.multivalue == None:
             try:
