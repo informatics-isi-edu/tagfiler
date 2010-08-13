@@ -42,7 +42,7 @@ echo "" >> $LOGFILE
 
 echo "Define \"$TAG1\" tag with POST" >> $LOGFILE
 echo "" >> $LOGFILE
-curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG1&type-1=text&multivalue-1=true&writers-1=owner&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
+curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG1&type-1=text&multivalue-1=true&readpolicy-1=anonymous&writepolicy-1=users&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
 
 echo "List \"$TAG1\" tag" >> $LOGFILE
 curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS "$HOST/$SVCPREFIX/tagdef/$TAG1" >> $LOGFILE
@@ -62,7 +62,7 @@ echo "" >> $LOGFILE
 
 echo "Define \"$TAG1\" tag with PUT" >> $LOGFILE
 echo "" >> $LOGFILE
-curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -X PUT "$HOST/$SVCPREFIX/tagdef/$TAG1?typestr=text&multivalue=true&writers=*" >> $LOGFILE
+curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -X PUT "$HOST/$SVCPREFIX/tagdef/$TAG1?typestr=text&multivalue=true" >> $LOGFILE
 
 echo "List \"$TAG1\" tag" >> $LOGFILE
 curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS "$HOST/$SVCPREFIX/tagdef/$TAG1" >> $LOGFILE
@@ -82,7 +82,7 @@ echo "" >> $LOGFILE
 
 echo "Define \"$TAG1\" tag with POST" >> $LOGFILE
 echo "" >> $LOGFILE
-curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG1&type-1=text&multivalue-1=true&writers-1=owner&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
+curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG1&type-1=text&multivalue-1=true&readpolicy-1=anonymous&writepolicy-1=users&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
 
 echo "List \"$TAG1\" tag" >> $LOGFILE
 curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS "$HOST/$SVCPREFIX/tagdef/$TAG1" >> $LOGFILE
@@ -94,7 +94,7 @@ echo "" >> $LOGFILE
 
 echo "Define \"$TAG2\" tag with POST" >> $LOGFILE
 echo "" >> $LOGFILE
-curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG2&type-1=text&multivalue-1=false&writers-1=*&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
+curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS -d "tag-1=$TAG2&type-1=text&multivalue-1=false&readpolicy-1=anonymous&writepolicy-1=users&action=add" "$HOST/$SVCPREFIX/tagdef" >> $LOGFILE
 
 echo "List \"$TAG2\" tag" >> $LOGFILE
 curl -u $AUTHENTICATION --$AUTHENTICATION_METHOD $COMMON_OPTIONS "$HOST/$SVCPREFIX/tagdef/$TAG2" >> $LOGFILE
