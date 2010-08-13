@@ -175,6 +175,7 @@ class Tagdef (Node):
             return ''
 
         def postCommit(results):
+            self.log('DELETE', tag=self.tag_id)
             return ''
 
         if len(self.queryopts) > 0:
@@ -221,6 +222,7 @@ class Tagdef (Node):
         def postCommit(results):
             # send client back to get new tag definition
             # or should we just return empty success result?
+            self.log('CREATE', tag=self.tag_id)
             raise web.seeother('/tagdef/' + urlquote(self.tag_id))
 
         return self.dbtransact(body, postCommit)
@@ -440,6 +442,7 @@ class FileTags (Node):
                 self.enforceFileTagRestriction(tag_id)
                 for value in self.tagvals[tag_id]:
                     self.set_file_tag(tag_id, value)
+                self.log('CREATE', dataset=self.data_id, tag=tag_id)
             return None
 
         def postCommit(results):
@@ -469,6 +472,7 @@ class FileTags (Node):
             return None
 
         def postCommit(results):
+            self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
             return ''
 
         return self.dbtransact(body, postCommit)

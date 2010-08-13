@@ -311,6 +311,7 @@ class FileIO (Application):
                 self.deleteFile(filename)
                 web.ctx.status = '204 No Content'
                 
+            self.log('DELETE', dataset=self.data_id)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -641,6 +642,7 @@ class FileIO (Application):
         def postWritePostCommit(results):
             if len(results) > 0:
                 self.deletePrevious(results[0])
+                self.log('DELETE', dataset=self.data_id)
             uri = self.home + self.store_path + '/' + urlquote(self.data_id)
             web.header('Location', uri)
             if filename:
@@ -649,6 +651,7 @@ class FileIO (Application):
             else:
                 web.ctx.status = '204 No Content'
                 res = ''
+            self.log('CREATE', dataset=self.data_id)
             return res
 
         try:
