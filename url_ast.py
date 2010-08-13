@@ -442,7 +442,7 @@ class FileTags (Node):
                 self.enforceFileTagRestriction(tag_id)
                 for value in self.tagvals[tag_id]:
                     self.set_file_tag(tag_id, value)
-                self.log('CREATE', dataset=self.data_id, tag=tag_id)
+                self.log('SET', dataset=self.data_id, tag=tag_id)
             return None
 
         def postCommit(results):
@@ -486,7 +486,7 @@ class FileTags (Node):
             for tag_id in self.tagvals:
                 self.enforceFileTagRestriction(tag_id)
                 self.set_file_tag(tag_id, self.tagvals[tag_id])
-                self.log('CREATE', dataset=self.data_id, tag=tag_id)
+                self.log('SET', dataset=self.data_id, tag=tag_id)
             return None
 
         def deleteBody():
