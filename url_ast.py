@@ -352,7 +352,7 @@ class FileTags (Node):
         def body():
             def buildtaginfo(where1, where2):
                 tagdefs = [ tagdef for tagdef in self.select_defined_tags(where1) ]
-                filewriteok = self.test_file_authz('write')
+                tagwriteok = self.test_tag_authz('write', tagdef.tagname)
                 tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
                 filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
                 filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
@@ -363,7 +363,7 @@ class FileTags (Node):
                          filetags,
                          filetagvals,
                          length,
-                         filewriteok )
+                         tagwriteok )
             
             return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                     buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined

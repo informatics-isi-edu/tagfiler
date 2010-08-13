@@ -273,7 +273,7 @@ class Application:
         try:
             tagdef = self.select_tagdef(tagname)[0]
         except:
-            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+            raise BadRequest(data="The tag %s is not defined on this server." % tagname)
 
         # lookup policy model based on access mode we are checking
         column = dict(read='readpolicy', write='writepolicy')
@@ -301,6 +301,11 @@ class Application:
             results = []
         elif model == 'system':
             return False
+
+        web.debug(model)
+        web.debug(user)
+        web.debug(results)
+        web.debug(owner)
 
         if owner and user == owner:
             return True
@@ -348,9 +353,9 @@ class Application:
             raise NotFound(data="dataset %s" % self.data_id)
         allow = self.test_tag_authz(mode, tagname, user, fowner)
         if allow == False:
-            raise Forbidden(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
+            raise Forbidden(data="access to tag %s on dataset %s" % (tagname, self.data_id))
         elif allow == None:
-            raise Unauthorized(data="access to tag %s on dataset %s" % (tag_id, self.data_id))
+            raise Unauthorized(data="access to tag %s on dataset %s" % (tagname, self.data_id))
         else:
             pass
 
