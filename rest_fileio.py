@@ -340,11 +340,13 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
+        remote = False
         results = [ res for res in self.select_file() ]
 
         if len(results) > 0:
             # check permissions and update existing file
             self.enforceFileRestriction('write users')
+            remote = not results[0].local
             self.update_file()
         else:
             # anybody is free to insert new uniquely named file
@@ -396,6 +398,8 @@ class FileIO (Application):
             try:
                 self.delete_file_tag('url')
                 t.commit()
+                if remote:
+                    self.log('DELETE', self.data_id)
             except:
                 t.rollback()
                 
@@ -444,6 +448,8 @@ class FileIO (Application):
             try:
                 self.set_file_tag('url', self.location)
                 t.commit()
+                if remote:
+                    self.log('DELETE', self.data_id)
             except:
                 t.rollback()
 
@@ -532,6 +538,8 @@ class FileIO (Application):
                 os.rmdir(dir)
             except:
                 pass
+            
+        self.log('DELETE', dataset=self.data_id)
 
     def deletePrevious(self, result):
         if result.local:
@@ -673,6 +681,7 @@ class FileIO (Application):
         def putPostCommit(results):
             if len(results) > 0:
                 self.deletePrevious(results[0])
+            self.log('CREATE', dataset=self.data_id)
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():

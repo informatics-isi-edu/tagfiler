@@ -254,6 +254,7 @@ class Tagdef (Node):
                     if len(results) > 0:
                         raise Conflict(data="Tag %s is already defined." % self.tag_id)
                     self.insert_tagdef()
+                    self.log('CREATE', tag=self.tag_id)
             elif self.action == 'delete' or self.action == 'CancelDelete':
                 self.enforceTagRestriction(self.tag_id)
                 return None
@@ -481,6 +482,7 @@ class FileTags (Node):
             for tag_id in self.tagvals:
                 self.enforceFileTagRestriction(tag_id)
                 self.set_file_tag(tag_id, self.tagvals[tag_id])
+                self.log('CREATE', dataset=self.data_id, tag=tag_id)
             return None
 
         def deleteBody():
