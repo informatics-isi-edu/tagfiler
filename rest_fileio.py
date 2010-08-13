@@ -685,6 +685,7 @@ class FileIO (Application):
 
         def deletePostCommit(result):
             self.deletePrevious(result)
+            self.log('DELETE', dataset=self.data_id)
             raise web.seeother('/file')
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()

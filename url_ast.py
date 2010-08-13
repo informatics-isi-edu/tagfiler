@@ -260,6 +260,7 @@ class Tagdef (Node):
             elif self.action == 'ConfirmDelete':
                 self.enforceTagRestriction(self.tag_id)
                 self.delete_tagdef()
+                self.log('DELETE', tag=self.tag_id)
             else:
                 raise BadRequest(data="Form field action=%s not understood." % self.action)
             return None
@@ -485,6 +486,7 @@ class FileTags (Node):
         def deleteBody():
             self.enforceFileTagRestriction(self.tag_id)
             self.delete_file_tag(self.tag_id, self.value)
+            self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
             return None
 
         def postCommit(results):

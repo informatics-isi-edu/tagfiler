@@ -2,6 +2,8 @@ import urllib
 import web
 import psycopg2
 import os
+import logging
+from logging.handlers import SysLogHandler
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -17,6 +19,11 @@ import os
 # see rules = [ ... ] for real matching rules
 
 render = None
+
+""" Set the logger """
+logger = logging.getLogger('tagfiler')
+logger.addHandler(SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1))
+logger.setLevel(logging.INFO)
 
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -136,6 +143,14 @@ class Application:
 
         self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
+
+    def log(self, action, dataset=None, tag=None):
+        if dataset and tag:
+            logger.info('tagfiler: %s tag "%s" in dataset "%s" by user %s.' % (action, tag, dataset, self.user()))
+        elif dataset:
+            logger.info('tagfiler: %s dataset "%s" by user %s.' % (action, dataset, self.user()))
+        else:
+            logger.info('tagfiler: %s tag "%s" by user %s.' % (action, tag, self.user()))
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
