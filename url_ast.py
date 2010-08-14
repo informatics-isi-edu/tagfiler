@@ -619,7 +619,7 @@ class Query (Node):
                           for res in self.select_files_by_predlist() ]
             else:
                 files = []
-            alltags = [ tagdef.tagname for tagdef in self.select_tagdefs() ]
+            alltags = [ tagdef.tagname for tagdef in self.select_tagdef() ]
             return ( files, alltags )
 
         def postCommit(results):
