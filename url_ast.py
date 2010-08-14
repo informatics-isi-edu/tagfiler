@@ -368,7 +368,6 @@ class FileTags (Node):
                                  tag,
                                  [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
                                 for file, tag in filetags ]
-                web.debug(filetags, filetagvals)
                 length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
                 return ( self.systemTags, # excludes
                          tagdefs,
