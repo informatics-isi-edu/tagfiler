@@ -124,9 +124,9 @@ class Tagdef (Node):
 
         def body():
             predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, None)
-                     for tagdef in self.select_defined_tags('owner is null') ]
+                     for tagdef in self.select_tagdef(where='owner is null') ]
             userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
-                     for tagdef in self.select_defined_tags('owner is not null') ]
+                     for tagdef in self.select_tagdef(where='owner is not null') ]
             
             return (predefined, userdefined)
 
@@ -315,7 +315,10 @@ class FileTags (Node):
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
                 raise NotFound(data='tag definition %s' % self.tag_id)
-            results = self.select_file_tag(self.tag_id, self.value)
+            else:
+                tagdef = results[0]
+            owner = self.owner()
+            results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
             if len(results) == 0:
                 if self.value == None:
                     raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
@@ -337,9 +340,11 @@ class FileTags (Node):
         def postCommit(values):
             # return raw value to REST client
             web.header('Content-Type', 'application/x-www-form-urlencoded')
-
-            return "&".join([(urlquote(self.tag_id) + '=' + urlquote(self.mystr(val))) for val in values])
-
+            if len(values) > 0:
+                return "&".join([(urlquote(self.tag_id) + '=' + urlquote(self.mystr(val))) for val in values])
+            else:
+                return urlquote(self.tag_id)
+            
         return self.dbtransact(body, postCommit)
 
     def GETall(self, uri):
@@ -352,23 +357,29 @@ class FileTags (Node):
         
         def body():
             def buildtaginfo(where1, where2):
-                tagdefs = [ tagdef for tagdef in self.select_defined_tags(where1) ]
-                tagwriteok = self.test_tag_authz('write', tagdef.tagname)
-                tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdefs ])
-                filetags = [ (result.file, result.tagname) for result in self.select_defined_file_tags(where2) ]
-                filetagvals = [ (file, tag, [self.mystr(val) for val in self.gettagvals(tag, data_id=file)]) for file, tag in filetags ]
+                owner = self.owner()
+                tagdefs = [ (tagdef.tagname,
+                             tagdef.typestr,
+                             self.test_tag_authz('write', tagdef.tagname, fowner=owner))
+                            for tagdef in self.select_tagdef(where=where1) ]
+                tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
+                filetags = [ (result.file, result.tagname) for result in self.select_filetags(where=where2) ]
+                filetagvals = [ (file,
+                                 tag,
+                                 [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
+                                for file, tag in filetags ]
+                web.debug(filetags, filetagvals)
                 length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
                 return ( self.systemTags, # excludes
                          tagdefs,
                          tagdefsdict,
                          filetags,
                          filetagvals,
-                         length,
-                         tagwriteok )
+                         length )
             
             return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                     buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
-                    buildtaginfo('', '') )                                               # all
+                    buildtaginfo('', '') )                                           # all
 
         def postCommit(results):
             system, userdefined, all = results
@@ -384,8 +395,11 @@ class FileTags (Node):
                     web.header('Content-Type', 'application/x-www-form-urlencoded')
                     body = []
                     for file, tag, vals in all[4]:
-                        for val in vals:
-                            body.append("%s=%s" % (urlquote(tag), urlquote(val)))
+                        if len(vals) > 0:
+                            for val in vals:
+                                body.append("%s=%s" % (urlquote(tag), urlquote(val)))
+                        else:
+                            body.append("%s" % (urlquote(tag)))
                     return '&'.join(body)
                 elif acceptType == 'text/html':
                     break
@@ -394,7 +408,7 @@ class FileTags (Node):
                 return self.renderlist("\"%s\" tags" % (self.data_id),
                                        [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
                                         self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
-                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, lambda tag: self.test_tag_authz('write', tag), urlquote)])
+                                        self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, urlquote)])
             else:
                 return self.renderlist("All tags for all files",
                                        [self.render.FileTagValExisting('System and User', apptarget, self.data_id, all, urlquote)])

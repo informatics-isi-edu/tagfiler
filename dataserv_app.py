@@ -217,7 +217,7 @@ class Application:
 
     def owner(self, data_id=None):
         try:
-            results = self.select_file_tag('owner', data_id=data_id)
+            results = self.select_file_tag('owner', data_id=data_id, owner='_')
             if len(results) > 0:
                 return results[0].value
             else:
@@ -257,18 +257,20 @@ class Application:
         else:
             return None
 
-    def test_tag_authz(self, mode, tagname=None, user=None, fowner=None):
+    def test_tag_authz(self, mode, tagname=None, user=None, data_id=None, fowner=None):
         """Check whether access is allowed to user given policy_tag and owner.
 
            True: access allowed
            False: access forbidden
            None: user needs to authenticate to be sure"""
+        if data_id == None:
+            data_id = self.data_id
         if tagname == None:
             tagname = self.tag_id
         if user == None:
             user = self.user()
-        if fowner == None:
-            fowner = self.owner()
+        if fowner == None and data_id:
+            fowner = self.owner(data_id)
         
         try:
             tagdef = self.select_tagdef(tagname)[0]
@@ -284,28 +286,23 @@ class Application:
             return True
         elif model == 'users' and user:
             return True
+        elif model == 'system':
+            return False
+        elif model == 'fowner':
+            owner = fowner
+            results = []
         elif model == 'file':
             owner = fowner
             try:
-                results = [ res.value for res in self.select_file_acl(mode, user) ]
+                results = [ res.value for res in self.select_file_acl(mode, user, data_id=data_id) ]
             except:
                 results = []
         elif model == 'tag':
             owner = tagdef.owner
             try:
-                results = [ res.value for res in self.select_tag_acl(tagname, mode, user) ]
+                results = [ res.value for res in self.select_tag_acl(mode, user, tagname) ]
             except:
                 results = []
-        elif model == 'fowner':
-            owner = fowner
-            results = []
-        elif model == 'system':
-            return False
-
-        web.debug(model)
-        web.debug(user)
-        web.debug(results)
-        web.debug(owner)
 
         if owner and user == owner:
             return True
@@ -351,7 +348,7 @@ class Application:
             tagname = self.tag_id
         if len(results) == 0:
             raise NotFound(data="dataset %s" % self.data_id)
-        allow = self.test_tag_authz(mode, tagname, user, fowner)
+        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner)
         if allow == False:
             raise Forbidden(data="access to tag %s on dataset %s" % (tagname, self.data_id))
         elif allow == None:
@@ -375,8 +372,8 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def gettagvals(self, tagname, data_id=None):
-        results = self.select_file_tag(tagname, data_id=data_id)
+    def gettagvals(self, tagname, data_id=None, owner=None):
+        results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
         values = [ ]
         for result in results:
             try:
@@ -404,18 +401,17 @@ class Application:
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
 
-    def select_tagdef(self, tagname):
-        return self.db.select('tagdefs', where="tagname = $tagname",
-                              vars=dict(tagname=tagname))
-
-    def select_tagdefs(self):
-        return self.db.select('tagdefs', order="tagname")
-
-    def select_defined_tags(self, where):
+    def select_tagdef(self, tagname=None, where=None):
+        wheres = []
+        if tagname:
+            wheres.append("tagname = $tagname")
         if where:
-            return self.db.select('tagdefs', where=where, order="tagname")
+            wheres.append(where)
+        wheres = " AND ".join(wheres)
+        if wheres:
+            return self.db.select('tagdefs', where=wheres, vars=dict(tagname=tagname))
         else:
-            return self.db.select('tagdefs', order="tagname")
+            return self.db.select('tagdefs', vars=dict(tagname=tagname))
 
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",
@@ -439,9 +435,36 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname, value=None, data_id=None):
-        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file"
+    def select_file_tag(self, tagname, value=None, data_id=None, tagdef=None, user=None, owner=None):
+        if user == None:
+            user = self.user()
+        if tagdef == None:
+            tagdef = self.select_tagdef(tagname)[0]
+            
+        joins = ''
+        wheres = ''
+
+        if tagdef.readpolicy == 'anonymous':
+            pass
+        elif tagdef.readpolicy == 'users':
+            if not user:
+                return []
+        elif tagdef.readpolicy == 'tag':
+            if not self.test_tag_authz('read', tagname, user=user, data_id=data_id, fowner=owner):
+                return []
+        else:
+            if owner == None:
+                # only do this if not short-circuited above, to prevent recursion
+                owner = self.owner()
+            if tagdef.readpolicy == 'fowner':
+                if owner and owner != user:
+                    return []
+            elif tagdef.readpolicy == 'file':
+                if  not self.test_file_authz('read', owner=owner):
+                    return []
+
+        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) 
+        query += " WHERE file = $file" 
         if value == '':
             query += " AND value IS NULL ORDER BY VALUE"
         elif value:
@@ -460,35 +483,37 @@ class Application:
         vars=dict(file=data_id, value=user, any="*")
         return self.db.query(query, vars=vars)
 
-    def select_file_tags(self, tagname=''):
-        if tagname:
-            where = " AND tagname = $tagname"
-        else:
-            where = ""
-        query = "SELECT tagname FROM filetags WHERE file = $file" \
-                + where \
-                + " GROUP BY tagname ORDER BY tagname"
-        #web.debug(query)
-        return self.db.query(query,
-                             vars=dict(file=self.data_id, tagname=tagname))
+    def select_tag_acl(self, mode, user, tag_id=None):
+        if tag_id == None:
+            tag_id = self.tag_id
+        table = dict(read='tagreaders', write='tagwriters')[mode]
+        query = "SELECT * FROM \"%s\"" % table \
+                + " WHERE tagname = $tag_id AND (value = $user)"
+        vars=dict(tag_id=tag_id, user=user)
+        return self.db.query(query, vars=vars)
 
-    def select_defined_file_tags(self, where):
+    def select_filetags(self, tagname=None, where=None, user=None):
+        wheres = []
+        vars = dict()
         if self.data_id:
-            wheres = "WHERE file = $file"
-            if where:
-                wheres += " AND" + where
-        else:
-            if where:
-                wheres = "WHERE" + where
-            else:
-                wheres = ""
+            wheres.append("file = $file")
+            vars['file'] = self.data_id
+        if where:
+            wheres.append(where)
+        if tagname:
+            wheres.append("tagname = $tagname")
+            vars['tagname'] = tagname
+
+        wheres = ' AND '.join(wheres)
+        if wheres:
+            wheres = "WHERE " + wheres
         query = "SELECT file, tagname FROM filetags join tagdefs using (tagname) " + wheres \
                 + " GROUP BY file, tagname ORDER BY file, tagname"
         #web.debug(query)
-        return self.db.query(query,
-                             vars=dict(file=self.data_id))
+        return [ result for result in self.db.query(query, vars=vars)
+                 if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
-    def delete_file_tag(self, tagname, value=None):
+    def delete_file_tag(self, tagname, value=None, owner=None):
         if value == '':
             whereval = " AND value IS NULL"
         elif value:
@@ -498,13 +523,13 @@ class Application:
         self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
                       + " WHERE file = $file" + whereval,
                       vars=dict(file=self.data_id, value=value))
-        results = self.select_file_tag(tagname)
+        results = self.select_file_tag(tagname, owner=owner)
         if len(results) == 0:
             # there may be other values tagged still
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
                            vars=dict(file=self.data_id, tagname=tagname))
 
-    def set_file_tag(self, tagname, value):
+    def set_file_tag(self, tagname, value, owner=None):
         try:
             results = self.select_tagdef(tagname)
             result = results[0]
@@ -514,12 +539,12 @@ class Application:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
         if not multivalue:
-            results = self.select_file_tag(tagname)
+            results = self.select_file_tag(tagname, owner=owner)
             if len(results) > 0:
                 # drop existing value so we can reinsert one standard way
                 self.delete_file_tag(tagname)
         else:
-            results = self.select_file_tag(tagname, value)
+            results = self.select_file_tag(tagname, value, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
@@ -535,7 +560,7 @@ class Application:
         #web.debug(query)
         self.db.query(query, vars=dict(file=self.data_id, value=value))
         
-        results = self.select_file_tags(tagname)
+        results = self.select_filetags(tagname)
         if len(results) == 0:
             self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
                           vars=dict(file=self.data_id, tagname=tagname))

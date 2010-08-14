@@ -5,7 +5,10 @@ $code
 	def rendertagvals(filetagvals):
 		s = ""
 		for file, tag, vals in filetagvals:
-			for val in vals:
-				s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "=" + urlquote(val) + "\n"
+			if len(vals) > 0:
+				for val in vals:
+					s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "=" + urlquote(val) + "\n"
+			else:
+				s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "\n"
 		return s
 ${rendertagvals(taginfo[4])[:-1]}

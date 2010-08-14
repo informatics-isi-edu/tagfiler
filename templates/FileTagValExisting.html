@@ -7,9 +7,9 @@ $if len(filetagvals) > 0:
 	<table border="1">
 	<tr><th>Dataset</th><th>Tag</th><th>Value(s)</th></tr>
 	$for data_id, tag, vals in filetagvals:
-		$ tagdef = tagdefsdict[tag]
+		$ tagname, typestr, writeok = tagdefsdict[tag]
 		<tr><td>${data_id}</td><td>${tag}</td>
-			$if tagdef.typestr:
+			$if typestr:
 				<td><table>
 				$for val in vals:
 					<tr><td>${val}</td></tr>
