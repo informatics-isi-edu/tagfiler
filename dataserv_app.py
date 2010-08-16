@@ -401,17 +401,21 @@ class Application:
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
 
-    def select_tagdef(self, tagname=None, where=None, order='tagname'):
+    def select_tagdef(self, tagname=None, where=None, order=None):
         wheres = []
         if tagname:
             wheres.append("tagname = $tagname")
         if where:
             wheres.append(where)
         wheres = " AND ".join(wheres)
-        if wheres:
+        if wheres and order:
             return self.db.select('tagdefs', where=wheres, order=order, vars=dict(tagname=tagname))
-        else:
+        elif wheres:
+            return self.db.select('tagdefs', where=wheres, vars=dict(tagname=tagname))
+        elif order:
             return self.db.select('tagdefs', order=order, vars=dict(tagname=tagname))
+        else:
+            return self.db.select('tagdefs', vars=dict(tagname=tagname))
 
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",

@@ -124,9 +124,9 @@ class Tagdef (Node):
 
         def body():
             predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, None)
-                     for tagdef in self.select_tagdef(where='owner is null') ]
+                     for tagdef in self.select_tagdef(where='owner is null', order='tagname') ]
             userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
-                     for tagdef in self.select_tagdef(where='owner is not null') ]
+                     for tagdef in self.select_tagdef(where='owner is not null', order='tagname') ]
             
             return (predefined, userdefined)
 
@@ -361,7 +361,7 @@ class FileTags (Node):
                 tagdefs = [ (tagdef.tagname,
                              tagdef.typestr,
                              self.test_tag_authz('write', tagdef.tagname, fowner=owner))
-                            for tagdef in self.select_tagdef(where=where1) ]
+                            for tagdef in self.select_tagdef(where=where1, order='tagname') ]
                 tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
                 filetags = [ (result.file, result.tagname) for result in self.select_filetags(where=where2) ]
                 filetagvals = [ (file,
@@ -619,7 +619,7 @@ class Query (Node):
                           for res in self.select_files_by_predlist() ]
             else:
                 files = []
-            alltags = [ tagdef.tagname for tagdef in self.select_tagdef() ]
+            alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname') ]
             return ( files, alltags )
 
         def postCommit(results):
