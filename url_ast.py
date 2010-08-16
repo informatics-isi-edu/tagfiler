@@ -140,8 +140,8 @@ class Tagdef (Node):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             predefined, userdefined = tagdefs
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', lambda mode, tag: self.test_tagdef_authz(mode, tag)),
-                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', lambda mode, tag: self.test_tagdef_authz(mode, tag)),
+                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', lambda mode, tag: self.test_tagdef_authz(mode, tag), urlquote),
+                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', lambda mode, tag: self.test_tagdef_authz(mode, tag), urlquote),
                                     self.render.TagdefNew(self.target, tagdefs, self.typenames)])
 
         if len(self.queryopts) > 0:
@@ -608,8 +608,8 @@ class TagdefACL (FileTags):
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
         user = self.user()
-        acldefs = [ ('readers', 'text', tagdef.owner == user),
-                    ('writers', 'text', tagdef.owner == user) ]
+        acldefs = [ ('readers', 'text', tagdef.owner == user and tagdef.readpolicy == 'tag'),
+                    ('writers', 'text', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
         readacls = [ (result.tagname, 'readers')
                      for result in self.select_tagdef(tagname=self.data_id,
@@ -669,8 +669,23 @@ class TagdefACL (FileTags):
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             value, self.data_id)
         return None
-
     
+    def post_putBody(self):
+        for tag_id in self.tagvals:
+            self.enforce_tagacl_authz('write', tag_id=self.data_id)
+            self.set_tag_acl(dict(writers='write', readers='read')[tag_id],
+                             self.tagvals[tag_id], self.data_id)
+        return None
+
+    def post_deleteBody(self):
+        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
+                            self.value, self.data_id)
+        return None
+
+    def post_postCommit(self, results):
+        url = '/tagdefacl/' + urlquote(self.data_id)
+        raise web.seeother(url)
 
 class Query (Node):
     __slots__ = [ 'predlist', 'queryopts', 'action' ]

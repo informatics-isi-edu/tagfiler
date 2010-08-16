@@ -1,9 +1,15 @@
-$def with (target, tagdefs, typenames, title, test_tagdef_authz)
+$def with (target, tagdefs, typenames, title, test_tagdef_authz, urlquote)
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code
-	def tagpolicy(policy, mode):
-		m = dict(anonymous=None, users='any authenticated user', file=('same clients who can %s file content' % mode), fowner='owner of file', tag=('"%s" and clients in tagdef ACL' % owner), system='system')
+	def tagpolicy(tagname, policy, mode):
+		aclurl = target + 'acl/' + urlquote(tagname)
+		m = dict(anonymous=None, 
+			users='any authenticated user', 
+			file=('same clients who can %s file content' % mode),
+			fowner='owner of file',
+			tag=('"%s" and clients in <a href="%s">tagdef ACL</a>' % (owner, aclurl)), 
+			system='system')
 		r = m[policy]
 		if r:
 			return 'Tag %s restricted to %s.' % (mode, r)
@@ -27,12 +33,12 @@ $if len(tagdefs) > 0:
 			0 or more values allowed.
 		$else:
 			0 or 1 values allowed.
-		$ readrestriction = tagpolicy(readpolicy, 'read')
+		$ readrestriction = tagpolicy(tagname, readpolicy, 'read')
 		$if readrestriction:
-			$readrestriction
-		$ writerestriction = tagpolicy(writepolicy, 'write')
+			$:readrestriction
+		$ writerestriction = tagpolicy(tagname, writepolicy, 'write')
 		$if writerestriction:
-			$writerestriction
+			$:writerestriction
 		</fieldset>
 		</form>
 $else:

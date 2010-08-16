@@ -527,7 +527,11 @@ class Application:
             return False
         return True
 
-    def enforce_tagacle_authz(self, mode, user, tag_id):
+    def enforce_tagacl_authz(self, mode, user=None, tag_id=None):
+        if user == None:
+            user = self.user()
+        if tag_id == None:
+            tag_id = self.tag_id
         allow = self.test_tagacl_authz(mode, user, tag_id)
         if allow == False:
             raise Forbidden(data='tag "%s" ACL' % tag_id)
