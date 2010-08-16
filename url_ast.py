@@ -634,7 +634,7 @@ class TagdefACL (FileTags):
     def get_all_body(self):
         """Override FileTags.get_all_body to consult tagdef ACL instead"""
         aclinfo = self.buildaclinfo()
-        return ( aclinfo,
+        return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
                  aclinfo )
 

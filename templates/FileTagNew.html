@@ -1,23 +1,25 @@
 $def with (title, apptarget, tagspace, data_id, typenames, taginfo, urlquote)
 $ excludes, tagdefs, tagdefsdict, tags, tagvals, length = taginfo
+$ tagdefs = [ tagdef for tagdef in tagdefs if tagdef[0] not in excludes and tagdef[2] ]
 $if len(tagdefs) > 0:
 	<h2>${title}</h2>
 	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Apply". Multiple tags may be set at once. Any tag which is unchecked will remain unchanged.</p>
 	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/' + tagspace + '/' + urlquote(data_id)}" method="post">
 	$for tagdef in tagdefs:
 		$ tagname, typestr, writeok = tagdef
-		$if tagname not in excludes:
-			$if writeok:
-				<fieldset>
-				  <legend>${tagname}</legend>
-				  <input type="checkbox" name="set-${urlquote(tagname)}" value="true" /> Set
-				$if typestr != '':
-		  			<input type="text" name="val-${urlquote(tagname)}" size="${length}" /> (${typenames[typestr]})
-				</fieldset>
+		<fieldset>
+		  <legend>${tagname}</legend>
+		  <input type="checkbox" name="set-${urlquote(tagname)}" value="true" /> Set
+		$if typestr != '':
+			<input type="text" name="val-${urlquote(tagname)}" size="${length}" /> (${typenames[typestr]})
+		</fieldset>
 	  <input type="hidden" name="action" value="put" />
 	  <input type="submit" value="Apply ${tagspace}" />
 	  <input type="reset" value="Reset form" />
 	</form>
-$else:
+$elif title == 'Set tags':
 	<h2>Notice</h2>
 	<p>You cannot annotate this file until tag definitions are created.</p>
+$elif title == 'Add an authorized user':
+	<h2>Notice</h2>
+	<p>There are no ACLs available for you to manage.</p>
