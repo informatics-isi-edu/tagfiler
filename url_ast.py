@@ -3,7 +3,7 @@
 import web
 import urllib
 import re
-from dataserv_app import Application, NotFound, BadRequest, Conflict, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote
 from rest_fileio import FileIO
 
 def listmax(list):
@@ -654,7 +654,23 @@ class TagdefACL (FileTags):
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote)])       
 
+    def put_body(self):
+        """Override FileTags.put_body to consult tagdef ACL instead"""
+        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        for acl in self.tagvals.keys():
+            for value in self.tagvals[acl]:
+                self.set_tag_acl(dict(writers='write', readers='read')[acl],
+                                 value, self.data_id)
+        return None
 
+    def delete_body(self):
+        """Override FileTags.put_body to consult tagdef ACL instead"""
+        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
+                            value, self.data_id)
+        return None
+
+    
 
 class Query (Node):
     __slots__ = [ 'predlist', 'queryopts', 'action' ]
