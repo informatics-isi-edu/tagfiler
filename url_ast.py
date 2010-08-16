@@ -304,6 +304,7 @@ class FileTags (Node):
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
+        self.apptarget = self.home + web.ctx.homepath
         if tagvals:
             self.tagvals = tagvals
         else:
@@ -319,8 +320,7 @@ class FileTags (Node):
         results = self.select_tagdef(self.tag_id)
         if len(results) == 0:
             raise NotFound(data='tag definition %s' % self.tag_id)
-        else:
-            tagdef = results[0]
+        tagdef = results[0]
         owner = self.owner()
         results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
         if len(results) == 0:
@@ -348,38 +348,56 @@ class FileTags (Node):
         else:
             return urlquote(self.tag_id)
 
+    def buildtaginfo(self, where1, where2):
+        owner = self.owner()
+        tagdefs = [ (tagdef.tagname,
+                     tagdef.typestr,
+                     self.test_tag_authz('write', tagdef.tagname, fowner=owner))
+                    for tagdef in self.select_tagdef(where=where1, order='tagname') ]
+        tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
+        filetags = [ (result.file, result.tagname) for result in self.select_filetags(where=where2) ]
+        filetagvals = [ (file,
+                         tag,
+                         [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
+                        for file, tag in filetags ]
+        length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
+        return ( self.systemTags, # excludes
+                 tagdefs,
+                 tagdefsdict,
+                 filetags,
+                 filetagvals,
+                 length )
+    
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-        def buildtaginfo(where1, where2):
-            owner = self.owner()
-            tagdefs = [ (tagdef.tagname,
-                         tagdef.typestr,
-                         self.test_tag_authz('write', tagdef.tagname, fowner=owner))
-                        for tagdef in self.select_tagdef(where=where1, order='tagname') ]
-            tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
-            filetags = [ (result.file, result.tagname) for result in self.select_filetags(where=where2) ]
-            filetagvals = [ (file,
-                             tag,
-                             [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
-                            for file, tag in filetags ]
-            length = listmax([listmax([ len(val) for val in vals]) for file, tag, vals in filetagvals])
-            return ( self.systemTags, # excludes
-                     tagdefs,
-                     tagdefsdict,
-                     filetags,
-                     filetagvals,
-                     length )
 
-        return (buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
-                buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
-                buildtaginfo('', '') )                                           # all
+        return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
+                self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
+                self.buildtaginfo('', '') )                                           # all
+
+    def get_title_one(self):
+        return 'Tags for dataset "%s"' % self.data_id
+
+    def get_title_all(self):
+        return 'Tags for all datasets'
+
+    def get_all_html_render(self, results):
+        system, userdefined, all = results
+        if self.data_id:
+            return self.renderlist(self.get_title_one(),
+                                   [self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
+                                    self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
+                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote),
+                                    self.render.TagdefNewShortcut('Define more tags', self.apptarget)])
+        else:
+            return self.renderlist(self.get_title_all(),
+                                   [self.render.FileTagValExisting('', self.apptarget, 'tags', self.data_id, all, urlquote)])       
 
     def get_all_postCommit(self, results):
         system, userdefined, all = results
-        apptarget = self.home + web.ctx.homepath
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 
@@ -400,14 +418,7 @@ class FileTags (Node):
             elif acceptType == 'text/html':
                 break
         # render HTML result
-        if self.data_id:
-            return self.renderlist("\"%s\" tags" % (self.data_id),
-                                   [self.render.FileTagExisting('System', apptarget, self.data_id, system, urlquote),
-                                    self.render.FileTagExisting('User', apptarget, self.data_id, userdefined, urlquote),
-                                    self.render.FileTagNew(apptarget, self.data_id, self.typenames, all, urlquote)])
-        else:
-            return self.renderlist("All tags for all files",
-                                   [self.render.FileTagValExisting('System and User', apptarget, self.data_id, all, urlquote)])
+        return self.get_all_html_render(results)
         
     def GETall(self, uri):
         # HTML get of all tags on one file...
@@ -549,6 +560,101 @@ class FileTags (Node):
             return self.dbtransact(self.post_deleteBody, self.post_postCommit)
         else:
             raise BadRequest(data="Form field action=%s not understood." % action)
+
+class TagdefACL (FileTags):
+    """Reuse FileTags plumbing but map file/tagname to tagdef/role-users."""
+    __slots__ = [ ]
+    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None):
+        FileTags.__init__(self, appname, data_id, tag_id, value, tagvals)
+
+    def get_tag_body(self):
+        """Override FileTags.get_tag_body to consult tagdef ACL instead"""
+        results = self.select_tagdef(self.data_id)
+        if len(results) == 0:
+            raise NotFound(data='tag definition "%s"' % self.data_id)
+        tagdef = results[0]
+        acl = self.tag_id.lower()
+        if acl not in [ 'readers', 'writers' ]:
+            raise BadRequest(data='Tag definition ACL %s not understood.' % acl)
+        m1 = dict(readers='readpolicy', writers='writepolicy')
+        m2 = dict(readers='read', writers='write')
+        mode = m2[acl]
+        policy = tagdef[m1[acl]]
+        if policy != 'tag':
+            raise Conflict(data=('Tagdef "%s", with %s=%s, does not use ACLs.'
+                                 % (self.data_id, m1[acl], policy)))
+        results = self.select_tag_acl(mode, self.value, tag_id=self.data_id)
+        if len(results) == 0:
+            if self.value == None:
+                pass
+            elif self.value == '':
+                raise NotFound(data='ACL %s = "" on tagdef %s' % (self.tag_id, self.data_id))
+            else:
+                raise NotFound(data='ACL %s = %s on tagdef %s' % (self.tag_id, self.value, self.data_id))
+        values = []
+        for res in results:
+            try:
+                value = res.value
+                if value == None:
+                    value = ''
+                values.append(value)
+            except:
+                pass
+        return values
+
+    def buildaclinfo(self):
+        results = self.select_tagdef(self.data_id)
+        if len(results) == 0:
+            raise NotFound(data='tag definition "%s"' % self.data_id)
+        tagdef = results[0]
+        user = self.user()
+        acldefs = [ ('readers', 'text', tagdef.owner == user),
+                    ('writers', 'text', tagdef.owner == user) ]
+        acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
+        readacls = [ (result.tagname, 'readers')
+                     for result in self.select_tagdef(tagname=self.data_id,
+                                                      where="readpolicy = 'tag'") ]
+        writeacls = [ (result.tagname, 'writers')
+                      for result in self.select_tagdef(tagname=self.data_id,
+                                                       where="writepolicy = 'tag'") ]
+        tagacls = readacls + writeacls
+        m = dict(readers='read', writers='write')
+        tagaclvals = [ (tag,
+                        acl,
+                        [result.value for result in self.select_tag_acl(m[acl], tag_id=tag)])
+                       for tag, acl in tagacls ]
+        length = listmax([listmax([ len(val) for val in vals]) for tag, acl, vals in tagaclvals])
+        return ( [],
+                 acldefs,
+                 acldefsdict,
+                 tagacls,
+                 tagaclvals,
+                 length )
+
+    def get_all_body(self):
+        """Override FileTags.get_all_body to consult tagdef ACL instead"""
+        aclinfo = self.buildaclinfo()
+        return ( aclinfo,
+                 ( [], [], {}, [], [], 0 ),
+                 aclinfo )
+
+    def get_title_one(self):
+        return 'ACLs for tag "%s"' % self.data_id
+
+    def get_title_all(self):
+        return 'ACLs for all tags'
+
+    def get_all_html_render(self, results):
+        system, userdefined, all = results
+        if self.data_id:
+            return self.renderlist(self.get_title_one(),
+                                   [self.render.FileTagExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote),
+                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote)])
+        else:
+            return self.renderlist(self.get_title_all(),
+                                   [self.render.FileTagValExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote)])       
+
+
 
 class Query (Node):
     __slots__ = [ 'predlist', 'queryopts', 'action' ]

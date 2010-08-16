@@ -12,7 +12,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileList.html FileUriList.txt ConfirmForm.html \
 	TagdefExisting.html TagdefNew.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
-	FileTagNew.html \
+	FileTagNew.html TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
 	Error.html
 

@@ -487,14 +487,23 @@ class Application:
         vars=dict(file=data_id, value=user, any="*")
         return self.db.query(query, vars=vars)
 
-    def select_tag_acl(self, mode, user, tag_id=None):
+    def select_tag_acl(self, mode, user=None, tag_id=None):
         if tag_id == None:
             tag_id = self.tag_id
         table = dict(read='tagreaders', write='tagwriters')[mode]
-        query = "SELECT * FROM \"%s\"" % table \
-                + " WHERE tagname = $tag_id AND (value = $user)"
-        vars=dict(tag_id=tag_id, user=user)
+        wheres = [ 'tagname = $tag_id' ]
+        vars = dict(tag_id=tag_id)
+        if user != None:
+            wheres.append('value = $user')
+            vars['user'] = user
+        wheres = " AND ".join(wheres)
+        query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
         return self.db.query(query, vars=vars)
+
+    def select_acltags(self, mode):
+        table = dict(read='tagreaders', write='tagwriters')[mode]
+        query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
+        return self.db.query(query)
 
     def select_filetags(self, tagname=None, where=None, user=None):
         wheres = []

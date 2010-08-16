@@ -14,6 +14,7 @@ def p_start(p):
     """start : filelist
              | file
              | tagdef
+             | tagdefacl
              | tags
              | query
 """
@@ -53,6 +54,27 @@ def p_tagdef_rest_put(p):
     # PUT queryopts supports typestr=string&multivalue=boolean&readpolicy=pol&writepolicy=pol
     #  where pol is in [ anonymous, users, file, fowner, tag, system ]
     p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
+
+def p_tagdefacl_all(p):
+    """tagdefacl : slash string slash TAGDEFACL
+            | slash string slash TAGDEFACL slash"""
+    # note: this class hijacks FileTags
+    p[0] = url_ast.TagdefACL(appname=p[2])
+
+def p_tagdefacl(p):
+    """tagdefacl : slash string slash TAGDEFACL slash string 
+            | slash string slash TAGDEFACL slash string slash"""
+    # note: this class hijacks FileTags so arg naming is weird
+    # data_id --> tag_id
+    p[0] = url_ast.TagdefACL(appname=p[2], data_id=p[6])
+
+def p_tagdefaclvalrest(p):
+    """tagdefacl : slash string slash TAGDEFACL slash string slash tagvals"""
+    # note: this class hijacks FileTags so arg naming is weird
+    # data_id --> tag_id
+    # tag_id --> [ readers, writers ]
+    # values --> usernames
+    p[0] = url_ast.TagdefACL(appname=p[2], data_id=p[6], tagvals=p[8])
 
 def p_tags_all(p):
     """tags : slash string slash TAGS

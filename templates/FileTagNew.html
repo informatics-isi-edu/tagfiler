@@ -1,9 +1,9 @@
-$def with (apptarget, data_id, typenames, taginfo, urlquote)
+$def with (title, apptarget, tagspace, data_id, typenames, taginfo, urlquote)
 $ excludes, tagdefs, tagdefsdict, tags, tagvals, length = taginfo
 $if len(tagdefs) > 0:
-	<h2>Set a tag</h2>
+	<h2>${title}</h2>
 	<p>To set a tag, check its "Set" checkbox below, enter a value if applicable, and select "Apply". Multiple tags may be set at once. Any tag which is unchecked will remain unchanged.</p>
-	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/tags/' + urlquote(data_id)}" method="post">
+	<form enctype="application/x-www-form-urlencoded" action="${apptarget + '/' + tagspace + '/' + urlquote(data_id)}" method="post">
 	$for tagdef in tagdefs:
 		$ tagname, typestr, writeok = tagdef
 		$if tagname not in excludes:
@@ -15,12 +15,9 @@ $if len(tagdefs) > 0:
 		  			<input type="text" name="val-${urlquote(tagname)}" size="${length}" /> (${typenames[typestr]})
 				</fieldset>
 	  <input type="hidden" name="action" value="put" />
-	  <input type="submit" value="Apply tag(s)" />
+	  <input type="submit" value="Apply ${tagspace}" />
 	  <input type="reset" value="Reset form" />
 	</form>
 $else:
 	<h2>Notice</h2>
 	<p>You cannot annotate this file until tag definitions are created.</p>
-<h2>Define more tags</h2>
-<p>You may go to the <a href="${apptarget + '/tagdef/'}">Tag definitions</a> page to
-create tag definitions, and then come back to this page to annotate your file.</p>
