@@ -7,8 +7,6 @@ $if title == 'System' and data_id:
 $if len(filetagvals) > 0:
 	$for data_id, tag, vals in filetagvals:
 		$ tagname, typestr, writeok = tagdefsdict[tag]
-		$if typestr and not vals:
-			$continue
 		<fieldset>
 		   <legend>${tag}</legend>
 			$if typestr:
