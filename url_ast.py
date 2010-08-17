@@ -661,6 +661,7 @@ class TagdefACL (FileTags):
             for value in self.tagvals[acl]:
                 self.set_tag_acl(dict(writers='write', readers='read')[acl],
                                  value, self.data_id)
+                self.log('SET', tag=self.data_id, mode=acl, user=value)
         return None
 
     def delete_body(self):
@@ -675,12 +676,14 @@ class TagdefACL (FileTags):
             self.enforce_tagacl_authz('write', tag_id=self.data_id)
             self.set_tag_acl(dict(writers='write', readers='read')[tag_id],
                              self.tagvals[tag_id], self.data_id)
+            self.log('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
         return None
 
     def post_deleteBody(self):
         self.enforce_tagacl_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             self.value, self.data_id)
+        self.log('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)
         return None
 
     def post_postCommit(self, results):

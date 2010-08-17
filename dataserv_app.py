@@ -144,8 +144,10 @@ class Application:
         self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
 
-    def log(self, action, dataset=None, tag=None):
-        if dataset and tag:
+    def log(self, action, dataset=None, tag=None, mode=None, user=None):
+        if tag and mode and user:
+            logger.info('tagfiler: %s user "%s" in tag "%s" %s by user %s.' % (action, user, tag, mode, self.user()))
+        elif dataset and tag:
             logger.info('tagfiler: %s tag "%s" in dataset "%s" by user %s.' % (action, tag, dataset, self.user()))
         elif dataset:
             logger.info('tagfiler: %s dataset "%s" by user %s.' % (action, dataset, self.user()))
