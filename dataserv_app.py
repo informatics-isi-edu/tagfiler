@@ -698,7 +698,9 @@ class Application:
             excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
             excepttables = " LEFT OUTER JOIN ".join(excepttables)
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
-            query2 = 'SELECT _owner.file AS file, _owner.value AS owner FROM %s WHERE %s GROUP BY _owner.file, owner' % (excepttables, exceptwheres)
+            if exceptwheres:
+                exceptwheres = "WHERE " + exceptwheres
+            query2 = 'SELECT _owner.file AS file, _owner.value AS owner FROM %s %s GROUP BY _owner.file, owner' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
