@@ -656,7 +656,7 @@ class TagdefACL (FileTags):
 
     def put_body(self):
         """Override FileTags.put_body to consult tagdef ACL instead"""
-        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        self.enforce_tagdef_authz('write', tag_id=self.data_id)
         for acl in self.tagvals.keys():
             for value in self.tagvals[acl]:
                 self.set_tag_acl(dict(writers='write', readers='read')[acl],
@@ -666,21 +666,21 @@ class TagdefACL (FileTags):
 
     def delete_body(self):
         """Override FileTags.put_body to consult tagdef ACL instead"""
-        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        self.enforce_tagdef_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             self.value, self.data_id)
         return None
     
     def post_putBody(self):
         for tag_id in self.tagvals:
-            self.enforce_tagacl_authz('write', tag_id=self.data_id)
+            self.enforce_tagdef_authz('write', tag_id=self.data_id)
             self.set_tag_acl(dict(writers='write', readers='read')[tag_id],
                              self.tagvals[tag_id], self.data_id)
             self.log('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
         return None
 
     def post_deleteBody(self):
-        self.enforce_tagacl_authz('write', tag_id=self.data_id)
+        self.enforce_tagdef_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             self.value, self.data_id)
         self.log('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)

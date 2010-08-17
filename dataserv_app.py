@@ -515,33 +515,6 @@ class Application:
         query = "DELETE FROM %s" % table + " WHERE tagname = $tag_id AND value = $user"
         self.db.query(query, vars=dict(tag_id=tag_id, user=user))
 
-    def test_tagacl_authz(self, mode, user, tag_id):
-        if mode == 'read':
-            return True
-        results = self.select_tagdef(self.data_id)
-        if len(results) == 0:
-            raise NotFound(data='tag definition %s' % self.data_id)
-        tagdef = results[0]
-        user = self.user()
-        if user == None:
-            return None
-        if tagdef.owner != user:
-            return False
-        return True
-
-    def enforce_tagacl_authz(self, mode, user=None, tag_id=None):
-        if user == None:
-            user = self.user()
-        if tag_id == None:
-            tag_id = self.tag_id
-        allow = self.test_tagacl_authz(mode, user, tag_id)
-        if allow == False:
-            raise Forbidden(data='tag "%s" ACL' % tag_id)
-        elif allow == None:
-            raise Unauthorized(data='tag "%s" ACL' % tag_id)
-        else:
-            pass
-
     def select_acltags(self, mode):
         table = dict(read='tagreaders', write='tagwriters')[mode]
         query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
