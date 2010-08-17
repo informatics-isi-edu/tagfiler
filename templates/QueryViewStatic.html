@@ -6,7 +6,9 @@ $def with (target, predlist, ops)
 $for pred in predlist:
 	<li><b>${pred['tag']}</b>
 	$if pred['op']:
-		<i>${ops[pred['op']]}</i> "${','.join(pred['vals'])}"
+		<i>${ops[pred['op']]}</i>
+		$if pred['vals']:
+			"${','.join(pred['vals'])}"
 	</li>
 </ul>
 <h2>Matching Datasets</h2>

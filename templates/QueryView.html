@@ -7,10 +7,12 @@ $for pred in predlist:
 	  <fieldset>
 	    <legend>${pred['tag']}</legend>
 	    $if pred['op']:
-	    	${ops[pred['op']]}:
+	    	${ops[pred['op']]}
 	    	$ count = 0
 	    	$for val in pred['vals']:
-	    		$if count != 0:
+	    		$if count == 0:
+	    			:
+	    		$else:
 	    			OR
 	    		<tt style="color:green">$:{val.replace(' ', '&nbsp;')}</tt>
 	    		$ count += 1

@@ -114,7 +114,7 @@ class Application:
                            'text' : 'Text' }
 
         self.ops = [ ('', 'Exists (ignores value)'),
-                     (':not:', 'Does not exists'),
+                     (':not:', 'Does not exist'),
                      ('=', 'Equal'),
                      ('!=', 'Not equal'),
                      (':lt:', 'Less than'),
