@@ -662,8 +662,7 @@ class Application:
                 elif tagdef.readpolicy == 'file':
                     # note this case is irrelevant because user cannot find files they cannot read
                     # but here for documentation purposes, in case that rule is relaxed
-                    pass
-                    # exceptwheres.append('t%s.file IS NOT NULL AND (_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'' % p)
+                    exceptwheres.append('t%s.file IS NOT NULL AND (_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\')' % p)
                 else:
                     exceptwheres.append('t%s.file IS NOT NULL' % p)
             else:
