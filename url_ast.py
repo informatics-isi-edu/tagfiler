@@ -668,7 +668,7 @@ class TagdefACL (FileTags):
         """Override FileTags.put_body to consult tagdef ACL instead"""
         self.enforce_tagacl_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
-                            value, self.data_id)
+                            self.value, self.data_id)
         return None
     
     def post_putBody(self):
