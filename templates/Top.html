@@ -1,4 +1,4 @@
-$def with (home, title)
+$def with (home, title, user)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -6,6 +6,12 @@ $def with (home, title)
   <title>${title}</title>
 </head>
 <body>
+$if user:
+	<table align="right">
+	<tr>
+	<td style="color:green">Login User: ${user}</td>
+	</tr>
+	</table>
 <div class="page">
 <div class="title">
 <h1>${title}</h1>
