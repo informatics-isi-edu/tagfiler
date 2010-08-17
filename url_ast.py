@@ -39,7 +39,11 @@ class FileList (Node):
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
 
         def body():
-            self.predlist=[]
+            results = self.select_tagdef(tagname='list on homepage')
+            if len(results) > 0:
+                self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
+            else:
+                self.predlist=[]
             return [ (res.file,
                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                       for res in self.select_files_by_predlist() ]
