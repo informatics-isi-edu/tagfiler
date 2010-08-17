@@ -37,7 +37,7 @@ $for i in range(1,11):
 	    	<option value="${pol}">${policies[pol] % 'read'}</option>
 	  <select name="writepolicy-${i}">
 	    <option value="users">${policies['users'] % 'write'}</option>
-	    $for pol in ['anonymous', 'users', 'file', 'fowner', 'tag']:
+	    $for pol in ['anonymous', 'file', 'fowner', 'tag']:
 	    	<option value="${pol}">${policies[pol] % 'write'}</option>
 	  </select>
 	</fieldset>
