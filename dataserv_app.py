@@ -624,15 +624,28 @@ class Application:
             pass            
 
     def select_files_by_predlist(self):
-
+        tagdefs = dict()
         for pred in self.predlist:
             results = self.select_tagdef(pred['tag'])
             if len(results) == 0:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+            tagdef = results[0]
+            if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
+                user = self.user()
+                if user == None:
+                    raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
+                if tagdef.readpolicy == 'tag' and tagdef.owner != user:
+                    results = self.select_tag_acl('read', user=user, tag_id=tagdef.tagname)
+                    if len(results) == 0:
+                        # this is statically known, so either warn user (friendly)
+                        # or return an empty result set since nothing can match?
+                        raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
+            tagdefs[tagdef.tagname] = tagdef
 
         tables = ['_owner']
-        excepttables = ['_owner']
+        excepttables = ['_owner'] # only gets used if others are appended
         wheres = []
+        exceptwheres = []
         values = dict()
 
         for p in range(0, len(self.predlist)):
@@ -640,8 +653,19 @@ class Application:
             tag = pred['tag']
             op = pred['op']
             vals = pred['vals']
+            tagdef = tagdefs[tag]
             if op == ':not:':
-                excepttables.append("\"%s\" USING (file)" % self.wraptag(tag))
+                # a non-NULL match excludes the file, but only if user can see that match
+                excepttables.append('"%s" AS t%s ON (_owner.file = t%s.file)' % (self.wraptag(tag), p, p))
+                if tagdef.readpolicy == 'fowner':
+                    exceptwheres.append('t%s.file IS NOT NULL AND _owner.value = $client' % p)
+                elif tagdef.readpolicy == 'file':
+                    # note this case is irrelevant because user cannot find files they cannot read
+                    # but here for documentation purposes, in case that rule is relaxed
+                    pass
+                    # exceptwheres.append('t%s.file IS NOT NULL AND (_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'' % p)
+                else:
+                    exceptwheres.append('t%s.file IS NOT NULL' % p)
             else:
                 tables.append("\"%s\" AS t%s USING (file)" % (self.wraptag(tag), p))
                 if op and vals and len(vals) > 0:
@@ -650,6 +674,15 @@ class Application:
                         valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
                         values["val%s_%s" % (p, v)] = vals[v]
                     wheres.append(" OR ".join(valpreds))
+                # a predicate matches only if tag is present and value constraints are met
+                # but only if user can see that match
+                if tagdef.readpolicy == 'fowner':
+                    wheres.append('_owner.value = $client')
+                elif tagdef.readpolicy == 'file':
+                    # note this case is irrelevant because user cannot find files they cannot read
+                    # but here for documentation purposes, in case that rule is relaxed
+                    pass
+                    # wheres.append('OR "_read users".value = $client OR "_read users".value = \'*\'')
             
         tables = " JOIN ".join(tables)
         tables += ' LEFT OUTER JOIN "_read users" USING (file)'
@@ -662,12 +695,14 @@ class Application:
         query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner' % (tables, wheres)
 
         if len(excepttables) > 1:
-            excepttables = " JOIN ".join(excepttables)
-            query2 = 'SELECT file, _owner.value AS owner FROM %s GROUP BY file, owner' % excepttables
+            excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
+            excepttables = " LEFT OUTER JOIN ".join(excepttables)
+            exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
+            query2 = 'SELECT _owner.file AS file, _owner.value AS owner FROM %s WHERE %s GROUP BY _owner.file, owner' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
         
-        #web.debug(query)
+        web.debug(query)
         return self.db.query(query, vars=values)
 
