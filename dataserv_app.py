@@ -403,22 +403,40 @@ class Application:
         self.db.query("DELETE FROM files where name = $name",
                       vars=dict(name=self.data_id))
 
-    def select_tagdef(self, tagname=None, where=None, order=None):
+    def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
+        tables = [ 'tagdefs' ]
         wheres = []
+        vars = dict()
         if tagname:
             wheres.append("tagname = $tagname")
+            vars['tagname'] = tagname
         if where:
             wheres.append(where)
-        wheres = " AND ".join(wheres)
-        if wheres and order:
-            return self.db.select('tagdefs', where=wheres, order=order, vars=dict(tagname=tagname))
-        elif wheres:
-            return self.db.select('tagdefs', where=wheres, vars=dict(tagname=tagname))
-        elif order:
-            return self.db.select('tagdefs', order=order, vars=dict(tagname=tagname))
+        if order:
+            order = 'ORDER BY ' + order
         else:
-            return self.db.select('tagdefs', vars=dict(tagname=tagname))
+            order = ''
+        if staticauthz != None:
+            user = self.user()
+            table = dict(read='tagreaders', write='tagwriters')[staticauthz]
+            policy = dict(read='readpolicy', write='writepolicy')[staticauthz]
+            tables.append("%s USING (tagname)" % table)
+            if user != None:
+                wheres.append("%s != 'tag' OR owner = $user OR value = $user" % policy)
+                vars['user'] = user
+            else:
+                wheres.append("%s != 'tag'" % policy)
+                wheres.append("%s != 'fowner'" % policy)
+                wheres.append("%s != 'users'" % policy)
+        tables = " LEFT OUTER JOIN ".join(tables)
+        wheres = " AND ".join([ '(%s)' % where for where in wheres ])
+        if wheres:
+            wheres = "WHERE %s" % wheres
 
+        query = 'SELECT tagdefs.* FROM %s %s %s' % (tables, wheres, order)
+        web.debug(query)
+        return self.db.query(query, vars)
+        
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",
                       vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.user()))

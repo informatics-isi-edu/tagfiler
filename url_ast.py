@@ -774,7 +774,7 @@ class Query (Node):
                           for res in self.select_files_by_predlist() ]
             else:
                 files = []
-            alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname') ]
+            alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
             return ( files, alltags )
 
         def postCommit(results):
