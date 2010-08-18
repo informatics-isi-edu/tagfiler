@@ -768,12 +768,9 @@ class Query (Node):
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
-            if len(self.predlist) > 0:
-                files = [ (res.file,
-                           self.test_file_authz('write', owner=res.owner, data_id=res.file) )
-                          for res in self.select_files_by_predlist() ]
-            else:
-                files = []
+            files = [ (res.file,
+                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
+                      for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
             return ( files, alltags )
 
@@ -784,11 +781,6 @@ class Query (Node):
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
-
-            if len(self.predlist) == 0:
-                # render a blank starting form
-                return self.renderlist("Query by Tags",
-                                       [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops)])
 
             if self.action == 'query':
                 for acceptType in self.acceptTypesPreferedOrder():
@@ -806,5 +798,4 @@ class Query (Node):
                                         self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
                                         self.render.FileList(target, files, urlquote)])
 
-        # this only runs if we need to do a DB query
         return self.dbtransact(body, postCommit)

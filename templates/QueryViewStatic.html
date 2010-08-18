@@ -1,7 +1,10 @@
 $def with (target, predlist, ops)
 <h2>Query Terms</h2>
 <p><a href="${target}">Permanent link to this query</a></p>
-<p>Match files consistent with all of the following terms:</p>
+$if len(predlist) == 0:
+	<p>Match all files.</p>
+$else:
+	<p>Match files tagged with all of the following tags:</p>
 <ul>
 $for pred in predlist:
 	<li><b>${pred['tag']}</b>
