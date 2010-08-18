@@ -369,7 +369,9 @@ class FileTags (Node):
                      self.test_tag_authz('write', tagdef.tagname, fowner=owner))
                     for tagdef in self.select_tagdef(where=where1, order='tagname') ]
         tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
-        filetags = [ (result.file, result.tagname) for result in self.select_filetags(where=where2) ]
+        filetags = [ (result.file, result.tagname)
+                     for result in self.select_filetags(where=where2)
+                     if self.test_tag_authz('read', result.tagname, fowner=owner) ]
         filetagvals = [ (file,
                          tag,
                          [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
