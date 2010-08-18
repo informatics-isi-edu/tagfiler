@@ -5,10 +5,12 @@ $def with (target, predlist, ops)
 <ul>
 $for pred in predlist:
 	<li><b>${pred['tag']}</b>
-	$if pred['op']:
+	$if pred['op'] == None:
+		<i>${ops['']}</i>
+	$else:
 		<i>${ops[pred['op']]}</i>
-		$if pred['vals']:
-			"${','.join(pred['vals'])}"
+	$if pred['vals']:
+		"${','.join(pred['vals'])}"
 	</li>
 </ul>
 <h2>Matching Datasets</h2>

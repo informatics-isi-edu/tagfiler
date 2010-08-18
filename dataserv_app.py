@@ -113,8 +113,8 @@ class Application:
                            'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text' }
 
-        self.ops = [ ('', 'Exists (ignores value)'),
-                     (':not:', 'Does not exist'),
+        self.ops = [ ('', 'Tagged'),
+                     (':not:', 'Not tagged'),
                      ('=', 'Equal'),
                      ('!=', 'Not equal'),
                      (':lt:', 'Less than'),
