@@ -24,10 +24,12 @@ def p_filelist(p):
     """filelist : slash string
                 | slash string slash
                 | slash string slash FILE
-                | slash string slash FILE slash
-                | slash string slash FILE queryopts"""
-    # ignore queryopts
+                | slash string slash FILE slash"""
     p[0] = url_ast.FileList(appname=p[2])
+    
+def p_filelist_opts(p):
+    """filelist : slash string slash FILE queryopts"""
+    p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 
 def p_file(p):
     """file : slash string slash FILE slash string

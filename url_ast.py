@@ -31,7 +31,7 @@ class FileList (Node):
 
     __slots__ = []
 
-    def __init__(self, appname):
+    def __init__(self, appname, queryopts={}):
         Node.__init__(self, appname)
 
     def GET(self, uri):
@@ -57,36 +57,46 @@ class FileList (Node):
 
         storage = web.input()
         action = None
+        name = None
+        filetype = None
+        readers = None
+        writers = None
         try:
             action = storage.action
+            try:
+                name = storage.name
+                filetype = storage.type
+                readers = storage['read users']
+                writers = storage['write users']
+            except:
+                pass
         except:
             pass
 
         if action == 'define':
-            target = self.home + web.ctx.homepath + '/file'
-            return self.renderlist("Define a dataset",
-                                   [self.render.NameForm(target)])
+            if name and filetype and readers and writers:
+                if readers not in [ '*', 'owner' ]:
+                    readers = 'owner'
+                if writers not in [ '*', 'owner' ]:
+                    writers = 'owner'
+                if filetype not in [ 'file', 'url' ]:
+                    filetype = 'file'
+
+                url = self.home + web.ctx.homepath + '/file/' + urlquote(name)
+                url += '?action=define'
+                url += '&type=' + urlquote(filetype)
+                if readers == '*':
+                    url += '&read%20users=*'
+                if writers == '*':
+                    url += '&write%20users=*'
+                raise web.seeother(url)
+            else:
+                target = self.home + web.ctx.homepath + '/file'
+                return self.renderlist("Define a dataset",
+                                       [self.render.NameForm(target)])
         else:
             return self.dbtransact(body, postCommit)
 
-    def POST(self, uri):
-
-        storage = web.input()
-        try:
-            name = storage.name
-            filetype = storage.type
-            readers = storage.readers
-            writers = storage.writers
-        except:
-            raise BadRequest(data="Missing one of the required form fields (name, filetype).")
-
-        if name == '':
-            raise BadRequest(data="The form field name must not be empty.")
-        else:
-            raise web.seeother(self.home + web.ctx.homepath + '/file/' + urlquote(name) 
-                               + '?type=' + urlquote(filetype) + '&action=define' 
-                               + '&read users=' + urlquote(readers) + '&write users=' + urlquote(writers))
-        
 
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
