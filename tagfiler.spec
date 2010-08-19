@@ -2,7 +2,7 @@
 %define version 1.0
 %define unmangled_version 1.0
 %define unmangled_version 1.0
-%define release 566
+%define release 737
 
 Summary: service of a tag catalog
 Name: %{name}
@@ -35,9 +35,6 @@ rm -rf $RPM_BUILD_ROOT
 %post
 TAGFILERDIR=$(python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/%{name}
 %{__chmod} +x ${TAGFILERDIR}/tagfiler ${TAGFILERDIR}/tagfiler-httpd 
-mkdir -p /usr/share/tagfiler
-mv -f ${TAGFILERDIR}/templates /usr/share/tagfiler
-mv -f ${TAGFILERDIR}/dataserv.wsgi /usr/share/tagfiler/
 mv -f ${TAGFILERDIR}/tagfiler /usr/sbin/
 mv -f ${TAGFILERDIR}/tagfiler-httpd /usr/sbin/
 
