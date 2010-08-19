@@ -35,7 +35,6 @@ chkconfig httpd on
 chkconfig postgresql on
 
 # finish initializing system for our service
-mkdir -p ${SVCDIR}/templates
 mkdir -p ${DATADIR}
 mkdir -p ${RUNDIR}
 
