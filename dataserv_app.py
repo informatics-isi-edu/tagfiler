@@ -434,7 +434,7 @@ class Application:
             wheres = "WHERE %s" % wheres
 
         query = 'SELECT tagdefs.* FROM %s %s %s' % (tables, wheres, order)
-        web.debug(query)
+        #web.debug(query)
         return self.db.query(query, vars)
         
     def insert_tagdef(self):
