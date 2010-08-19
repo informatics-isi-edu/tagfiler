@@ -1,11 +1,13 @@
 RELEASE=$(shell svn info  | grep "Revision:" | awk  '{print $$2}')
 
 INSTALLSVC=tagfiler
-INSTALLDIR=/var/www/$(INSTALLSVC)
+INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
-FILES=dataserv.wsgi \
-	dataserv_app.py rest_fileio.py \
-	url_ast.py url_lex.py url_parse.py
+WSGIFILE=tagfiler.wsgi
+
+FILES=dataserv_app.py rest_fileio.py \
+	url_ast.py url_lex.py url_parse.py \
+	__init__.py
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
@@ -17,6 +19,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	Error.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
+WSGI=$(WSGIFILE:%=wsgi/%)
 
 # turn off annoying built-ins
 .SUFFIXES:
@@ -30,9 +33,12 @@ $(HOME)/.tagfiler.predeploy:
 deploy: $(HOME)/.tagfiler.predeploy
 	./deploy.sh $(INSTALLSVC)
 
-install: $(FILES) $(TEMPLATES)
+install: $(FILES) $(TEMPLATES) $(WSGI)
+	mkdir -p $(INSTALLDIR)/templates
+	mkdir -p $(INSTALLDIR)/wsgi
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
+	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 
 restart: force install
 	service httpd restart

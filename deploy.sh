@@ -5,6 +5,8 @@
 # which invokes this with SVCPREFIX...
 ######
 
+TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()'`/tagfiler
+
 # this is the URL base path of the service
 SVCPREFIX=${1:-tagfiler}
 
@@ -183,27 +185,30 @@ AllowEncodedSlashes On
 
 WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 
-WSGIScriptAlias /${SVCPREFIX} ${SVCDIR}/dataserv.wsgi
+WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
 WSGISocketPrefix ${RUNDIR}/wsgi
 
-<Directory ${SVCDIR}>
+<Location /${SVCPREFIX}>
 
     WSGIProcessGroup ${SVCPREFIX}
-
-    SetEnv ${SVCPREFIX}.source_path ${SVCDIR}
-    SetEnv ${SVCPREFIX}.dbnstr postgres
-    SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
-    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
-    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
-    SetEnv ${SVCPREFIX}.template_path ${SVCDIR}/templates
-    SetEnv ${SVCPREFIX}.chunkbytes 1048576
-
+    
     AuthType Digest
     AuthName "${SVCPREFIX}"
     AuthDigestDomain /${SVCPREFIX}/
     AuthUserFile /etc/httpd/passwd/passwd
     Require valid-user
+
+</Location>
+
+<Directory ${TAGFILERDIR}/wsgi>
+
+    SetEnv ${SVCPREFIX}.dbnstr postgres
+    SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
+    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
+    SetEnv ${SVCPREFIX}.template_path ${TAGFILERDIR}/templates
+    SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
 </Directory>
 
