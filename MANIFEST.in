@@ -1,8 +1,7 @@
-exclude INSTALL
-exclude utils/*
-exclude test/*
-exclude tagfiler.spec
-exclude MANIFEST.in
-exclude Makefile
-exclude deploy.sh
-exclude post-script
+prune *
+exclude *
+include *.py
+graft templates
+graft wsgi
+include tagfiler tagfiler-httpd
+
