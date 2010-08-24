@@ -94,8 +94,8 @@ application = web.application(urls, globals()).wsgifunc()
 
 if __name__ == "__main__":
 		# Comment the below line in case of a RPM installation
-        sys.path.append(os.path.dirname(sys.argv[0]))
+        # sys.path.append(os.path.dirname(sys.argv[0]))
         
 	# Comment the below line in case of a RPM installation
-	import url_parse
+	# import url_parse
 	url_parse.make_parse()
