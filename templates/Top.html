@@ -1,4 +1,4 @@
-$def with (home, title, user, loginsince, webauthnhome)
+$def with (home, title, user, loginsince, loginuntil, webauthnhome)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -14,6 +14,8 @@ $if user:
 		<tr><td></td><td><a href="${webauthnhome}/password">change&nbsp;password</a></td></tr>
 	$if loginsince:
 		<tr><td>Since:</td><td>${loginsince.strftime("%Y-%m-%d %H:%M:%S")}</td></tr>
+	$if loginuntil:
+		<tr><td>Expires:</td><td>${loginuntil.strftime("%Y-%m-%d %H:%M:%S")}</td></tr>
 $else:
 	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
 	$if webauthnhome:

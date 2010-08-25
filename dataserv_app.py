@@ -122,6 +122,7 @@ class Application:
         self.role = None
         self.roles = []
         self.loginsince = None
+        self.loginuntil = None
 
         self.render = web.template.render(self.template_path)
         render = self.render # HACK: make this available to exception classes too
@@ -174,7 +175,7 @@ class Application:
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.webauthnhome)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.loginuntil, self.webauthnhome)] + renderlist + [self.render.Bottom()]])
 
     def preDispatch(self, uri):
         if self.webauthnhome:
@@ -182,7 +183,7 @@ class Application:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
             authn = webauthn.session.test_and_update_session(self.db)
             if authn:
-                self.role, self.roles, self.loginsince = authn
+                self.role, self.roles, self.loginsince, self.loginuntil = authn
             elif self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
