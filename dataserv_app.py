@@ -114,7 +114,7 @@ class Application:
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
         self.db = None
-        if self.webauthnrequire.lower in ['t', 'true', 'y', 'yes', '1']:
+        if self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:
             self.webauthnrequire = False
@@ -176,15 +176,15 @@ class Application:
         return "".join([unicode(r) for r in 
                         [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.webauthnhome)] + renderlist + [self.render.Bottom()]])
 
-    def preDispatch(self):
+    def preDispatch(self, uri):
         if self.webauthnhome:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-                authn = webauthn.session.test_and_update_session(self.db)
-                if authn:
-                    self.role, self.roles, self.loginsince = authn
-                elif self.webauthnrequire:
-                    raise web.seeother(self.webauthnhome + '/login')
+            authn = webauthn.session.test_and_update_session(self.db)
+            if authn:
+                self.role, self.roles, self.loginsince = authn
+            elif self.webauthnrequire:
+                raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
