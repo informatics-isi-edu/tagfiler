@@ -1,4 +1,4 @@
-$def with (home, title, user)
+$def with (home, title, user, loginsince, webauthnhome)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -6,12 +6,19 @@ $def with (home, title, user)
   <title>${title}</title>
 </head>
 <body>
+<table align="right">
 $if user:
-	<table align="right">
-	<tr>
-	<td style="color:green">Login User: ${user}</td>
-	</tr>
-	</table>
+	<tr style="color:green"><td>Login User:</td><td>${user} (<a href="${webauthnhome}/status">details</a>)</td></tr>
+	$if loginsince:
+		<tr><td>Logged in since:</td><td>${loginsince}</td></tr>
+	$if webauthnhome:
+		<tr><td></td><td><a href="${webauthnhome}/logout">Log out now</a></td></tr>
+		<tr><td></td><td><a href="${webauthnhome}/password">Change password</a></td></tr>
+$else:
+	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
+	$if webauthnhome:
+		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
+</table>
 <div class="page">
 <div class="title">
 <h1>${title}</h1>

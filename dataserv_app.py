@@ -4,6 +4,10 @@ import psycopg2
 import os
 import logging
 from logging.handlers import SysLogHandler
+try:
+    import webauthn
+except:
+    pass
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -96,7 +100,10 @@ class Application:
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
         def getParam(suffix):
-            return web.ctx.env['%s.%s' % (myAppName, suffix)]
+            try:
+                return web.ctx.env['%s.%s' % (myAppName, suffix)]
+            except:
+                return None
 
         self.dbnstr = getParam('dbnstr')
         self.dbstr = getParam('dbstr')
@@ -104,6 +111,17 @@ class Application:
         self.store_path = getParam('store_path')
         self.template_path = getParam('template_path')
         self.chunkbytes = int(getParam('chunkbytes'))
+        self.webauthnhome = getParam('webauthnhome')
+        self.webauthnrequire = getParam('webauthnrequire')
+        self.db = None
+        if self.webauthnrequire.lower in ['t', 'true', 'y', 'yes', '1']:
+            self.webauthnrequire = True
+        else:
+            self.webauthnrequire = False
+
+        self.role = None
+        self.roles = []
+        self.loginsince = None
 
         self.render = web.template.render(self.template_path)
         render = self.render # HACK: make this available to exception classes too
@@ -156,7 +174,17 @@ class Application:
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user())] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.webauthnhome)] + renderlist + [self.render.Bottom()]])
+
+    def preDispatch(self):
+        if self.webauthnhome:
+            if not self.db:
+                self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+                authn = webauthn.session.test_and_update_session(self.db)
+                if authn:
+                    self.role, self.roles, self.loginsince = authn
+                elif self.webauthnrequire:
+                    raise web.seeother(self.webauthnhome + '/login')
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
@@ -164,7 +192,8 @@ class Application:
            using caller-provided thunks under boilerplate
            commit/rollback/retry logic
         """
-        self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+        if not self.db:
+            self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
         count = 0
         limit = 10
         while True:
@@ -229,7 +258,10 @@ class Application:
 
     def user(self):
         try:
-            user = web.ctx.env['REMOTE_USER']
+            if self.webauthnhome:
+                user = self.role
+            else:
+                user = web.ctx.env['REMOTE_USER']
         except:
             return None
         return user

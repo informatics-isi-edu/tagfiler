@@ -63,24 +63,28 @@ class Dispatcher:
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'HEAD'):
             raise web.NoMethod()
+        ast.preDispatch()
         return ast.HEAD(uri)
 
     def GET(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'GET'):
             raise web.NoMethod()
+        ast.preDispatch()
         return ast.GET(uri)
 
     def PUT(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'PUT'):
             raise web.NoMethod()
+        ast.preDispatch()
         return ast.PUT(uri)
 
     def DELETE(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'DELETE'):
             raise web.NoMethod()
+        ast.preDispatch()
         return ast.DELETE(uri)
 
     def POST(self):
