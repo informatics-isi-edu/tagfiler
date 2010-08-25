@@ -13,7 +13,7 @@ $if user:
 		<tr><td></td><td><a href="${webauthnhome}/logout">log&nbsp;out</a></td></tr>
 		<tr><td></td><td><a href="${webauthnhome}/password">change&nbsp;password</a></td></tr>
 	$if loginsince:
-		<tr><td>Since:</td><td>${loginsince}</td></tr>
+		<tr><td>Since:</td><td>${loginsince.strftime("%Y-%m-%d %H:%M:%S")}</td></tr>
 $else:
 	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
 	$if webauthnhome:
