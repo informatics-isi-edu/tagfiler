@@ -8,12 +8,12 @@ $def with (home, title, user, loginsince, webauthnhome)
 <body>
 <table align="right">
 $if user:
-	<tr style="color:green"><td>Login User:</td><td>${user} (<a href="${webauthnhome}/status">details</a>)</td></tr>
-	$if loginsince:
-		<tr><td>Logged in since:</td><td>${loginsince}</td></tr>
+	<tr><td>User:</td><td><a href="${webauthnhome}/status">${user}</a></td></tr>
 	$if webauthnhome:
-		<tr><td></td><td><a href="${webauthnhome}/logout">Log out now</a></td></tr>
-		<tr><td></td><td><a href="${webauthnhome}/password">Change password</a></td></tr>
+		<tr><td></td><td><a href="${webauthnhome}/logout">log&nbsp;out</a></td></tr>
+		<tr><td></td><td><a href="${webauthnhome}/password">change&nbsp;password</a></td></tr>
+	$if loginsince:
+		<tr><td>Since:</td><td>${loginsince}</td></tr>
 $else:
 	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
 	$if webauthnhome:
