@@ -17,6 +17,7 @@ def p_start(p):
              | tagdefacl
              | tags
              | query
+             | transmitnumber
 """
     p[0] = p[1]
 
@@ -259,6 +260,10 @@ def p_stringany(p):
 def p_stringplus_concat(p):
     """string : string string"""
     p[0] = p[1] + p[2]
+
+def p_transmit_number(p):
+    """transmitnumber : slash string slash TRANSMITNUMBER """
+    p[0] = url_ast.TransmitNumber(p[2])
 
 class ParseError:
     """Exception for parse errors"""

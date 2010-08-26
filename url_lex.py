@@ -31,7 +31,8 @@ keywords = {
     'simto' : 'SIMTO',
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
-    'not' : 'NOT'
+    'not' : 'NOT',
+    'transmitnumber' : 'TRANSMITNUMBER'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())

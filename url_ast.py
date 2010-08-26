@@ -21,6 +21,32 @@ class Node (object, Application):
         self.appname = appname
         Application.__init__(self)
 
+class TransmitNumber (Node):
+    """Represents a transmitnumber URI
+
+       POST tagfiler/transmitnumber
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname):
+        Node.__init__(self, appname)
+
+    def POST(self, uri):
+
+        def body():
+            result  = self.select_next_transmit_number()
+            return result
+
+        def postCommit(results):
+            uri = self.home + '/transmitnumber/' + results
+            web.header('Location', uri)
+            return uri
+
+        return self.dbtransact(body, postCommit)
+
+
+
 class FileList (Node):
     """Represents a bare FILE/ URI
 

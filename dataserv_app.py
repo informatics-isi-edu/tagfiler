@@ -735,3 +735,8 @@ class Application:
         #web.debug(query)
         return self.db.query(query, vars=values)
 
+    def select_next_transmit_number(self):
+        query = "SELECT NEXTVAL ('transmitnumber')"
+        result = self.db.query(query)
+        return str(result[0].nextval).rjust(9, '0')
+

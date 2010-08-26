@@ -93,6 +93,7 @@ psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multival
 psql -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL )"
 psql -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
+psql -c "CREATE SEQUENCE transmitnumber"
 
 # pre-establish core restricted tags used by codebase
 tagdef()
