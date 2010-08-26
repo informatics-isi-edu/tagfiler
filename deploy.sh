@@ -108,7 +108,12 @@ tagdef()
    #   tag -- tag access rule is observed for tag access
    #   system  -- no client can access
 
-   psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$3', '\$4', \$5 )"
+   if [[ -n "\$3" ]]
+   then
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$3', '\$4', '\$5', \$6 )"
+   else
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$4', '\$5', \$6 )"
+   fi
    if [[ -n "\$2" ]]
    then
       psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 )"
@@ -117,23 +122,25 @@ tagdef()
    fi
 }
 
-tagdef owner text anonymous fowner false
-tagdef created timestamptz anonymous system false
-tagdef "read users" text anonymous fowner true
-tagdef "write users" text anonymous fowner true
-tagdef "modified by" text anonymous system false
-tagdef modified timestamptz anonymous system false
-tagdef bytes int8 anonymous system false
-tagdef name text anonymous system false
-tagdef url text anonymous system false
-tagdef content-type text anonymous file false
+#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL
+tagdef owner          text        ""      anonymous   fowner     false
+tagdef created        timestamptz ""      anonymous   system     false
+tagdef "read users"   text        ""      anonymous   fowner     true
+tagdef "write users"  text        ""      anonymous   fowner     true
+tagdef "modified by"  text        ""      anonymous   system     false
+tagdef modified       timestamptz ""      anonymous   system     false
+tagdef bytes          int8        ""      anonymous   system     false
+tagdef name           text        ""      anonymous   system     false
+tagdef url            text        ""      anonymous   system     false
+tagdef content-type   text        ""      anonymous   file       false
 
 # DEI specific tags (alpha 8/27)
-tagdef "image set" "" anonymous file file false
-tagdef "protocol" text anonymous file file false
-tagdef "patient" text anonymous file file false
-tagdef "visit"  text anonymous file file false
-tagdef "image type"  text anonymous file file false
+
+tagdef "image set"    ""          dirc    file        file       false
+tagdef protocol       text        dirc    file        file       false
+tagdef patient        text        dirc    file        file       false
+tagdef visit          text        dirc    file        file       false
+tagdef "image type"   text        dirc    file        file       false
 
 EOF
 
