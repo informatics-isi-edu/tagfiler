@@ -3,6 +3,7 @@ import web
 import psycopg2
 import os
 import logging
+import datetime
 from logging.handlers import SysLogHandler
 try:
     import webauthn
@@ -99,21 +100,21 @@ class Application:
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
-        def getParam(suffix):
-            try:
-                return web.ctx.env['%s.%s' % (myAppName, suffix)]
-            except:
-                return None
+        def getParam(suffix, default=None):
+            return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
-        self.dbnstr = getParam('dbnstr')
-        self.dbstr = getParam('dbstr')
+        self.dbnstr = getParam('dbnstr', 'postgres')
+        self.dbstr = getParam('dbstr', '')
         self.home = getParam('home')
         self.store_path = getParam('store_path')
         self.template_path = getParam('template_path')
-        self.chunkbytes = int(getParam('chunkbytes'))
+        self.chunkbytes = int(getParam('chunkbytes', 1048576))
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
+        self.webauthnexpiremins = int(getParam('webauthnexpiremins', 10))
+        self.webauthnrotatemins = int(getParam('webauthnrotatemins', 120))
         self.db = None
+        
         if self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:
@@ -181,7 +182,9 @@ class Application:
         if self.webauthnhome:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-            authn = webauthn.session.test_and_update_session(self.db)
+            authn = webauthn.session.test_and_update_session(self.db,
+                                                             expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
+                                                             rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins))
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil = authn
             elif self.webauthnrequire:
@@ -263,6 +266,7 @@ class Application:
                 user = self.role
             else:
                 user = web.ctx.env['REMOTE_USER']
+                self.roles = [ user ]
         except:
             return None
         return user
