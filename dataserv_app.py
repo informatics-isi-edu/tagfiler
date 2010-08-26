@@ -115,7 +115,7 @@ class Application:
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', 120))
         self.db = None
         
-        if self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
+        if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:
             self.webauthnrequire = False
