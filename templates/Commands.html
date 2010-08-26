@@ -1,11 +1,11 @@
 $def with (target, user, urlquote)
 <h2>Getting Started</h2>
 <ol>
-  <li>Upload DIRC trial visit image set (put applet here)</li>
+  <li>Upload DIRC study (put applet here)</li>
   <li><a href="${target}/query?action=edit">Query by tags</a>
   $if user:
   	<ul>
-		<li><a href="${target}/query/owner=${urlquote(user)};Image Set">View DIRC image sets owned by ${user}</a></li>
+		<li><a href="${target}/query/owner=${urlquote(user)};Image Set">View DIRC studies owned by ${user}</a></li>
 	</ul>
   </li>
   <li><a href="https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home">Help and documentation</a></li>
