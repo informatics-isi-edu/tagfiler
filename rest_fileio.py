@@ -259,15 +259,25 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
-            params = []
-            if storage['read users'] == '*':
-                params.append('read users=*')
-            if storage['write users'] == '*':
-                params.append('write users=*')
-            if len(params) > 0:
-                suffix = '?' + '&'.join(params)
         except:
             pass
+        
+        params = []
+        
+        try:
+            if storage['read users'] == '*':
+                params.append('read users=*')
+        except:
+            pass
+        
+        try:
+            if storage['write users'] == '*':
+                params.append('write users=*')
+        except:
+            pass
+        
+        if len(params) > 0:
+            suffix = '?' + '&'.join(params)
 
         target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
         if self.action == 'define':
