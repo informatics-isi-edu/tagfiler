@@ -98,6 +98,7 @@ class FileList (Node):
                 self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
                 
             return [ (res.file,
+                      res.local,
                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                       for res in self.select_files_by_predlist() ]
 
@@ -823,6 +824,7 @@ class Query (Node):
 
         def body():
             files = [ (res.file,
+                       res.local,
                        self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                       for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]

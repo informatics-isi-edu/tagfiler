@@ -1,7 +1,12 @@
 $def with (target, files, quote)
 $if len(files) > 0:
-	$for name, writeok in files:
-		$ tags = [ '<a href="%s/file/%s">Download</a>' % (target, quote(name)), '<a href="%s/tags/%s">View or set tags</a>' % (target, quote(name)) ]
+	$for name, local, writeok in files:
+		$ tags = []
+		$if local:
+			$ tags.append( '<a href="%s/file/%s">Download</a>' % (target, quote(name)) )
+		$else:
+			$ tags.append( '<a href="%s/file/%s">View</a>' % (target, quote(name)) )
+		$ tags.append( '<a href="%s/tags/%s">View or set tags</a>' % (target, quote(name)) )
 		$if writeok:
 			$ tags += [ '<a href="%s/file/%s?action=define&amp;type=file">Update via file</a>' % (target, quote(name)), '<a href="%s/file/%s?action=define&amp;type=url">Update via URL</a>' % (target, quote(name)) ]
 		<fieldset>

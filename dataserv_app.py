@@ -670,8 +670,8 @@ class Application:
                         raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
             tagdefs[tagdef.tagname] = tagdef
 
-        tables = ['_owner']
-        excepttables = ['_owner'] # only gets used if others are appended
+        tables = ['files', '_owner ON (files.name = _owner.file)']
+        excepttables = ['files', '_owner ON (files.name = _owner.file)'] # only gets used if others are appended
         wheres = []
         exceptwheres = []
         values = dict()
@@ -684,7 +684,7 @@ class Application:
             tagdef = tagdefs[tag]
             if op == ':not:':
                 # a non-NULL match excludes the file, but only if user can see that match
-                excepttables.append('"%s" AS t%s ON (_owner.file = t%s.file)' % (self.wraptag(tag), p, p))
+                excepttables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
                 if tagdef.readpolicy == 'fowner':
                     exceptwheres.append('t%s.file IS NOT NULL AND _owner.value = $client' % p)
                 elif tagdef.readpolicy == 'file':
@@ -694,7 +694,7 @@ class Application:
                 else:
                     exceptwheres.append('t%s.file IS NOT NULL' % p)
             else:
-                tables.append("\"%s\" AS t%s USING (file)" % (self.wraptag(tag), p))
+                tables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
@@ -712,27 +712,27 @@ class Application:
                     # wheres.append('OR "_read users".value = $client OR "_read users".value = \'*\'')
             
         tables = " JOIN ".join(tables)
-        tables += ' LEFT OUTER JOIN "_read users" USING (file)'
+        tables += ' LEFT OUTER JOIN "_read users" ON (files.name = "_read users".file)'
         wheres.append('_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'')
         values["client"] = self.user()
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner' % (tables, wheres)
+        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner FROM %s %s GROUP BY files.name, files.local, owner' % (tables, wheres)
 
-        if len(excepttables) > 1:
+        if len(excepttables) > 2:
             excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
             excepttables = " LEFT OUTER JOIN ".join(excepttables)
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
             if exceptwheres:
                 exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT _owner.file AS file, _owner.value AS owner FROM %s %s GROUP BY _owner.file, owner' % (excepttables, exceptwheres)
+            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner FROM %s %s GROUP BY files.name, files.local, owner' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
         
-        #web.debug(query)
+        web.debug(query)
         return self.db.query(query, vars=values)
 
     def select_next_transmit_number(self):
