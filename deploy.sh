@@ -192,11 +192,11 @@ WSGISocketPrefix ${RUNDIR}/wsgi
 
     WSGIProcessGroup ${SVCPREFIX}
     
-    AuthType Digest
-    AuthName "${SVCPREFIX}"
-    AuthDigestDomain /${SVCPREFIX}/
-    AuthUserFile /etc/httpd/passwd/passwd
-    Require valid-user
+    # AuthType Digest
+    # AuthName "${SVCPREFIX}"
+    # AuthDigestDomain /${SVCPREFIX}/
+    # AuthUserFile /etc/httpd/passwd/passwd
+    # Require valid-user
 
 </Location>
 
@@ -205,6 +205,8 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
     SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
+    SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn
+    SetEnv ${SVCPREFIX}.webauthnrequire Yes
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
     SetEnv ${SVCPREFIX}.template_path ${TAGFILERDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
