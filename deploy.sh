@@ -136,11 +136,25 @@ tagdef content-type   text        ""      anonymous   file       false
 
 # DEI specific tags (alpha 8/27)
 
-tagdef "image set"    ""          dirc    file        file       false
-tagdef protocol       text        dirc    file        file       false
-tagdef patient        text        dirc    file        file       false
-tagdef visit          text        dirc    file        file       false
-tagdef "image type"   text        dirc    file        file       false
+tagdef "Image Set"    ""          dirc    file        file       false
+
+tagdef Sponsor        text        dirc    file        file       false
+tagdef Protocol       text        dirc    file        file       false
+tagdef "Investigator Last Name" \
+                      text        dirc    file        file       false
+tagdef "Investigator First Name" \
+                      text        dirc    file        file       false
+tagdef "Study Site Number" \
+                      text        dirc    file        file       false
+tagdef "Patient Study ID" \
+                      text        dirc    file        file       false
+tagdef "Study Visit"  text        dirc    file        file       false
+tagdef "Image Type"   text        dirc    file        file       false
+tagdef Eye            text        dirc    file        file       false
+tagdef "Capture Date" date        dirc    file        file       false
+tagdef Comment        text        dirc    file        file       false
+tagdef "Control Number" \
+                      text        dirc    file        file       false
 
 EOF
 
