@@ -1,0 +1,12 @@
+$def with (target)
+<center>
+<APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet"
+ CODEBASE="/tagfiler/static" ARCHIVE="signed-isi-misd-tagfiler-upload-applet.jar"
+  width=1010 height=500 classloader_cache="false">
+<PARAM name="tagfiler.server.url" value="${target}"/>
+<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
+  Download JRE 1.5 for your system from the following link:</b><br/>
+<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
+</APPLET>
+<div class="link" id="dataset_link"></div>
+</center>

@@ -133,6 +133,7 @@ tagdef bytes          int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
+tagdef sha256sum      text        ""      file        file       false
 
 # DEI specific tags (alpha 8/27)
 
@@ -217,6 +218,8 @@ WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
 WSGISocketPrefix ${RUNDIR}/wsgi
 
+Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
+
 <Location /${SVCPREFIX}>
 
     WSGIProcessGroup ${SVCPREFIX}
@@ -226,6 +229,14 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     # AuthDigestDomain /${SVCPREFIX}/
     # AuthUserFile /etc/httpd/passwd/passwd
     # Require valid-user
+
+</Location>
+
+<Location /${SVCPREFIX}/static>
+
+   # we don't want authentication on the applet download etc.
+   Satisfy Any
+   Allow from all
 
 </Location>
 
@@ -241,6 +252,28 @@ WSGISocketPrefix ${RUNDIR}/wsgi
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
 
 </Directory>
+
+EOF
+
+mkdir -p /var/www/html/${SVCPREFIX}/static/
+cp main.css /var/www/html/${SVCPREFIX}/static/
+cp functions.js /var/www/html/${SVCPREFIX}/static/
+mkdir -p /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
+chmod -r a+r /var/www/html/${SVCPREFIX}/static/*
+
+cat <<EOF
+Integration notes
+-------------------------
+
+This is not automated yet:
+
+cp signed-isi-misd-tagfiler-upload-applet.jar \
+   /var/www/html/${SVCPREFIX}/static/
+
+cp applet.properties \
+   /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
+
+chmod -r a+r /var/www/html/${SVCPREFIX}/static/*
 
 EOF
 

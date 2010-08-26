@@ -45,7 +45,29 @@ class TransmitNumber (Node):
 
         return self.dbtransact(body, postCommit)
 
+class Study (Node):
+    """Represents a study URI
 
+       GET tagfiler/study?action=upload
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+        self.action = None
+
+    def GET(self, uri):
+        storage = web.input()
+        try:
+            action = storage.action
+        except:
+            pass
+
+        if action == 'upload':
+            target = self.home + web.ctx.homepath
+            return self.renderlist("Study Upload",
+                                   [self.render.TreeUpload(target)])
 
 class FileList (Node):
     """Represents a bare FILE/ URI
@@ -70,6 +92,11 @@ class FileList (Node):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
             else:
                 self.predlist=[]
+
+            results = self.select_tagdef(tagname='Image Set')
+            if len(results) > 0:
+                self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
+                
             return [ (res.file,
                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
                       for res in self.select_files_by_predlist() ]

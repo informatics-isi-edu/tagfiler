@@ -16,6 +16,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
 	FileTagNew.html TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
+	TreeUpload.html \
 	Error.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)

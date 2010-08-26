@@ -18,6 +18,7 @@ def p_start(p):
              | tags
              | query
              | transmitnumber
+             | study
 """
     p[0] = p[1]
 
@@ -224,6 +225,18 @@ def p_queryopts_grow_short(p):
     p[0] = p[1]
     p[0][p[3]] = None
 
+def p_transmit_number(p):
+    """transmitnumber : slash string slash TRANSMITNUMBER """
+    p[0] = url_ast.TransmitNumber(appname=p[2])
+
+def p_study(p):
+    """study : slash string slash STUDY"""
+    p[0] = url_ast.Study(appname=p[2])
+
+def p_study_opts(p):
+    """study : slash string slash STUDY queryopts"""
+    p[0] = url_ast.Study(appname=p[2], queryopts=p[5])
+
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):
     """slash : '/'
@@ -260,10 +273,6 @@ def p_stringany(p):
 def p_stringplus_concat(p):
     """string : string string"""
     p[0] = p[1] + p[2]
-
-def p_transmit_number(p):
-    """transmitnumber : slash string slash TRANSMITNUMBER """
-    p[0] = url_ast.TransmitNumber(p[2])
 
 class ParseError:
     """Exception for parse errors"""

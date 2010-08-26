@@ -1,8 +1,8 @@
 $def with (target, user, urlquote)
 <h2>Getting Started</h2>
 <ol>
-  <li>Upload DIRC study (put applet here)</li>
-  <li>Download DIRC study (put applet here)</li>
+  <li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
+  <li>Download DIRC study (TBD)</li>
   <li><a href="${target}/query?action=edit">Query by tags</a>
   $if user:
   	<ul>
@@ -14,4 +14,4 @@ $def with (target, user, urlquote)
   <li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
   <li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>
-<h2>Existing Datasets</h2>
+<h2>Existing Studies</h2>

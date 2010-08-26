@@ -4,6 +4,8 @@ $def with (home, title, user, loginsince, loginuntil, webauthnhome)
 <head>
   <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
   <title>${title}</title>
+  <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
+  <script type="text/javascript" src="${home}/static/functions.js"></script>
 </head>
 <body>
 <table align="right">
@@ -22,16 +24,14 @@ $else:
 		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
 </table>
 <div class="page">
-<div class="title">
 <h1>${title}</h1>
-</div>
 <table cellpadding="10">
   <tr>
     <td>
       <a href="${home}/">Home</a>
     </td>
     <td>
-      Upload study (applet)
+      <a href="${home}/study?action=upload">Upload study</a>
     </td>
     <td>
       Download study (TBD)
