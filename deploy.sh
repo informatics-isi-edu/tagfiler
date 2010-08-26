@@ -128,6 +128,13 @@ tagdef name text anonymous system false
 tagdef url text anonymous system false
 tagdef content-type text anonymous file false
 
+# DEI specific tags (alpha 8/27)
+tagdef "image set" "" anonymous file file false
+tagdef "protocol" text anonymous file file false
+tagdef "patient" text anonymous file file false
+tagdef "visit"  text anonymous file file false
+tagdef "image type"  text anonymous file file false
+
 EOF
 
 chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
