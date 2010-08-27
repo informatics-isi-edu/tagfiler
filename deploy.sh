@@ -10,6 +10,8 @@ TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get
 # this is the URL base path of the service
 SVCPREFIX=${1:-tagfiler}
 
+APPLETBUILD=${2}
+
 # you can set this to override...
 HOME_HOST=
 
@@ -255,25 +257,43 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 EOF
 
-mkdir -p /var/www/html/${SVCPREFIX}/static/
-cp main.css /var/www/html/${SVCPREFIX}/static/
-cp functions.js /var/www/html/${SVCPREFIX}/static/
-mkdir -p /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
-chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
+deploydir=/var/www/html/${SVCPREFIX}/static/
+mkdir -p ${deploydir}
+cp main.css ${deploydir}
+cp functions.js ${deploydir}
 
-cat <<EOF
+signedjar=signed-isi-misd-tagfiler-upload-applet.jar
+namespace=edu/isi/misd/tagfiler/util
+props=tagfiler.properties
+
+if [[ -n "$APPLETBUILD" ]] \
+    && [[ -f "${APPLETBUILD}/lib/${signedjar}" ]] \
+    && [[ -f "${APPLETBUILD}/src/${namespace}/${props}" ]]
+then
+    mkdir -p /var/www/html/${SVCPREFIX}/static/${namespace}/
+    cp "${APPLETBUILD}/lib/${signedjar}" ${deploydir}
+    cp "${APPLETBUILD}/src/${namespace}/${props}" ${deploydir}/${namespace}/
+else
+    cat <<EOF
 Integration notes
 -------------------------
 
-This is not automated yet:
+Could not find one of:
+   "${APPLETBUILD}/lib/${signedjar}"
+   "${APPLETBUILD}/src/${namespace}/${props}"
+
+You need to build a signed jar and do this manually:
 
 cp signed-isi-misd-tagfiler-upload-applet.jar \
    /var/www/html/${SVCPREFIX}/static/
 
-cp applet.properties \
-   /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
+cp tagfiler.properties \
+   /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/util
 
 chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
 
 EOF
+fi
+
+chmod -R a+r ${deploydir}
 

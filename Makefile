@@ -1,6 +1,8 @@
 RELEASE=$(shell svn info  | grep "Revision:" | awk  '{print $$2}')
 
 INSTALLSVC=tagfiler
+APPLETBUILD=../dei_applet-trunk
+
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
 WSGIFILE=tagfiler.wsgi
@@ -32,7 +34,7 @@ $(HOME)/.tagfiler.predeploy:
 	touch $(HOME)/.tagfiler.predeploy
 
 deploy: $(HOME)/.tagfiler.predeploy
-	./deploy.sh $(INSTALLSVC)
+	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
