@@ -732,7 +732,7 @@ class Application:
 
         query += " ORDER BY file"
         
-        web.debug(query)
+        #web.debug(query)
         return self.db.query(query, vars=values)
 
     def select_next_transmit_number(self):
