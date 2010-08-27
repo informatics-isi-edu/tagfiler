@@ -259,7 +259,7 @@ mkdir -p /var/www/html/${SVCPREFIX}/static/
 cp main.css /var/www/html/${SVCPREFIX}/static/
 cp functions.js /var/www/html/${SVCPREFIX}/static/
 mkdir -p /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
-chmod -r a+r /var/www/html/${SVCPREFIX}/static/*
+chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
 
 cat <<EOF
 Integration notes
@@ -273,7 +273,7 @@ cp signed-isi-misd-tagfiler-upload-applet.jar \
 cp applet.properties \
    /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/
 
-chmod -r a+r /var/www/html/${SVCPREFIX}/static/*
+chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
 
 EOF
 
