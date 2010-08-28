@@ -364,7 +364,7 @@ class FileIO (Application):
             self.insert_file()
             t = self.db.transaction()
             try:
-                self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+                self.set_file_tag('owner', self.user())
                 t.commit()
             except:
                 t.rollback()
@@ -385,7 +385,7 @@ class FileIO (Application):
     
         t = self.db.transaction()
         try:
-            self.set_file_tag('modified by', web.ctx.env['REMOTE_USER'])
+            self.set_file_tag('modified by', self.user())
             t.commit()
         except:
             t.rollback()
