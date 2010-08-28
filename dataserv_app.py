@@ -185,9 +185,10 @@ class Application:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
             authn = webauthn.session.test_and_update_session(self.db,
                                                              expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
-                                                             rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins))
+                                                             rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+                                                             referer=self.home + uri)
             if authn:
-                self.role, self.roles, self.loginsince, self.loginuntil = authn
+                self.role, self.roles, self.loginsince, self.loginuntil, mustchange = authn
             elif self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
