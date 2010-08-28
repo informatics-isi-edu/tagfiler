@@ -47,6 +47,7 @@ class Forbidden (web.HTTPError):
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
+        web.debug(desc % data)
         data = render.Error(status, desc, data)
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
@@ -210,6 +211,7 @@ class Application:
             # syntax "Type as var" not supported by Python 2.4
             except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                 t.rollback()
+                web.debug(te)
                 raise te
             except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                 t.rollback()
@@ -389,9 +391,10 @@ class Application:
             raise NotFound(data="dataset %s" % self.data_id)
         allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner)
         if allow == False:
-            raise Forbidden(data="access to tag %s on dataset %s" % (tagname, self.data_id))
+            web.debug(mode, tagname, user, fowner)
+            raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
         elif allow == None:
-            raise Unauthorized(data="access to tag %s on dataset %s" % (tagname, self.data_id))
+            raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
         else:
             pass
 
