@@ -4,6 +4,8 @@ import psycopg2
 import os
 import logging
 import datetime
+import traceback
+import sys
 from logging.handlers import SysLogHandler
 try:
     import webauthn
@@ -122,7 +124,7 @@ class Application:
             self.webauthnrequire = False
 
         self.role = None
-        self.roles = []
+        self.roles = set([])
         self.loginsince = None
         self.loginuntil = None
 
@@ -219,7 +221,7 @@ class Application:
                 raise BadRequest(data='Logical error: ' + str(te))
             except TypeError, te:
                 t.rollback()
-                web.debug(te)
+                web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
                 raise RuntimeError(data=str(te))
             except (psycopg2.IntegrityError, IOError), te:
                 t.rollback()
@@ -269,7 +271,7 @@ class Application:
                 user = self.role
             else:
                 user = web.ctx.env['REMOTE_USER']
-                self.roles = [ user ]
+                self.roles = set([ user ])
         except:
             return None
         return user
@@ -280,22 +282,30 @@ class Application:
            True: access allowed
            False: access forbidden
            None: user needs to authenticate to be sure"""
-        user = self.user()
+        user = self.user() # initializes self.roles if needed...
         if data_id == None:
             data_id = self.data_id
         if owner == None:
             owner = self.owner(data_id=data_id)
-        if owner and user == owner:
-            return True
         try:
-            results = [ res.value for res in self.select_file_acl(mode, user, data_id) ]
+            authorized = [ res.value for res in self.select_file_acl(mode, data_id) ]
         except:
-            results = []
-            
-        if user in results or '*' in results:
-            return True
-        elif user:
-            return False
+            authorized = []
+        if owner:
+            authorized.append(owner)
+        else:
+            pass
+            # authorized.append('*')  # fall back to public model w/o owner?
+
+        authorized.append('root') # allow root to do everything in case of trouble?
+
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+            if roles.intersection(set(authorized)):
+                return True
+            else:
+                return False
         else:
             return None
 
@@ -310,7 +320,7 @@ class Application:
         if tagname == None:
             tagname = self.tag_id
         if user == None:
-            user = self.user()
+            user = self.user() # initializes self.roles if needed...
         if fowner == None and data_id:
             fowner = self.owner(data_id)
         
@@ -331,27 +341,33 @@ class Application:
         elif model == 'system':
             return False
         elif model == 'fowner':
-            owner = fowner
-            results = []
+            authorized = [ fowner ]
         elif model == 'file':
-            owner = fowner
             try:
-                results = [ res.value for res in self.select_file_acl(mode, user, data_id=data_id) ]
+                authorized = [ res.value for res in self.select_file_acl(mode, data_id=data_id) ]
             except:
-                results = []
+                authorized = [ ]
+            if fowner:
+                authorized.append(fowner)
+            else:
+                pass
+                #authorized.append('*') # fall back to public model w/o owner?
         elif model == 'tag':
-            owner = tagdef.owner
             try:
-                results = [ res.value for res in self.select_tag_acl(mode, user, tagname) ]
+                authorized = [ res.value for res in self.select_tag_acl(mode, user, tagname) ]
             except:
-                results = []
+                authorized = [ ]
+            authorized.append(tagdef.owner)
 
-        if owner and user == owner:
-            return True
-        elif user in results or '*' in results:
-            return True
-        elif user:
-            return False
+        authorized.append('root') # allow root to do everything in case of trouble?
+
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+            if roles.intersection(set(authorized)):
+                return True
+            else:
+                return False
         else:
             return None
 
@@ -364,8 +380,8 @@ class Application:
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
         if mode == 'write':
-            if user:
-                return user == tagdef.owner
+            if self.roles:
+                return tagdef.owner in self.roles
             else:
                 return None
         else:
@@ -392,7 +408,6 @@ class Application:
             raise NotFound(data="dataset %s" % self.data_id)
         allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner)
         if allow == False:
-            web.debug(mode, tagname, user, fowner)
             raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
         elif allow == None:
             raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
@@ -539,24 +554,21 @@ class Application:
             data_id = self.data_id
         return self.db.query(query, vars=dict(file=data_id, value=value))
 
-    def select_file_acl(self, mode, user, data_id=None):
+    def select_file_acl(self, mode, data_id=None):
         if data_id == None:
             data_id = self.data_id
         tagname = dict(read='read users', write='write users')[mode]
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file AND (value = $value OR value = $any)"
-        vars=dict(file=data_id, value=user, any="*")
+                + " WHERE file = $file"
+        vars=dict(file=data_id)
         return self.db.query(query, vars=vars)
 
-    def select_tag_acl(self, mode, user=None, tag_id=None):
+    def select_tag_acl(self, mode, tag_id=None):
         if tag_id == None:
             tag_id = self.tag_id
         table = dict(read='tagreaders', write='tagwriters')[mode]
         wheres = [ 'tagname = $tag_id' ]
         vars = dict(tag_id=tag_id)
-        if user != None:
-            wheres.append('value = $user')
-            vars['user'] = user
         wheres = " AND ".join(wheres)
         query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
         return self.db.query(query, vars=vars)
@@ -666,9 +678,13 @@ class Application:
                 user = self.user()
                 if user == None:
                     raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
-                if tagdef.readpolicy == 'tag' and tagdef.owner != user:
-                    results = self.select_tag_acl('read', user=user, tag_id=tagdef.tagname)
-                    if len(results) == 0:
+                if tagdef.readpolicy == 'tag':
+                    authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
+                    authorized.append(tagdef.owner)
+                    roles = self.roles.copy()
+                    if roles:
+                        roles.add('*')
+                    if not roles.intersection(set(authorized)):
                         # this is statically known, so either warn user (friendly)
                         # or return an empty result set since nothing can match?
                         raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
@@ -679,6 +695,18 @@ class Application:
         wheres = []
         exceptwheres = []
         values = dict()
+
+        readclauses = []
+        rn = 0
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+        for role in roles:
+            readclauses.append('_owner.value = $r%s' % rn)
+            readclauses.append('"_read users".value = $r%s' % rn)
+            values['r%s' % rn] = role
+            rn += 1
+        readclauses = " OR ".join(readclauses)
 
         for p in range(0, len(self.predlist)):
             pred = self.predlist[p]
@@ -694,7 +722,7 @@ class Application:
                 elif tagdef.readpolicy == 'file':
                     # note this case is irrelevant because user cannot find files they cannot read
                     # but here for documentation purposes, in case that rule is relaxed
-                    exceptwheres.append('t%s.file IS NOT NULL AND (_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\')' % p)
+                    exceptwheres.append('t%s.file IS NOT NULL AND (%s)' % (p, readclauses))
                 else:
                     exceptwheres.append('t%s.file IS NOT NULL' % p)
             else:
@@ -717,7 +745,7 @@ class Application:
             
         tables = " JOIN ".join(tables)
         tables += ' LEFT OUTER JOIN "_read users" ON (files.name = "_read users".file)'
-        wheres.append('_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'')
+        wheres.append(readclauses)
         values["client"] = self.user()
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
