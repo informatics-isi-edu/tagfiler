@@ -43,8 +43,8 @@ class TransmitNumber (Node):
 
         def postCommit(results):
             uri = self.home + '/transmitnumber/' + results
-            web.header('Location', uri)
-            return uri
+            web.header('Location', results)
+            return results
 
         return self.dbtransact(body, postCommit)
 
