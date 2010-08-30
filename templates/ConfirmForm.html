@@ -1,4 +1,4 @@
-$def with (target, type, name, quote)
+$def with (target, type, name, referer, quote)
 		<fieldset>
 		  <legend>Do you want to delete "${name}"?</legend>
 		  <table>
@@ -6,10 +6,12 @@ $def with (target, type, name, quote)
 		      <td>
 		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${type}/${quote(name)}" method="post">
 				  <input type="hidden" name="action" value="ConfirmDelete" />
+				  <input type="hidden" name="referer" value="${referer}" />
 				  <input type="submit" value="Yes" />
 			    </form>
 		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${type}/${quote(name)}" method="post">
 				  <input type="hidden" name="action" value="CancelDelete" />
+				  <input type="hidden" name="referer" value="${referer}" />
 				  <input type="submit" value="No" />
 		  		</form>
 		      </td>

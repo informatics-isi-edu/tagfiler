@@ -21,6 +21,9 @@ class Node (object, Application):
         self.appname = appname
         Application.__init__(self)
 
+    def uri2referer(self, uri):
+        return uri[len("/" + self.appname):]
+
 class TransmitNumber (Node):
     """Represents a transmitnumber URI
 
@@ -108,7 +111,7 @@ class FileList (Node):
             user = self.user()
             return self.renderlist("Repository Summary",
                                    [self.render.Commands(target, user, urlquote),
-                                    self.render.FileList(target, files, urlquote)])
+                                    self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
 
         storage = web.input()
         action = None
@@ -847,11 +850,11 @@ class Query (Node):
                         break
                 return self.renderlist("Query Results",
                                        [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, urlquote)])
+                                        self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
             else:
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
                                         self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, urlquote)])
+                                        self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
 
         return self.dbtransact(body, postCommit)

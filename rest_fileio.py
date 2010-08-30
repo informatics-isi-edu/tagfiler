@@ -58,13 +58,14 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type' ]
+    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
     def __init__(self):
         Application.__init__(self)
         self.action = None
         self.filetype = 'file'
         self.bytes = None
+        self.referer = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -708,7 +709,7 @@ class FileIO (Application):
             self.deletePrevious(result)
             if not result.local:
                 self.log('DELETE', dataset=self.data_id)
-            raise web.seeother('/file')
+            raise web.seeother(self.referer)
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
@@ -758,12 +759,19 @@ class FileIO (Application):
             storage = web.input()
             self.action = storage.action
 
+            try:
+                self.referer = storage.referer
+            except:
+                self.referer = "/file"
+
+            web.debug(self.referer)
+
             if self.action == 'delete':
                 target = self.home + web.ctx.homepath
                 return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(target, 'file', self.data_id, urlquote)])
+                                   [self.render.ConfirmForm(target, 'file', self.data_id, self.referer, urlquote)])
             elif self.action == 'CancelDelete':
-                raise web.seeother('/file')
+                raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
             elif self.action == 'put':
