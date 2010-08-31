@@ -1,4 +1,4 @@
-$def with (target, user, urlquote)
+$def with (target, user, urlquote, help, jira)
 <h2>Getting Started</h2>
 <ol>
   <li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
@@ -9,8 +9,8 @@ $def with (target, user, urlquote)
 		<li><a href="${target}/query/owner=${urlquote(user)};Image Set">View DIRC studies owned by ${user}</a></li>
 	</ul>
   </li>
-  <li><a href="https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home">Help and documentation</a></li>
-  <li><a href="https://jira.misd.isi.edu:8444/browse/DEIIMGUP">View or submit bug reports/issues</a></li>
+  <li><a href="${help}">Help and documentation</a></li>
+  <li><a href="${jira}">View or submit bug reports/issues</a></li>
   <li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
   <li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>

@@ -11,6 +11,7 @@ try:
     import webauthn
 except:
     pass
+from ConfigParser import ConfigParser
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -95,7 +96,7 @@ class RuntimeError (web.HTTPError):
 
 class Application:
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames' ]
+    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'conf' ]
 
     def __init__(self):
         "store common configuration data for all service classes"
@@ -106,6 +107,8 @@ class Application:
         def getParam(suffix, default=None):
             return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
+        self.conf = ConfigParser()
+        self.conf.read(getParam('conf'))
         self.dbnstr = getParam('dbnstr', 'postgres')
         self.dbstr = getParam('dbstr', '')
         self.home = getParam('home')
@@ -179,7 +182,7 @@ class Application:
 
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.loginuntil, self.webauthnhome)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.loginuntil, self.webauthnhome, self.conf.get("tagfiler", "help"))] + renderlist + [self.render.Bottom()]])
 
     def preDispatch(self, uri):
         if self.webauthnhome:
