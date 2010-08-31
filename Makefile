@@ -4,10 +4,8 @@ INSTALLSVC=tagfiler
 APPLETBUILD=../dei_applet-trunk
 
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
-CONFDIR=/var/www/html/$(INSTALLSVC)/static
 
 WSGIFILE=tagfiler.wsgi
-CONFFILE=tagfiler.conf
 
 FILES=dataserv_app.py rest_fileio.py \
 	url_ast.py url_lex.py url_parse.py \
@@ -38,11 +36,9 @@ $(HOME)/.tagfiler.predeploy:
 deploy: $(HOME)/.tagfiler.predeploy
 	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
 
-install: $(FILES) $(TEMPLATES) $(WSGI) $(CONFFILE)
-	mkdir -p $(CONFDIR)
+install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
-	rsync -av $(CONFFILE) $(CONFDIR)/.
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.

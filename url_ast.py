@@ -110,7 +110,7 @@ class FileList (Node):
             files = results
             user = self.user()
             return self.renderlist("Repository Summary",
-                                   [self.render.Commands(target, user, urlquote, self.conf.get("tagfiler", "help"), self.conf.get("tagfiler", "jira")),
+                                   [self.render.Commands(target, user, urlquote, self.help, self.jira),
                                     self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
 
         storage = web.input()

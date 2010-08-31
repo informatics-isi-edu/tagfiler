@@ -244,7 +244,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 <Directory ${TAGFILERDIR}/wsgi>
 
-    SetEnv ${SVCPREFIX}.conf /var/www/html/${SVCPREFIX}/static/tagfiler.conf
+    SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
+    SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
     SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
