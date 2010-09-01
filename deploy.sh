@@ -246,6 +246,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
     SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
     SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
+    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
     SetEnv ${SVCPREFIX}.dbnstr postgres
     SetEnv ${SVCPREFIX}.dbstr ${SVCUSER}
     SetEnv ${SVCPREFIX}.home https://${HOME_HOST}

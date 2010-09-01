@@ -95,7 +95,7 @@ class RuntimeError (web.HTTPError):
 
 class Application:
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira' ]
+    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap' ]
 
     def __init__(self):
         "store common configuration data for all service classes"
@@ -106,8 +106,25 @@ class Application:
         def getParam(suffix, default=None):
             return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
+        def parseBoolString(theString):
+            if theString[0].upper() == 'T':
+                return True
+            else:
+                return False
+              
+        def getPolicyRules(rules):
+            remap = dict()
+            if rules:
+                rules = rules.split(';')
+                for rule in rules:
+                    rule = tuple(rule.split(','))
+                    srcrole,dstrole,read,write = rule
+                    remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
+            return remap
+
         self.help = getParam('help')
         self.jira = getParam('jira')
+        self.remap = getPolicyRules(getParam('policyrules', None))
         self.dbnstr = getParam('dbnstr', 'postgres')
         self.dbstr = getParam('dbstr', '')
         self.home = getParam('home')

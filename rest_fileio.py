@@ -471,6 +471,22 @@ class FileIO (Application):
             self.enforce_tag_authz('write', tagname)
             self.set_file_tag(tagname, self.queryopts[tagname])
 
+        srcroles = set(self.remap.keys()).intersection(self.roles)
+        if len(srcroles) == 1:
+            try:
+                t = self.db.transaction()
+                dstrole, readuser, writeuser = remap[srcroles[0]]
+                self.set_file_tag('owner', dstrole)
+                if readuser:
+                    set_file_tag('read users', self.role)
+                if writeuser:
+                    set_file_tag('write users', self.role)
+                t.commit()
+            except:
+                t.rollback()
+        elif len(srcroles) > 1:
+            raise Conflict("Ambiguous remap rules encountered")
+            
         return results
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
