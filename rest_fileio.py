@@ -477,12 +477,13 @@ class FileIO (Application):
         if len(srcroles) == 1:
             try:
                 t = self.db.transaction()
-                dstrole, readuser, writeuser = self.remap[srcroles.pop()]
-                self.set_file_tag('owner', dstrole)
+                srcrole = srcroles.pop()
+                dstrole, readuser, writeuser = self.remap[srcrole]
                 if readuser:
-                    self.set_file_tag('read users', self.role)
+                    self.set_file_tag('read users', srcrole)
                 if writeuser:
-                    self.set_file_tag('write users', self.role)
+                    self.set_file_tag('write users', srcrole)
+                self.set_file_tag('owner', dstrole)
                 t.commit()
             except:
                 #et, ev, tb = sys.exc_info()
