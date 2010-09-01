@@ -4,7 +4,7 @@ $for foo in [ 0 ]:
 $code
 	def renderfiles(files):
 		s = ""
-		for name, local, owner in files:
+		for name, local, authz, imgset in files:
 			s += target + "/file/" + urlquote(name) + "\n"
 		return s
 ${renderfiles(files)[:-1]}
