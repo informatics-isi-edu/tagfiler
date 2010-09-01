@@ -102,7 +102,8 @@ class FileList (Node):
                 
             return [ (res.file,
                       res.local,
-                      self.test_file_authz('write', owner=res.owner, data_id=res.file) )
+                      self.test_file_authz('write', owner=res.owner, data_id=res.file),
+                      res.imgset != None)
                       for res in self.select_files_by_predlist() ]
 
         def postCommit(results):
@@ -111,7 +112,7 @@ class FileList (Node):
             user = self.user()
             return self.renderlist("Repository Summary",
                                    [self.render.Commands(target, user, urlquote, self.help, self.jira),
-                                    self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
+                                    self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 
         storage = web.input()
         action = None
@@ -828,7 +829,8 @@ class Query (Node):
         def body():
             files = [ (res.file,
                        res.local,
-                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
+                       self.test_file_authz('write', owner=res.owner, data_id=res.file),
+                       res.imgset != None)
                       for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
             return ( files, alltags )
@@ -850,11 +852,11 @@ class Query (Node):
                         break
                 return self.renderlist("Query Results",
                                        [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
+                                        self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
             else:
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
                                         self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, self.uri2referer(uri), urlquote)])
+                                        self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 
         return self.dbtransact(body, postCommit)

@@ -747,26 +747,34 @@ class Application:
             
         tables = " JOIN ".join(tables)
         tables += ' LEFT OUTER JOIN "_read users" ON (files.name = "_read users".file)'
+
+        # custom DEI hack
+        tables += ' LEFT OUTER JOIN "_Image Set" ON (files.name = "_Image Set".file)'
+
         wheres.append(readclauses)
         values["client"] = self.user()
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner FROM %s %s GROUP BY files.name, files.local, owner' % (tables, wheres)
+        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset FROM %s %s GROUP BY files.name, files.local, owner, imgset' % (tables, wheres)
 
         if len(excepttables) > 2:
             excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
+
+            # custom DEI hack
+            excepttables.append('"_Image Set" ON (files.name = "_Image Set".file)')
+
             excepttables = " LEFT OUTER JOIN ".join(excepttables)
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
             if exceptwheres:
                 exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner FROM %s %s GROUP BY files.name, files.local, owner' % (excepttables, exceptwheres)
+            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset FROM %s %s GROUP BY files.name, files.local, owner, imgset' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
         
-        #web.debug(query)
+        web.debug(query)
         return self.db.query(query, vars=values)
 
     def select_next_transmit_number(self):
