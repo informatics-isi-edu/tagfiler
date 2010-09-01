@@ -1,32 +1,33 @@
 $def with (target, files, referer, quote)
 $if len(files) > 0:
 	$for name, local, writeok in files:
-		$ tags = []
+		$ links = []
 		$if local:
-			$ tags.append( '<a href="%s/file/%s">Download</a>' % (target, quote(name)) )
+			$ links.append( '<a href="file/%s">Download</a>' % quote(name) )
 		$else:
-			$ tags.append( '<a href="%s/file/%s">View</a>' % (target, quote(name)) )
-		$ tags.append( '<a href="%s/tags/%s">View or set tags</a>' % (target, quote(name)) )
+			$ links.append( '<a href="file/%s">View</a>' % quote(name) )
+		$ links.append( '<a href="tags/%s">Tags</a>' % quote(name) )
 		$if writeok:
-			$ tags += [ '<a href="%s/file/%s?action=define&amp;type=file">Update via file</a>' % (target, quote(name)), '<a href="%s/file/%s?action=define&amp;type=url">Update via URL</a>' % (target, quote(name)) ]
+			$for type in [ 'file', 'url' ]:
+				$ links.append( '<a href="file/%s?action=define&amp;type=%s">Replace with %s</a>' % (quote(name), type, type) )
 		<fieldset>
 		  <legend>${name}</legend>
 		  <table>
 		  <tr>
 		  <td>
-			  $:{', '.join(tags)}
+			  $:{', '.join(links)}
 		  </td>
 		  <td>
-		  <form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
-		    <div>
-		    <input type="hidden" name="action" value="delete" />
-		    <input type="hidden" name="referer" value="${referer}" />
-		    $if writeok:
-		    	<input type="submit" value="Delete" />
-		    </div>
-		  </form>
-		      </td>
-		    </tr>
+		  $if False:
+		  	<form enctype="application/x-www-form-urlencoded" action="file/${quote(name)}" method="post">
+			    <div>
+			    <input type="hidden" name="action" value="delete" />
+			    <input type="hidden" name="referer" value="${referer}" />
+			    <input type="submit" value="Delete" />
+			    </div>
+			</form>
+		  </td>
+		  </tr>
 		  </table>
 		</fieldset>
 $else:
