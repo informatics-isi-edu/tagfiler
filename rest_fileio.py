@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import random
 import re
+import traceback
+import sys
 
 from dataserv_app import Application, NotFound, BadRequest, urlquote
 
@@ -475,14 +477,17 @@ class FileIO (Application):
         if len(srcroles) == 1:
             try:
                 t = self.db.transaction()
-                dstrole, readuser, writeuser = remap[srcroles[0]]
+                dstrole, readuser, writeuser = self.remap[srcroles.pop()]
                 self.set_file_tag('owner', dstrole)
                 if readuser:
-                    set_file_tag('read users', self.role)
+                    self.set_file_tag('read users', self.role)
                 if writeuser:
-                    set_file_tag('write users', self.role)
+                    self.set_file_tag('write users', self.role)
                 t.commit()
             except:
+                #et, ev, tb = sys.exc_info()
+                #web.debug('got exception during owner remap attempt',
+                #          traceback.format_exception(et, ev, tb))
                 t.rollback()
         elif len(srcroles) > 1:
             raise Conflict("Ambiguous remap rules encountered")
@@ -780,7 +785,7 @@ class FileIO (Application):
             except:
                 self.referer = "/file"
 
-            web.debug(self.referer)
+            #web.debug(self.referer)
 
             if self.action == 'delete':
                 target = self.home + web.ctx.homepath
