@@ -462,8 +462,8 @@ class FileTags (Node):
         system, userdefined, all = results
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
-                                    self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
+                                   [self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
+                                    self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
                                     self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote),
                                     self.render.TagdefNewShortcut('Define more tags', self.apptarget)])
         else:
