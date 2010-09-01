@@ -198,7 +198,7 @@ class Application:
             parts.append('mode "%s"' % mode)
         if not user:
             user = self.user()
-        logger.info('tagfiler: %s ' % action + ', '.join(parts) + ' by user "%s"' % user)
+        logger.info(('tagfiler: %s ' % action) + ', '.join(parts) + ' by user "%s"' % user)
         
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
