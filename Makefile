@@ -33,7 +33,7 @@ $(HOME)/.tagfiler.predeploy:
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
 
-deploy: $(HOME)/.tagfiler.predeploy
+deploy: $(HOME)/.tagfiler.predeploy install
 	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
