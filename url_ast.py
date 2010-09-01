@@ -109,9 +109,8 @@ class FileList (Node):
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = results
-            user = self.user()
             return self.renderlist("Repository Summary",
-                                   [self.render.Commands(target, user, urlquote, self.help, self.jira),
+                                   [self.render.Commands(target, self.roles, urlquote, self.help, self.jira),
                                     self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 
         storage = web.input()

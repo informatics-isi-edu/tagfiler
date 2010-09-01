@@ -1,4 +1,4 @@
-$def with (home, title, user, loginsince, loginuntil, webauthnhome, help)
+$def with (home, title, user, roles, loginsince, loginuntil, webauthnhome, help)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -33,12 +33,14 @@ $else:
     <td>
       <a href="${home}/study?action=upload">Upload study</a>
     </td>
-    <td>
-      Download study (TBD)
-    </td>
-    <td>
-      <a href="${home}/query?action=edit">Query by tags</a>
-    </td>
+    $if 'dirc' in roles or 'grader' in roles:
+    	<td>
+	Download study (TBD)
+	</td>
+    $if 'dirc' in roles:
+    	<td>
+	<a href="${home}/query?action=edit">Query by tags</a>
+	</td>
     <td>
       <a href="${help}">Help</a>
     </td>
