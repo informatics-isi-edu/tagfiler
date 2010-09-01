@@ -186,16 +186,20 @@ class Application:
         self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
 
-    def log(self, action, dataset=None, tag=None, mode=None, user=None):
-        if tag and mode and user:
-            logger.info('tagfiler: %s user "%s" in tag "%s" %s by user %s.' % (action, user, tag, mode, self.user()))
-        elif dataset and tag:
-            logger.info('tagfiler: %s tag "%s" in dataset "%s" by user %s.' % (action, tag, dataset, self.user()))
-        elif dataset:
-            logger.info('tagfiler: %s dataset "%s" by user %s.' % (action, dataset, self.user()))
-        else:
-            logger.info('tagfiler: %s tag "%s" by user %s.' % (action, tag, self.user()))
-
+    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        parts = []
+        if dataset:
+            parts.append('dataset "%s"' % dataset)
+        if tag:
+            parts.append('tag "%s"' % tag)
+        if value:
+            parts.append('value "%s"' % value)
+        if mode:
+            parts.append('mode "%s"' % mode)
+        if not user:
+            user = self.user()
+        logger.info('tagfiler: %s ' % action + ', '.join(parts) + ' by user "%s"' % user)
+        
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
                         [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.loginsince, self.loginuntil, self.webauthnhome, self.help)] + renderlist + [self.render.Bottom()]])
@@ -416,20 +420,22 @@ class Application:
         else:
             pass
 
-    def enforce_tag_authz(self, mode, tagname=None):
+    def enforce_tag_authz(self, mode, tagname=None, data_id=None):
         """Check whether access is allowed and throw web exception if not."""
-        fowner = self.owner()
+        if data_id == None:
+            data_id = self.data_id
+        fowner = self.owner(data_id=data_id)
         user = self.user()
-        results = self.select_file()
         if tagname == None:
             tagname = self.tag_id
+        results = self.select_file(data_id=data_id)
         if len(results) == 0:
-            raise NotFound(data="dataset %s" % self.data_id)
-        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner)
+            raise NotFound(data="dataset %s" % data_id)
+        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id)
         if allow == False:
-            raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
+            raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
         elif allow == None:
-            raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, self.data_id))
+            raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
         else:
             pass
 
@@ -462,8 +468,10 @@ class Application:
                 pass
         return values
 
-    def select_file(self):
-        results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
+    def select_file(self, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
+        results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
         return results
 
     def insert_file(self):
@@ -610,12 +618,14 @@ class Application:
         query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
         return self.db.query(query)
 
-    def select_filetags(self, tagname=None, where=None, user=None):
+    def select_filetags(self, tagname=None, where=None, data_id=None, user=None):
         wheres = []
         vars = dict()
-        if self.data_id:
+        if data_id == None:
+            data_id = self.data_id
+        if data_id:
             wheres.append("file = $file")
-            vars['file'] = self.data_id
+            vars['file'] = data_id
         if where:
             wheres.append(where)
         if tagname:
@@ -631,23 +641,25 @@ class Application:
         return [ result for result in self.db.query(query, vars=vars)
                  if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
-    def delete_file_tag(self, tagname, value=None, owner=None):
+    def delete_file_tag(self, tagname, value=None, data_id=None, owner=None):
         if value == '':
             whereval = " AND value IS NULL"
         elif value:
             whereval = " AND value = $value"
         else:
             whereval = ""
+        if data_id == None:
+            data_id = self.data_id
         self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
                       + " WHERE file = $file" + whereval,
-                      vars=dict(file=self.data_id, value=value))
-        results = self.select_file_tag(tagname, owner=owner)
+                      vars=dict(file=data_id, value=value))
+        results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
         if len(results) == 0:
             # there may be other values tagged still
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
-                           vars=dict(file=self.data_id, tagname=tagname))
+                           vars=dict(file=data_id, tagname=tagname))
 
-    def set_file_tag(self, tagname, value, owner=None):
+    def set_file_tag(self, tagname, value, data_id=None, owner=None):
         try:
             results = self.select_tagdef(tagname)
             result = results[0]
@@ -656,13 +668,16 @@ class Application:
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
 
+        if data_id == None:
+            data_id = self.data_id
+
         if not multivalue:
-            results = self.select_file_tag(tagname, owner=owner)
+            results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
             if len(results) > 0:
                 # drop existing value so we can reinsert one standard way
-                self.delete_file_tag(tagname)
+                self.delete_file_tag(tagname, data_id=data_id)
         else:
-            results = self.select_file_tag(tagname, value, owner=owner)
+            results = self.select_file_tag(tagname, value, data_id=data_id, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
@@ -676,19 +691,22 @@ class Application:
                     + " ( file ) VALUES ( $file )"
 
         #web.debug(query)
-        self.db.query(query, vars=dict(file=self.data_id, value=value))
+        self.db.query(query, vars=dict(file=data_id, value=value))
         
-        results = self.select_filetags(tagname)
+        results = self.select_filetags(tagname, data_id=data_id)
         if len(results) == 0:
             self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
-                          vars=dict(file=self.data_id, tagname=tagname))
+                          vars=dict(file=data_id, tagname=tagname))
         else:
             # may already be reverse-indexed in multivalue case
             pass            
 
-    def select_files_by_predlist(self):
+    def select_files_by_predlist(self, predlist=None):
+        if predlist == None:
+            predlist = self.predlist
+
         tagdefs = dict()
-        for pred in self.predlist:
+        for pred in predlist:
             results = self.select_tagdef(pred['tag'])
             if len(results) == 0:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
@@ -727,8 +745,8 @@ class Application:
             rn += 1
         readclauses = " OR ".join(readclauses)
 
-        for p in range(0, len(self.predlist)):
-            pred = self.predlist[p]
+        for p in range(0, len(predlist)):
+            pred = predlist[p]
             tag = pred['tag']
             op = pred['op']
             vals = pred['vals']

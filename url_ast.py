@@ -518,6 +518,16 @@ class FileTags (Node):
             return self.GETall(uri)
 
     def put_body(self):
+        try:
+            # custom DEI EIU hack, proxy tag ops on Image Set to all member files
+            results = self.select_file_tag('Image Set')
+            if len(results) > 0:
+                predlist = [ { 'tag' : 'Control Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+            else:
+                subfiles = []
+        except:
+            subfiles = []
         for tag_id in self.tagvals.keys():
             results = self.select_tagdef(tag_id)
             if len(results) == 0:
@@ -525,7 +535,12 @@ class FileTags (Node):
             self.enforce_tag_authz('write', tag_id)
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
-            self.log('SET', dataset=self.data_id, tag=tag_id)
+                self.log('SET', dataset=self.data_id, tag=tag_id, value=value)
+                if tag_id in [ 'read users', 'write users' ]:
+                    for subfile in subfiles:
+                        self.enforce_tag_authz('write', tag_id, data_id=subfile)
+                        self.log('SET', dataset=subfile, tag=tag_id, value=value)
+                        self.set_file_tag(tag_id, value, data_id=subfile)
         return None
 
     def put_postCommit(self, results):
@@ -559,8 +574,24 @@ class FileTags (Node):
         return self.dbtransact(self.put_body, self.put_postCommit)
 
     def delete_body(self):
+        try:
+            # custom DEI EIU hack
+            results = self.select_file_tag('Image Set')
+            if len(results) > 0:
+                predlist = [ { 'tag' : 'Control Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+            else:
+                subfiles = []
+        except:
+            subfiles = []
         self.enforce_tag_authz('write')
+        self.log('DELETE', dataset=self.data_id, tag=self.tag_id, value=self.value)
         self.delete_file_tag(self.tag_id, self.value)
+        if self.tag_id in [ 'read users', 'write users' ]:
+            for subfile in subfiles:
+                self.enforce_tag_authz('write', self.tag_id, data_id=subfile)
+                self.log('DELETE', dataset=subfile, tag=self.tag_id, value=self.value)
+                self.delete_file_tag(self.tag_id, self.value, data_id=subfile)
         return None
 
     def delete_postCommit(self, results):
@@ -588,19 +619,6 @@ class FileTags (Node):
     def post_nullBody(self):
         return None
 
-    def post_putBody(self):
-        for tag_id in self.tagvals:
-            self.enforce_tag_authz('write', tag_id)
-            self.set_file_tag(tag_id, self.tagvals[tag_id])
-            self.log('SET', dataset=self.data_id, tag=tag_id)
-        return None
-
-    def post_deleteBody(self):
-        self.enforce_tag_authz('write')
-        self.delete_file_tag(self.tag_id, self.value)
-        self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
-        return None
-
     def post_postCommit(self, results):
         url = '/tags/' + urlquote(self.data_id)
         raise web.seeother(url)
@@ -617,7 +635,7 @@ class FileTags (Node):
                         value = storage['val-%s' % (tag_id)]
                     except:
                         value = ''
-                    self.tagvals[urllib.unquote(tag_id)] = value
+                    self.tagvals[urllib.unquote(tag_id)] = [ value ]
             try:
                 self.tag_id = storage.tag
                 self.value = storage.value
@@ -628,11 +646,11 @@ class FileTags (Node):
 
         if action == 'put':
             if len(self.tagvals) > 0:
-                return self.dbtransact(self.post_putBody, self.post_postCommit)
+                return self.dbtransact(self.put_body, self.post_postCommit)
             else:
                 return self.dbtransact(self.post_nullBody, self.post_postCommit)
         elif action == 'delete':
-            return self.dbtransact(self.post_deleteBody, self.post_postCommit)
+            return self.dbtransact(self.delete_body, self.post_postCommit)
         else:
             raise BadRequest(data="Form field action=%s not understood." % action)
 
