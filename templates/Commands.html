@@ -6,7 +6,7 @@ $def with (target, roles, urlquote, webauthnhome, help, jira)
   $if 'dirc' in roles or 'grader' in roles:
   	<li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
   $if 'dirc' in roles or 'grader' in roles:
-  	<li><a href="${target}/study?action=download">Download DIRC study</a></li>
+  	<li><a href="${target}/study">Download DIRC study</a></li>
   $if 'dirc' in roles:
 	<li><a href="${target}/query?action=edit">Query by tags</a></li>
   <li><a href="${help}">Help and documentation</a></li>

@@ -7,7 +7,7 @@ $if len(files) > 0:
 		$else:
 			$ links.append( '<a href="%s/file/%s">View</a>' % (target, quote(name)) )
 		$if imgset:
-			$ links.append( 'TBD image set links...' )
+			$ links.append( '<a href="%s/study/%s">Download study</a>' % (target, quote(name)) )
 		$ links.append( '<a href="%s/tags/%s">Tags</a>' % (target, quote(name)) )
 		$if writeok:
 			$for type in [ 'file', 'url' ]:
