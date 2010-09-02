@@ -68,14 +68,18 @@ class Study (Node):
         except:
             action = 'download'
 
+        # the applet needs to manage expiration itself
+        # since it may be active while the html page is idle
         if action == 'upload':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Upload",
-                                   [self.render.TreeUpload(target)])
+                                   [self.render.TreeUpload(target, self.webauthnexpiremins)],
+                                   refresh=False)
         elif action == 'download':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Download",
-                                   [self.render.TreeDownload(target, self.data_id)])
+                                   [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)],
+                                   refresh=False)
 
 class FileList (Node):
     """Represents a bare FILE/ URI

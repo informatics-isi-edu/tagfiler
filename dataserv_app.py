@@ -95,7 +95,7 @@ class RuntimeError (web.HTTPError):
 
 class Application:
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap' ]
+    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
     def __init__(self):
         "store common configuration data for all service classes"
@@ -133,8 +133,8 @@ class Application:
         self.chunkbytes = int(getParam('chunkbytes', 1048576))
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
-        self.webauthnexpiremins = int(getParam('webauthnexpiremins', 10))
-        self.webauthnrotatemins = int(getParam('webauthnrotatemins', 120))
+        self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
+        self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
         self.db = None
         
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
@@ -200,9 +200,13 @@ class Application:
             user = self.user()
         logger.info(('tagfiler: %s ' % action) + ', '.join(parts) + ' by user "%s"' % user)
         
-    def renderlist(self, title, renderlist):
+    def renderlist(self, title, renderlist, refresh=True):
+        if refresh:
+            expiremins = self.webauthnexpiremins
+        else:
+            expiremins = None
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, expiremins)] + renderlist + [self.render.Bottom()]])
 
     def preDispatch(self, uri):
         if self.webauthnhome:

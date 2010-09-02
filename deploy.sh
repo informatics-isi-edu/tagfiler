@@ -255,6 +255,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.store_path ${DATADIR}
     SetEnv ${SVCPREFIX}.template_path ${TAGFILERDIR}/templates
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
+    SetEnv ${SVCPREFIX}.webauthnexpiremins 10
+    SetEnv ${SVCPREFIX}.webauthnrotatemins 120
 
 </Directory>
 
