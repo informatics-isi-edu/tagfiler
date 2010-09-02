@@ -208,6 +208,13 @@ class Application:
         return "".join([unicode(r) for r in 
                         [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, expiremins)] + renderlist + [self.render.Bottom()]])
 
+    def preDispatchFake(self, uri, app):
+        self.db = app.db
+        self.role = app.role
+        self.roles = app.roles
+        self.loginsince = app.loginsince
+        self.loginuntil = app.loginuntil
+
     def preDispatch(self, uri):
         if self.webauthnhome:
             if not self.db:
@@ -594,14 +601,18 @@ class Application:
         vars=dict(file=data_id)
         return self.db.query(query, vars=vars)
 
-    def select_tag_acl(self, mode, tag_id=None):
+    def select_tag_acl(self, mode, user=None, tag_id=None):
         if tag_id == None:
             tag_id = self.tag_id
         table = dict(read='tagreaders', write='tagwriters')[mode]
         wheres = [ 'tagname = $tag_id' ]
         vars = dict(tag_id=tag_id)
+        if user:
+            wheres.append('value = $user')
+            vars['user'] = user
         wheres = " AND ".join(wheres)
         query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
+        web.debug(query)
         return self.db.query(query, vars=vars)
 
     def set_tag_acl(self, mode, user, tag_id):

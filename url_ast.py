@@ -105,9 +105,9 @@ class FileList (Node):
             else:
                 self.predlist=[]
 
-            results = self.select_tagdef(tagname='Image Set')
-            if len(results) > 0:
-                self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
+            #results = self.select_tagdef(tagname='Image Set')
+            #if len(results) > 0:
+            #    self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
                 
             return [ (res.file,
                       res.local,
@@ -164,6 +164,22 @@ class FileList (Node):
         else:
             return self.dbtransact(body, postCommit)
 
+    def POST(self, uri):
+        storage = web.input()
+        name = None
+        url = None
+        try:
+            action = storage.action
+            name = storage.name
+            url = storage.url
+        except:
+            raise BadRequest('Expected action, name, and url form fields.')
+        ast = FileId(appname=self.appname,
+                     data_id=name,
+                     location=url,
+                     local=False)
+        ast.preDispatchFake(uri, self)
+        return ast.POST(uri)
 
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
@@ -882,7 +898,7 @@ class Query (Node):
             else:
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
-                                        self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
+                                        self.render.QueryView(target, self.qtarget(), self.predlist, dict(self.ops)),
                                         self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 
         return self.dbtransact(body, postCommit)

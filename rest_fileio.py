@@ -367,6 +367,7 @@ class FileIO (Application):
             self.insert_file()
             t = self.db.transaction()
             try:
+                web.debug('setting owner "%s"' % self.user())
                 self.set_file_tag('owner', self.user())
                 t.commit()
             except:
