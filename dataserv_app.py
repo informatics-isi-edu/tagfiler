@@ -183,8 +183,19 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
+        self.validators = { 'owner' : self.validateRole,
+                            'read users' : self.validateRole,
+                            'write users' : self.validateRole,
+                            'modified by' : self.validateRole }
+
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
+
+    def validateRole(self, owner):
+        if self.webauthnhome:
+            results = webauthn.role.db_select_role(self.db, role=owner)
+            if len(results) == 0:
+                raise Conflict('Supplied tag value "%s" is not a valid role.' % owner)
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
@@ -675,13 +686,16 @@ class Application:
                            vars=dict(file=data_id, tagname=tagname))
 
     def set_file_tag(self, tagname, value, data_id=None, owner=None):
+        validator = self.validators.get(tagname)
+        if validator:
+            validator(value)
         try:
             results = self.select_tagdef(tagname)
             result = results[0]
             tagtype = result.typestr
             multivalue = result.multivalue
         except:
-            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+            raise BadRequest(data="The tag %s is not defined on this server." % tagname)
 
         if data_id == None:
             data_id = self.data_id
