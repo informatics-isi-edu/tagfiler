@@ -184,18 +184,26 @@ class Application:
                             (':!ciregexp:', '!~*') ])
 
         self.validators = { 'owner' : self.validateRole,
-                            'read users' : self.validateRole,
-                            'write users' : self.validateRole,
+                            'read users' : self.validateRolePattern,
+                            'write users' : self.validateRolePattern,
                             'modified by' : self.validateRole }
 
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
 
-    def validateRole(self, owner):
+    def validateRole(self, role):
         if self.webauthnhome:
-            results = webauthn.role.db_select_role(self.db, role=owner)
+            results = webauthn.role.db_select_role(self.db, role=role)
             if len(results) == 0:
-                raise Conflict('Supplied tag value "%s" is not a valid role.' % owner)
+                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
+
+    def validateRolePattern(self, role):
+        if role in [ '*' ]:
+            return
+        if self.webauthnhome:
+            results = webauthn.role.db_select_role(self.db, role=role)
+            if len(results) == 0:
+                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
