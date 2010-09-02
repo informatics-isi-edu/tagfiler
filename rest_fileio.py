@@ -481,9 +481,9 @@ class FileIO (Application):
                 srcrole = srcroles.pop()
                 dstrole, readuser, writeuser = self.remap[srcrole]
                 if readuser:
-                    self.set_file_tag('read users', srcrole)
+                    self.set_file_tag('read users', self.role)
                 if writeuser:
-                    self.set_file_tag('write users', srcrole)
+                    self.set_file_tag('write users', self.role)
                 self.set_file_tag('owner', dstrole)
                 t.commit()
             except:
