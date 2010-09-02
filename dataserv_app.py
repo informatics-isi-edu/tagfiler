@@ -202,7 +202,7 @@ class Application:
         
     def renderlist(self, title, renderlist):
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira)] + renderlist + [self.render.Bottom()]])
 
     def preDispatch(self, uri):
         if self.webauthnhome:

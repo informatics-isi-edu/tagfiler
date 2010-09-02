@@ -1,19 +1,15 @@
-$def with (target, roles, urlquote, help, jira)
+$def with (target, roles, urlquote, webauthnhome, help, jira)
 <h2>Getting Started</h2>
 <ol>
+  $if 'admin' in roles:
+  	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
   <li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
   $if 'dirc' in roles or 'grader' in roles:
   	<li>Download DIRC study (TBD)</li>
-  <li>
   	$if 'dirc' in roles:
+		<li>
 		<a href="${target}/query?action=edit">Query by tags</a>
-	$else:
-		Useful queries
-    	<ul>
-	$for role in roles:
-		<li><a href="${target}/query/owner=${urlquote(role)};Image Set">View DIRC studies owned by "${role}"</a></li>
-	</ul>
-  </li>
+		</li>
   <li><a href="${help}">Help and documentation</a></li>
   $if 'dirc' in roles:
 	<li><a href="${jira}">View or submit bug reports/issues</a></li>

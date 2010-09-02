@@ -1,4 +1,4 @@
-$def with (home, title, user, roles, loginsince, loginuntil, webauthnhome, help)
+$def with (home, title, user, roles, loginsince, loginuntil, webauthnhome, help, jira)
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -30,6 +30,10 @@ $else:
     <td>
       <a href="${home}/">Home</a>
     </td>
+    $if webauthnhome and 'admin' in roles:
+    	<td>
+	<a href="${webauthnhome}/role/">Manage roles</a>
+	</td>
     <td>
       <a href="${home}/study?action=upload">Upload study</a>
     </td>
@@ -44,6 +48,10 @@ $else:
     <td>
       <a href="${help}">Help</a>
     </td>
+    $if 'dirc' in roles:
+    	<td>
+	<a href="${jira}">Bugs</a>
+	</td>
   </tr>
 </table>
 <div class="content">

@@ -110,7 +110,7 @@ class FileList (Node):
             target = self.home + web.ctx.homepath
             files = results
             return self.renderlist("Repository Summary",
-                                   [self.render.Commands(target, self.roles, urlquote, self.help, self.jira),
+                                   [self.render.Commands(target, self.roles, urlquote, self.webauthnhome, self.help, self.jira),
                                     self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 
         storage = web.input()
