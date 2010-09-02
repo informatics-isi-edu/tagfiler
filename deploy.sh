@@ -137,6 +137,8 @@ tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
+tagdef "list on homepage" ""      dirc    anonymous   tag        false
+
 # DEI specific tags (alpha 8/27)
 
 tagdef "Image Set"    ""          dirc    file        file       false
