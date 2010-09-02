@@ -183,7 +183,7 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
-        self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
+        self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url']
         self.ownerTags = ['read users', 'write users']
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
