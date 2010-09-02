@@ -56,21 +56,26 @@ class Study (Node):
 
     __slots__ = []
 
-    def __init__(self, appname, queryopts={}):
+    def __init__(self, appname, data_id=None, queryopts={}):
         Node.__init__(self, appname)
         self.action = None
+        self.data_id = data_id
 
     def GET(self, uri):
         storage = web.input()
         try:
             action = storage.action
         except:
-            pass
+            action = 'download'
 
         if action == 'upload':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Upload",
                                    [self.render.TreeUpload(target)])
+        elif action == 'download':
+            target = self.home + web.ctx.homepath
+            return self.renderlist("Study Download",
+                                   [self.render.TreeDownload(target, self.data_id)])
 
 class FileList (Node):
     """Represents a bare FILE/ URI

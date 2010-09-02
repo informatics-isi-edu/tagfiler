@@ -233,6 +233,10 @@ def p_study(p):
     """study : slash string slash STUDY"""
     p[0] = url_ast.Study(appname=p[2])
 
+def p_study_num(p):
+    """study : slash string slash STUDY slash string"""
+    p[0] = url_ast.Study(appname=p[2], data_id=p[6])
+
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
     p[0] = url_ast.Study(appname=p[2], queryopts=p[5])
