@@ -560,7 +560,7 @@ class FileTags (Node):
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
                 self.log('SET', dataset=self.data_id, tag=tag_id, value=value)
-                if tag_id in [ 'read users', 'write users' ]:
+                if tag_id in [ 'read users', 'write users', 'owner' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', tag_id, data_id=subfile)
                         self.log('SET', dataset=subfile, tag=tag_id, value=value)
