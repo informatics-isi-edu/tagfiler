@@ -34,12 +34,13 @@ $else:
     	<td>
 	<a href="${webauthnhome}/role/">Manage roles</a>
 	</td>
-    <td>
-      <a href="${home}/study?action=upload">Upload study</a>
-    </td>
+    $if 'dirc' in roles or 'uploader' in roles:
+	<td>
+	<a href="${home}/study?action=upload">Upload study</a>
+	</td>
     $if 'dirc' in roles or 'grader' in roles:
     	<td>
-	Download study (TBD)
+	<a href="${home}/study?action=download">Download study</a>
 	</td>
     $if 'dirc' in roles:
     	<td>
