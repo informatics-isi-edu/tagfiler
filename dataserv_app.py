@@ -144,6 +144,8 @@ class Application:
         self.webauthnrequire = getParam('webauthnrequire')
         self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
+        self.logo = getParam('logo', '')
+        self.subtitle = getParam('subtitle', '')
         self.db = None
         
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
@@ -234,7 +236,7 @@ class Application:
         else:
             expiremins = None
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, expiremins)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.subtitle, self.logo, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, expiremins)] + renderlist + [self.render.Bottom()]])
 
     def preDispatchFake(self, uri, app):
         self.db = app.db

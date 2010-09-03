@@ -259,6 +259,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.chunkbytes 1048576
     SetEnv ${SVCPREFIX}.webauthnexpiremins 10
     SetEnv ${SVCPREFIX}.webauthnrotatemins 120
+    SetEnv ${SVCPREFIX}.subtitle 'DIRC Client Data Uploader (DIRC CDU)'
+    SetEnv ${SVCPREFIX}.logo '<img alt="DIRC logo" title="Doheny Image Reading Center" src="/${SVCPREFIX}/static/DIRC.png" width="208" height="60" />'
 
 </Directory>
 
@@ -272,6 +274,9 @@ cp functions.js ${deploydir}
 signedjar=signed-isi-misd-tagfiler-upload-applet.jar
 namespace=edu/isi/misd/tagfiler/util
 props=tagfiler.properties
+
+mkdir -p /var/www/html/${SVCPREFIX}/static
+cp DIRC.png /var/www/html/${SVCPREFIX}/static/
 
 if [[ -n "$APPLETBUILD" ]] \
     && [[ -f "${APPLETBUILD}/lib/${signedjar}" ]] \

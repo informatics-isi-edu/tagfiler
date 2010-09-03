@@ -1,11 +1,15 @@
-$def with (home, title, user, roles, loginsince, loginuntil, webauthnhome, help, jira, expiremins)
+$def with (home, title, subtitle, logo, user, roles, loginsince, loginuntil, webauthnhome, help, jira, expiremins)
+$ titles = ''
+$if subtitle:
+	$ titles += subtitle + ': '
+$ titles += title
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
   <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
   $if expiremins:
   	<meta http-equiv="refresh" content="${expiremins * 60 + 10};url=${webauthnhome}/status" />
-  <title>${title}</title>
+  <title>${titles}</title>
   <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
   <script type="text/javascript" src="${home}/static/functions.js"></script>
 </head>
@@ -26,6 +30,10 @@ $else:
 		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
 </table>
 <div class="page">
+$if logo:
+	$:{logo}
+$if subtitle:
+	<h2>${subtitle}</h2>
 <h1>${title}</h1>
 <table cellpadding="10">
   <tr>
