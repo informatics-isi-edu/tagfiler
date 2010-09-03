@@ -90,14 +90,22 @@ class Study (Node):
             return self.renderlist("Study Upload",
                                    [self.render.TreeUpload(target, self.webauthnexpiremins)],
                                    refresh=False)
-        elif self.action == 'download' or (self.action == 'get' and not self.data_id):
+        elif self.action == 'download':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Download",
                                    [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)],
                                    refresh=False)
-        elif self.action == 'get' :
-            return self.renderlist("Study Status",
-                                   [self.render.TreeStatus(self.data_id, tags, files, self.status)])
+        elif self.action == 'get':
+            if self.data_id:
+                return self.renderlist("Study Status",
+                                       [self.render.TreeStatus(self.data_id, tags, files, self.status)])
+            else:
+                url = '/appleterror'
+                if self.status:
+                    url += '?status=%s' % urlquote(self.status)
+                raise web.seeother(url)
+        else:
+            raise BadRequest('Unrecognized action form field.')
 
     def GET(self, uri):
         storage = web.input()
