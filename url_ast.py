@@ -106,7 +106,7 @@ class Study (Node):
                 error = self.status
                 
             if self.data_id:
-                return self.renderlist("Study Status",
+                return self.renderlist(None,
                                        [self.render.TreeStatus(self.data_id, tags, files, success, error)])
             else:
                 url = '/appleterror'
@@ -193,7 +193,7 @@ class FileList (Node):
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = results
-            return self.renderlist("Repository Summary",
+            return self.renderlist(None,
                                    [self.render.Commands(target, self.roles, urlquote, self.webauthnhome, self.help, self.jira),
                                     self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), urlquote)])
 

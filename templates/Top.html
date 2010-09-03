@@ -1,8 +1,12 @@
 $def with (home, title, subtitle, logo, user, roles, loginsince, loginuntil, webauthnhome, help, jira, expiremins)
-$ titles = ''
-$if subtitle:
-	$ titles += subtitle + ': '
-$ titles += title
+$if subtitle and title:
+	$ titles = subtitle + ': ' + title
+$elif subtitle:
+	$ titles = subtitle
+$elif title:
+	$ titles = title
+$else:
+	$ titles = home
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
 <head>
@@ -14,6 +18,13 @@ $ titles += title
   <script type="text/javascript" src="${home}/static/functions.js"></script>
 </head>
 <body>
+<table width="100%">
+<tr>
+$if logo:
+	<td align="left">$:{logo}</td>
+$if subtitle:
+	<td align="center"><h1>${subtitle}</h1></td>
+<td align="right">
 <table align="right">
 $if user:
 	<tr><td>User:</td><td><a href="${webauthnhome}/status">${user}</a></td></tr>
@@ -29,12 +40,10 @@ $else:
 	$if webauthnhome:
 		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
 </table>
+</td>
+</tr>
+</table>
 <div class="page">
-$if logo:
-	$:{logo}
-$if subtitle:
-	<h2>${subtitle}</h2>
-<h1>${title}</h1>
 <table cellpadding="10">
   <tr>
     <td>
@@ -65,4 +74,6 @@ $if subtitle:
 	</td>
   </tr>
 </table>
+$if title:
+	<h2>${title}</h2>
 <div class="content">
