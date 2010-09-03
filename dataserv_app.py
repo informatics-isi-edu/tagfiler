@@ -1,3 +1,4 @@
+import re
 import urllib
 import web
 import psycopg2
@@ -36,62 +37,70 @@ def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
 
-class NotFound (web.HTTPError):
+class WebException (web.HTTPError):
+    def __init__(self, status, data='', headers={}):
+        m = re.match('.*MSIE.*',
+                     web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
+        if m:
+            status = '200 OK'
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class NotFound (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Forbidden (web.HTTPError):
+class Forbidden (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
         web.debug(desc % data)
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Unauthorized (web.HTTPError):
+class Unauthorized (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class BadRequest (web.HTTPError):
+class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Conflict (web.HTTPError):
+class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class IntegrityError (web.HTTPError):
+class IntegrityError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class RuntimeError (web.HTTPError):
+class RuntimeError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
 class Application:
     "common parent class of all service handler classes to use db etc."
