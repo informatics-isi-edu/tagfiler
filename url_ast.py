@@ -96,9 +96,18 @@ class Study (Node):
                                    [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)],
                                    refresh=False)
         elif self.action == 'get':
+            success = None
+            error = None
+            if self.status == 'success':
+                success = 'All files were successfully uploaded.'
+            elif self.status == 'error':
+                error = 'An unknown error prevented a complete upload.'
+            else:
+                error = self.status
+                
             if self.data_id:
                 return self.renderlist("Study Status",
-                                       [self.render.TreeStatus(self.data_id, tags, files, self.status)])
+                                       [self.render.TreeStatus(self.data_id, tags, files, success, error)])
             else:
                 url = '/appleterror'
                 if self.status:
@@ -116,10 +125,6 @@ class Study (Node):
 
         try:
             self.status = storage.status
-            if self.status == 'success':
-                self.status = 'All files were successfully uploaded.'
-            elif self.status == 'error':
-                self.status = 'An error prevented a complete upload.'
         except:
             pass
 

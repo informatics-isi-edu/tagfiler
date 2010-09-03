@@ -1,9 +1,16 @@
-$def with (controlnum, tags, files, status)
-$if status:
-	<h2>Upload Status</h2>
+$def with (controlnum, tags, files, success, error)
+$if success:
+	<h2>Upload Completed</h2>
 	<p>
-	<b>${status}</b> See below for a summary of what was transferred.
-	</p>
+	<b>${success}</b>
+$elif error:
+	<h2>Upload Failed</h2>
+	<b>${error}</b>
+$else:
+	<h2>Upload Status</h2>
+	The status of the transfer is unknown.
+See below for a summary of what was transferred.
+</p>
 <h2>Study Information</h2>
 $if controlnum:
 	<p><b>Control number: ${controlnum}</b></p>
