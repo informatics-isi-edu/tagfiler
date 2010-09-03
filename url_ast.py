@@ -117,9 +117,9 @@ class Study (Node):
         try:
             self.status = storage.status
             if self.status == 'success':
-                self.status = 'All files were successfully uploaded. See below for a summary of all uploaded files and study information.'
+                self.status = 'All files were successfully uploaded.'
             elif self.status == 'error':
-                self.status = 'An error prevented a complete upload. See below for a summary of what was transferred.'
+                self.status = 'An error prevented a complete upload.'
         except:
             pass
 
