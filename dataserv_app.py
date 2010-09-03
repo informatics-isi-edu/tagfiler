@@ -197,7 +197,7 @@ class Application:
                             'write users' : self.validateRolePattern,
                             'modified by' : self.validateRole }
 
-        self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url']
+        self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
 
     def validateRole(self, role):
