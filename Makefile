@@ -18,8 +18,8 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
 	FileTagNew.html TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
-	TreeUpload.html TreeDownload.html \
-	Error.html
+	TreeUpload.html TreeDownload.html TreeStatus.html \
+	Error.html AppletError.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)

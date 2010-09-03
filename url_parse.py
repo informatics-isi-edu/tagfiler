@@ -19,6 +19,7 @@ def p_start(p):
              | query
              | transmitnumber
              | study
+             | appleterror
 """
     p[0] = p[1]
 
@@ -237,9 +238,21 @@ def p_study_num(p):
     """study : slash string slash STUDY slash string"""
     p[0] = url_ast.Study(appname=p[2], data_id=p[6])
 
+def p_study_num(p):
+    """study : slash string slash STUDY slash string queryopts"""
+    p[0] = url_ast.Study(appname=p[2], data_id=p[6], queryopts=p[7])
+
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
     p[0] = url_ast.Study(appname=p[2], queryopts=p[5])
+
+def p_appleterror(p):
+    """appleterror : slash string slash APPLETERROR"""
+    p[0] = url_ast.AppletError(appname=p[2])
+
+def p_appleterror_opts(p):
+    """appleterror : slash string slash APPLETERROR queryopts"""
+    p[0] = url_ast.AppletError(appname=p[2], queryopts=p[5])
 
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):

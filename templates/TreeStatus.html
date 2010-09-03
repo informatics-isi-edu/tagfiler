@@ -1,0 +1,24 @@
+$def with (controlnum, tags, files, status)
+$if status:
+	<h2>Upload Status</h2>
+	<p>
+	${status}
+	</p>
+<h2>Study Information</h2>
+$if controlnum:
+	<p><b>Control number: ${controlnum}</b></p>
+<table border=1>
+$for tag in tags:
+	$ tagname, vals = tag
+	<tr><td>${tagname}</td>
+	<td>
+	$for val in vals:
+		${val}
+	</td>
+	</tr>
+</table>
+<h2>Study Files</h2>
+<ul>
+$for file in files:
+	<li>${file}</li>
+</ul>

@@ -58,28 +58,86 @@ class Study (Node):
 
     def __init__(self, appname, data_id=None, queryopts={}):
         Node.__init__(self, appname)
-        self.action = None
+        self.action = 'get'
         self.data_id = data_id
+        self.status = None
 
-    def GET(self, uri):
-        storage = web.input()
-        try:
-            action = storage.action
-        except:
-            action = 'download'
+    def body(self):
+        if self.action == 'get' and self.data_id:
+            tagnames = [ 'Sponsor', 'Protocol', 'Investigator Last Name',
+                         'Investigator First Name', 'Study Site Number',
+                         'Patient Study ID', 'Study Visit', 'Image Type',
+                         'Eye', 'Capture Date', 'Comment' ]
+            files = [ res.file for res
+                      in self.select_files_by_predlist([{'tag' : 'Control Number',
+                                                         'op' : '=',
+                                                         'vals' : [ self.data_id ]}]) ]
+            tags = [ (tagname, [ res.value for res
+                                 in self.select_file_tag(tagname=tagname,
+                                                          data_id=self.data_id) ])
+                     for tagname in tagnames ]
+        else:
+            tags = []
+            files = []
+        return (tags, files)
 
+    def postCommit(self, results):
         # the applet needs to manage expiration itself
         # since it may be active while the html page is idle
-        if action == 'upload':
+        tags, files = results
+        if self.action == 'upload':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Upload",
                                    [self.render.TreeUpload(target, self.webauthnexpiremins)],
                                    refresh=False)
-        elif action == 'download':
+        elif self.action == 'download' or (self.action == 'get' and not self.data_id):
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Download",
                                    [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)],
                                    refresh=False)
+        elif self.action == 'get' :
+            return self.renderlist("Study Status",
+                                   [self.render.TreeStatus(self.data_id, tags, files, self.status)])
+
+    def GET(self, uri):
+        storage = web.input()
+        try:
+            self.action = storage.action
+        except:
+            pass
+
+        try:
+            self.status = storage.status
+        except:
+            pass
+
+        return self.dbtransact(self.body, self.postCommit)
+
+class AppletError (Node):
+    """Represents an appleterror URI
+
+       GET tagfiler/appleterror?status=string
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+        self.action = None
+        self.status = None
+
+    def GET(self, uri):
+        storage = web.input()
+        try:
+            self.status = storage.status
+        except:
+            pass
+
+        # the applet needs to manage expiration itself
+        # since it may be active while the html page is idle
+        target = self.home + web.ctx.homepath
+        return self.renderlist("Study Download",
+                               [self.render.AppletError(self.status)])
 
 class FileList (Node):
     """Represents a bare FILE/ URI
