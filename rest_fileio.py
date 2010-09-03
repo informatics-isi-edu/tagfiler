@@ -7,7 +7,7 @@ import re
 import traceback
 import sys
 
-from dataserv_app import Application, NotFound, BadRequest, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, urlquote
 
 # build a map of mime type --> primary suffix
 mime_types_suffixes = dict()
