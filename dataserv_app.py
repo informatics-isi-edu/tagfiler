@@ -30,7 +30,17 @@ render = None
 
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
-logger.addHandler(SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1))
+
+filehandler = logging.FileHandler('/var/www/tagfiler-logs/messages')
+fileformatter = logging.Formatter('%(asctime)s %(name)s: %(levelname)s: %(message)s')
+filehandler.setFormatter(fileformatter)
+logger.addHandler(filehandler)
+
+sysloghandler = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1)
+syslogformatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+sysloghandler.setFormatter(syslogformatter)
+logger.addHandler(sysloghandler)
+
 logger.setLevel(logging.INFO)
 
 def urlquote(url):
@@ -228,7 +238,7 @@ class Application:
             parts.append('mode "%s"' % mode)
         if not user:
             user = self.user()
-        logger.info(('tagfiler: %s ' % action) + ', '.join(parts) + ' by user "%s"' % user)
+        logger.info(('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user)
         
     def renderlist(self, title, renderlist, refresh=True):
         if refresh:
