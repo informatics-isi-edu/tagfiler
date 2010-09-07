@@ -13,7 +13,9 @@ See below for a summary of what was transferred.
 </p>
 <h2>Study Information</h2>
 $if controlnum:
-	<p><b>Control number: ${controlnum}</b></p>
+	<p><div class="controlnum">Control number: ${controlnum}</div>
+	Please write this control number on the visit inventory form.</p>
+<p>
 <table border=1>
 $for tag in tags:
 	$ tagname, vals = tag
@@ -24,6 +26,7 @@ $for tag in tags:
 	</td>
 	</tr>
 </table>
+</p>
 <h2>Study Files</h2>
 <ul>
 $for file in files:
