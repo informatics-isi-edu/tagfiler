@@ -1,22 +1,23 @@
 $def with (target, files, urlquote)
-$if len(files) > 0:
-	<ul>
-	$for name in files:
-		<li><a href="${target}/log/${urlquote(name)}?action=view">${name}</a>
-		[<a href="${target}/log/${urlquote(name)}">Download</a>]</li>
+<h3>Current active log file</h3>
+$if 'messages' in files:
+	<ul><li><a href="${target}/log/messages?action=view">messages</a>
+	[<a href="${target}/log/messages">Download</a>]</li>
 	</ul>
 $else:
-	<p>There are no logs to list.</p>
-<h2>Instructions</h2>
-<ol>
-<li>Click the log name to view in the browser.</li>
-<li>Click the download link to save to file.</li>
-<li>The log file "messages" is the currently active log file and will change.</li>
-<li>The log files "messages-YYYYMMDD" are older logs suitable for archiving.
-    <ol>
-       <li>There will be at most one log file per day.</li>
-       <li>When service activity is low, several days may be combined in one log file, thus avoiding many small log files.</li>
-       <li>When too many log files accumulate, the oldest files will be purged.</li>
-    <ol>   
-</li>
-</ol>
+	<p>There is no active log file.</p>
+<h3>Archived log files</h3>
+$if len(set(files).difference(set(['messages']))) > 0:
+	<ol>
+	<li>There will be at most one log file per day.</li>
+	<li>When service activity is low, several days may be combined in one log file, thus avoiding many small log files.</li>
+	<li>When too many log files accumulate, the oldest files will be purged.</li>
+	<ol>
+	<ul>
+	$for name in files:
+		$if name != 'messages':
+			<li><a href="${target}/log/${urlquote(name)}?action=view">${name}</a>
+			[<a href="${target}/log/${urlquote(name)}">Download</a>]</li>
+	</ul>
+$else:
+	<p>There are no archived logs to list.</p>
