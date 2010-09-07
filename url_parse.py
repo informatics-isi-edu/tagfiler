@@ -20,6 +20,8 @@ def p_start(p):
              | transmitnumber
              | study
              | appleterror
+             | loglist
+             | log
 """
     p[0] = p[1]
 
@@ -30,6 +32,11 @@ def p_filelist(p):
                 | slash string slash FILE slash"""
     p[0] = url_ast.FileList(appname=p[2])
     
+def p_loglist(p):
+    """loglist : slash string slash LOG
+               | slash string slash LOG slash"""
+    p[0] = url_ast.LogList(appname=p[2])
+    
 def p_filelist_opts(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
@@ -38,6 +45,14 @@ def p_file(p):
     """file : slash string slash FILE slash string
             | slash string slash FILE slash string slash"""
     p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
+
+def p_log(p):
+    """log : slash string slash LOG slash string"""
+    p[0] = url_ast.LogId(appname=p[2], data_id=p[6])
+
+def p_log_opts(p):
+    """file : slash string slash LOG slash string queryopts"""
+    p[0] = url_ast.LogId(appname=p[2], data_id=p[6], queryopts=p[7])
 
 def p_file_opts(p):
     """file : slash string slash FILE slash string queryopts"""

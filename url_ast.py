@@ -3,8 +3,9 @@
 import web
 import urllib
 import re
+import os
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote
-from rest_fileio import FileIO
+from rest_fileio import FileIO, LogFileIO
 
 def listmax(list):
     if len(list) > 0:
@@ -256,6 +257,28 @@ class FileList (Node):
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 
+class LogList (Node):
+    """Represents a bare LOG/ URI
+
+       GET LOG or LOG/  -- gives a listing
+       """
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+
+    def GET(self, uri):
+        if 'admin' not in self.roles:
+            raise Forbidden('listing of log files')
+        
+        if self.log_path:
+            lognames = os.listdir(self.log_path)
+        else:
+            lognames = []
+        
+        target = self.home + web.ctx.homepath
+        return self.renderlist("Available logs",
+                               [self.render.LogList(target, lognames)])
+
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
 
@@ -269,6 +292,19 @@ class FileId(Node, FileIO):
         self.data_id = data_id
         self.location = location
         self.local = local
+        self.queryopts = queryopts
+
+class LogId(Node, LogFileIO):
+    """Represents a direct LOG/data_id URI
+
+       Just creates filename and lets LogFileIO do the work.
+
+    """
+    __slots__ = [ 'data_id' ]
+    def __init__(self, appname, data_id, queryopts={}):
+        Node.__init__(self, appname)
+        LogFileIO.__init__(self)
+        self.data_id = data_id
         self.queryopts = queryopts
 
 class Tagdef (Node):

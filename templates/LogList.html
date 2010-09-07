@@ -1,0 +1,9 @@
+$def with (target, files)
+$if len(files) > 0:
+	<ul>
+	$for name in files:
+		<li><a href="${target}/log/${name}?action=view">${name}</a>
+		[<a href="${target}/log/${name}">Download</a>]</li>
+	</ul>
+$else:
+	<p>There are no logs to list.</p>

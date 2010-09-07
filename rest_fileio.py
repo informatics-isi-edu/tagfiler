@@ -1,3 +1,6 @@
+import traceback
+import sys
+
 import os
 import web
 import subprocess
@@ -21,6 +24,20 @@ f.close()
 
 # we want .txt not .asc!
 mime_types_suffixes['text/plain'] = 'txt'
+
+def yieldBytes(f, first, last, chunkbytes):
+    """Helper function yields range of file."""
+    f.seek(first, 0)  # first from beginning (os.SEEK_SET)
+    byte = first
+    while byte <= last:
+        readbytes = min(chunkbytes, last - byte + 1)
+        buf = f.read(readbytes)
+
+        byte += len(buf)
+        yield buf
+
+        if len(buf) < readbytes:
+            break
 
 def choose_content_type(clientval, guessedval, taggedval):
     """Hueristic choice between client-supplied and guessed Content-Type.
@@ -143,20 +160,6 @@ class FileIO (Application):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        def yieldBytes(f, first, last):
-            """Helper function yields range of file."""
-            f.seek(first, 0)  # first from beginning (os.SEEK_SET)
-            byte = first
-            while byte <= last:
-                readbytes = min(self.chunkbytes, last - byte + 1)
-                buf = f.read(readbytes)
-
-                byte += len(buf)
-                yield buf
-                
-                if len(buf) < readbytes:
-                    break
-
         if sendBody:
 
             # parse Range: header if it exists
@@ -215,7 +218,7 @@ class FileIO (Application):
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-                    for res in yieldBytes(f, first, last):
+                    for res in yieldBytes(f, first, last, self.chunkbytes):
                         yield res
                 else:
                     # result is a multipart/byteranges ?
@@ -228,7 +231,7 @@ class FileIO (Application):
                         first, last = rangeset[r]
                         yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
                               % (boundary, content_type, first, last, length, disposition_name)
-                        for res in yieldBytes(f, first, last):
+                        for res in yieldBytes(f, first, last, self.chunkbytes):
                             yield res
                         if r == len(rangeset) - 1:
                             yield '\r\n--%s--\r\n' % boundary
@@ -240,7 +243,7 @@ class FileIO (Application):
                 web.header('Content-Length', length)
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
-                for buf in yieldBytes(f, 0, length - 1):
+                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
                     yield buf
 
         else: # not sendBody...
@@ -808,3 +811,54 @@ class FileIO (Application):
 
         else:
             raise BadRequest(data="Content-Type %s not expected via this interface."% contentType)
+
+
+class LogFileIO (FileIO):
+
+    def __init__(self):
+        FileIO.__init__(self)
+
+
+    def GET(self, uri, sendBody=True):
+
+        if 'admin' not in self.roles:
+            raise Forbidden('read access to log file "%s"' % self.data_id)
+
+        if not self.log_path:
+            raise Conflict('log_path is not configured on this server')
+
+        if self.queryopts.get('action', None) == 'view':
+            disposition_name = None
+        else:
+            disposition_name = self.data_id
+
+        filename = self.log_path + '/' + self.data_id
+        try:
+            f = open(filename, "rb")
+            content_type = "text/plain"
+            
+            f.seek(0, 2)
+            length = f.tell()
+            f.seek(0, 0)
+
+            if sendBody:
+                web.ctx.status = '200 OK'
+                web.header('Content-type', content_type)
+                web.header('Content-Length', length)
+                if disposition_name:
+                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+
+                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                    yield buf
+            else:
+                web.header('Content-type', content_type)
+                web.header('Content-Length', length)
+
+            f.close()
+
+        
+        except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception in logfileIO',
+                      traceback.format_exception(et, ev, tb))
+            raise NotFound('log file "%s"' % self.data_id)

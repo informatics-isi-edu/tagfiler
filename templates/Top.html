@@ -72,6 +72,10 @@ $else:
     	<td>
 	<a href="${jira}">Bugs</a>
 	</td>
+    $if 'admin' in roles:
+    	<td>
+	<a href="${home}/log">Logs</a>
+	</td>
   </tr>
 </table>
 $if title:

@@ -34,7 +34,8 @@ keywords = {
     'not' : 'NOT',
     'transmitnumber' : 'TRANSMITNUMBER',
     'study' : 'STUDY',
-    'appleterror' : 'APPLETERROR'
+    'appleterror' : 'APPLETERROR',
+    'log' : 'LOG'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())

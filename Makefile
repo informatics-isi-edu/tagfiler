@@ -19,7 +19,8 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileTagNew.html TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
 	TreeUpload.html TreeDownload.html TreeStatus.html \
-	Error.html AppletError.html
+	Error.html AppletError.html \
+	LogList.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)

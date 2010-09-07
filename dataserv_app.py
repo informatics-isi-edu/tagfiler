@@ -148,6 +148,7 @@ class Application:
         self.dbstr = getParam('dbstr', '')
         self.home = getParam('home')
         self.store_path = getParam('store_path')
+        self.log_path = getParam('log_path')
         self.template_path = getParam('template_path')
         self.chunkbytes = int(getParam('chunkbytes', 1048576))
         self.webauthnhome = getParam('webauthnhome')

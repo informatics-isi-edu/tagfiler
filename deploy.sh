@@ -315,7 +315,11 @@ then
 /var/www/tagfiler-logs/messages {
     missingok
     dateext
-    notifempty
+    create 0600 tagfiler tagfiler
+    daily
+    minsize 500k
+    maxage 30
+    ifempty
     sharedscripts
     postrotate
         /sbin/service httpd reload > /dev/null 2>/dev/null || true
