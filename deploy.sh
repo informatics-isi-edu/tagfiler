@@ -309,3 +309,17 @@ fi
 
 chmod -R a+r ${deploydir}
 
+if [[ -d /etc/logrotate.d/ ]]
+then
+    cat > /etc/logrotate.d/tagfiler <<EOF
+/var/www/tagfiler-logs/messages {
+    missingok
+    dateext
+    notifempty
+    sharedscripts
+    postrotate
+        /sbin/service httpd reload > /dev/null 2>/dev/null || true
+    endscript
+}
+EOF
+
