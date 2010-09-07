@@ -1,9 +1,22 @@
-$def with (target, files)
+$def with (target, files, urlquote)
 $if len(files) > 0:
 	<ul>
 	$for name in files:
-		<li><a href="${target}/log/${name}?action=view">${name}</a>
-		[<a href="${target}/log/${name}">Download</a>]</li>
+		<li><a href="${target}/log/${urlquote(name)}?action=view">${name}</a>
+		[<a href="${target}/log/${urlquote(name)}">Download</a>]</li>
 	</ul>
 $else:
 	<p>There are no logs to list.</p>
+<h2>Instructions</h2>
+<ol>
+<li>Click the log name to view in the browser.</li>
+<li>Click the download link to save to file.</li>
+<li>The log file "messages" is the currently active log file and will change.</li>
+<li>The log files "messages-YYYYMMDD" are older logs suitable for archiving.
+    <ol>
+       <li>There will be at most one log file per day.</li>
+       <li>When service activity is low, several days may be combined in one log file, thus avoiding many small log files.</li>
+       <li>When too many log files accumulate, the oldest files will be purged.</li>
+    <ol>   
+</li>
+</ol>

@@ -276,8 +276,14 @@ class LogList (Node):
             lognames = []
         
         target = self.home + web.ctx.homepath
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType == 'text/uri-list':
+                # return raw results for REST client
+                return self.render.LogUriList(target, lognames, urlquote)
+            elif acceptType == 'text/html':
+                break
         return self.renderlist("Available logs",
-                               [self.render.LogList(target, lognames)])
+                               [self.render.LogList(target, lognames, urlquote)])
 
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
