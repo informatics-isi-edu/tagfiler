@@ -3,16 +3,13 @@ $def with (target, roles, urlquote, webauthnhome, help, jira)
 <ol>
   $if 'admin' in roles:
   	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
-  $if 'dirc' in roles or 'uploader' in roles:
+  $if 'dirc' in roles in roles:
   	<li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
-  $if 'dirc' in roles:
   	<li><a href="${target}/study?action=download">Download DIRC study</a></li>
-  $if 'dirc' in roles:
 	<li><a href="${target}/query?action=edit">Query by tags</a></li>
-  <li><a href="${help}">Help and documentation</a></li>
-  $if 'dirc' in roles:
+	<li><a href="${help}">Help and documentation</a></li>
 	<li><a href="${jira}">View or submit bug reports/issues</a></li>
-	  <li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
-	  <li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
+	<li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
+	<li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>
 
