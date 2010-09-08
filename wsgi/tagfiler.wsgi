@@ -64,35 +64,45 @@ class Dispatcher:
         if not hasattr(ast, 'HEAD'):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        return ast.HEAD(uri)
+        result = ast.HEAD(uri)
+        ast.postDispatch(uri)
+        return result
 
     def GET(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'GET'):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        return ast.GET(uri)
+        result = ast.GET(uri)
+        ast.postDispatch(uri)
+        return result
 
     def PUT(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'PUT'):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        return ast.PUT(uri)
+        result = ast.PUT(uri)
+        ast.postDispatch(uri)
+        return result
 
     def DELETE(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'DELETE'):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        return ast.DELETE(uri)
+        result = ast.DELETE(uri)
+        ast.postDispatch(uri)
+        return result
 
     def POST(self):
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, 'POST'):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        return ast.POST(uri)
+        result = ast.POST(uri)
+        ast.postDispatch(uri)
+        return result
 
 # this creates the WSGI app from the urls map
 application = web.application(urls, globals()).wsgifunc() 

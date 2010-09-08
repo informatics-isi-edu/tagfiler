@@ -168,6 +168,7 @@ class Application:
         self.roles = set([])
         self.loginsince = None
         self.loginuntil = None
+        self.sessguid = None
 
         self.render = web.template.render(self.template_path)
         render = self.render # HACK: make this available to exception classes too
@@ -265,9 +266,16 @@ class Application:
                                                              rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
                                                              referer=self.home + uri)
             if authn:
-                self.role, self.roles, self.loginsince, self.loginuntil, mustchange = authn
+                self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
+
+    def postDispatch(self, uri):
+        if self.webauthnhome:
+            webauthn.session.test_and_update_session(self.db, self.sessguid,
+                                                     expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
+                                                     rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+                                                     ignoremustchange=True)
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
