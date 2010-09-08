@@ -203,6 +203,7 @@ class FileIO (Application):
             except:
                 rangeset = None
 
+            self.log('GET', dataset=self.data_id)
             if rangeset != None:
 
                 if len(rangeset) == 0:
@@ -317,6 +318,7 @@ class FileIO (Application):
                 raise NotFound(data='dataset %s' % (self.data_id))
             self.enforce_file_authz('write')
             self.delete_file()
+            self.txlog('DELETE', dataset=self.data_id)
             return results[0]
 
         def postCommit(result):
@@ -326,8 +328,6 @@ class FileIO (Application):
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
                 web.ctx.status = '204 No Content'
-            else:
-                self.log('DELETE', dataset=self.data_id)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -365,9 +365,11 @@ class FileIO (Application):
             self.enforce_file_authz('write')
             remote = not results[0].local
             self.update_file()
+            self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
             self.insert_file()
+            self.txlog('CREATE', dataset=self.data_id)
             t = self.db.transaction()
             try:
                 web.debug('setting owner "%s"' % self.user())
@@ -417,7 +419,7 @@ class FileIO (Application):
                 self.delete_file_tag('url')
                 t.commit()
                 if remote:
-                    self.log('DELETE', self.data_id)
+                    self.txlog('DELETE', self.data_id)
             except:
                 t.rollback()
                 
@@ -467,7 +469,7 @@ class FileIO (Application):
                 self.set_file_tag('url', self.location)
                 t.commit()
                 if remote:
-                    self.log('DELETE', self.data_id)
+                    self.txlog('DELETE', self.data_id)
             except:
                 t.rollback()
 
@@ -476,6 +478,7 @@ class FileIO (Application):
         for tagname in self.queryopts.keys():
             self.enforce_tag_authz('write', tagname)
             self.set_file_tag(tagname, self.queryopts[tagname])
+            self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
 
         srcroles = set(self.remap.keys()).intersection(self.roles)
         if len(srcroles) == 1:
@@ -485,9 +488,12 @@ class FileIO (Application):
                 dstrole, readuser, writeuser = self.remap[srcrole]
                 if readuser:
                     self.set_file_tag('read users', self.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=self.role)
                 if writeuser:
                     self.set_file_tag('write users', self.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=self.role)
                 self.set_file_tag('owner', dstrole)
+                self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
                 t.commit()
             except:
                 #et, ev, tb = sys.exc_info()
@@ -577,8 +583,6 @@ class FileIO (Application):
             except:
                 pass
             
-        self.log('DELETE', dataset=self.data_id)
-
     def deletePrevious(self, result):
         if result.local:
             # previous result had local file, so free it
@@ -687,7 +691,6 @@ class FileIO (Application):
             else:
                 web.ctx.status = '204 No Content'
                 res = ''
-            self.log('CREATE', dataset=self.data_id)
             return res
 
         try:
@@ -720,7 +723,6 @@ class FileIO (Application):
         def putPostCommit(results):
             if len(results) > 0:
                 self.deletePrevious(results[0])
-            self.log('CREATE', dataset=self.data_id)
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
@@ -733,8 +735,6 @@ class FileIO (Application):
 
         def deletePostCommit(result):
             self.deletePrevious(result)
-            if not result.local:
-                self.log('DELETE', dataset=self.data_id)
             raise web.seeother(self.referer)
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()

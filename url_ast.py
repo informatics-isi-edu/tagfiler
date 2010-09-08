@@ -553,6 +553,7 @@ class FileTags (Node):
                 values.append(value)
             except:
                 pass
+        self.txlog('GET', dataset=self.data_id, tag=self.tag_id)
         return values
 
     def get_tag_postCommit(self, values):
@@ -589,7 +590,7 @@ class FileTags (Node):
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-
+        self.txlog('GET ALL TAGS', dataset=self.data_id)
         return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                 self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
                 self.buildtaginfo('', '') )                                           # all
@@ -676,11 +677,11 @@ class FileTags (Node):
             self.enforce_tag_authz('write', tag_id)
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
-                self.log('SET', dataset=self.data_id, tag=tag_id, value=value)
+                self.txlog('SET', dataset=self.data_id, tag=tag_id, value=value)
                 if tag_id in [ 'read users', 'write users', 'owner' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', tag_id, data_id=subfile)
-                        self.log('SET', dataset=subfile, tag=tag_id, value=value)
+                        self.txlog('SET', dataset=subfile, tag=tag_id, value=value)
                         self.set_file_tag(tag_id, value, data_id=subfile)
         return None
 
@@ -726,17 +727,16 @@ class FileTags (Node):
         except:
             subfiles = []
         self.enforce_tag_authz('write')
-        self.log('DELETE', dataset=self.data_id, tag=self.tag_id, value=self.value)
+        self.txlog('DELETE', dataset=self.data_id, tag=self.tag_id, value=self.value)
         self.delete_file_tag(self.tag_id, self.value)
         if self.tag_id in [ 'read users', 'write users' ]:
             for subfile in subfiles:
                 self.enforce_tag_authz('write', self.tag_id, data_id=subfile)
-                self.log('DELETE', dataset=subfile, tag=self.tag_id, value=self.value)
+                self.txlog('DELETE', dataset=subfile, tag=self.tag_id, value=self.value)
                 self.delete_file_tag(self.tag_id, self.value, data_id=subfile)
         return None
 
     def delete_postCommit(self, results):
-        self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
         return ''
 
     def DELETE(self, uri):
@@ -895,7 +895,7 @@ class TagdefACL (FileTags):
             for value in self.tagvals[acl]:
                 self.set_tag_acl(dict(writers='write', readers='read')[acl],
                                  value, self.data_id)
-                self.log('SET', tag=self.data_id, mode=acl, user=value)
+                self.txlog('SET', tag=self.data_id, mode=acl, user=value)
         return None
 
     def delete_body(self):
@@ -910,14 +910,14 @@ class TagdefACL (FileTags):
             self.enforce_tagdef_authz('write', tag_id=self.data_id)
             self.set_tag_acl(dict(writers='write', readers='read')[tag_id],
                              self.tagvals[tag_id], self.data_id)
-            self.log('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
+            self.txlog('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
         return None
 
     def post_deleteBody(self):
         self.enforce_tagdef_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             self.value, self.data_id)
-        self.log('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)
+        self.txlog('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)
         return None
 
     def post_postCommit(self, results):

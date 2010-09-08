@@ -158,6 +158,7 @@ class Application:
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
         self.db = None
+        self.logmsgs = []
         
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
@@ -228,7 +229,7 @@ class Application:
             if len(results) == 0:
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
 
-    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
         if dataset:
             parts.append('dataset "%s"' % dataset)
@@ -240,8 +241,14 @@ class Application:
             parts.append('mode "%s"' % mode)
         if not user:
             user = self.user()
-        logger.info(('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user)
-        
+        return ('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user
+
+    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        logger.info(self.logfmt(action, dataset, tag, mode, user, value))
+
+    def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
+
     def renderlist(self, title, renderlist, refresh=True):
         if refresh:
             expiremins = self.webauthnexpiremins
@@ -289,6 +296,7 @@ class Application:
         limit = 10
         while True:
             t = self.db.transaction()
+            self.logmsgs = []
             count = count + 1
             try:
                 bodyval = body()
@@ -317,6 +325,9 @@ class Application:
                 t.rollback()
                 web.debug('got unknown exception from body in dbtransact')
                 raise
+        for msg in self.logmsgs:
+            logger.info(msg)
+        self.logmsgs = []
         return postCommit(bodyval)
 
     def acceptPair(self, s):
