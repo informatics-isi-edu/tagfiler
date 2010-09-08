@@ -78,6 +78,10 @@ class Study (Node):
                                  in self.select_file_tag(tagname=tagname,
                                                           data_id=self.data_id) ])
                      for tagname in tagnames ]
+            if self.status == 'success':
+                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
+            else:
+                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.data_id)
         else:
             tags = []
             files = []
