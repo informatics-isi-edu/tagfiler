@@ -62,6 +62,7 @@ class Study (Node):
         self.action = 'get'
         self.data_id = data_id
         self.status = None
+        self.direction = 'upload'
 
     def body(self):
         if self.action == 'get' and self.data_id:
@@ -100,15 +101,15 @@ class Study (Node):
             success = None
             error = None
             if self.status == 'success':
-                success = 'All files were successfully uploaded.'
+                success = 'All files were successfully %sed.' % self.direction
             elif self.status == 'error':
-                error = 'An unknown error prevented a complete upload.'
+                error = 'An unknown error prevented a complete %s.' % self.direction
             else:
                 error = self.status
                 
             if self.data_id:
                 return self.renderlist(None,
-                                       [self.render.TreeStatus(self.data_id, tags, files, success, error)])
+                                       [self.render.TreeStatus(self.data_id, tags, files, self.direction, success, error)])
             else:
                 url = '/appleterror'
                 if self.status:
@@ -121,6 +122,11 @@ class Study (Node):
         storage = web.input()
         try:
             self.action = storage.action
+        except:
+            pass
+
+        try:
+            self.direction = storage.direction
         except:
             pass
 
@@ -154,7 +160,7 @@ class AppletError (Node):
         # the applet needs to manage expiration itself
         # since it may be active while the html page is idle
         target = self.home + web.ctx.homepath
-        return self.renderlist("Study Download",
+        return self.renderlist("Study Transfer Applet",
                                [self.render.AppletError(self.status)])
 
 class FileList (Node):
