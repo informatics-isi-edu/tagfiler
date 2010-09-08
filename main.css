@@ -8,3 +8,7 @@ div.controlnum {
   font-weight: bold;
   color: #00aa00
 }
+div.error {
+  font-weight: bold;
+  color: #ff0000
+}
