@@ -223,6 +223,7 @@ WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
 WSGISocketPrefix ${RUNDIR}/wsgi
+WSGIChunkedRequest On
 
 Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
