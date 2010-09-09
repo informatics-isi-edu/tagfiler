@@ -12,7 +12,7 @@ $if len(set(files).difference(set(['messages']))) > 0:
 	<li>There will be at most one log file per day.</li>
 	<li>When service activity is low, several days may be combined in one log file, thus avoiding many small log files.</li>
 	<li>When too many log files accumulate, the oldest files will be purged.</li>
-	<ol>
+	</ol>
 	<ul>
 	$for name in files:
 		$if name != 'messages':
