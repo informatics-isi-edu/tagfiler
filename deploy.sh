@@ -28,6 +28,7 @@ SVCUSER=${SVCPREFIX}
 SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
+LOGDIR=${SVCDIR}-logs
 
 # location of platform installed file
 PGCONF=/var/lib/pgsql/data/postgresql.conf
@@ -39,6 +40,7 @@ chkconfig postgresql on
 # finish initializing system for our service
 mkdir -p ${DATADIR}
 mkdir -p ${RUNDIR}
+mkdir -p ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -261,6 +263,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.webauthnrotatemins 120
     SetEnv ${SVCPREFIX}.subtitle 'DIRC Client Data Uploader (DIRC CDU)'
     SetEnv ${SVCPREFIX}.logo '<img alt="DIRC logo" title="Doheny Image Reading Center" src="/${SVCPREFIX}/static/DIRC.png" width="208" height="60" />'
+    SetEnv ${SVCPREFIX}.log_path ${LOGDIR}
 
 </Directory>
 
