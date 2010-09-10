@@ -34,6 +34,7 @@ $for i in range(1,11):
 	  <select name="readpolicy-${i}">
 	    $for pol in ['anonymous', 'users', 'file', 'fowner', 'tag']:
 	    	<option value="${pol}">${policies[pol] % 'read'}</option>
+	  </select>
 	  <select name="writepolicy-${i}">
 	    $for pol in ['users', 'anonymous', 'file', 'fowner', 'tag']:
 	    	<option value="${pol}">${policies[pol] % 'write'}</option>
