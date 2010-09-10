@@ -1,5 +1,7 @@
 # define abstract syntax tree nodes for more readable code
 
+import traceback
+import sys
 import web
 import urllib
 import re
@@ -485,6 +487,9 @@ class Tagdef (Node):
                 pass
             
         except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception during tagdef form post',
+                      traceback.format_exception(et, ev, tb))
             raise BadRequest(data="Error extracting form data.")
 
         def body():
