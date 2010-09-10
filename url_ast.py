@@ -476,16 +476,29 @@ class Tagdef (Node):
             for key in storage.keys():
                 if key[0:4] == 'tag-':
                     if storage[key] != '':
-                        typestr = storage['type-%s' % (key[4:])]
-                        readpolicy = storage['readpolicy-%s' % (key[4:])]
-                        writepolicy = storage['writepolicy-%s' % (key[4:])]
-                        multivalue = storage['multivalue-%s' % (key[4:])]
+                        try:
+                            typestr = storage['type-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A tag type must be specified.")
+                        try:
+                            readpolicy = storage['readpolicy-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A read policy must be specified.")
+                        try:
+                            writepolicy = storage['writepolicy-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A write policy must be specified.")
+                        try:
+                            multivalue = storage['multivalue-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="The value cardinality must be specified.")
                         self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, multivalue)
             try:
                 self.tag_id = storage.tag
             except:
                 pass
-            
+        except BadRequest:
+            raise
         except:
             et, ev, tb = sys.exc_info()
             web.debug('got exception during tagdef form post',
