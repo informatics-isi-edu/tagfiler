@@ -1,4 +1,4 @@
-$def with (target, files, referer, quote)
+$def with (target, files, referer, role, roles, quote)
 $if len(files) > 0:
 	$for name, local, writeok, imgset in files:
 		$ links = []
@@ -32,5 +32,7 @@ $if len(files) > 0:
 		  </tr>
 		  </table>
 		</fieldset>
+$elif 'uploader' in roles:
+	<p></p>
 $else:
 	<p>There are no items to list with your current privileges.</p>
