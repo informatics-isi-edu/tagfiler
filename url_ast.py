@@ -511,7 +511,7 @@ class Tagdef (Node):
         def postCommit(results):
             if self.action == 'delete':
                 return self.renderlist("Delete Confirmation",
-                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, urlquote)])
+                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, self.uri2referer(uri), urlquote)])
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
