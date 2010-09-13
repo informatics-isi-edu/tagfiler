@@ -283,7 +283,8 @@ class LogList (Node):
             raise Forbidden('listing of log files')
         
         if self.log_path:
-            lognames = os.listdir(self.log_path)
+            lognames = sorted(os.listdir(self.log_path), reverse=True)
+                              
         else:
             lognames = []
         
