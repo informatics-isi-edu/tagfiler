@@ -553,9 +553,11 @@ class Application:
         self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
                       vars=dict(name=self.data_id, location=self.location, local=self.local))
 
-    def delete_file(self):
+    def delete_file(self, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
         self.db.query("DELETE FROM files where name = $name",
-                      vars=dict(name=self.data_id))
+                      vars=dict(name=data_id))
 
     def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
         tables = [ 'tagdefs' ]

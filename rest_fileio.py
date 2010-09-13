@@ -583,10 +583,11 @@ class FileIO (Application):
             except:
                 pass
             
-    def deletePrevious(self, result):
-        if result.local:
-            # previous result had local file, so free it
-            self.deleteFile(self.store_path + '/' + result.location)
+    def deletePrevious(self, files):
+        for result in files:
+            if result.local:
+                # previous result had local file, so free it
+                self.deleteFile(self.store_path + '/' + result.location)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -682,7 +683,7 @@ class FileIO (Application):
 
         def postWritePostCommit(results):
             if len(results) > 0:
-                self.deletePrevious(results[0])
+                self.deletePrevious(results)
             uri = self.home + self.store_path + '/' + urlquote(self.data_id)
             web.header('Location', uri)
             if filename:
@@ -722,20 +723,61 @@ class FileIO (Application):
 
         def putPostCommit(results):
             if len(results) > 0:
-                self.deletePrevious(results[0])
+                self.deletePrevious(results)
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
+            files = []
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             self.enforce_file_authz('write')
-            self.delete_file()
-            return results[0]
-
-        def deletePostCommit(result):
-            self.deletePrevious(result)
+            result = results[0]
+            files.append(result)
+            if not result.local:
+                # custom DEI EIU hack, to proxy delete to all member files
+                try:
+                    results = self.select_file_tag('Image Set')
+                except:
+                    results = []
+                if len(results) > 0:
+                    self.predlist = [ dict(tag='Control Number', op='=', vals=[self.data_id]) ]
+                    for res in self.select_files_by_predlist():
+                        for f in self.select_file(data_id=res.file):
+                            files.append(f)
+            for res in files:
+                self.delete_file(res.name)
+                self.txlog('DELETE', dataset=res.name)
+            return files
+        
+        def deletePostCommit(files):
+            self.deletePrevious(files)
             raise web.seeother(self.referer)
+
+        def preDeleteBody():
+            results = self.select_file()
+            if len(results) == 0:
+                raise NotFound(data='dataset %s' % (self.data_id))
+            self.enforce_file_authz('write')
+            if results[0].local:
+                ftype = 'file'
+            else:
+                try:
+                    # custom DEI EIU hack, to proxy delete to all member files
+                    results = self.select_file_tag('Image Set')
+                    if len(results) > 0:
+                        ftype = 'imgset'
+                    else:
+                        ftype = 'url'
+                except:
+                    ftype = 'url'
+            return ftype
+
+        def preDeletePostCommit(result):
+            target = self.home + web.ctx.homepath
+            ftype = result
+            return self.renderlist("Delete Confirmation",
+                                   [self.render.ConfirmForm(target, ftype, self.data_id, self.referer, urlquote)])
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
@@ -793,9 +835,7 @@ class FileIO (Application):
             #web.debug(self.referer)
 
             if self.action == 'delete':
-                target = self.home + web.ctx.homepath
-                return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(target, 'file', self.data_id, self.referer, urlquote)])
+                return self.dbtransact(preDeleteBody, preDeletePostCommit)
             elif self.action == 'CancelDelete':
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':

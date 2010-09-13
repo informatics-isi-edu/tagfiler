@@ -25,7 +25,7 @@ class Node (object, Application):
         Application.__init__(self)
 
     def uri2referer(self, uri):
-        return uri[len("/" + self.appname):]
+        return self.home + uri
 
 class TransmitNumber (Node):
     """Represents a transmitnumber URI
@@ -208,7 +208,7 @@ class FileList (Node):
             files = results
             return self.renderlist(None,
                                    [self.render.Commands(target, self.roles, urlquote, self.webauthnhome, self.help, self.jira),
-                                    self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), self.role, self.roles, urlquote)])
+                                    self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
 
         storage = web.input()
         action = None
@@ -1040,11 +1040,11 @@ class Query (Node):
                         break
                 return self.renderlist("Query Results",
                                        [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), self.role, self.roles, urlquote)])
+                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
             else:
                 return self.renderlist("Query by Tags",
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
                                         self.render.QueryView(target, self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(web.ctx.homepath, files, self.uri2referer(uri), self.role, self.roles, urlquote)])
+                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
 
         return self.dbtransact(body, postCommit)
