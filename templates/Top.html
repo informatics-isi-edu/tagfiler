@@ -11,11 +11,13 @@ $else:
 <html>
 <head>
   <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
-  $if expiremins:
-  	<meta http-equiv="refresh" content="${expiremins * 60 + 10};url=${webauthnhome}/status" />
   <title>${titles}</title>
   <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
   <script type="text/javascript" src="${home}/static/functions.js"></script>
+  <script type="text/javascript">
+    $if expiremins:
+      runSessionPolling(${expiremins});
+  </script>
 </head>
 <body>
 <table width="100%">

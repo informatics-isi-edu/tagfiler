@@ -9,7 +9,7 @@ function setDatasetLink(div_id, datasetLink) {
  *
  */
 function runSessionPolling(m) {
-  startSessionTimer(s * 60 * 1000);
+  startSessionTimer(m * 60 * 1000);
 }
 
 /**
@@ -38,7 +38,7 @@ function processSessionRequest() {
       response_lines = ajax_request.responseText.split("&");
       next_poll = 0;
       for(i=0; i < response_lines.length; i++) {
-        if(response_lines.startsWith("until=")) {
+        if(response_lines[i].match("^until=") == "until=") {
           next_poll = Date.parse(unescape(response_lines[i].replace("until=", ""))) - new Date();
         }
       }
