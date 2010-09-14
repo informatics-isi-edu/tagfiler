@@ -160,7 +160,7 @@ tagdef "Image Type"   text        dirc    file        file       false
 tagdef Eye            text        dirc    file        file       false
 tagdef "Capture Date" date        dirc    file        file       false
 tagdef Comment        text        dirc    file        file       false
-tagdef "Control Number" \
+tagdef "Transmission Number" \
                       int8        dirc    file        file       false
 
 EOF

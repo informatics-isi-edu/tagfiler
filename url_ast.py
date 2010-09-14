@@ -73,7 +73,7 @@ class Study (Node):
                          'Patient Study ID', 'Study Visit', 'Image Type',
                          'Eye', 'Capture Date', 'Comment' ]
             files = [ res.file for res
-                      in self.select_files_by_predlist([{'tag' : 'Control Number',
+                      in self.select_files_by_predlist([{'tag' : 'Transmission Number',
                                                          'op' : '=',
                                                          'vals' : [ self.data_id ]}]) ]
             tags = [ (tagname, [ res.value for res
@@ -693,7 +693,7 @@ class FileTags (Node):
             # custom DEI EIU hack, proxy tag ops on Image Set to all member files
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                predlist = [ { 'tag' : 'Control Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
                 subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
             else:
                 subfiles = []
@@ -749,7 +749,7 @@ class FileTags (Node):
             # custom DEI EIU hack
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                predlist = [ { 'tag' : 'Control Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
                 subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
             else:
                 subfiles = []

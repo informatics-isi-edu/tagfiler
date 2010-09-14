@@ -1,4 +1,4 @@
-$def with (controlnum, tags, files, direction, success, error)
+$def with (transmissionnum, tags, files, direction, success, error)
 $if success:
 	<h2>Completed</h2>
 	<p>
@@ -12,10 +12,10 @@ $else:
 See below for a summary of the study.
 </p>
 <h2>Study Information</h2>
-$if controlnum:
-	<p><div class="controlnum">Control number: ${controlnum}</div>
+$if transmissionnum:
+	<p><div class="transmissionnum">Transmission number: ${transmissionnum}</div>
 	$if direction == 'upload':
-		Please write this control number on the visit inventory form.
+		Please write this transmission number on the visit inventory form.
 </p><p>
 <table border=1>
 $for tag in tags:

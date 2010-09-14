@@ -741,7 +741,7 @@ class FileIO (Application):
                 except:
                     results = []
                 if len(results) > 0:
-                    self.predlist = [ dict(tag='Control Number', op='=', vals=[self.data_id]) ]
+                    self.predlist = [ dict(tag='Transmission Number', op='=', vals=[self.data_id]) ]
                     for res in self.select_files_by_predlist():
                         for f in self.select_file(data_id=res.file):
                             files.append(f)
