@@ -5,6 +5,14 @@ function setDatasetLink(div_id, datasetLink) {
 }
 
 /**
+ * Runs the session poll - argument is in minutes
+ *
+ */
+function runSessionPolling(m) {
+  startSessionTimer(s * 60 * 1000);
+}
+
+/**
  * Starts the session check timer with a given delay time (millis)
  */
 function startSessionTimer(t) {
@@ -27,9 +35,15 @@ function runSessionRequest() {
 function processSessionRequest() {
   if(ajax_request.readyState == 4) {
     if(ajax_request.status == 200) {
-      expire_date_str = unescape(ajax_request.responseText.replace("until=", ""));
+      response_lines = ajax_request.responseText.split("&");
+      next_poll = 0;
+      for(i=0; i < response_lines.length; i++) {
+        if(response_lines.startsWith("until=")) {
+          next_poll = Date.parse(unescape(response_lines[i].replace("until=", ""))) - new Date();
+        }
+      }
       // update time variable with new expiration time and restart
-      // startSessionTimer();
+      startSessionTimer(next_poll);
     }
     else if(ajax_request.status == 404) {
       // redirect to the login page
