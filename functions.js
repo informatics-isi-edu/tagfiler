@@ -64,7 +64,8 @@ function processSessionRequest() {
       }
 
       // poll at regular interval until session is over
-      msecleft = until.valueOf() - until.getTime();
+      now = new Date();
+      msecleft = until.valueOf() - now.valueOf();
       minsleft = msecleft / 60 / 1000;
       if (msecleft < expiration_poll_mins * 60 * 1000) {
 	  startSessionTimer(msecleft);
