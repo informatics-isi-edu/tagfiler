@@ -175,9 +175,20 @@ class Application:
         render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
-        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point',
-                           'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
-                           'text' : 'Text' }
+        self.typenames = { '' : 'No content',
+                           'int8' : 'Integer',
+                           'float8' : 'Floating point',
+                           'date' : 'Date',
+                           'timestamptz' : 'Date and time with timezone',
+                           'text' : 'Text',
+                           'role' : 'Role' }
+
+        self.dbtypes = { 'int8' : 'int8',
+                         'float8' : 'float8',
+                         'date' : 'date',
+                         'timestamptz' : 'timestamptz',
+                         'text' : 'text',
+                         'role' : 'text' }
 
         self.ops = [ ('', 'Tagged'),
                      (':not:', 'Not tagged'),
@@ -599,8 +610,8 @@ class Application:
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
-        if self.typestr != '':
-            tabledef += ", value %s" % (self.typestr)
+        if self.dbtypes.get(self.typestr, '') != '':
+            tabledef += ", value %s" % (self.dbtypes[self.typestr])
         if not self.multivalue:
             if self.typestr != '':
                 tabledef += ", UNIQUE(file, value)"

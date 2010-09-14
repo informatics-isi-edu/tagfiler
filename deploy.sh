@@ -102,7 +102,7 @@ psql -c "CREATE SEQUENCE transmitnumber"
 # pre-establish core restricted tags used by codebase
 tagdef()
 {
-   # args: tagname typestr owner readpolicy writepolicy multivalue
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
 
    # policy is one of:
    #   anonymous  -- any client can access
@@ -114,9 +114,9 @@ tagdef()
 
    if [[ -n "\$3" ]]
    then
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$3', '\$4', '\$5', \$6 )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-2}', '\$3', '\$4', '\$5', \$6 )"
    else
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\$2', '\$4', '\$5', \$6 )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-2}', '\$4', '\$5', \$6 )"
    fi
    if [[ -n "\$2" ]]
    then
@@ -126,12 +126,12 @@ tagdef()
    fi
 }
 
-#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL
-tagdef owner          text        ""      anonymous   fowner     false
+#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
-tagdef "read users"   text        ""      anonymous   fowner     true
-tagdef "write users"  text        ""      anonymous   fowner     true
-tagdef "modified by"  text        ""      anonymous   system     false
+tagdef "read users"   text        ""      anonymous   fowner     true       role
+tagdef "write users"  text        ""      anonymous   fowner     true       role
+tagdef "modified by"  text        ""      anonymous   system     false      role
 tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false

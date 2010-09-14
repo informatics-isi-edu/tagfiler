@@ -6,8 +6,10 @@ import web
 import urllib
 import re
 import os
+import webauthn
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote
 from rest_fileio import FileIO, LogFileIO
+
 
 def listmax(list):
     if len(list) > 0:
@@ -613,6 +615,9 @@ class FileTags (Node):
                  filetags,
                  filetagvals,
                  length )
+
+    def buildroleinfo(self):
+        return [ res.role for res in webauthn.role.db_select_role(self.db) ]
     
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
@@ -622,7 +627,8 @@ class FileTags (Node):
         self.txlog('GET ALL TAGS', dataset=self.data_id)
         return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                 self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
-                self.buildtaginfo('', '') )                                           # all
+                self.buildtaginfo('', ''),                                            # all
+                self.buildroleinfo())                                                 # roleinfo
 
     def get_title_one(self):
         return 'Tags for dataset "%s"' % self.data_id
@@ -631,19 +637,19 @@ class FileTags (Node):
         return 'Tags for all datasets'
 
     def get_all_html_render(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         if self.data_id:
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
                                     self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
-                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote),
+                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote, roleinfo),
                                     self.render.TagdefNewShortcut('Define more tags', self.apptarget)])
         else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', self.apptarget, 'tags', self.data_id, all, urlquote)])       
 
     def get_all_postCommit(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 
@@ -871,8 +877,8 @@ class TagdefACL (FileTags):
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
         user = self.user()
-        acldefs = [ ('readers', 'text', tagdef.owner == user and tagdef.readpolicy == 'tag'),
-                    ('writers', 'text', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
+        acldefs = [ ('readers', 'role', tagdef.owner == user and tagdef.readpolicy == 'tag'),
+                    ('writers', 'role', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
         readacls = [ (result.tagname, 'readers')
                      for result in self.select_tagdef(tagname=self.data_id,
@@ -899,7 +905,8 @@ class TagdefACL (FileTags):
         aclinfo = self.buildaclinfo()
         return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
-                 aclinfo )
+                 aclinfo,
+                 self.buildroleinfo() )
 
     def get_title_one(self):
         return 'ACLs for tag "%s"' % self.data_id
@@ -908,11 +915,11 @@ class TagdefACL (FileTags):
         return 'ACLs for all tags'
 
     def get_all_html_render(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         if self.data_id:
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote),
-                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote)])
+                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote, roleinfo)])
         else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote)])       
