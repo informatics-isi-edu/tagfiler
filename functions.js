@@ -64,7 +64,7 @@ function processSessionRequest() {
       }
 
       // poll at regular interval until session is over
-      msecleft = until.valueOf() - Date.getTime();
+      msecleft = until.valueOf() - until.getTime();
       minsleft = msecleft / 60 / 1000;
       if (msecleft < expiration_poll_mins * 60 * 1000) {
 	  startSessionTimer(msecleft);
@@ -76,6 +76,9 @@ function processSessionRequest() {
     else if(ajax_request.status == 404) {
       // redirect to the login page
       window.location='/webauthn/login';
+    }
+    else {
+	window.location='/webauthn/status';
     }
   }
 }
