@@ -1,4 +1,4 @@
-$def with (home, title, subtitle, logo, user, roles, loginsince, loginuntil, webauthnhome, help, jira, expiremins)
+$def with (home, title, subtitle, logo, user, roles, loginsince, loginuntil, webauthnhome, help, jira, pollmins)
 $if subtitle and title:
 	$ titles = subtitle + ': ' + title
 $elif subtitle:
@@ -15,9 +15,10 @@ $else:
   <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
   <script type="text/javascript" src="${home}/static/functions.js"></script>
   <script type="text/javascript">
-    $if expiremins:
-      runSessionPolling(${expiremins});
+    $if pollmins:
+      runSessionPolling(${pollmins});
   </script>
+</td>
 </head>
 <body>
 <table width="100%">
@@ -29,14 +30,21 @@ $if subtitle:
 <td align="right">
 <table align="right">
 $if user:
+	$ rfc1123 = "%a, %d %b %Y %H:%M:%S UTC%z"
 	<tr><td>User:</td><td><a href="${webauthnhome}/status">${user}</a></td></tr>
 	$if webauthnhome:
 		<tr><td></td><td><a href="${webauthnhome}/logout">log&nbsp;out</a></td></tr>
 		<tr><td></td><td><a href="${webauthnhome}/password">change&nbsp;password</a></td></tr>
 	$if loginsince:
-		<tr><td>Since:</td><td>${loginsince.strftime("%Y-%m-%d %H:%M:%S")}</td></tr>
+		<tr><td>Since:</td><td><span id="sincetime">${loginsince.strftime(rfc1123)}</span></td>
+		<script type="text/javascript">
+		localizeDate("sincetime");
+		</script></tr>
 	$if loginuntil:
-		<tr><td>Expires:</td><td>${loginuntil.strftime("%Y-%m-%d %H:%M:%S")}</td></tr>
+		<tr><td>Expires:</td><td><span id="untiltime">${loginuntil.strftime(rfc1123)}</span></td>
+		<script type="text/javascript">
+		localizeDate("untiltime");
+		</script></tr>
 $else:
 	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
 	$if webauthnhome:

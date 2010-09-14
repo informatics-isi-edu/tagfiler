@@ -98,13 +98,11 @@ class Study (Node):
         if self.action == 'upload':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Upload",
-                                   [self.render.TreeUpload(target, self.webauthnexpiremins)],
-                                   refresh=False)
+                                   [self.render.TreeUpload(target, self.webauthnexpiremins)])
         elif self.action == 'download':
             target = self.home + web.ctx.homepath
             return self.renderlist("Study Download",
-                                   [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)],
-                                   refresh=False)
+                                   [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)])
         elif self.action == 'get':
             success = None
             error = None

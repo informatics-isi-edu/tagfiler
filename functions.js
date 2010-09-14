@@ -4,12 +4,28 @@ function setDatasetLink(div_id, datasetLink) {
   document.getElementById(div_id).innerHTML = html_link;
 }
 
+function localizeDate(id) {
+    var node = document.getElementById(id);
+    if (node) {
+	var d = new Date(node.innerHTML);
+	node.innerHTML = d.toLocaleTimeString();
+    }
+}
+
+function setLocaleDate(id, d) {
+    var node = document.getElementById(id);
+    if (node) {
+	node.innerHTML = d.toLocaleTimeString();
+    }
+}
+
 /**
  * Runs the session poll - argument is in minutes
  *
  */
 function runSessionPolling(m) {
-  startSessionTimer(m * 60 * 1000);
+    expiration_poll_mins = m;
+    startSessionTimer(m * 60 * 1000);
 }
 
 /**
@@ -35,15 +51,27 @@ function runSessionRequest() {
 function processSessionRequest() {
   if(ajax_request.readyState == 4) {
     if(ajax_request.status == 200) {
-      response_lines = ajax_request.responseText.split("&");
+      response_pairs = ajax_request.responseText.split("&");
       next_poll = 0;
-      for(i=0; i < response_lines.length; i++) {
-        if(response_lines[i].match("^until=") == "until=") {
-          next_poll = Date.parse(unescape(response_lines[i].replace("until=", ""))) - new Date();
-        }
+      until = null;
+      for(i=0; i < response_pairs.length; i++) {
+	  pair_fields = response_pairs[i].split("=");
+	  if(pair_fields[0] == 'until') {
+	      until = new Date(unescape(pair_fields[1]));
+	      setLocaleDate("untiltime", until);
+	      break;
+	  }
       }
-      // update time variable with new expiration time and restart
-      startSessionTimer(next_poll);
+
+      // poll at regular interval until session is over
+      msecleft = until.valueOf() - Date.getTime();
+      minsleft = msecleft / 60 / 1000;
+      if (msecleft < expiration_poll_mins * 60 * 1000) {
+	  startSessionTimer(msecleft);
+      }
+      else {
+	  startSessionTimer(expiration_poll_mins * 60 * 1000);
+      }
     }
     else if(ajax_request.status == 404) {
       // redirect to the login page
@@ -52,6 +80,7 @@ function processSessionRequest() {
   }
 }
 
+var expiration_poll_mins = 1;
 var expiration_check_url = "/webauthn/session";
 var ajax_request = null;
 if(window.ActiveXObject) {

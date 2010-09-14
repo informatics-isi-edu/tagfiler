@@ -262,11 +262,11 @@ class Application:
 
     def renderlist(self, title, renderlist, refresh=True):
         if refresh:
-            expiremins = self.webauthnexpiremins
+            pollmins = 1
         else:
-            expiremins = None
+            pollmins = None
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.subtitle, self.logo, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, expiremins)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.subtitle, self.logo, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, pollmins)] + renderlist + [self.render.Bottom()]])
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
