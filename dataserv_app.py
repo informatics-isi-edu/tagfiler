@@ -288,12 +288,15 @@ class Application:
             elif self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
-    def postDispatch(self, uri):
+    def postDispatch(self, uri=None):
         if self.webauthnhome:
             webauthn.session.test_and_update_session(self.db, self.sessguid,
                                                      expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                      rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
                                                      ignoremustchange=True)
+
+    def midDispatch(self):
+        self.postDispatch()
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern

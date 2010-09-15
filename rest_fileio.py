@@ -220,6 +220,7 @@ class FileIO (Application):
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                     for res in yieldBytes(f, first, last, self.chunkbytes):
+                        self.midDispatch()
                         yield res
                 else:
                     # result is a multipart/byteranges ?
@@ -233,6 +234,7 @@ class FileIO (Application):
                         yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
                               % (boundary, content_type, first, last, length, disposition_name)
                         for res in yieldBytes(f, first, last, self.chunkbytes):
+                            self.midDispatch()
                             yield res
                         if r == len(rangeset) - 1:
                             yield '\r\n--%s--\r\n' % boundary
@@ -245,6 +247,7 @@ class FileIO (Application):
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
                 for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                    self.midDispatch()
                     yield buf
 
         else: # not sendBody...
@@ -522,6 +525,7 @@ class FileIO (Application):
             f.write(buf)
             buflen = len(buf)
             bytes = bytes + buflen
+            self.midDispatch()
 
             if clen != None:
                 if clen == bytes:
@@ -889,6 +893,7 @@ class LogFileIO (FileIO):
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
 
                 for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                    self.midDispatch()
                     yield buf
             else:
                 web.header('Content-type', content_type)

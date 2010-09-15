@@ -92,8 +92,6 @@ class Study (Node):
         return (tags, files)
 
     def postCommit(self, results):
-        # the applet needs to manage expiration itself
-        # since it may be active while the html page is idle
         tags, files = results
         if self.action == 'upload':
             target = self.home + web.ctx.homepath
