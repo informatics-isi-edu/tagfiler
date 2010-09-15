@@ -16,7 +16,7 @@ $else:
   <script type="text/javascript" src="${home}/static/functions.js"></script>
   <script type="text/javascript">
     $if pollmins:
-      runSessionPolling(${pollmins});
+      runSessionPolling(${pollmins}, ${2 * pollmins});
   </script>
 </td>
 </head>

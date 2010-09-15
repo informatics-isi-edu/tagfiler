@@ -23,9 +23,10 @@ function setLocaleDate(id, d) {
  * Runs the session poll - argument is in minutes
  *
  */
-function runSessionPolling(m) {
-    expiration_poll_mins = m;
-    startSessionTimer(m * 60 * 1000);
+function runSessionPolling(pollmins, warnmins) {
+    expiration_poll_mins = pollmins;
+    expiration_warn_mins = warnmins;
+    startSessionTimer(pollmins * 60 * 1000);
 }
 
 /**
@@ -49,7 +50,7 @@ function runSessionRequest() {
  * Processes the response from the Ajax request
  */
 function processSessionRequest() {
-  if(ajax_request.readyState == 4) {
+  if(ajax_request && ajax_request.readyState == 4) {
     if(ajax_request.status == 200) {
       response_pairs = ajax_request.responseText.split("&");
       next_poll = 0;
@@ -68,15 +69,23 @@ function processSessionRequest() {
       msecleft = until.valueOf() - now.valueOf();
       minsleft = msecleft / 60 / 1000;
       if (msecleft < expiration_poll_mins * 60 * 1000) {
-	  startSessionTimer(msecleft);
+	  startSessionTimer(msecleft + 250);
       }
       else {
+	  if (msecleft > 0 && msecleft < expiration_warn_mins * 60 * 1000) {
+	      warn_window = window.open(expiration_warn_url,
+					warn_window_name,
+					warn_window_features);
+	  }
 	  startSessionTimer(expiration_poll_mins * 60 * 1000);
       }
     }
     else if(ajax_request.status == 404) {
-      // redirect to the login page
-      window.location='/webauthn/login';
+	// redirect to the login page
+	if (warn_window) {
+	    warn_window.close();
+	}
+	window.location='/webauthn/login';
     }
     else {
 	window.location='/webauthn/status';
@@ -85,8 +94,14 @@ function processSessionRequest() {
 }
 
 var expiration_poll_mins = 1;
+var expiration_warn_mins = 2;
 var expiration_check_url = "/webauthn/session";
+var expiration_warn_url = "/webauthn/session?action=prompt";
+var warn_window_name = "Session Idle Warning";
+var warn_window_features = "height=400,width=600,resizable=yes,scrollbars=yes,status=yes";
 var ajax_request = null;
+var warn_window = null;
+
 if(window.ActiveXObject) {
   ajax_request = new ActiveXObject("Microsoft.XMLHTTP");
 }
