@@ -122,7 +122,7 @@ tagdef()
    if [[ -n "\$2" ]]
    then
       psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2, UNIQUE(file, value) )"
-      psql -c "CREATE INDEX \\"_\$1\\"_value_idx ON \\"_\$1\\" (value)"
+      psql -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
    else
       psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
    fi
