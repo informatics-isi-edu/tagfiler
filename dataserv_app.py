@@ -159,6 +159,7 @@ class Application:
         self.subtitle = getParam('subtitle', '')
         self.db = None
         self.logmsgs = []
+        self.middispatchtime = None
         
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
@@ -296,7 +297,10 @@ class Application:
                                                      ignoremustchange=True)
 
     def midDispatch(self):
-        self.postDispatch()
+        now = datetime.datetime.now()
+        if self.middispatchtime == None or (now - self.middispatchtime).seconds < 10:
+            self.postDispatch()
+            self.middispatchtime = now
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
