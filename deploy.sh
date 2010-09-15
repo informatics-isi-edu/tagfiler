@@ -41,6 +41,7 @@ chkconfig postgresql on
 mkdir -p ${DATADIR}
 mkdir -p ${RUNDIR}
 mkdir -p ${LOGDIR}
+chown ${SVCUSER}: ${logdir}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -274,13 +275,12 @@ deploydir=/var/www/html/${SVCPREFIX}/static/
 mkdir -p ${deploydir}
 cp main.css ${deploydir}
 cp functions.js ${deploydir}
+cp DIRC.png ${deploydir}
 
 signedjar=signed-isi-misd-tagfiler-upload-applet.jar
 namespace=edu/isi/misd/tagfiler/util
 props=tagfiler.properties
 
-mkdir -p /var/www/html/${SVCPREFIX}/static
-cp DIRC.png /var/www/html/${SVCPREFIX}/static/
 
 if [[ -n "$APPLETBUILD" ]] \
     && [[ -f "${APPLETBUILD}/lib/${signedjar}" ]] \
@@ -315,8 +315,8 @@ chmod -R a+r ${deploydir}
 
 if [[ -d /etc/logrotate.d/ ]]
 then
-    cat > /etc/logrotate.d/tagfiler <<EOF
-/var/www/tagfiler-logs/messages {
+    cat > /etc/logrotate.d/${SVCPREFIX} <<EOF
+/var/www/${SVCPREFIX}-logs/messages {
     missingok
     dateext
     create 0600 tagfiler tagfiler
