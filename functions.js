@@ -51,6 +51,24 @@ function runSessionRequest() {
   }
 }
 
+function runLogoutRequest() {
+    if (ajax_request) {
+	if (ajax_request.readystate != 0) {
+	  ajax_request.abort();
+	}
+      ajax_request.open("POST", "/webauthn/logout");
+      ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
+      ajax_request.onreadystatechange = processLogoutRequest;
+      ajax_request.send(null);
+    }
+}
+
+function processLogoutRequest() {
+    if (ajax_request.readyState == 4) {
+	window.location = "/tagfiler/"
+    }
+}
+
 /**
  * Processes the response from the Ajax request
  */
@@ -97,7 +115,7 @@ function processSessionRequest() {
 	window.location='/webauthn/login';
     }
     else {
-	window.location='/webauthn/status';
+	window.location='/webauthn/login';
     }
   }
 }
