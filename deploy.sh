@@ -114,9 +114,9 @@ tagdef()
 
    if [[ -n "\$3" ]]
    then
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-2}', '\$3', '\$4', '\$5', \$6 )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-\${2}}', '\$3', '\$4', '\$5', \$6 )"
    else
-      psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-2}', '\$4', '\$5', \$6 )"
+      psql -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-\${2}}', '\$4', '\$5', \$6 )"
    fi
    if [[ -n "\$2" ]]
    then
