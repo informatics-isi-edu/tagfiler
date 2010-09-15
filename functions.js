@@ -4,6 +4,13 @@ function setDatasetLink(div_id, datasetLink) {
   document.getElementById(div_id).innerHTML = html_link;
 }
 
+function log(msg) {
+    var node = document.getElementById("javascriptlog");
+    if (node) {
+	node.innerHTML = node.innerHTML + msg + "<br />"
+    }
+}
+
 function localizeDate(id) {
     var node = document.getElementById(id);
     if (node) {
@@ -33,6 +40,7 @@ function runSessionPolling(pollmins, warnmins) {
  * Starts the session check timer with a given delay time (millis)
  */
 function startSessionTimer(t) {
+    log("startSessionTimer: set timeout (ms) " + t);
   setTimeout("runSessionRequest()", t);
 }
 
@@ -44,6 +52,7 @@ function runSessionRequest() {
       if (ajax_request.readystate != 0) {
 	  ajax_request.abort();
       }
+      log("runSessionRequest: starting GET " + expiration_check_url);
       ajax_request.open("GET", expiration_check_url);
       ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
       ajax_request.onreadystatechange = processSessionRequest;
@@ -54,12 +63,12 @@ function runSessionRequest() {
 function runLogoutRequest() {
     if (ajax_request) {
 	if (ajax_request.readystate != 0) {
-	  ajax_request.abort();
+	    ajax_request.abort();
 	}
-      ajax_request.open("POST", "/webauthn/logout");
-      ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
-      ajax_request.onreadystatechange = processLogoutRequest;
-      ajax_request.send(null);
+	ajax_request.open("POST", "/webauthn/logout");
+	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
+	ajax_request.onreadystatechange = processLogoutRequest;
+	ajax_request.send(null);
     }
 }
 
@@ -74,6 +83,7 @@ function processLogoutRequest() {
  */
 function processSessionRequest() {
   if(ajax_request && ajax_request.readyState == 4) {
+      log("processSessionRequest: readyState=4 status=" + ajax_request.status);
     if(ajax_request.status == 200) {
       response_pairs = ajax_request.responseText.split("&");
       until = null;
@@ -83,19 +93,25 @@ function processSessionRequest() {
 	      until = new Date(unescape(pair_fields[1]));
 	      setLocaleDate("untiltime", until);
 
+	      log("processSessionRequest: until=" + unescape(pair_fields[1]));
+
 	      // poll at regular interval until session is over
 	      now = new Date();
 	      msecleft = until.valueOf() - now.valueOf();
-	      minsleft = msecleft / 60 / 1000;
+	      if (msecleft < 1000) {
+		  msecleft = 1000;
+		  log("processSessionRequest: clamping msecleft to 1000");
+	      }	
+	      
+	      if ( msecleft < expiration_warn_mins * 60 * 1000) {
+		  warn_window = (window.open(expiration_warn_url,
+					     warn_window_name,
+					     warn_window_features));
+	      }
 	      if (msecleft < expiration_poll_mins * 60 * 1000) {
-		  startSessionTimer(msecleft + 250);
+		  startSessionTimer(msecleft);
 	      }
 	      else {
-		  if (msecleft > 0 && msecleft < expiration_warn_mins * 60 * 1000) {
-		      warn_window = (window.open(expiration_warn_url,
-						 warn_window_name,
-						 warn_window_features));
-		  }
 		  startSessionTimer(expiration_poll_mins * 60 * 1000);
 	      }
 	      return;
@@ -105,6 +121,7 @@ function processSessionRequest() {
       if (warn_window) {
 	  warn_window.close();
       }
+      log("processSessionRequest: status=200 but did not find until field!");
       window.location='/webauthn/login';
     }
     else if(ajax_request.status == 404) {
