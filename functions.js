@@ -41,8 +41,13 @@ function startSessionTimer(t) {
  */
 function runSessionRequest() {
   if(ajax_request) {
-    ajax_request.open("GET", expiration_check_url);
-    ajax_request.send(null);
+      if (ajax_request.readystate != 0) {
+	  ajax_request.abort();
+      }
+      ajax_request.open("GET", expiration_check_url);
+      ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
+      ajax_request.onreadystatechange = processSessionRequest;
+      ajax_request.send(null);
   }
 }
 
@@ -53,32 +58,36 @@ function processSessionRequest() {
   if(ajax_request && ajax_request.readyState == 4) {
     if(ajax_request.status == 200) {
       response_pairs = ajax_request.responseText.split("&");
-      next_poll = 0;
       until = null;
       for(i=0; i < response_pairs.length; i++) {
 	  pair_fields = response_pairs[i].split("=");
 	  if(pair_fields[0] == 'until') {
 	      until = new Date(unescape(pair_fields[1]));
 	      setLocaleDate("untiltime", until);
-	      break;
-	  }
-      }
 
-      // poll at regular interval until session is over
-      now = new Date();
-      msecleft = until.valueOf() - now.valueOf();
-      minsleft = msecleft / 60 / 1000;
-      if (msecleft < expiration_poll_mins * 60 * 1000) {
-	  startSessionTimer(msecleft + 250);
-      }
-      else {
-	  if (msecleft > 0 && msecleft < expiration_warn_mins * 60 * 1000) {
-	      warn_window = window.open(expiration_warn_url,
-					warn_window_name,
-					warn_window_features);
+	      // poll at regular interval until session is over
+	      now = new Date();
+	      msecleft = until.valueOf() - now.valueOf();
+	      minsleft = msecleft / 60 / 1000;
+	      if (msecleft < expiration_poll_mins * 60 * 1000) {
+		  startSessionTimer(msecleft + 250);
+	      }
+	      else {
+		  if (msecleft > 0 && msecleft < expiration_warn_mins * 60 * 1000) {
+		      warn_window = (window.open(expiration_warn_url,
+						 warn_window_name,
+						 warn_window_features));
+		  }
+		  startSessionTimer(expiration_poll_mins * 60 * 1000);
+	      }
+	      return;
 	  }
-	  startSessionTimer(expiration_poll_mins * 60 * 1000);
       }
+      // not finding until field is a failure?
+      if (warn_window) {
+	  warn_window.close();
+      }
+      window.location='/webauthn/login';
     }
     else if(ajax_request.status == 404) {
 	// redirect to the login page
@@ -97,10 +106,11 @@ var expiration_poll_mins = 1;
 var expiration_warn_mins = 2;
 var expiration_check_url = "/webauthn/session";
 var expiration_warn_url = "/webauthn/session?action=prompt";
-var warn_window_name = "Session Idle Warning";
-var warn_window_features = "height=400,width=600,resizable=yes,scrollbars=yes,status=yes";
+var warn_window_name = "SessionIdleWarning";
+var warn_window_features = "height=400,width=600,resizable=yes,scrollbars=yes,status=yes,location=no";
 var ajax_request = null;
 var warn_window = null;
+var until = null;
 
 if(window.ActiveXObject) {
   ajax_request = new ActiveXObject("Microsoft.XMLHTTP");
