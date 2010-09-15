@@ -617,15 +617,21 @@ class Application:
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
+        indexdef = ''
         if self.dbtypes.get(self.typestr, '') != '':
             tabledef += ", value %s" % (self.dbtypes[self.typestr])
         if not self.multivalue:
             if self.typestr != '':
                 tabledef += ", UNIQUE(file, value)"
+                indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
+                indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
+                indexdef += ' (value)'
             else:
                 tabledef += ", UNIQUE(file)"
         tabledef += " )"
         self.db.query(tabledef)
+        if indexdef:
+            self.db.query(indexdef)
 
     def delete_tagdef(self):
         self.db.query("DELETE FROM tagdefs WHERE tagname = $tag_id",
