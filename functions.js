@@ -80,6 +80,10 @@ function processLogoutRequest() {
 
 function redirectNow() {
     var node = document.getElementById("javascriptlog");
+    if (warn_window) {
+	log("redirectNow: closing warning window");
+	warn_window.close();
+    }
     if (node) {
 	alert("About to redirect to login page");
     }
@@ -95,29 +99,34 @@ function processSessionRequest() {
     if(ajax_request.status == 200) {
       response_pairs = ajax_request.responseText.split("&");
       until = null;
+      secsremain = 0;
       for(i=0; i < response_pairs.length; i++) {
 	  pair_fields = response_pairs[i].split("=");
 	  if(pair_fields[0] == 'until') {
 	      until = new Date(unescape(pair_fields[1]));
-	      setLocaleDate("untiltime", until);
-
 	      log("processSessionRequest: until=" + unescape(pair_fields[1]));
+	      setLocaleDate("untiltime", until);
+	  }
+	  if(pair_fields[0] == 'secsremain') {
+	      secsremain = parseInt(unescape(pair_fields[1]));
+	      log("processSessionRequest: secsremain=" + secsremain);
 
 	      // poll at regular interval until session is over
-	      now = new Date();
-	      msecleft = until.valueOf() - now.valueOf();
-	      if (msecleft < 1000) {
-		  msecleft = 1000;
-		  log("processSessionRequest: clamping msecleft to 1000");
+	      if (secsremain < 1) {
+		  secsremain = 1;
+		  log("processSessionRequest: clamping secsremain to 1");
 	      }	
 	      
-	      if ( msecleft < expiration_warn_mins * 60 * 1000) {
-		  warn_window = (window.open(expiration_warn_url,
-					     warn_window_name,
-					     warn_window_features));
+	      if ( secsremain < expiration_warn_mins * 60) {
+		  if (!warn_window || warn_window.closed) {
+		      log("processSessionRequest: raising warning window");
+		      warn_window = (window.open(expiration_warn_url,
+						 warn_window_name,
+						 warn_window_features));
+		  }
 	      }
-	      if (msecleft < expiration_poll_mins * 60 * 1000) {
-		  startSessionTimer(msecleft);
+	      if (secsremain < expiration_poll_mins * 60) {
+		  startSessionTimer(secsremain * 1000);
 	      }
 	      else {
 		  startSessionTimer(expiration_poll_mins * 60 * 1000);
@@ -125,21 +134,12 @@ function processSessionRequest() {
 	      return;
 	  }
       }
-      // not finding until field is a failure?
-      if (warn_window) {
-	  warn_window.close();
-      }
-      log("processSessionRequest: status=200 but did not find until field!");
+      // not finding field is a failure?
+      log("processSessionRequest: status=200 but did not find secsremain field!");
       redirectNow();
     }
-    else if(ajax_request.status == 404) {
-	// redirect to the login page
-	if (warn_window) {
-	    warn_window.close();
-	}
-	redirectNow();
-    }
     else {
+	// usually 404 ends a session
 	redirectNow();
     }
   }
