@@ -7,7 +7,7 @@ function setDatasetLink(div_id, datasetLink) {
 function log(msg) {
     var node = document.getElementById("javascriptlog");
     if (node) {
-	node.innerHTML = node.innerHTML + msg + "<br />"
+	node.innerHTML =  msg + "<br />" + node.innerHTML
     }
 }
 
