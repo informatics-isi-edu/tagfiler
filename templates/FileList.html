@@ -2,7 +2,7 @@ $def with (target, files, referer, role, roles, quote)
 $if len(files) > 0:
 	$for name, local, writeok, imgset, downloaded in files:
 		$ links = []
-		$if 'downloader' in roles:
+		$if imgset and 'downloader' in roles:
 			<!-- Download/View -->
 		$elif local:
 			$ links.append( '<a href="%s/file/%s">Download</a>' % (target, quote(name)) )
