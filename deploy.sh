@@ -143,7 +143,7 @@ tagdef sha256sum      text        ""      file        file       false
 
 tagdef "list on homepage" ""      dirc    anonymous   tag        false
 
-# DEI specific tags (alpha 8/27)
+# DEI specific tags
 
 tagdef "Image Set"    ""          dirc    file        file       false
 
@@ -165,6 +165,54 @@ tagdef Comment        text        dirc    file        file       false
 tagdef "Transmission Number" \
                       int8        dirc    file        file       false
 tagdef Downloaded     ""          dirc    tag         tag        false
+
+tagacl()
+{
+   # args: tagname {read|write} [value]...
+   tag=\$1
+   mode=\${2:0:4}
+   shift 2
+   while [[ \$# -gt 0 ]]
+   do
+      "INSERT INTO tag\${mode}ers (tagname, value) VALUES ('\$tag', '\$1')"
+      shift
+   done
+}
+
+tag()
+{
+   # args: file tag typestr [value]
+   if [[ -n "\$3" ]]
+   then
+      psql -c "INSERT INTO \\"_\$2\\" ( file, value ) VALUES ( '\$1', '\$4' )"
+   else
+      psql -c "INSERT INTO \\"_\$2\\" ( file ) VALUES ( '\$1' )"
+   fi
+   if [[ -z "\$(psql -A -t -c "SELECT * FROM \\"_\$2\\" WHERE file = '\$1'")" ]]
+   then
+      psql -c "INSERT INTO filetags (file, tagname) VALUES ('\$1', '\$2')"
+   fi
+}
+
+# pre-established stored queries for use case
+storedquery()
+{
+   # args: name terms owner [readuser]...
+   psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, 'https://${HOME_HOST}/${SVCPREFIX}/query/\$2' )"
+   tag "\$1" owner text "\$3"
+   tag "\$1" "list on homepage"
+   file=\$1
+   shift 3
+   while [[ \$# -gt 0 ]]
+   do
+      tag "\$file" "read users" text "\$1"
+      shift
+   done
+}
+
+storedquery "New image studies" "Image%20Set;Downloaded:not:" dirc dirc downloader
+storedquery "Previous image studies" "Image%20Set;Downloaded" dirc dirc downloader
+storedquery "All image studies" "Image%20Set" dirc dirc downloader
 
 EOF
 
