@@ -41,7 +41,7 @@ chkconfig postgresql on
 mkdir -p ${DATADIR}
 mkdir -p ${RUNDIR}
 mkdir -p ${LOGDIR}
-chown ${SVCUSER}: ${logdir}
+chown ${SVCUSER}: ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
