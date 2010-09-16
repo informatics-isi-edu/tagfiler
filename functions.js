@@ -78,6 +78,14 @@ function processLogoutRequest() {
     }
 }
 
+function redirectNow() {
+    var node = document.getElementById("javascriptlog");
+    if (node) {
+	alert("About to redirect to login page");
+    }
+    window.location='/webauthn/login';	
+}
+
 /**
  * Processes the response from the Ajax request
  */
@@ -122,17 +130,17 @@ function processSessionRequest() {
 	  warn_window.close();
       }
       log("processSessionRequest: status=200 but did not find until field!");
-      window.location='/webauthn/login';
+      redirectNow();
     }
     else if(ajax_request.status == 404) {
 	// redirect to the login page
 	if (warn_window) {
 	    warn_window.close();
 	}
-	window.location='/webauthn/login';
+	redirectNow();
     }
     else {
-	window.location='/webauthn/login';
+	redirectNow();
     }
   }
 }
