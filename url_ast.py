@@ -198,7 +198,8 @@ class FileList (Node):
             return [ (res.file,
                       res.local,
                       self.test_file_authz('write', owner=res.owner, data_id=res.file),
-                      res.imgset != None)
+                      res.imgset != None,
+                      res.downloaded)
                       for res in self.select_files_by_predlist() ]
 
         def postCommit(results):
@@ -546,6 +547,7 @@ class FileTags (Node):
         self.tag_id = tag_id
         self.value = value
         self.apptarget = self.home + web.ctx.homepath
+        self.referer = None
         if tagvals:
             self.tagvals = tagvals
         else:
@@ -792,8 +794,9 @@ class FileTags (Node):
         return None
 
     def post_postCommit(self, results):
-        url = '/tags/' + urlquote(self.data_id)
-        raise web.seeother(url)
+        if self.referer == None:
+            self.referer = '/tags/' + urlquote(self.data_id)
+        raise web.seeother(self.referer)
 
     def POST(self, uri):
         # simulate RESTful actions and provide helpful web pages to browsers
@@ -813,6 +816,11 @@ class FileTags (Node):
                 self.value = storage.value
             except:
                 pass
+
+            try:
+                self.referer = storage.referer
+            except:
+                self.referer = None
         except:
             raise BadRequest(data="Error extracting form data.")
 
@@ -1021,7 +1029,8 @@ class Query (Node):
             files = [ (res.file,
                        res.local,
                        self.test_file_authz('write', owner=res.owner, data_id=res.file),
-                       res.imgset != None)
+                       res.imgset != None,
+                       res.downloaded)
                       for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
             return ( files, alltags )

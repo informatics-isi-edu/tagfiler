@@ -466,7 +466,7 @@ class Application:
                 #authorized.append('*') # fall back to public model w/o owner?
         elif model == 'tag':
             try:
-                authorized = [ res.value for res in self.select_tag_acl(mode, user, tagname) ]
+                authorized = [ res.value for res in self.select_tag_acl(mode, None, tagname) ]
             except:
                 authorized = [ ]
             authorized.append(tagdef.owner)
@@ -889,6 +889,7 @@ class Application:
 
         # custom DEI hack
         tables += ' LEFT OUTER JOIN "_Image Set" ON (files.name = "_Image Set".file)'
+        tables += ' LEFT OUTER JOIN "_Downloaded" ON (files.name = "_Downloaded".file)'
 
         wheres.append(readclauses)
         values["client"] = self.user()
@@ -896,19 +897,20 @@ class Application:
         if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset FROM %s %s GROUP BY files.name, files.local, owner, imgset' % (tables, wheres)
+        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (tables, wheres)
 
         if len(excepttables) > 2:
             excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
 
             # custom DEI hack
             excepttables.append('"_Image Set" ON (files.name = "_Image Set".file)')
+            excepttables.append('"_Downloaded" ON (files.name = "_Downloaded".file)')
 
             excepttables = " LEFT OUTER JOIN ".join(excepttables)
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
             if exceptwheres:
                 exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset FROM %s %s GROUP BY files.name, files.local, owner, imgset' % (excepttables, exceptwheres)
+            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"

@@ -164,6 +164,7 @@ tagdef "Capture Date" date        dirc    file        file       false
 tagdef Comment        text        dirc    file        file       false
 tagdef "Transmission Number" \
                       int8        dirc    file        file       false
+tagdef Downloaded     ""          dirc    tag         tag        false
 
 EOF
 

@@ -1,14 +1,19 @@
 $def with (target, files, referer, role, roles, quote)
 $if len(files) > 0:
-	$for name, local, writeok, imgset in files:
+	$for name, local, writeok, imgset, downloaded in files:
 		$ links = []
-		$if local:
+		$if 'downloader' in roles:
+			<!-- Download/View -->
+		$elif local:
 			$ links.append( '<a href="%s/file/%s">Download</a>' % (target, quote(name)) )
 		$else:
 			$ links.append( '<a href="%s/file/%s">View</a>' % (target, quote(name)) )
 		$if imgset:
 			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (target, quote(name)) )
-		$ links.append( '<a href="%s/tags/%s">Tags</a>' % (target, quote(name)) )
+		$if 'downloader' in roles:
+			<!-- Tags -->
+		$else:
+			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (target, quote(name)) )
 		$if writeok:
 			$for type in [ 'file', 'url' ]:
 				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (target, quote(name), type, type) )
@@ -19,8 +24,27 @@ $if len(files) > 0:
 		  <td>
 			  $:{', '.join(links)}
 		  </td>
-		  <td>
+		  $if imgset:
+		  	<td>&nbsp;&nbsp;&nbsp;</td>
+		  	<td>
+			<form enctype="application/x-www-form-urlencoded" action="${target}/tags/${quote(name)}" method="post">
+			    <div>
+			    <input type="hidden" name="referer" value="${referer}" />
+			    $if downloaded:
+			    	    Downloaded: <input type="checkbox" name="downloaded" value="true" checked />
+				    <input type="hidden" name="tag" value="Downloaded" />
+				    <input type="hidden" name="action" value="delete" />
+				    <input type="submit" value="Clear" />
+			    $else:
+			    	    Downloaded: <input type="checkbox" name="downloaded" value="true" />
+				    <input type="hidden" name="set-Downloaded" value="true" />
+				    <input type="hidden" name="action" value="put" />
+				    <input type="submit" value="Mark" />
+			    </div>
+			</form>
+		  	</td>
 		  $if writeok:
+		  	<td>
 		  	<form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
@@ -28,7 +52,7 @@ $if len(files) > 0:
 			    <input type="submit" value="Delete" />
 			    </div>
 			</form>
-		  </td>
+		  	</td>
 		  </tr>
 		  </table>
 		</fieldset>
