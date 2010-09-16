@@ -1,5 +1,10 @@
 $def with (target, roles, urlquote, webauthnhome, help, jira)
-<p><b>Welcome to the DIRC Client Data Uploader System. Click Upload Study to start image submission.</b></p>
+<p><b>Welcome to the DIRC Client Data Uploader System.
+$if len(set(roles).intersection(['dirc', 'uploader'])) > 0:
+	Click Upload Study to start image submission.
+$if len(set(roles).intersection(['dirc', 'downloader'])) > 0:
+	Use stored queries or click Download Study to access images.
+</b></p>
 <ol>
   $if 'admin' in roles:
   	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
