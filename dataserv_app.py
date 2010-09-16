@@ -916,7 +916,7 @@ class Application:
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
             if exceptwheres:
                 exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT _owner.file AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (excepttables, exceptwheres)
+            query2 = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
