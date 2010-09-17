@@ -971,6 +971,7 @@ class Query (Node):
         self.predlist = predlist
         self.queryopts = queryopts
         self.action = 'query'
+        self.title = None
 
     def qtarget(self):
         terms = []
@@ -1004,6 +1005,11 @@ class Query (Node):
                 value = self.queryopts['vals']
         except:
             pass
+
+        try:
+            self.title = self.queryopts['title']
+        except:
+            self.title = None
 
         if op == '':
             op = None
@@ -1043,6 +1049,12 @@ class Query (Node):
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
 
+            if self.title == None:
+                if self.action == 'query':
+                    self.title = "Query Results"
+                else:
+                    self.title = "Query by Tags"
+
             if self.action == 'query':
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
@@ -1050,11 +1062,11 @@ class Query (Node):
                         return self.render.FileUriList(target, files, urlquote)
                     elif acceptType == 'text/html':
                         break
-                return self.renderlist("Query Results",
+                return self.renderlist(self.title,
                                        [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops), self.roles),
                                         self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
             else:
-                return self.renderlist("Query by Tags",
+                return self.renderlist(self.title,
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
                                         self.render.QueryView(target, self.qtarget(), self.predlist, dict(self.ops)),
                                         self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
