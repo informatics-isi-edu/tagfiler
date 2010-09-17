@@ -36,12 +36,21 @@ function runSessionPolling(pollmins, warnmins) {
     startSessionTimer(pollmins * 60 * 1000);
 }
 
+function clearSessionTimer() {
+    if (timerset) {
+	clearTimeout(timer);
+	timerset = 0;
+    }
+}
+
 /**
  * Starts the session check timer with a given delay time (millis)
  */
 function startSessionTimer(t) {
     log("startSessionTimer: set timeout (ms) " + t);
-  setTimeout("runSessionRequest()", t);
+    clearSessionTimer();
+    timer = setTimeout("runSessionRequest()", t);
+    timerset = 1;
 }
 
 /**
@@ -74,12 +83,14 @@ function runLogoutRequest() {
 
 function processLogoutRequest() {
     if (ajax_request.readyState == 4) {
+	clearSessionTimer();
 	window.location = "/tagfiler/"
     }
 }
 
 function redirectNow() {
     var node = document.getElementById("javascriptlog");
+    clearSessionTimer();
     if (warn_window) {
 	log("redirectNow: closing warning window");
 	warn_window.close();
@@ -145,6 +156,8 @@ function processSessionRequest() {
   }
 }
 
+var timer = 0;
+var timerset = 0;
 var expiration_poll_mins = 1;
 var expiration_warn_mins = 2;
 var expiration_check_url = "/webauthn/session";
