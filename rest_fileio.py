@@ -409,7 +409,7 @@ class FileIO (Application):
         except:
             t.rollback()
 
-        if self.bytes:
+        if self.bytes != None:
             t = self.db.transaction()
             try:
                 self.set_file_tag('bytes', self.bytes)

@@ -766,7 +766,7 @@ class Application:
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
                            vars=dict(file=data_id, tagname=tagname))
 
-    def set_file_tag(self, tagname, value, data_id=None, owner=None):
+    def set_file_tag(self, tagname, value=None, data_id=None, owner=None):
         validator = self.validators.get(tagname)
         if validator:
             validator(value)
@@ -792,7 +792,7 @@ class Application:
                 # (file, tag, value) already set, so we're done
                 return
 
-        if value:
+        if value != None:
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
                     + " ( file, value ) VALUES ( $file, $value )" 
         else:
