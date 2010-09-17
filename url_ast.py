@@ -809,7 +809,7 @@ class FileTags (Node):
                     try:
                         value = storage['val-%s' % (tag_id)]
                     except:
-                        value = ''
+                        value = None
                     self.tagvals[urllib.unquote(tag_id)] = [ value ]
             try:
                 self.tag_id = storage.tag
