@@ -1,6 +1,6 @@
 $def with (apptarget, querytarget, tags, ops)
 $if len(tags) > 0:
-	<h2>Add a Query Term</h2>
+	<h3>Add a Query Term</h3>
 	<p>Select an available tag and click 'Add' to build a query:
 	</p>
 	<form enctype="application/x-www-form-urlencoded" action="${querytarget}" method="get">
@@ -23,5 +23,5 @@ $if len(tags) > 0:
 	  <input type="hidden" name="action" value="add" />
 	</form>
 $else:
-	<h2>Notice</h2>
+	<h3>Notice</h3>
 	<p>You must <a href="${apptarget}/tagdef">define tags</a> before you can use the query interface.</p>
