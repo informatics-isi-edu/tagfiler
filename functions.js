@@ -82,6 +82,18 @@ function runLogoutRequest() {
     }
 }
 
+function runExtendRequest() {
+    if (ajax_request) {
+	if (ajax_request.readystate != 0) {
+	    ajax_request.abort();
+	}
+	ajax_request.open("GET", "/webauthn/session?action=extend");
+	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
+	ajax_request.onreadystatechange = processSessionRequest;
+	ajax_request.send(null);
+    }
+}
+
 function processLogoutRequest() {
     if (ajax_request.readyState == 4) {
 	clearSessionTimer();
