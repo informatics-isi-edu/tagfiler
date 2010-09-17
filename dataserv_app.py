@@ -792,7 +792,7 @@ class Application:
                 # (file, tag, value) already set, so we're done
                 return
 
-        if value != None:
+        if tagtype != '' and value != None:
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
                     + " ( file, value ) VALUES ( $file, $value )" 
         else:

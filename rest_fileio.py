@@ -844,9 +844,13 @@ class FileIO (Application):
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action == 'put':
+            elif self.action in [ 'put', 'putsq' ]:
                 # we only support URL PUT simulation this way
-                self.location = storage.url
+                if self.action == 'put':
+                    self.location = storage.url
+                elif self.action == 'putsq':
+                    # add title=name queryopt for stored queries
+                    self.location = storage.url + '?title=%s' % urlquote(self.data_id)
                 self.local = False
                 return self.dbtransact(putBody, putPostCommit)
 
