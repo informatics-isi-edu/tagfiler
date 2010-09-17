@@ -1051,7 +1051,7 @@ class Query (Node):
                     elif acceptType == 'text/html':
                         break
                 return self.renderlist("Query Results",
-                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
+                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops), self.roles),
                                         self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
             else:
                 return self.renderlist("Query by Tags",
