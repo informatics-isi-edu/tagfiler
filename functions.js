@@ -99,7 +99,7 @@ function redirectNow() {
     if (node) {
 	alert("About to redirect to login page");
     }
-    window.location='/webauthn/login';	
+    window.location='/webauthn/login?referer=' + encodeURIComponent(window.location);
 }
 
 /**
@@ -108,6 +108,7 @@ function redirectNow() {
 function processSessionRequest() {
   if(ajax_request && ajax_request.readyState == 4) {
       log("processSessionRequest: readyState=4 status=" + ajax_request.status);
+      log("window.location=" + window.location);
     if(ajax_request.status == 200) {
       response_pairs = ajax_request.responseText.split("&");
       until = null;
