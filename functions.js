@@ -7,7 +7,7 @@ function setDatasetLink(div_id, datasetLink) {
 function log(msg) {
     var node = document.getElementById("javascriptlog");
     if (node) {
-	node.innerHTML =  msg + "<br />" + node.innerHTML
+	node.innerHTML = (new Date()).toLocaleTimeString() + " " + msg + "<br />" + node.innerHTML
     }
 }
 
@@ -38,6 +38,7 @@ function runSessionPolling(pollmins, warnmins) {
 
 function clearSessionTimer() {
     if (timerset) {
+	log("clearSessionTimer: cancel timer " + timer)
 	clearTimeout(timer);
 	timerset = 0;
     }
@@ -47,9 +48,9 @@ function clearSessionTimer() {
  * Starts the session check timer with a given delay time (millis)
  */
 function startSessionTimer(t) {
-    log("startSessionTimer: set timeout (ms) " + t);
     clearSessionTimer();
     timer = setTimeout("runSessionRequest()", t);
+    log("startSessionTimer: set timeout (ms) " + t + " as timer " + timer);
     timerset = 1;
 }
 
