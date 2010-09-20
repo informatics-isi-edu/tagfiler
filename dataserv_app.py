@@ -502,27 +502,31 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode, local=False):
+    def enforce_file_authz(self, mode, data_id=None, local=False):
         """Check whether access is allowed and throw web exception if not."""
+        if data_id == None:
+            data_id = self.data_id
         if mode == 'write':
             if not local:
-                """ Get the 'Image Set' tag """
-                results = self.select_file_tag('Image Set')
-                if len(results) > 0:
-                    local = True
+                try:
+                    results = self.select_file_tag('Image Set', data_id=data_id)
+                    if len(results) > 0:
+                        local = True
+                except:
+                    pass
             if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
-                raise Forbidden(data="access to dataset %s" % self.data_id)
-        allow = self.test_file_authz(mode)
+                raise Forbidden(data="access to immutable dataset %s" % data_id)
+        allow = self.test_file_authz(mode, data_id=data_id)
         if allow == False:
-            raise Forbidden(data="access to dataset %s" % self.data_id)
+            raise Forbidden(data="access to dataset %s" % data_id)
         elif allow == None:
-            raise Unauthorized(data="access to dataset %s" % self.data_id)
+            raise Unauthorized(data="access to dataset %s" % data_id)
         else:
             pass
 
     def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
         try:
-            self.enforce_file_authz(mode, local=local)
+            self.enforce_file_authz(mode, data_id=data_id, local=local)
             return True
         except:
             return False
