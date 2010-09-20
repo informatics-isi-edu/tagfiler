@@ -157,8 +157,6 @@ class Application:
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
         self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
-        self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'True'))
-        self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'True'))
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
         self.contact = getParam('contact', None)
