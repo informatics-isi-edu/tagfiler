@@ -27,7 +27,8 @@ $for tag in tags:
 	</td>
 	</tr>
 </table>
-<p>Please compare this study information with that on the visit inventory form.</p>
+$if direction == 'upload':
+	<p>Please compare this study information with that on the visit inventory form.</p>
 </p>
 <h2>Study Files</h2>
 <ul>
