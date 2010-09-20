@@ -502,7 +502,7 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode, data_id=None, local=False):
+    def enforce_file_authz(self, mode, data_id=None, local=False, owner=None):
         """Check whether access is allowed and throw web exception if not."""
         if data_id == None:
             data_id = self.data_id
@@ -516,7 +516,7 @@ class Application:
                     pass
             if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
                 raise Forbidden(data="access to immutable dataset %s" % data_id)
-        allow = self.test_file_authz(mode, data_id=data_id)
+        allow = self.test_file_authz(mode, data_id=data_id, owner=owner)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % data_id)
         elif allow == None:
@@ -526,7 +526,7 @@ class Application:
 
     def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
         try:
-            self.enforce_file_authz(mode, data_id=data_id, local=local)
+            self.enforce_file_authz(mode, data_id=data_id, local=local, owner=owner)
             return True
         except:
             return False
@@ -692,7 +692,7 @@ class Application:
                 if owner and owner != user:
                     return []
             elif tagdef.readpolicy == 'file':
-                if  not self.test_file_authz('read', owner=owner):
+                if  not self.test_file_authz('read', data_id=data_id, owner=owner):
                     return []
 
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) 
