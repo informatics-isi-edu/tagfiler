@@ -524,10 +524,12 @@ class Application:
             pass
 
     def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
+        status = web.ctx.status
         try:
             self.enforce_file_authz(mode, data_id=data_id, local=local, owner=owner)
             return True
         except:
+            web.ctx.status = status
             return False
 
     def enforce_tag_authz(self, mode, tagname=None, data_id=None):
