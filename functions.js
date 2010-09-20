@@ -78,7 +78,7 @@ function runLogoutRequest() {
 	ajax_request.open("POST", "/webauthn/logout");
 	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_request.onreadystatechange = processLogoutRequest;
-	ajax_request.send(null);
+	ajax_request.send("action=logout");
     }
 }
 
