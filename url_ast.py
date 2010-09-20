@@ -297,6 +297,21 @@ class LogList (Node):
         return self.renderlist("Available logs",
                                [self.render.LogList(target, lognames, urlquote)])
 
+class Contact (Node):
+    """Represents a bare CONTACT URI
+
+       GET CONTACT
+       """
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+
+    def GET(self, uri):
+        
+        target = self.home + web.ctx.homepath
+        return self.renderlist("Contact Us",
+                               [self.render.Contact(target, self.contact)])
+
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
 

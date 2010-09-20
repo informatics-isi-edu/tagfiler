@@ -159,6 +159,7 @@ class Application:
         self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
+        self.contact = getParam('contact', None)
         self.db = None
         self.logmsgs = []
         self.middispatchtime = None

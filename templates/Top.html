@@ -76,10 +76,8 @@ $else:
 	<a href="${home}/query?action=edit">Query by tags</a>
 	</td>
     <td>
-    $if 'uploader' in roles:
-	<a href="${home}/tagfiler/static/DIRC-upload-manual.doc">Help</a>
-    $elif 'downloader' in roles:
-	<a href="${home}/tagfiler/static/DIRC-download-manual.doc">Help</a>
+    $if 'uploader' in roles or 'downloader' in roles:
+	<a href="${home}/contact">Help</a>
     $elif 'dirc' in roles:
 	<a href="${help}">Help</a>
     </td>

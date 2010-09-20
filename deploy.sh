@@ -316,6 +316,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.subtitle 'DIRC Client Data Uploader (DIRC CDU)'
     SetEnv ${SVCPREFIX}.logo '<img alt="DIRC logo" title="Doheny Image Reading Center" src="/${SVCPREFIX}/static/DIRC.png" width="208" height="60" />'
     SetEnv ${SVCPREFIX}.log_path ${LOGDIR}
+    SetEnv tagfiler.contact '<h3>Service Operator</h3><p>Doheny Image Reading Center<br />1450 San Pablo Street, #3603<br />Los Angeles, California 90033<p><h3>Study Coordinators</h3><p><ol><li>Katie Aguilar<br />kaguilar@doheny.org<br />+1 (323) 442-6393</li><li>Khalid Mansoor<br />kmansoor@doheny.org<br />+1 (323) 442-6393</li></ol></p>'
 
 </Directory>
 

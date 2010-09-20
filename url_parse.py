@@ -23,6 +23,7 @@ def p_start(p):
              | appleterror
              | loglist
              | log
+             | contact
 """
     p[0] = p[1]
 
@@ -37,6 +38,10 @@ def p_loglist(p):
     """loglist : slash string slash LOG
                | slash string slash LOG slash"""
     p[0] = url_ast.LogList(appname=p[2])
+
+def p_contact(p):
+    """contact : slash string slash CONTACT"""
+    p[0] = url_ast.Contact(appname=p[2])
     
 def p_filelist_opts(p):
     """filelist : slash string slash FILE queryopts"""
