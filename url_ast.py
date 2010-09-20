@@ -197,7 +197,7 @@ class FileList (Node):
                 
             return [ (res.file,
                       res.local,
-                      self.test_file_authz('write', owner=res.owner, data_id=res.file),
+                      self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
                       res.imgset != None,
                       res.downloaded)
                       for res in self.select_files_by_predlist() ]
@@ -1049,7 +1049,7 @@ class Query (Node):
         def body():
             files = [ (res.file,
                        res.local,
-                       self.test_file_authz('write', owner=res.owner, data_id=res.file),
+                       self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
                        res.imgset != None,
                        res.downloaded)
                       for res in self.select_files_by_predlist() ]

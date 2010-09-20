@@ -506,13 +506,20 @@ class Application:
         """Check whether access is allowed and throw web exception if not."""
         if file and mode == 'write' and (local and self.localFilesImmutable or not local and self.remoteFilesImmutable):
             raise Forbidden(data="access to dataset %s" % self.data_id)
-        allow = self.test_file_authz(mode)
+        allow = self.test_file_authz(mode, data_id=file)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % self.data_id)
         elif allow == None:
             raise Unauthorized(data="access to dataset %s" % self.data_id)
         else:
             pass
+
+    def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
+        try:
+            self.enforce_file_authz(mode, file=data_id, local=local)
+            return True
+        except:
+            return False
 
     def enforce_tag_authz(self, mode, tagname=None, data_id=None):
         """Check whether access is allowed and throw web exception if not."""
