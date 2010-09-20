@@ -296,7 +296,7 @@ class FileIO (Application):
                 results = self.select_file()
                 if len(results) == 0:
                     return None
-                self.enforce_file_authz('write')
+                self.enforce_file_authz('write', file=True, local=results[0].local)
                 return None
 
             def postCommit(results):
@@ -319,10 +319,11 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforce_file_authz('write')
+            result = results[0]
+            self.enforce_file_authz('write', file=True, local=result.local)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
-            return results[0]
+            return result
 
         def postCommit(result):
             if result.local:
@@ -365,8 +366,8 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            self.enforce_file_authz('write')
             remote = not results[0].local
+            self.enforce_file_authz('write', file=True, local=not remote)
             self.update_file()
             self.txlog('UPDATE', dataset=self.data_id)
         else:
@@ -638,9 +639,10 @@ class FileIO (Application):
             if len(results) == 0:
                 return None
             else:
-                self.enforce_file_authz('write')
+                result = results[0]
+                self.enforce_file_authz('write', file=True, local=result.local)
                 if self.update:
-                    if results[0].local:
+                    if result.local:
                         self.location = result.location
                         filename = self.store_path + '/' + self.location
                         return open(filename, 'r+b')
@@ -716,7 +718,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 return True
-            self.enforce_file_authz('write')
+            self.enforce_file_authz('write', file=True, local=results[0].local)
             return True
 
         def preWritePostCommit(result):
@@ -735,8 +737,8 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforce_file_authz('write')
             result = results[0]
+            self.enforce_file_authz('write', file=True, local=result.local)
             files.append(result)
             if not result.local:
                 # custom DEI EIU hack, to proxy delete to all member files
@@ -762,8 +764,9 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforce_file_authz('write')
-            if results[0].local:
+            result = results[0]
+            self.enforce_file_authz('write', file=True, local=result.local)
+            if result.local:
                 ftype = 'file'
             else:
                 try:

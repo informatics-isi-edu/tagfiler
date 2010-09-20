@@ -155,6 +155,8 @@ class Application:
         self.webauthnrequire = getParam('webauthnrequire')
         self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
+        self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
+        self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
         self.db = None
@@ -499,8 +501,10 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode):
+    def enforce_file_authz(self, mode, file=None, local=False):
         """Check whether access is allowed and throw web exception if not."""
+        if file and mode == 'write' and (local and self.localFilesImmutable or not local and self.remoteFilesImmutable):
+            raise Forbidden(data="access to dataset %s" % self.data_id)
         allow = self.test_file_authz(mode)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % self.data_id)
