@@ -157,6 +157,8 @@ class Application:
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
         self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
+        self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'True'))
+        self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'True'))
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
         self.contact = getParam('contact', None)
@@ -502,11 +504,17 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode, file=None, local=False):
+    def enforce_file_authz(self, mode, local=False):
         """Check whether access is allowed and throw web exception if not."""
-        if file and mode == 'write' and (local and self.localFilesImmutable or not local and self.remoteFilesImmutable):
-            raise Forbidden(data="access to dataset %s" % self.data_id)
-        allow = self.test_file_authz(mode, data_id=file)
+        if mode == 'write':
+            if not local:
+                """ Get the 'Image Set' tag """
+                results = self.select_file_tag('Image Set')
+                if len(results) > 0:
+                    local = True
+            if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
+                raise Forbidden(data="access to dataset %s" % self.data_id)
+        allow = self.test_file_authz(mode)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % self.data_id)
         elif allow == None:
@@ -516,7 +524,7 @@ class Application:
 
     def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
         try:
-            self.enforce_file_authz(mode, file=data_id, local=local)
+            self.enforce_file_authz(mode, local=local)
             return True
         except:
             return False
