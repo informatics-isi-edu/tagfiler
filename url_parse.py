@@ -1,4 +1,5 @@
 import ply.yacc as yacc
+import threading
 
 from url_lex import make_lexer, tokens
 
@@ -330,7 +331,12 @@ def make_parser():
 def make_parse():
     parser = make_parser()
     lexer = make_lexer()
+    lock = threading.Lock()
     def parse(s):
-        return parser.parse(s, lexer=lexer)
+        lock.acquire()
+        try:
+            return parser.parse(s, lexer=lexer)
+        finally:
+            lock.release()
     return parse
 

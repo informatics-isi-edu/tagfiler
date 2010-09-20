@@ -269,7 +269,7 @@ cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 # need this for some of the RESTful URIs we can generate
 AllowEncodedSlashes On
 
-WSGIDaemonProcess ${SVCPREFIX} processes=20 threads=1 user=${SVCUSER}
+WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=15 user=${SVCUSER}
 
 WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
