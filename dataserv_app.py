@@ -68,7 +68,6 @@ class Forbidden (WebException):
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
-        web.debug(desc % data)
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
