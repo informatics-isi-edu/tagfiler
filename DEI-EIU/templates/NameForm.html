@@ -1,0 +1,22 @@
+$def with (target)
+<h2>Choose Name and Type of Data</h2>
+<form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
+Enter a name for the dataset: <input name="name" type="text" /><br />
+Select a type of dataset definition: 
+<input type="hidden" name="action" value="define" />
+<select name="type">
+  <option value="file">Upload a file</option>
+  <option value="url">Register a remote URL</option>
+</select><br />
+Select an initial read permission:
+<select name="read users">
+  <option value="owner">Only owner may read</option>
+  <option value="*">Anybody may read</option>
+</select><br />
+Select an initial write permission:
+<select name="write users">
+  <option value="owner">Only owner may write</option>
+  <option value="*">Anybody may write</option>
+</select><br />
+<input type="submit" value="Proceed" />
+</form>

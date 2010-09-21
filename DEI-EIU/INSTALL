@@ -1,0 +1,52 @@
+
+The install process is a bit convoluted with lots of system tweaks
+needing root permissions.  These steps would be incorporated into
+RPM mechanisms in a properly packaged service.
+
+Recommended practice:
+
+  1. Check this code out to a temporary work location NOT in
+     the /var/www tree.
+
+  2. Modify Makefile INSTALLHOST= if you want to have the checkout
+     on a development workstation, and the deployed service on
+     another remote server.  Use default 'localhost' if you want to
+     run service on the same machine where the checkout lives.
+
+     * You must have ssh access from your working area to the root
+       account of the service host.  Make this so, rather than trying
+       to work around it.  Recommended method: ssh public key
+       authentication using ssh-agent to avoid entering passphrase
+       repeatedly.
+
+  3. Run these steps the first time:
+
+     dev@wkstn% make deploy
+     dev@wkstn% make restart
+
+  4. For minor code changes, you can just do:
+
+     dev@wkstn% ...modify working copy
+     dev@wkstn% make restart
+
+Resetting the world after some serious use and breakage:
+
+  root@server# service httpd stop
+  dev@wkstn  % make install
+  daemon@server% ~/dbclear.sh   # daemon user, e.g. tagfiler
+  daemon@server% rm -rf /var/www/tagfiler-data/*
+  daemon@server% ~/dbsetup.sh
+  root@server# service httpd start
+
+Recovering from database problems the brute-force way (assuming
+default deployment model):
+
+  root@server# service httpd stop
+  root@server# rm -rf /var/www/tagfiler{,-data}
+  postgres@server% dropdb tagfiler
+
+This will allow a full redeploy:
+
+  dev@wkstn% make deploy
+
+

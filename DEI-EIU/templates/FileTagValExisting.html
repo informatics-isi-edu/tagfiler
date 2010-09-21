@@ -1,0 +1,25 @@
+$def with (title, apptarget, tagspace, data_id, taginfo, urlquote)
+<h2>${title}</h2>
+$ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
+$if title == 'System' and data_id:
+	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
+$if len(filetagvals) > 0:
+	<table border="1">
+	$if tagspace == 'tags':
+		<tr><th>File</th><th>Tag</th><th>Value(s)</th></tr>
+	$else:
+		<tr><th>Tag</th><th>ACL</th><th>Member(s)</th></tr>
+	$for data_id, tag, vals in filetagvals:
+		$ tagname, typestr, writeok = tagdefsdict[tag]
+		<tr><td>${data_id}</td><td>${tag}</td>
+			$if typestr:
+				<td><table>
+				$for val in vals:
+					<tr><td>${val}</td></tr>
+				</table></td>
+		</tr>
+	</table>
+$elif data_id:
+	<p>There are no existing tags on "${data_id}".</p>
+$else:
+	<p>There are no existing tags in the catalog.</p>

@@ -1,0 +1,48 @@
+#!/bin/sh
+
+# set the services to run automatically?
+chkconfig httpd on
+
+# WSGI Socket Prefix
+RUNDIR=/var/run/wsgi
+mkdir -p ${RUNDIR}
+
+# create local helper scripts
+mkdir -p /etc/httpd/passwd
+
+# allow slashes in URL
+CONFFILE=/etc/httpd/conf.d/ssl.conf
+if test -e $CONFFILE
+then
+	# save ssl.conf
+	cp $CONFFILE $CONFFILE.`date +%F.%H:%M:%S`
+	
+	TMPFILE=`mktemp $CONFFILE.XXXXXX`
+	cat $CONFFILE | sed 's/<\/VirtualHost>/\
+	AllowEncodedSlashes On\
+<\/VirtualHost>/' > $TMPFILE
+
+	mv -f $TMPFILE $CONFFILE
+fi
+
+# disable python.conf file
+CONFFILE=/etc/httpd/conf.d/python.conf
+if test -e $CONFFILE
+then
+	mv $CONFFILE $CONFFILE.save
+fi
+	
+# uncomment the LoadModule wsgi_module from wsgi.conf
+CONFFILE=/etc/httpd/conf.d/wsgi.conf
+if test -e $CONFFILE
+then
+	# save wsgi.conf
+	cp $CONFFILE $CONFFILE.`date +%F.%H:%M:%S`
+	
+	TMPFILE=`mktemp $CONFFILE.XXXXXX`
+	cat $CONFFILE | sed 's/^# LoadModule\(.*$\)/LoadModule\1/' > $TMPFILE
+	
+	mv -f $TMPFILE $CONFFILE
+fi
+
+service httpd restart

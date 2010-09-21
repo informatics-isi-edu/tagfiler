@@ -1,0 +1,45 @@
+$def with (home, target, predlist, ops)
+<p>
+<form enctype="application/x-www-form-urlencoded" action="${home}/file" method="post">
+<fieldset>
+<legend>Save named query</legend>
+Enter a descriptively unique name: <br />
+<input name="name" type="text" />
+<input type="hidden" name="url" value="${target}" />
+<input type="hidden" name="action" value="putsq" />
+<input type="submit" value="Create Saved Query" />
+</fieldset>
+</form>
+</p>
+<h3>Current Query</h3>
+<p><a href="${target}">Permanent link to this query</a></p>
+$if len(predlist) == 0:
+	<p>Match all files.</p>
+$else:
+	<p>Match files tagged with all of the following tags:</p>
+$for pred in predlist:
+	<form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
+	<fieldset>
+	<legend>${pred['tag']}</legend>
+	$if pred['op'] in [ '', None ]:
+		${ops['']}
+	$if pred['op'] == ':not:':
+		${ops[pred['op']]}
+	$elif pred['op']:
+		${ops[pred['op']]}
+		$ count = 0
+		$for val in pred['vals']:
+			$if count == 0:
+				:
+			$else:
+    				OR
+			<tt style="color:green">$:{val.replace(' ', '&nbsp;')}</tt>
+			$ count += 1
+	<input type="hidden" name="op" value="${pred['op']}" />
+	<input type="hidden" name="vals" value="${pred['vals']}" />
+	<input type="hidden" name="tag" value="${pred['tag']}" />
+	<input type="hidden" name="action" value="delete" />
+	<input type="submit" value="Remove from query" />
+	</fieldset>
+	</form>
+<h3>Results Preview</h3>

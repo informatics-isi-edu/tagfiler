@@ -1,0 +1,45 @@
+$def with (target, tagdefs, typenames, title, test_tagdef_authz, urlquote)
+$# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
+$for foo in [ 0 ]:
+$code
+	def tagpolicy(tagname, policy, mode):
+		aclurl = target + 'acl/' + urlquote(tagname)
+		m = dict(anonymous=None, 
+			users='any authenticated user', 
+			file=('same clients who can %s file content' % mode),
+			fowner='owner of file',
+			tag=('"%s" and clients in <a href="%s">tagdef ACL</a>' % (owner, aclurl)), 
+			system='system')
+		r = m[policy]
+		if r:
+			return 'Tag %s restricted to %s.' % (mode, r)
+		else:
+			return ''
+<h2>${title}</h2>
+<p>
+$if len(tagdefs) > 0:
+	$for tagdef in tagdefs:
+		$ tagname, typestr, multivalue, readpolicy, writepolicy, owner = tagdef
+		<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+		  <fieldset>
+		    <legend>${tagname}</legend>
+		<input type="hidden" name="tag" value="${tagname}" />
+		<input type="hidden" name="action" value="delete" />
+		$if test_tagdef_authz('write', tagname):
+			<input type="submit" value="Delete" />
+		$if typestr != '':
+			(${typenames[typestr]})
+		$if multivalue:
+			0 or more values allowed.
+		$else:
+			0 or 1 values allowed.
+		$ readrestriction = tagpolicy(tagname, readpolicy, 'read')
+		$if readrestriction:
+			$:readrestriction
+		$ writerestriction = tagpolicy(tagname, writepolicy, 'write')
+		$if writerestriction:
+			$:writerestriction
+		</fieldset>
+		</form>
+$else:
+	There are no tags currently defined.

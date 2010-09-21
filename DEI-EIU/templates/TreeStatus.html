@@ -1,0 +1,37 @@
+$def with (transmissionnum, tags, files, direction, success, error)
+$if success:
+	<h2>Completed</h2>
+	<p>
+	<b>${success}</b>
+$elif error:
+	<h2>Failed</h2>
+	<div class="error">${error}</div>
+$else:
+	<h2>Status</h2>
+	The status of the transfer is unknown.
+See below for a summary of the study.
+</p>
+<h2>Study Information</h2>
+$if transmissionnum:
+	<p><div class="transmissionnum">Transmission number: ${transmissionnum}</div>
+	$if direction == 'upload':
+		Please write this transmission number on the visit inventory form.
+</p><p>
+<table border=1>
+$for tag in tags:
+	$ tagname, vals = tag
+	<tr><td>${tagname}</td>
+	<td>
+	$for val in vals:
+		${val}
+	</td>
+	</tr>
+</table>
+$if direction == 'upload':
+	<p>Please compare this study information with that on the visit inventory form.</p>
+</p>
+<h2>Study Files</h2>
+<ul>
+$for file in files:
+	<li>${file}</li>
+</ul>
