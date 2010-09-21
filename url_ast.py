@@ -198,7 +198,7 @@ class FileList (Node):
             return [ (res.file,
                       res.local,
                       self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
-                      res.imgset != None,
+                      res.imgset,
                       res.downloaded)
                       for res in self.select_files_by_predlist() ]
 
@@ -1050,7 +1050,7 @@ class Query (Node):
             files = [ (res.file,
                        res.local,
                        self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
-                       res.imgset != None,
+                       res.imgset,
                        res.downloaded)
                       for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]

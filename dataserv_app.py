@@ -834,121 +834,112 @@ class Application:
             # may already be reverse-indexed in multivalue case
             pass            
 
+    def select_next_transmit_number(self):
+        query = "SELECT NEXTVAL ('transmitnumber')"
+        result = self.db.query(query)
+        return str(result[0].nextval).rjust(9, '0')
+
     def select_files_by_predlist(self, predlist=None):
+        def dbquote(s):
+            return s.replace("'", "''")
+        
         if predlist == None:
             predlist = self.predlist
 
+        roles = [ r for r in self.roles ]
+        if roles:
+            roles.append('*')
+
         tagdefs = dict()
         for pred in predlist:
-            results = self.select_tagdef(pred['tag'])
-            if len(results) == 0:
-                raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
-            tagdef = results[0]
-            if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
-                user = self.user()
-                if user == None:
-                    raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
-                if tagdef.readpolicy == 'tag':
-                    authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
-                    authorized.append(tagdef.owner)
-                    roles = self.roles.copy()
-                    if roles:
-                        roles.add('*')
-                    if not roles.intersection(set(authorized)):
-                        # this is statically known, so either warn user (friendly)
-                        # or return an empty result set since nothing can match?
-                        raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
-            tagdefs[tagdef.tagname] = tagdef
+            # do static checks on each referenced tag at most once
+            if not tagdefs.has_key(pred['tag']):
+                results = self.select_tagdef(pred['tag'])
+                if len(results) == 0:
+                    raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+                tagdef = results[0]
+                if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
+                    user = self.user()
+                    if user == None:
+                        raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
+                    if tagdef.readpolicy == 'tag':
+                        authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
+                        authorized.append(tagdef.owner)
+                        if not roles.intersection(set(authorized)):
+                            # warn or return an empty result set since nothing can match?
+                            raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
+                    # fall off, enforce dynamic security below
+                tagdefs[tagdef.tagname] = tagdef
 
-        tables = ['files', '_owner ON (files.name = _owner.file)']
-        excepttables = ['files', '_owner ON (files.name = _owner.file)'] # only gets used if others are appended
+        innertables = ['files',
+                       '_owner ON (files.name = _owner.file)']
+        outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
+                       '"_read users" ON (files.name = "_read users".file)']
+        selects = ['files.name AS file',
+                   'files.local AS local',
+                   '_owner.value AS owner']
         wheres = []
-        exceptwheres = []
         values = dict()
 
-        readclauses = []
-        rn = 0
-        roles = self.roles.copy()
-        if roles:
-            roles.add('*')
-        for role in roles:
-            readclauses.append('_owner.value = $r%s' % rn)
-            readclauses.append('"_read users".value = $r%s' % rn)
-            values['r%s' % rn] = role
-            rn += 1
-        readclauses = " OR ".join(readclauses)
+        roletable = []
+        for r in range(0, len(roles)):
+            roletable.append("('%s')" % dbquote(roles[r]))
+        roletable = ", ".join(roletable)
 
+        outertables.append( '(VALUES %s) AS ownrole (role) ON ("_owner".value = ownrole.role)' % roletable)
+        outertables.append( '(VALUES %s) AS readrole (role) ON ("_read users".value = readrole.role)' % roletable)
+        wheres.append('ownrole.role IS NOT NULL OR readrole IS NOT NULL')
+        
         for p in range(0, len(predlist)):
             pred = predlist[p]
             tag = pred['tag']
             op = pred['op']
             vals = pred['vals']
             tagdef = tagdefs[tag]
+
             if op == ':not:':
-                # a non-NULL match excludes the file, but only if user can see that match
-                excepttables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
+                # not matches if tag column is null or we lack read access to the tag (act as if not there)
+                outertables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))                
                 if tagdef.readpolicy == 'fowner':
-                    exceptwheres.append('t%s.file IS NOT NULL AND _owner.value = $client' % p)
-                elif tagdef.readpolicy == 'file':
-                    # note this case is irrelevant because user cannot find files they cannot read
-                    # but here for documentation purposes, in case that rule is relaxed
-                    exceptwheres.append('t%s.file IS NOT NULL AND (%s)' % (p, readclauses))
+                    # this tag rule is more restrictive than file or static checks already done
+                    wheres.append('t%s.file IS NULL OR (ownrole.role IS NULL)' % p)
                 else:
-                    exceptwheres.append('t%s.file IS NOT NULL' % p)
+                    # covers all cases where tag is more or equally permissive to file or static checks already done
+                    wheres.append('t%s.file IS NULL' % p)
             else:
-                tables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
+                # all others match if and only if tag column is not null and we have read access
+                # ...and any value constraints are met
+                innertables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))                
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
                         valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
                         values["val%s_%s" % (p, v)] = vals[v]
                     wheres.append(" OR ".join(valpreds))
-                # a predicate matches only if tag is present and value constraints are met
-                # but only if user can see that match
                 if tagdef.readpolicy == 'fowner':
-                    wheres.append('_owner.value = $client')
-                elif tagdef.readpolicy == 'file':
-                    # note this case is irrelevant because user cannot find files they cannot read
-                    # but here for documentation purposes, in case that rule is relaxed
-                    pass
-                    # wheres.append('OR "_read users".value = $client OR "_read users".value = \'*\'')
-            
-        tables = " JOIN ".join(tables)
-        tables += ' LEFT OUTER JOIN "_read users" ON (files.name = "_read users".file)'
+                    # this tag rule is more restrictive than file or static checks already done
+                    wheres.append('ownrole.role IS NOT NULL' % p)
 
-        # custom DEI hack
-        tables += ' LEFT OUTER JOIN "_Image Set" ON (files.name = "_Image Set".file)'
-        tables += ' LEFT OUTER JOIN "_Downloaded" ON (files.name = "_Downloaded".file)'
+        # DEI hacks... extra columns in all results
+        outertables.append('"_Image Set" ON (files.name = "_Image Set".file)')
+        outertables.append('"_Downloaded" ON (files.name = "_Downloaded".file)')
+        selects.append('("_Image Set".file IS NOT NULL) AS imgset')
+        selects.append('("_Downloaded".file IS NOT NULL) AS downloaded')
 
-        wheres.append(readclauses)
-        values["client"] = self.user()
+        groupbys = ", ".join([ t.split(" AS ")[0] for t in selects ])
+        selects = ", ".join(selects)
+        tables = " JOIN ".join(innertables) + " LEFT OUTER JOIN ".join(outertables)
+
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (tables, wheres)
+        query = 'SELECT %s FROM %s %s GROUP BY %s' % (selects, tables, wheres, groupbys)
 
-        if len(excepttables) > 2:
-            excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
-
-            # custom DEI hack
-            excepttables.append('"_Image Set" ON (files.name = "_Image Set".file)')
-            excepttables.append('"_Downloaded" ON (files.name = "_Downloaded".file)')
-
-            excepttables = " LEFT OUTER JOIN ".join(excepttables)
-            exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
-            if exceptwheres:
-                exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (excepttables, exceptwheres)
-            query = '(%s) EXCEPT (%s)' % (query, query2)
-
-        query += " ORDER BY file"
+        query += " ORDER BY files.name"
         
         #web.debug(query)
+        #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
+        #    web.debug(r)
         return self.db.query(query, vars=values)
-
-    def select_next_transmit_number(self):
-        query = "SELECT NEXTVAL ('transmitnumber')"
-        result = self.db.query(query)
-        return str(result[0].nextval).rjust(9, '0')
 
