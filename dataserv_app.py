@@ -696,5 +696,7 @@ class Application:
         query += " ORDER BY file"
         
         #web.debug(query)
+        #for l in self.db.query('explain analyze %s' % query, vars=values):
+        #    web.debug(l)
         return self.db.query(query, vars=values)
 
