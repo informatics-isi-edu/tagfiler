@@ -1,6 +1,8 @@
 RELEASE=$(shell svn info  | grep "Revision:" | awk  '{print $$2}')
 
 INSTALLSVC=tagfiler
+APPLETBUILD=../dei_applet-trunk
+
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
 WSGIFILE=tagfiler.wsgi
@@ -16,7 +18,9 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
 	FileTagNew.html TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
-	Error.html
+	TreeUpload.html TreeDownload.html TreeStatus.html \
+	Error.html AppletError.html \
+	LogList.html LogUriList.html Contact.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)
@@ -30,8 +34,8 @@ $(HOME)/.tagfiler.predeploy:
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
 
-deploy: $(HOME)/.tagfiler.predeploy
-	./deploy.sh $(INSTALLSVC)
+deploy: $(HOME)/.tagfiler.predeploy install
+	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates

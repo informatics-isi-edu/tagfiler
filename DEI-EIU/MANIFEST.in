@@ -1,7 +1,0 @@
-prune *
-exclude *
-include *.py
-graft templates
-graft wsgi
-include tagfiler tagfiler-httpd
-

@@ -1,11 +1,16 @@
+import traceback
+import sys
+
 import os
 import web
 import subprocess
 import tempfile
 import random
 import re
+import traceback
+import sys
 
-from dataserv_app import Application, NotFound, BadRequest, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, urlquote
 
 # build a map of mime type --> primary suffix
 mime_types_suffixes = dict()
@@ -19,6 +24,20 @@ f.close()
 
 # we want .txt not .asc!
 mime_types_suffixes['text/plain'] = 'txt'
+
+def yieldBytes(f, first, last, chunkbytes):
+    """Helper function yields range of file."""
+    f.seek(first, 0)  # first from beginning (os.SEEK_SET)
+    byte = first
+    while byte <= last:
+        readbytes = min(chunkbytes, last - byte + 1)
+        buf = f.read(readbytes)
+
+        byte += len(buf)
+        yield buf
+
+        if len(buf) < readbytes:
+            break
 
 def choose_content_type(clientval, guessedval, taggedval):
     """Hueristic choice between client-supplied and guessed Content-Type.
@@ -58,13 +77,14 @@ class FileIO (Application):
     memory allocations.
 
     """
-    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type' ]
+    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
     def __init__(self):
         Application.__init__(self)
         self.action = None
         self.filetype = 'file'
         self.bytes = None
+        self.referer = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -140,20 +160,6 @@ class FileIO (Application):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        def yieldBytes(f, first, last):
-            """Helper function yields range of file."""
-            f.seek(first, 0)  # first from beginning (os.SEEK_SET)
-            byte = first
-            while byte <= last:
-                readbytes = min(self.chunkbytes, last - byte + 1)
-                buf = f.read(readbytes)
-
-                byte += len(buf)
-                yield buf
-                
-                if len(buf) < readbytes:
-                    break
-
         if sendBody:
 
             # parse Range: header if it exists
@@ -197,6 +203,7 @@ class FileIO (Application):
             except:
                 rangeset = None
 
+            self.log('GET', dataset=self.data_id)
             if rangeset != None:
 
                 if len(rangeset) == 0:
@@ -212,7 +219,8 @@ class FileIO (Application):
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-                    for res in yieldBytes(f, first, last):
+                    for res in yieldBytes(f, first, last, self.chunkbytes):
+                        self.midDispatch()
                         yield res
                 else:
                     # result is a multipart/byteranges ?
@@ -225,7 +233,8 @@ class FileIO (Application):
                         first, last = rangeset[r]
                         yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
                               % (boundary, content_type, first, last, length, disposition_name)
-                        for res in yieldBytes(f, first, last):
+                        for res in yieldBytes(f, first, last, self.chunkbytes):
+                            self.midDispatch()
                             yield res
                         if r == len(rangeset) - 1:
                             yield '\r\n--%s--\r\n' % boundary
@@ -237,7 +246,8 @@ class FileIO (Application):
                 web.header('Content-Length', length)
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
-                for buf in yieldBytes(f, 0, length - 1):
+                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                    self.midDispatch()
                     yield buf
 
         else: # not sendBody...
@@ -259,15 +269,25 @@ class FileIO (Application):
         try:
             self.action = storage.action
             self.filetype = storage.type
-            params = []
-            if storage['read users'] == '*':
-                params.append('read users=*')
-            if storage['write users'] == '*':
-                params.append('write users=*')
-            if len(params) > 0:
-                suffix = '?' + '&'.join(params)
         except:
             pass
+        
+        params = []
+        
+        try:
+            if storage['read users'] == '*':
+                params.append('read users=*')
+        except:
+            pass
+        
+        try:
+            if storage['write users'] == '*':
+                params.append('write users=*')
+        except:
+            pass
+        
+        if len(params) > 0:
+            suffix = '?' + '&'.join(params)
 
         target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
         if self.action == 'define':
@@ -276,7 +296,7 @@ class FileIO (Application):
                 results = self.select_file()
                 if len(results) == 0:
                     return None
-                self.enforce_file_authz('write')
+                self.enforce_file_authz('write', local=results[0].local)
                 return None
 
             def postCommit(results):
@@ -299,9 +319,11 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforce_file_authz('write')
+            result = results[0]
+            self.enforce_file_authz('write', local=result.local)
             self.delete_file()
-            return results[0]
+            self.txlog('DELETE', dataset=self.data_id)
+            return result
 
         def postCommit(result):
             if result.local:
@@ -310,8 +332,6 @@ class FileIO (Application):
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
                 web.ctx.status = '204 No Content'
-            else:
-                self.log('DELETE', dataset=self.data_id)
             return ''
 
         return self.dbtransact(body, postCommit)
@@ -346,15 +366,18 @@ class FileIO (Application):
 
         if len(results) > 0:
             # check permissions and update existing file
-            self.enforce_file_authz('write')
             remote = not results[0].local
+            self.enforce_file_authz('write', local=not remote)
             self.update_file()
+            self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
             self.insert_file()
+            self.txlog('CREATE', dataset=self.data_id)
             t = self.db.transaction()
             try:
-                self.set_file_tag('owner', web.ctx.env['REMOTE_USER'])
+                web.debug('setting owner "%s"' % self.user())
+                self.set_file_tag('owner', self.user())
                 t.commit()
             except:
                 t.rollback()
@@ -375,7 +398,7 @@ class FileIO (Application):
     
         t = self.db.transaction()
         try:
-            self.set_file_tag('modified by', web.ctx.env['REMOTE_USER'])
+            self.set_file_tag('modified by', self.user())
             t.commit()
         except:
             t.rollback()
@@ -387,7 +410,7 @@ class FileIO (Application):
         except:
             t.rollback()
 
-        if self.bytes:
+        if self.bytes != None:
             t = self.db.transaction()
             try:
                 self.set_file_tag('bytes', self.bytes)
@@ -400,7 +423,7 @@ class FileIO (Application):
                 self.delete_file_tag('url')
                 t.commit()
                 if remote:
-                    self.log('DELETE', self.data_id)
+                    self.txlog('DELETE', self.data_id)
             except:
                 t.rollback()
                 
@@ -450,7 +473,7 @@ class FileIO (Application):
                 self.set_file_tag('url', self.location)
                 t.commit()
                 if remote:
-                    self.log('DELETE', self.data_id)
+                    self.txlog('DELETE', self.data_id)
             except:
                 t.rollback()
 
@@ -459,7 +482,31 @@ class FileIO (Application):
         for tagname in self.queryopts.keys():
             self.enforce_tag_authz('write', tagname)
             self.set_file_tag(tagname, self.queryopts[tagname])
+            self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
 
+        srcroles = set(self.remap.keys()).intersection(self.roles)
+        if len(srcroles) == 1:
+            try:
+                t = self.db.transaction()
+                srcrole = srcroles.pop()
+                dstrole, readuser, writeuser = self.remap[srcrole]
+                if readuser:
+                    self.set_file_tag('read users', self.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=self.role)
+                if writeuser:
+                    self.set_file_tag('write users', self.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=self.role)
+                self.set_file_tag('owner', dstrole)
+                self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
+                t.commit()
+            except:
+                #et, ev, tb = sys.exc_info()
+                #web.debug('got exception during owner remap attempt',
+                #          traceback.format_exception(et, ev, tb))
+                t.rollback()
+        elif len(srcroles) > 1:
+            raise Conflict("Ambiguous remap rules encountered")
+            
         return results
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
@@ -479,6 +526,7 @@ class FileIO (Application):
             f.write(buf)
             buflen = len(buf)
             bytes = bytes + buflen
+            self.midDispatch()
 
             if clen != None:
                 if clen == bytes:
@@ -540,12 +588,11 @@ class FileIO (Application):
             except:
                 pass
             
-        self.log('DELETE', dataset=self.data_id)
-
-    def deletePrevious(self, result):
-        if result.local:
-            # previous result had local file, so free it
-            self.deleteFile(self.store_path + '/' + result.location)
+    def deletePrevious(self, files):
+        for result in files:
+            if result.local:
+                # previous result had local file, so free it
+                self.deleteFile(self.store_path + '/' + result.location)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -592,9 +639,10 @@ class FileIO (Application):
             if len(results) == 0:
                 return None
             else:
-                self.enforce_file_authz('write')
+                result = results[0]
+                self.enforce_file_authz('write', local=result.local)
                 if self.update:
-                    if results[0].local:
+                    if result.local:
                         self.location = result.location
                         filename = self.store_path + '/' + self.location
                         return open(filename, 'r+b')
@@ -641,7 +689,7 @@ class FileIO (Application):
 
         def postWritePostCommit(results):
             if len(results) > 0:
-                self.deletePrevious(results[0])
+                self.deletePrevious(results)
             uri = self.home + self.store_path + '/' + urlquote(self.data_id)
             web.header('Location', uri)
             if filename:
@@ -650,7 +698,6 @@ class FileIO (Application):
             else:
                 web.ctx.status = '204 No Content'
                 res = ''
-            self.log('CREATE', dataset=self.data_id)
             return res
 
         try:
@@ -671,7 +718,7 @@ class FileIO (Application):
             results = self.select_file()
             if len(results) == 0:
                 return True
-            self.enforce_file_authz('write')
+            self.enforce_file_authz('write', local=results[0].local)
             return True
 
         def preWritePostCommit(result):
@@ -682,23 +729,62 @@ class FileIO (Application):
 
         def putPostCommit(results):
             if len(results) > 0:
-                self.deletePrevious(results[0])
-            self.log('CREATE', dataset=self.data_id)
+                self.deletePrevious(results)
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
+            files = []
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
-            self.enforce_file_authz('write')
-            self.delete_file()
-            return results[0]
-
-        def deletePostCommit(result):
-            self.deletePrevious(result)
+            result = results[0]
+            self.enforce_file_authz('write', local=result.local)
+            files.append(result)
             if not result.local:
-                self.log('DELETE', dataset=self.data_id)
-            raise web.seeother('/file')
+                # custom DEI EIU hack, to proxy delete to all member files
+                try:
+                    results = self.select_file_tag('Image Set')
+                except:
+                    results = []
+                if len(results) > 0:
+                    self.predlist = [ dict(tag='Transmission Number', op='=', vals=[self.data_id]) ]
+                    for res in self.select_files_by_predlist():
+                        for f in self.select_file(data_id=res.file):
+                            files.append(f)
+            for res in files:
+                self.delete_file(res.name)
+                self.txlog('DELETE', dataset=res.name)
+            return files
+        
+        def deletePostCommit(files):
+            self.deletePrevious(files)
+            raise web.seeother(self.referer)
+
+        def preDeleteBody():
+            results = self.select_file()
+            if len(results) == 0:
+                raise NotFound(data='dataset %s' % (self.data_id))
+            result = results[0]
+            self.enforce_file_authz('write', local=result.local)
+            if result.local:
+                ftype = 'file'
+            else:
+                try:
+                    # custom DEI EIU hack, to proxy delete to all member files
+                    results = self.select_file_tag('Image Set')
+                    if len(results) > 0:
+                        ftype = 'imgset'
+                    else:
+                        ftype = 'url'
+                except:
+                    ftype = 'url'
+            return ftype
+
+        def preDeletePostCommit(result):
+            target = self.home + web.ctx.homepath
+            ftype = result
+            return self.renderlist("Delete Confirmation",
+                                   [self.render.ConfirmForm(target, ftype, self.data_id, self.referer, urlquote)])
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
@@ -748,17 +834,26 @@ class FileIO (Application):
             storage = web.input()
             self.action = storage.action
 
+            try:
+                self.referer = storage.referer
+            except:
+                self.referer = "/file"
+
+            #web.debug(self.referer)
+
             if self.action == 'delete':
-                target = self.home + web.ctx.homepath
-                return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(target, 'file', self.data_id, urlquote)])
+                return self.dbtransact(preDeleteBody, preDeletePostCommit)
             elif self.action == 'CancelDelete':
-                raise web.seeother('/file')
+                raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action == 'put':
+            elif self.action in [ 'put', 'putsq' ]:
                 # we only support URL PUT simulation this way
-                self.location = storage.url
+                if self.action == 'put':
+                    self.location = storage.url
+                elif self.action == 'putsq':
+                    # add title=name queryopt for stored queries
+                    self.location = storage.url + '?title=%s' % urlquote(self.data_id)
                 self.local = False
                 return self.dbtransact(putBody, putPostCommit)
 
@@ -767,3 +862,55 @@ class FileIO (Application):
 
         else:
             raise BadRequest(data="Content-Type %s not expected via this interface."% contentType)
+
+
+class LogFileIO (FileIO):
+
+    def __init__(self):
+        FileIO.__init__(self)
+
+
+    def GET(self, uri, sendBody=True):
+
+        if 'admin' not in self.roles:
+            raise Forbidden('read access to log file "%s"' % self.data_id)
+
+        if not self.log_path:
+            raise Conflict('log_path is not configured on this server')
+
+        if self.queryopts.get('action', None) == 'view':
+            disposition_name = None
+        else:
+            disposition_name = self.data_id
+
+        filename = self.log_path + '/' + self.data_id
+        try:
+            f = open(filename, "rb")
+            content_type = "text/plain"
+            
+            f.seek(0, 2)
+            length = f.tell()
+            f.seek(0, 0)
+
+            if sendBody:
+                web.ctx.status = '200 OK'
+                web.header('Content-type', content_type)
+                web.header('Content-Length', length)
+                if disposition_name:
+                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+
+                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                    self.midDispatch()
+                    yield buf
+            else:
+                web.header('Content-type', content_type)
+                web.header('Content-Length', length)
+
+            f.close()
+
+        
+        except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception in logfileIO',
+                      traceback.format_exception(et, ev, tb))
+            raise NotFound('log file "%s"' % self.data_id)

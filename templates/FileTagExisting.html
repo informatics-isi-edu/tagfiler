@@ -2,6 +2,8 @@ $def with (title, apptarget, tagspace, data_id, taginfo, urlquote)
 $if title != '':
 	<h2>${title}</h2>
 $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
+$ excludes = [ x for x in excludes ]
+$ excludes.append('owner')
 $if title == 'System' and data_id:
 	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(filetagvals) > 0:

@@ -1,9 +1,17 @@
+import re
 import urllib
 import web
 import psycopg2
 import os
 import logging
+import datetime
+import traceback
+import sys
 from logging.handlers import SysLogHandler
+try:
+    import webauthn
+except:
+    pass
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -22,72 +30,90 @@ render = None
 
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
-logger.addHandler(SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1))
+
+filehandler = logging.FileHandler('/var/www/tagfiler-logs/messages')
+fileformatter = logging.Formatter('%(asctime)s %(name)s: %(levelname)s: %(message)s')
+filehandler.setFormatter(fileformatter)
+logger.addHandler(filehandler)
+
+sysloghandler = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1)
+syslogformatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+sysloghandler.setFormatter(syslogformatter)
+logger.addHandler(sysloghandler)
+
 logger.setLevel(logging.INFO)
 
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
 
-class NotFound (web.HTTPError):
+class WebException (web.HTTPError):
+    def __init__(self, status, data='', headers={}):
+        m = re.match('.*MSIE.*',
+                     web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
+        if m:
+            status = '200 OK'
+        web.HTTPError.__init__(self, status, headers=headers, data=data)
+
+class NotFound (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Forbidden (web.HTTPError):
+class Forbidden (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Unauthorized (web.HTTPError):
+class Unauthorized (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class BadRequest (web.HTTPError):
+class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class Conflict (web.HTTPError):
+class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class IntegrityError (web.HTTPError):
+class IntegrityError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
-class RuntimeError (web.HTTPError):
+class RuntimeError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
         data = render.Error(status, desc, data)
-        web.HTTPError.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data)
 
 class Application:
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames' ]
+    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
     def __init__(self):
         "store common configuration data for all service classes"
@@ -95,23 +121,77 @@ class Application:
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
-        def getParam(suffix):
-            return web.ctx.env['%s.%s' % (myAppName, suffix)]
+        def getParam(suffix, default=None):
+            return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
-        self.dbnstr = getParam('dbnstr')
-        self.dbstr = getParam('dbstr')
+        def parseBoolString(theString):
+            if theString[0].upper() == 'T':
+                return True
+            else:
+                return False
+              
+        def getPolicyRules(rules):
+            remap = dict()
+            if rules:
+                rules = rules.split(';')
+                for rule in rules:
+                    rule = tuple(rule.split(','))
+                    srcrole,dstrole,read,write = rule
+                    remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
+            return remap
+
+        self.help = getParam('help')
+        self.jira = getParam('jira')
+        self.remap = getPolicyRules(getParam('policyrules', None))
+        self.dbnstr = getParam('dbnstr', 'postgres')
+        self.dbstr = getParam('dbstr', '')
         self.home = getParam('home')
         self.store_path = getParam('store_path')
+        self.log_path = getParam('log_path')
         self.template_path = getParam('template_path')
-        self.chunkbytes = int(getParam('chunkbytes'))
+        self.chunkbytes = int(getParam('chunkbytes', 1048576))
+        self.webauthnhome = getParam('webauthnhome')
+        self.webauthnrequire = getParam('webauthnrequire')
+        self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
+        self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
+        self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
+        self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
+        self.logo = getParam('logo', '')
+        self.subtitle = getParam('subtitle', '')
+        self.contact = getParam('contact', None)
+        self.db = None
+        self.logmsgs = []
+        self.middispatchtime = None
+        
+        if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
+            self.webauthnrequire = True
+        else:
+            self.webauthnrequire = False
+
+        self.role = None
+        self.roles = set([])
+        self.loginsince = None
+        self.loginuntil = None
+        self.sessguid = None
 
         self.render = web.template.render(self.template_path)
         render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
-        self.typenames = { '' : 'No content', 'int8' : 'Integer', 'float8' : 'Floating point',
-                           'date' : 'Date', 'timestamptz' : 'Date and time with timezone',
-                           'text' : 'Text' }
+        self.typenames = { '' : 'No content',
+                           'int8' : 'Integer',
+                           'float8' : 'Floating point',
+                           'date' : 'Date',
+                           'timestamptz' : 'Date and time with timezone',
+                           'text' : 'Text',
+                           'role' : 'Role' }
+
+        self.dbtypes = { 'int8' : 'int8',
+                         'float8' : 'float8',
+                         'date' : 'date',
+                         'timestamptz' : 'timestamptz',
+                         'text' : 'text',
+                         'role' : 'text' }
 
         self.ops = [ ('', 'Tagged'),
                      (':not:', 'Not tagged'),
@@ -141,22 +221,88 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
-        self.systemTags = ['created', 'modified', 'modified by', 'owner', 'bytes', 'name', 'url']
+        self.validators = { 'owner' : self.validateRole,
+                            'read users' : self.validateRolePattern,
+                            'write users' : self.validateRolePattern,
+                            'modified by' : self.validateRole }
+
+        self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
 
-    def log(self, action, dataset=None, tag=None, mode=None, user=None):
-        if tag and mode and user:
-            logger.info('tagfiler: %s user "%s" in tag "%s" %s by user %s.' % (action, user, tag, mode, self.user()))
-        elif dataset and tag:
-            logger.info('tagfiler: %s tag "%s" in dataset "%s" by user %s.' % (action, tag, dataset, self.user()))
-        elif dataset:
-            logger.info('tagfiler: %s dataset "%s" by user %s.' % (action, dataset, self.user()))
-        else:
-            logger.info('tagfiler: %s tag "%s" by user %s.' % (action, tag, self.user()))
+    def validateRole(self, role):
+        if self.webauthnhome:
+            results = webauthn.role.db_select_role(self.db, role=role)
+            if len(results) == 0:
+                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
 
-    def renderlist(self, title, renderlist):
+    def validateRolePattern(self, role):
+        if role in [ '*' ]:
+            return
+        if self.webauthnhome:
+            results = webauthn.role.db_select_role(self.db, role=role)
+            if len(results) == 0:
+                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
+
+    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        parts = []
+        if dataset:
+            parts.append('dataset "%s"' % dataset)
+        if tag:
+            parts.append('tag "%s"' % tag)
+        if value:
+            parts.append('value "%s"' % value)
+        if mode:
+            parts.append('mode "%s"' % mode)
+        if not user:
+            user = self.user()
+        return ('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user
+
+    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        logger.info(self.logfmt(action, dataset, tag, mode, user, value))
+
+    def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
+
+    def renderlist(self, title, renderlist, refresh=True):
+        if refresh:
+            pollmins = 1
+        else:
+            pollmins = None
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.user())] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(self.home + web.ctx.homepath, title, self.subtitle, self.logo, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, pollmins)] + renderlist + [self.render.Bottom()]])
+
+    def preDispatchFake(self, uri, app):
+        self.db = app.db
+        self.role = app.role
+        self.roles = app.roles
+        self.loginsince = app.loginsince
+        self.loginuntil = app.loginuntil
+
+    def preDispatch(self, uri):
+        if self.webauthnhome:
+            if not self.db:
+                self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+            authn = webauthn.session.test_and_update_session(self.db,
+                                                             expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
+                                                             rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+                                                             referer=self.home + uri)
+            if authn:
+                self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
+            elif self.webauthnrequire:
+                raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
+
+    def postDispatch(self, uri=None):
+        if self.webauthnhome:
+            webauthn.session.test_and_update_session(self.db, self.sessguid,
+                                                     expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
+                                                     rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+                                                     ignoremustchange=True)
+
+    def midDispatch(self):
+        now = datetime.datetime.now()
+        if self.middispatchtime == None or (now - self.middispatchtime).seconds < 10:
+            self.postDispatch()
+            self.middispatchtime = now
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
@@ -164,11 +310,13 @@ class Application:
            using caller-provided thunks under boilerplate
            commit/rollback/retry logic
         """
-        self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+        if not self.db:
+            self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
         count = 0
         limit = 10
         while True:
             t = self.db.transaction()
+            self.logmsgs = []
             count = count + 1
             try:
                 bodyval = body()
@@ -177,13 +325,14 @@ class Application:
             # syntax "Type as var" not supported by Python 2.4
             except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                 t.rollback()
+                web.debug(te)
                 raise te
             except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                 t.rollback()
                 raise BadRequest(data='Logical error: ' + str(te))
             except TypeError, te:
                 t.rollback()
-                web.debug(te)
+                web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
                 raise RuntimeError(data=str(te))
             except (psycopg2.IntegrityError, IOError), te:
                 t.rollback()
@@ -196,6 +345,9 @@ class Application:
                 t.rollback()
                 web.debug('got unknown exception from body in dbtransact')
                 raise
+        for msg in self.logmsgs:
+            logger.info(msg)
+        self.logmsgs = []
         return postCommit(bodyval)
 
     def acceptPair(self, s):
@@ -229,7 +381,11 @@ class Application:
 
     def user(self):
         try:
-            user = web.ctx.env['REMOTE_USER']
+            if self.webauthnhome:
+                user = self.role
+            else:
+                user = web.ctx.env['REMOTE_USER']
+                self.roles = set([ user ])
         except:
             return None
         return user
@@ -240,22 +396,30 @@ class Application:
            True: access allowed
            False: access forbidden
            None: user needs to authenticate to be sure"""
-        user = self.user()
+        user = self.user() # initializes self.roles if needed...
         if data_id == None:
             data_id = self.data_id
         if owner == None:
             owner = self.owner(data_id=data_id)
-        if owner and user == owner:
-            return True
         try:
-            results = [ res.value for res in self.select_file_acl(mode, user, data_id) ]
+            authorized = [ res.value for res in self.select_file_acl(mode, data_id) ]
         except:
-            results = []
-            
-        if user in results or '*' in results:
-            return True
-        elif user:
-            return False
+            authorized = []
+        if owner:
+            authorized.append(owner)
+        else:
+            pass
+            # authorized.append('*')  # fall back to public model w/o owner?
+
+        authorized.append('root') # allow root to do everything in case of trouble?
+
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+            if roles.intersection(set(authorized)):
+                return True
+            else:
+                return False
         else:
             return None
 
@@ -270,7 +434,7 @@ class Application:
         if tagname == None:
             tagname = self.tag_id
         if user == None:
-            user = self.user()
+            user = self.user() # initializes self.roles if needed...
         if fowner == None and data_id:
             fowner = self.owner(data_id)
         
@@ -291,27 +455,33 @@ class Application:
         elif model == 'system':
             return False
         elif model == 'fowner':
-            owner = fowner
-            results = []
+            authorized = [ fowner ]
         elif model == 'file':
-            owner = fowner
             try:
-                results = [ res.value for res in self.select_file_acl(mode, user, data_id=data_id) ]
+                authorized = [ res.value for res in self.select_file_acl(mode, data_id=data_id) ]
             except:
-                results = []
+                authorized = [ ]
+            if fowner:
+                authorized.append(fowner)
+            else:
+                pass
+                #authorized.append('*') # fall back to public model w/o owner?
         elif model == 'tag':
-            owner = tagdef.owner
             try:
-                results = [ res.value for res in self.select_tag_acl(mode, user, tagname) ]
+                authorized = [ res.value for res in self.select_tag_acl(mode, None, tagname) ]
             except:
-                results = []
+                authorized = [ ]
+            authorized.append(tagdef.owner)
 
-        if owner and user == owner:
-            return True
-        elif user in results or '*' in results:
-            return True
-        elif user:
-            return False
+        authorized.append('root') # allow root to do everything in case of trouble?
+
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+            if roles.intersection(set(authorized)):
+                return True
+            else:
+                return False
         else:
             return None
 
@@ -324,37 +494,60 @@ class Application:
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
         if mode == 'write':
-            if user:
-                return user == tagdef.owner
+            if self.roles:
+                return tagdef.owner in self.roles
             else:
                 return None
         else:
             return True
 
-    def enforce_file_authz(self, mode):
+    def enforce_file_authz(self, mode, data_id=None, local=False, owner=None):
         """Check whether access is allowed and throw web exception if not."""
-        allow = self.test_file_authz(mode)
+        if data_id == None:
+            data_id = self.data_id
+        if mode == 'write':
+            if not local:
+                try:
+                    results = self.select_file_tag('Image Set', data_id=data_id)
+                    if len(results) > 0:
+                        local = True
+                except:
+                    pass
+            if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
+                raise Forbidden(data="access to immutable dataset %s" % data_id)
+        allow = self.test_file_authz(mode, data_id=data_id, owner=owner)
         if allow == False:
-            raise Forbidden(data="access to dataset %s" % self.data_id)
+            raise Forbidden(data="access to dataset %s" % data_id)
         elif allow == None:
-            raise Unauthorized(data="access to dataset %s" % self.data_id)
+            raise Unauthorized(data="access to dataset %s" % data_id)
         else:
             pass
 
-    def enforce_tag_authz(self, mode, tagname=None):
+    def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
+        status = web.ctx.status
+        try:
+            self.enforce_file_authz(mode, data_id=data_id, local=local, owner=owner)
+            return True
+        except:
+            web.ctx.status = status
+            return False
+
+    def enforce_tag_authz(self, mode, tagname=None, data_id=None):
         """Check whether access is allowed and throw web exception if not."""
-        fowner = self.owner()
+        if data_id == None:
+            data_id = self.data_id
+        fowner = self.owner(data_id=data_id)
         user = self.user()
-        results = self.select_file()
         if tagname == None:
             tagname = self.tag_id
+        results = self.select_file(data_id=data_id)
         if len(results) == 0:
-            raise NotFound(data="dataset %s" % self.data_id)
-        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner)
+            raise NotFound(data="dataset %s" % data_id)
+        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id)
         if allow == False:
-            raise Forbidden(data="access to tag %s on dataset %s" % (tagname, self.data_id))
+            raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
         elif allow == None:
-            raise Unauthorized(data="access to tag %s on dataset %s" % (tagname, self.data_id))
+            raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
         else:
             pass
 
@@ -387,8 +580,10 @@ class Application:
                 pass
         return values
 
-    def select_file(self):
-        results = self.db.select('files', where="name = $name", vars=dict(name=self.data_id))
+    def select_file(self, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
+        results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
         return results
 
     def insert_file(self):
@@ -399,9 +594,11 @@ class Application:
         self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
                       vars=dict(name=self.data_id, location=self.location, local=self.local))
 
-    def delete_file(self):
+    def delete_file(self, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
         self.db.query("DELETE FROM files where name = $name",
-                      vars=dict(name=self.data_id))
+                      vars=dict(name=data_id))
 
     def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
         tables = [ 'tagdefs' ]
@@ -422,7 +619,13 @@ class Application:
             policy = dict(read='readpolicy', write='writepolicy')[staticauthz]
             tables.append("%s USING (tagname)" % table)
             if user != None:
-                wheres.append("%s != 'tag' OR owner = $user OR value = $user" % policy)
+                parts = [ "%s != 'tag'" % policy, "owner = $user" ]
+                r = 0
+                for role in self.roles:
+                    parts.append("value = $role%s" % r)
+                    vars['role%s' % r] = role
+                    r += 1
+                wheres.append(" OR ".join(parts))
                 vars['user'] = user
             else:
                 wheres.append("%s != 'tag'" % policy)
@@ -443,15 +646,21 @@ class Application:
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
-        if self.typestr != '':
-            tabledef += ", value %s" % (self.typestr)
+        indexdef = ''
+        if self.dbtypes.get(self.typestr, '') != '':
+            tabledef += ", value %s" % (self.dbtypes[self.typestr])
         if not self.multivalue:
             if self.typestr != '':
                 tabledef += ", UNIQUE(file, value)"
+                indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
+                indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
+                indexdef += ' (value)'
             else:
                 tabledef += ", UNIQUE(file)"
         tabledef += " )"
         self.db.query(tabledef)
+        if indexdef:
+            self.db.query(indexdef)
 
     def delete_tagdef(self):
         self.db.query("DELETE FROM tagdefs WHERE tagname = $tag_id",
@@ -484,7 +693,7 @@ class Application:
                 if owner and owner != user:
                     return []
             elif tagdef.readpolicy == 'file':
-                if  not self.test_file_authz('read', owner=owner):
+                if  not self.test_file_authz('read', data_id=data_id, owner=owner):
                     return []
 
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) 
@@ -498,13 +707,13 @@ class Application:
             data_id = self.data_id
         return self.db.query(query, vars=dict(file=data_id, value=value))
 
-    def select_file_acl(self, mode, user, data_id=None):
+    def select_file_acl(self, mode, data_id=None):
         if data_id == None:
             data_id = self.data_id
         tagname = dict(read='read users', write='write users')[mode]
         query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file AND (value = $value OR value = $any)"
-        vars=dict(file=data_id, value=user, any="*")
+                + " WHERE file = $file"
+        vars=dict(file=data_id)
         return self.db.query(query, vars=vars)
 
     def select_tag_acl(self, mode, user=None, tag_id=None):
@@ -513,11 +722,12 @@ class Application:
         table = dict(read='tagreaders', write='tagwriters')[mode]
         wheres = [ 'tagname = $tag_id' ]
         vars = dict(tag_id=tag_id)
-        if user != None:
+        if user:
             wheres.append('value = $user')
             vars['user'] = user
         wheres = " AND ".join(wheres)
         query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
+        web.debug(query)
         return self.db.query(query, vars=vars)
 
     def set_tag_acl(self, mode, user, tag_id):
@@ -538,12 +748,14 @@ class Application:
         query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
         return self.db.query(query)
 
-    def select_filetags(self, tagname=None, where=None, user=None):
+    def select_filetags(self, tagname=None, where=None, data_id=None, user=None):
         wheres = []
         vars = dict()
-        if self.data_id:
+        if data_id == None:
+            data_id = self.data_id
+        if data_id:
             wheres.append("file = $file")
-            vars['file'] = self.data_id
+            vars['file'] = data_id
         if where:
             wheres.append(where)
         if tagname:
@@ -559,43 +771,51 @@ class Application:
         return [ result for result in self.db.query(query, vars=vars)
                  if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
-    def delete_file_tag(self, tagname, value=None, owner=None):
+    def delete_file_tag(self, tagname, value=None, data_id=None, owner=None):
         if value == '':
             whereval = " AND value IS NULL"
         elif value:
             whereval = " AND value = $value"
         else:
             whereval = ""
+        if data_id == None:
+            data_id = self.data_id
         self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
                       + " WHERE file = $file" + whereval,
-                      vars=dict(file=self.data_id, value=value))
-        results = self.select_file_tag(tagname, owner=owner)
+                      vars=dict(file=data_id, value=value))
+        results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
         if len(results) == 0:
             # there may be other values tagged still
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
-                           vars=dict(file=self.data_id, tagname=tagname))
+                           vars=dict(file=data_id, tagname=tagname))
 
-    def set_file_tag(self, tagname, value, owner=None):
+    def set_file_tag(self, tagname, value=None, data_id=None, owner=None):
+        validator = self.validators.get(tagname)
+        if validator:
+            validator(value)
         try:
             results = self.select_tagdef(tagname)
             result = results[0]
             tagtype = result.typestr
             multivalue = result.multivalue
         except:
-            raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
+            raise BadRequest(data="The tag %s is not defined on this server." % tagname)
+
+        if data_id == None:
+            data_id = self.data_id
 
         if not multivalue:
-            results = self.select_file_tag(tagname, owner=owner)
+            results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
             if len(results) > 0:
                 # drop existing value so we can reinsert one standard way
-                self.delete_file_tag(tagname)
+                self.delete_file_tag(tagname, data_id=data_id)
         else:
-            results = self.select_file_tag(tagname, value, owner=owner)
+            results = self.select_file_tag(tagname, value, data_id=data_id, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
 
-        if value:
+        if tagtype != '' and value != None:
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
                     + " ( file, value ) VALUES ( $file, $value )" 
         else:
@@ -604,19 +824,22 @@ class Application:
                     + " ( file ) VALUES ( $file )"
 
         #web.debug(query)
-        self.db.query(query, vars=dict(file=self.data_id, value=value))
+        self.db.query(query, vars=dict(file=data_id, value=value))
         
-        results = self.select_filetags(tagname)
+        results = self.select_filetags(tagname, data_id=data_id)
         if len(results) == 0:
             self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
-                          vars=dict(file=self.data_id, tagname=tagname))
+                          vars=dict(file=data_id, tagname=tagname))
         else:
             # may already be reverse-indexed in multivalue case
             pass            
 
-    def select_files_by_predlist(self):
+    def select_files_by_predlist(self, predlist=None):
+        if predlist == None:
+            predlist = self.predlist
+
         tagdefs = dict()
-        for pred in self.predlist:
+        for pred in predlist:
             results = self.select_tagdef(pred['tag'])
             if len(results) == 0:
                 raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
@@ -625,39 +848,55 @@ class Application:
                 user = self.user()
                 if user == None:
                     raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
-                if tagdef.readpolicy == 'tag' and tagdef.owner != user:
-                    results = self.select_tag_acl('read', user=user, tag_id=tagdef.tagname)
-                    if len(results) == 0:
+                if tagdef.readpolicy == 'tag':
+                    authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
+                    authorized.append(tagdef.owner)
+                    roles = self.roles.copy()
+                    if roles:
+                        roles.add('*')
+                    if not roles.intersection(set(authorized)):
                         # this is statically known, so either warn user (friendly)
                         # or return an empty result set since nothing can match?
                         raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
             tagdefs[tagdef.tagname] = tagdef
 
-        tables = ['_owner']
-        excepttables = ['_owner'] # only gets used if others are appended
+        tables = ['files', '_owner ON (files.name = _owner.file)']
+        excepttables = ['files', '_owner ON (files.name = _owner.file)'] # only gets used if others are appended
         wheres = []
         exceptwheres = []
         values = dict()
 
-        for p in range(0, len(self.predlist)):
-            pred = self.predlist[p]
+        readclauses = []
+        rn = 0
+        roles = self.roles.copy()
+        if roles:
+            roles.add('*')
+        for role in roles:
+            readclauses.append('_owner.value = $r%s' % rn)
+            readclauses.append('"_read users".value = $r%s' % rn)
+            values['r%s' % rn] = role
+            rn += 1
+        readclauses = " OR ".join(readclauses)
+
+        for p in range(0, len(predlist)):
+            pred = predlist[p]
             tag = pred['tag']
             op = pred['op']
             vals = pred['vals']
             tagdef = tagdefs[tag]
             if op == ':not:':
                 # a non-NULL match excludes the file, but only if user can see that match
-                excepttables.append('"%s" AS t%s ON (_owner.file = t%s.file)' % (self.wraptag(tag), p, p))
+                excepttables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
                 if tagdef.readpolicy == 'fowner':
                     exceptwheres.append('t%s.file IS NOT NULL AND _owner.value = $client' % p)
                 elif tagdef.readpolicy == 'file':
                     # note this case is irrelevant because user cannot find files they cannot read
                     # but here for documentation purposes, in case that rule is relaxed
-                    exceptwheres.append('t%s.file IS NOT NULL AND (_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\')' % p)
+                    exceptwheres.append('t%s.file IS NOT NULL AND (%s)' % (p, readclauses))
                 else:
                     exceptwheres.append('t%s.file IS NOT NULL' % p)
             else:
-                tables.append("\"%s\" AS t%s USING (file)" % (self.wraptag(tag), p))
+                tables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
@@ -675,28 +914,41 @@ class Application:
                     # wheres.append('OR "_read users".value = $client OR "_read users".value = \'*\'')
             
         tables = " JOIN ".join(tables)
-        tables += ' LEFT OUTER JOIN "_read users" USING (file)'
-        wheres.append('_owner.value = $client OR "_read users".value = $client OR "_read users".value = \'*\'')
+        tables += ' LEFT OUTER JOIN "_read users" ON (files.name = "_read users".file)'
+
+        # custom DEI hack
+        tables += ' LEFT OUTER JOIN "_Image Set" ON (files.name = "_Image Set".file)'
+        tables += ' LEFT OUTER JOIN "_Downloaded" ON (files.name = "_Downloaded".file)'
+
+        wheres.append(readclauses)
         values["client"] = self.user()
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
             wheres = "WHERE " + wheres
 
-        query = 'SELECT file, _owner.value AS owner FROM %s %s GROUP BY file, owner' % (tables, wheres)
+        query = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (tables, wheres)
 
-        if len(excepttables) > 1:
+        if len(excepttables) > 2:
             excepttables.append('"_read users" ON (_owner.file = "_read users".file)')
+
+            # custom DEI hack
+            excepttables.append('"_Image Set" ON (files.name = "_Image Set".file)')
+            excepttables.append('"_Downloaded" ON (files.name = "_Downloaded".file)')
+
             excepttables = " LEFT OUTER JOIN ".join(excepttables)
             exceptwheres = " AND ".join(["(%s)" % where for where in exceptwheres])
             if exceptwheres:
                 exceptwheres = "WHERE " + exceptwheres
-            query2 = 'SELECT _owner.file AS file, _owner.value AS owner FROM %s %s GROUP BY _owner.file, owner' % (excepttables, exceptwheres)
+            query2 = 'SELECT files.name AS file, files.local AS local, _owner.value AS owner, "_Image Set".file AS imgset, ("_Downloaded".file IS NOT NULL) AS downloaded FROM %s %s GROUP BY files.name, files.local, owner, imgset, downloaded' % (excepttables, exceptwheres)
             query = '(%s) EXCEPT (%s)' % (query, query2)
 
         query += " ORDER BY file"
         
         #web.debug(query)
-        #for l in self.db.query('explain analyze %s' % query, vars=values):
-        #    web.debug(l)
         return self.db.query(query, vars=values)
+
+    def select_next_transmit_number(self):
+        query = "SELECT NEXTVAL ('transmitnumber')"
+        result = self.db.query(query)
+        return str(result[0].nextval).rjust(9, '0')
 

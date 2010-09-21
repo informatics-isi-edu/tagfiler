@@ -31,7 +31,12 @@ keywords = {
     'simto' : 'SIMTO',
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
-    'not' : 'NOT'
+    'not' : 'NOT',
+    'transmitnumber' : 'TRANSMITNUMBER',
+    'study' : 'STUDY',
+    'appleterror' : 'APPLETERROR',
+    'log' : 'LOG',
+    'contact' : 'CONTACT'
 }
 
 tokens = [ 'STRING' ] + list(keywords.values())
@@ -56,5 +61,5 @@ def t_error(t):
     raise LexicalError()
 
 def make_lexer():
-    return lex.lex(debug=False)
+    return lex.lex(debug=False, optimize=0, lextab='urllextab')
 

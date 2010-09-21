@@ -1,10 +1,20 @@
-$def with (target)
-<h2>Getting Started</h2>
+$def with (target, roles, urlquote, webauthnhome, help, jira)
+<p><b>Welcome to the DIRC Client Data Uploader System.
+$if len(set(roles).intersection(['dirc', 'uploader'])) > 0:
+	Click Upload Study to start image submission.
+$if len(set(roles).intersection(['dirc', 'downloader'])) > 0:
+	Use stored queries or click Download Study to access images.
+</b></p>
 <ol>
-  <li><a href="${target}/file?action=define">Define a new dataset</a></li>
-  <li><a href="${target}/tagdef">Manage available tag definitions</a></li>
-  <li><a href="${target}/query?action=edit">Query datasets by tags</a></li>
-  <li><a href="https://confluence.misd.isi.edu:8443/display/PSOC/PSOC+Tagfiler+Data+Repository">Help and documentation</a> (uses same login information as this service)</li>
-  <li><a href="https://jira.chigrid.org:8444/browse/PSOC">View or submit bug reports/issues</a> (uses same login information as this service)</li>
+  $if 'admin' in roles:
+  	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
+  $if 'dirc' in roles:
+  	<li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
+  	<li><a href="${target}/study?action=download">Download DIRC study</a></li>
+	<li><a href="${target}/query?action=edit">Query by tags</a></li>
+	<li><a href="${help}">Help and documentation</a></li>
+	<li><a href="${jira}">View or submit bug reports/issues</a></li>
+	<li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
+	<li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>
-<h2>Existing Datasets</h2>
+

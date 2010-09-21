@@ -1,4 +1,5 @@
 import ply.yacc as yacc
+import threading
 
 from url_lex import make_lexer, tokens
 
@@ -17,6 +18,12 @@ def p_start(p):
              | tagdefacl
              | tags
              | query
+             | transmitnumber
+             | study
+             | appleterror
+             | loglist
+             | log
+             | contact
 """
     p[0] = p[1]
 
@@ -27,6 +34,15 @@ def p_filelist(p):
                 | slash string slash FILE slash"""
     p[0] = url_ast.FileList(appname=p[2])
     
+def p_loglist(p):
+    """loglist : slash string slash LOG
+               | slash string slash LOG slash"""
+    p[0] = url_ast.LogList(appname=p[2])
+
+def p_contact(p):
+    """contact : slash string slash CONTACT"""
+    p[0] = url_ast.Contact(appname=p[2])
+    
 def p_filelist_opts(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
@@ -35,6 +51,14 @@ def p_file(p):
     """file : slash string slash FILE slash string
             | slash string slash FILE slash string slash"""
     p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
+
+def p_log(p):
+    """log : slash string slash LOG slash string"""
+    p[0] = url_ast.LogId(appname=p[2], data_id=p[6])
+
+def p_log_opts(p):
+    """file : slash string slash LOG slash string queryopts"""
+    p[0] = url_ast.LogId(appname=p[2], data_id=p[6], queryopts=p[7])
 
 def p_file_opts(p):
     """file : slash string slash FILE slash string queryopts"""
@@ -223,6 +247,34 @@ def p_queryopts_grow_short(p):
     p[0] = p[1]
     p[0][p[3]] = None
 
+def p_transmit_number(p):
+    """transmitnumber : slash string slash TRANSMITNUMBER """
+    p[0] = url_ast.TransmitNumber(appname=p[2])
+
+def p_study(p):
+    """study : slash string slash STUDY"""
+    p[0] = url_ast.Study(appname=p[2])
+
+def p_study_num(p):
+    """study : slash string slash STUDY slash string"""
+    p[0] = url_ast.Study(appname=p[2], data_id=p[6])
+
+def p_study_num_opts(p):
+    """study : slash string slash STUDY slash string queryopts"""
+    p[0] = url_ast.Study(appname=p[2], data_id=p[6], queryopts=p[7])
+
+def p_study_opts(p):
+    """study : slash string slash STUDY queryopts"""
+    p[0] = url_ast.Study(appname=p[2], queryopts=p[5])
+
+def p_appleterror(p):
+    """appleterror : slash string slash APPLETERROR"""
+    p[0] = url_ast.AppletError(appname=p[2])
+
+def p_appleterror_opts(p):
+    """appleterror : slash string slash APPLETERROR queryopts"""
+    p[0] = url_ast.AppletError(appname=p[2], queryopts=p[5])
+
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):
     """slash : '/'
@@ -278,13 +330,18 @@ def make_parser():
     # use this to shut it up: errorlog=yacc.NullLogger()
     # NullLogger attribute not supported by Python 2.4
     # return yacc.yacc(debug=False, errorlog=yacc.NullLogger())
-    return yacc.yacc(debug=False)
+    return yacc.yacc(debug=False, optimize=0, tabmodule='urlparsetab', write_tables=0)
 #    return yacc.yacc()
 
 def make_parse():
     parser = make_parser()
     lexer = make_lexer()
+    lock = threading.Lock()
     def parse(s):
-        return parser.parse(s, lexer=lexer)
+        lock.acquire()
+        try:
+            return parser.parse(s, lexer=lexer)
+        finally:
+            lock.release()
     return parse
 

@@ -1,10 +1,15 @@
 # define abstract syntax tree nodes for more readable code
 
+import traceback
+import sys
 import web
 import urllib
 import re
+import os
+import webauthn
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote
-from rest_fileio import FileIO
+from rest_fileio import FileIO, LogFileIO
+
 
 def listmax(list):
     if len(list) > 0:
@@ -20,6 +25,147 @@ class Node (object, Application):
     def __init__(self, appname):
         self.appname = appname
         Application.__init__(self)
+
+    def uri2referer(self, uri):
+        return self.home + uri
+
+class TransmitNumber (Node):
+    """Represents a transmitnumber URI
+
+       POST tagfiler/transmitnumber
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname):
+        Node.__init__(self, appname)
+
+    def POST(self, uri):
+
+        def body():
+            result  = self.select_next_transmit_number()
+            return result
+
+        def postCommit(results):
+            uri = self.home + '/transmitnumber/' + results
+            web.header('Location', results)
+            return results
+
+        return self.dbtransact(body, postCommit)
+
+class Study (Node):
+    """Represents a study URI
+
+       GET tagfiler/study?action=upload
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname, data_id=None, queryopts={}):
+        Node.__init__(self, appname)
+        self.action = 'get'
+        self.data_id = data_id
+        self.status = None
+        self.direction = 'upload'
+
+    def body(self):
+        if self.action == 'get' and self.data_id:
+            tagnames = [ 'Sponsor', 'Protocol', 'Investigator Last Name',
+                         'Investigator First Name', 'Study Site Number',
+                         'Patient Study ID', 'Study Visit', 'Image Type',
+                         'Eye', 'Capture Date', 'Comment' ]
+            files = [ res.file for res
+                      in self.select_files_by_predlist([{'tag' : 'Transmission Number',
+                                                         'op' : '=',
+                                                         'vals' : [ self.data_id ]}]) ]
+            tags = [ (tagname, [ res.value for res
+                                 in self.select_file_tag(tagname=tagname,
+                                                          data_id=self.data_id) ])
+                     for tagname in tagnames ]
+            if self.status == 'success':
+                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
+            else:
+                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.data_id)
+        else:
+            tags = []
+            files = []
+        return (tags, files)
+
+    def postCommit(self, results):
+        tags, files = results
+        if self.action == 'upload':
+            target = self.home + web.ctx.homepath
+            return self.renderlist("Study Upload",
+                                   [self.render.TreeUpload(target, self.webauthnexpiremins)])
+        elif self.action == 'download':
+            target = self.home + web.ctx.homepath
+            return self.renderlist("Study Download",
+                                   [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins)])
+        elif self.action == 'get':
+            success = None
+            error = None
+            if self.status == 'success':
+                success = 'All files were successfully %sed.' % self.direction
+            elif self.status == 'error':
+                error = 'An unknown error prevented a complete %s.' % self.direction
+            else:
+                error = self.status
+                
+            if self.data_id:
+                return self.renderlist(None,
+                                       [self.render.TreeStatus(self.data_id, tags, files, self.direction, success, error)])
+            else:
+                url = '/appleterror'
+                if self.status:
+                    url += '?status=%s' % urlquote(self.status)
+                raise web.seeother(url)
+        else:
+            raise BadRequest('Unrecognized action form field.')
+
+    def GET(self, uri):
+        storage = web.input()
+        try:
+            self.action = storage.action
+        except:
+            pass
+
+        try:
+            self.direction = storage.direction
+        except:
+            pass
+
+        try:
+            self.status = storage.status
+        except:
+            pass
+
+        return self.dbtransact(self.body, self.postCommit)
+
+class AppletError (Node):
+    """Represents an appleterror URI
+
+       GET tagfiler/appleterror?status=string
+    """
+
+    __slots__ = []
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+        self.action = None
+        self.status = None
+
+    def GET(self, uri):
+        storage = web.input()
+        try:
+            self.status = storage.status
+        except:
+            pass
+
+        # the applet needs to manage expiration itself
+        # since it may be active while the html page is idle
+        target = self.home + web.ctx.homepath
+        return self.renderlist("Study Transfer Applet",
+                               [self.render.AppletError(self.status)])
 
 class FileList (Node):
     """Represents a bare FILE/ URI
@@ -44,16 +190,24 @@ class FileList (Node):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
             else:
                 self.predlist=[]
+
+            #results = self.select_tagdef(tagname='Image Set')
+            #if len(results) > 0:
+            #    self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
+                
             return [ (res.file,
-                      self.test_file_authz('write', owner=res.owner, data_id=res.file) )
+                      res.local,
+                      self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
+                      res.imgset != None,
+                      res.downloaded)
                       for res in self.select_files_by_predlist() ]
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = results
-            return self.renderlist("Repository Summary",
-                                   [self.render.Commands(target),
-                                    self.render.FileList(target, files, urlquote)])
+            return self.renderlist(None,
+                                   [self.render.Commands(target, self.roles, urlquote, self.webauthnhome, self.help, self.jira),
+                                    self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
 
         storage = web.input()
         action = None
@@ -97,6 +251,66 @@ class FileList (Node):
         else:
             return self.dbtransact(body, postCommit)
 
+    def POST(self, uri):
+        storage = web.input()
+        name = None
+        url = None
+        try:
+            action = storage.action
+            name = storage.name
+            url = storage.url
+        except:
+            raise BadRequest('Expected action, name, and url form fields.')
+        ast = FileId(appname=self.appname,
+                     data_id=name,
+                     location=url,
+                     local=False)
+        ast.preDispatchFake(uri, self)
+        return ast.POST(uri)
+
+class LogList (Node):
+    """Represents a bare LOG/ URI
+
+       GET LOG or LOG/  -- gives a listing
+       """
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+
+    def GET(self, uri):
+        if 'admin' not in self.roles:
+            raise Forbidden('listing of log files')
+        
+        if self.log_path:
+            lognames = sorted(os.listdir(self.log_path), reverse=True)
+                              
+        else:
+            lognames = []
+        
+        target = self.home + web.ctx.homepath
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType == 'text/uri-list':
+                # return raw results for REST client
+                return self.render.LogUriList(target, lognames, urlquote)
+            elif acceptType == 'text/html':
+                break
+        return self.renderlist("Available logs",
+                               [self.render.LogList(target, lognames, urlquote)])
+
+class Contact (Node):
+    """Represents a bare CONTACT URI
+
+       GET CONTACT
+       """
+
+    def __init__(self, appname, queryopts={}):
+        Node.__init__(self, appname)
+
+    def GET(self, uri):
+        
+        target = self.home + web.ctx.homepath
+        return self.renderlist("Contact Us",
+                               [self.render.Contact(target, self.contact)])
 
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
@@ -111,6 +325,19 @@ class FileId(Node, FileIO):
         self.data_id = data_id
         self.location = location
         self.local = local
+        self.queryopts = queryopts
+
+class LogId(Node, LogFileIO):
+    """Represents a direct LOG/data_id URI
+
+       Just creates filename and lets LogFileIO do the work.
+
+    """
+    __slots__ = [ 'data_id' ]
+    def __init__(self, appname, data_id, queryopts={}):
+        Node.__init__(self, appname)
+        LogFileIO.__init__(self)
+        self.data_id = data_id
         self.queryopts = queryopts
 
 class Tagdef (Node):
@@ -264,17 +491,33 @@ class Tagdef (Node):
             for key in storage.keys():
                 if key[0:4] == 'tag-':
                     if storage[key] != '':
-                        typestr = storage['type-%s' % (key[4:])]
-                        readpolicy = storage['readpolicy-%s' % (key[4:])]
-                        writepolicy = storage['writepolicy-%s' % (key[4:])]
-                        multivalue = storage['multivalue-%s' % (key[4:])]
+                        try:
+                            typestr = storage['type-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A tag type must be specified.")
+                        try:
+                            readpolicy = storage['readpolicy-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A read policy must be specified.")
+                        try:
+                            writepolicy = storage['writepolicy-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="A write policy must be specified.")
+                        try:
+                            multivalue = storage['multivalue-%s' % (key[4:])]
+                        except:
+                            raise BadRequest(data="The value cardinality must be specified.")
                         self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, multivalue)
             try:
                 self.tag_id = storage.tag
             except:
                 pass
-            
+        except BadRequest:
+            raise
         except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception during tagdef form post',
+                      traceback.format_exception(et, ev, tb))
             raise BadRequest(data="Error extracting form data.")
 
         def body():
@@ -301,7 +544,7 @@ class Tagdef (Node):
         def postCommit(results):
             if self.action == 'delete':
                 return self.renderlist("Delete Confirmation",
-                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, urlquote)])
+                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, self.uri2referer(uri), urlquote)])
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
@@ -319,6 +562,7 @@ class FileTags (Node):
         self.tag_id = tag_id
         self.value = value
         self.apptarget = self.home + web.ctx.homepath
+        self.referer = None
         if tagvals:
             self.tagvals = tagvals
         else:
@@ -353,6 +597,7 @@ class FileTags (Node):
                 values.append(value)
             except:
                 pass
+        self.txlog('GET', dataset=self.data_id, tag=self.tag_id)
         return values
 
     def get_tag_postCommit(self, values):
@@ -383,16 +628,20 @@ class FileTags (Node):
                  filetags,
                  filetagvals,
                  length )
+
+    def buildroleinfo(self):
+        return [ res.role for res in webauthn.role.db_select_role(self.db) ]
     
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-
+        self.txlog('GET ALL TAGS', dataset=self.data_id)
         return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                 self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
-                self.buildtaginfo('', '') )                                           # all
+                self.buildtaginfo('', ''),                                            # all
+                self.buildroleinfo())                                                 # roleinfo
 
     def get_title_one(self):
         return 'Tags for dataset "%s"' % self.data_id
@@ -401,19 +650,19 @@ class FileTags (Node):
         return 'Tags for all datasets'
 
     def get_all_html_render(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
-                                    self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
-                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote),
+                                   [self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
+                                    self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
+                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote, roleinfo),
                                     self.render.TagdefNewShortcut('Define more tags', self.apptarget)])
         else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', self.apptarget, 'tags', self.data_id, all, urlquote)])       
 
     def get_all_postCommit(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 
@@ -459,6 +708,16 @@ class FileTags (Node):
             return self.GETall(uri)
 
     def put_body(self):
+        try:
+            # custom DEI EIU hack, proxy tag ops on Image Set to all member files
+            results = self.select_file_tag('Image Set')
+            if len(results) > 0:
+                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+            else:
+                subfiles = []
+        except:
+            subfiles = []
         for tag_id in self.tagvals.keys():
             results = self.select_tagdef(tag_id)
             if len(results) == 0:
@@ -466,7 +725,12 @@ class FileTags (Node):
             self.enforce_tag_authz('write', tag_id)
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
-            self.log('SET', dataset=self.data_id, tag=tag_id)
+                self.txlog('SET', dataset=self.data_id, tag=tag_id, value=value)
+                if tag_id in [ 'read users', 'write users', 'owner' ]:
+                    for subfile in subfiles:
+                        self.enforce_tag_authz('write', tag_id, data_id=subfile)
+                        self.txlog('SET', dataset=subfile, tag=tag_id, value=value)
+                        self.set_file_tag(tag_id, value, data_id=subfile)
         return None
 
     def put_postCommit(self, results):
@@ -500,12 +764,27 @@ class FileTags (Node):
         return self.dbtransact(self.put_body, self.put_postCommit)
 
     def delete_body(self):
+        try:
+            # custom DEI EIU hack
+            results = self.select_file_tag('Image Set')
+            if len(results) > 0:
+                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+            else:
+                subfiles = []
+        except:
+            subfiles = []
         self.enforce_tag_authz('write')
+        self.txlog('DELETE', dataset=self.data_id, tag=self.tag_id, value=self.value)
         self.delete_file_tag(self.tag_id, self.value)
+        if self.tag_id in [ 'read users', 'write users' ]:
+            for subfile in subfiles:
+                self.enforce_tag_authz('write', self.tag_id, data_id=subfile)
+                self.txlog('DELETE', dataset=subfile, tag=self.tag_id, value=self.value)
+                self.delete_file_tag(self.tag_id, self.value, data_id=subfile)
         return None
 
     def delete_postCommit(self, results):
-        self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
         return ''
 
     def DELETE(self, uri):
@@ -529,22 +808,10 @@ class FileTags (Node):
     def post_nullBody(self):
         return None
 
-    def post_putBody(self):
-        for tag_id in self.tagvals:
-            self.enforce_tag_authz('write', tag_id)
-            self.set_file_tag(tag_id, self.tagvals[tag_id])
-            self.log('SET', dataset=self.data_id, tag=tag_id)
-        return None
-
-    def post_deleteBody(self):
-        self.enforce_tag_authz('write')
-        self.delete_file_tag(self.tag_id, self.value)
-        self.log('DELETE', dataset=self.data_id, tag=self.tag_id)
-        return None
-
     def post_postCommit(self, results):
-        url = '/tags/' + urlquote(self.data_id)
-        raise web.seeother(url)
+        if self.referer == None:
+            self.referer = '/tags/' + urlquote(self.data_id)
+        raise web.seeother(self.referer)
 
     def POST(self, uri):
         # simulate RESTful actions and provide helpful web pages to browsers
@@ -557,23 +824,28 @@ class FileTags (Node):
                     try:
                         value = storage['val-%s' % (tag_id)]
                     except:
-                        value = ''
-                    self.tagvals[urllib.unquote(tag_id)] = value
+                        value = None
+                    self.tagvals[urllib.unquote(tag_id)] = [ value ]
             try:
                 self.tag_id = storage.tag
                 self.value = storage.value
             except:
                 pass
+
+            try:
+                self.referer = storage.referer
+            except:
+                self.referer = None
         except:
             raise BadRequest(data="Error extracting form data.")
 
         if action == 'put':
             if len(self.tagvals) > 0:
-                return self.dbtransact(self.post_putBody, self.post_postCommit)
+                return self.dbtransact(self.put_body, self.post_postCommit)
             else:
                 return self.dbtransact(self.post_nullBody, self.post_postCommit)
         elif action == 'delete':
-            return self.dbtransact(self.post_deleteBody, self.post_postCommit)
+            return self.dbtransact(self.delete_body, self.post_postCommit)
         else:
             raise BadRequest(data="Form field action=%s not understood." % action)
 
@@ -624,8 +896,8 @@ class TagdefACL (FileTags):
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
         user = self.user()
-        acldefs = [ ('readers', 'text', tagdef.owner == user and tagdef.readpolicy == 'tag'),
-                    ('writers', 'text', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
+        acldefs = [ ('readers', 'role', tagdef.owner == user and tagdef.readpolicy == 'tag'),
+                    ('writers', 'role', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
         readacls = [ (result.tagname, 'readers')
                      for result in self.select_tagdef(tagname=self.data_id,
@@ -652,7 +924,8 @@ class TagdefACL (FileTags):
         aclinfo = self.buildaclinfo()
         return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
-                 aclinfo )
+                 aclinfo,
+                 self.buildroleinfo() )
 
     def get_title_one(self):
         return 'ACLs for tag "%s"' % self.data_id
@@ -661,11 +934,11 @@ class TagdefACL (FileTags):
         return 'ACLs for all tags'
 
     def get_all_html_render(self, results):
-        system, userdefined, all = results
+        system, userdefined, all, roleinfo = results
         if self.data_id:
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote),
-                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote)])
+                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote, roleinfo)])
         else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote)])       
@@ -677,7 +950,7 @@ class TagdefACL (FileTags):
             for value in self.tagvals[acl]:
                 self.set_tag_acl(dict(writers='write', readers='read')[acl],
                                  value, self.data_id)
-                self.log('SET', tag=self.data_id, mode=acl, user=value)
+                self.txlog('SET', tag=self.data_id, mode=acl, user=value)
         return None
 
     def delete_body(self):
@@ -692,14 +965,14 @@ class TagdefACL (FileTags):
             self.enforce_tagdef_authz('write', tag_id=self.data_id)
             self.set_tag_acl(dict(writers='write', readers='read')[tag_id],
                              self.tagvals[tag_id], self.data_id)
-            self.log('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
+            self.txlog('SET', tag=self.data_id, mode=tag_id, user=self.tagvals[tag_id])
         return None
 
     def post_deleteBody(self):
         self.enforce_tagdef_authz('write', tag_id=self.data_id)
         self.delete_tag_acl(dict(writers='write', readers='read')[self.tag_id],
                             self.value, self.data_id)
-        self.log('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)
+        self.txlog('DELETE', tag=self.data_id, mode=self.tag_id, user=self.value)
         return None
 
     def post_postCommit(self, results):
@@ -713,6 +986,7 @@ class Query (Node):
         self.predlist = predlist
         self.queryopts = queryopts
         self.action = 'query'
+        self.title = None
 
     def qtarget(self):
         terms = []
@@ -747,6 +1021,11 @@ class Query (Node):
         except:
             pass
 
+        try:
+            self.title = self.queryopts['title']
+        except:
+            self.title = None
+
         if op == '':
             op = None
 
@@ -769,7 +1048,10 @@ class Query (Node):
 
         def body():
             files = [ (res.file,
-                       self.test_file_authz('write', owner=res.owner, data_id=res.file) )
+                       res.local,
+                       self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
+                       res.imgset != None,
+                       res.downloaded)
                       for res in self.select_files_by_predlist() ]
             alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
             return ( files, alltags )
@@ -782,6 +1064,12 @@ class Query (Node):
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
 
+            if self.title == None:
+                if self.action == 'query':
+                    self.title = "Query Results"
+                else:
+                    self.title = "Query by Tags"
+
             if self.action == 'query':
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
@@ -789,13 +1077,13 @@ class Query (Node):
                         return self.render.FileUriList(target, files, urlquote)
                     elif acceptType == 'text/html':
                         break
-                return self.renderlist("Query Results",
-                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, urlquote)])
+                return self.renderlist(self.title,
+                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops), self.roles),
+                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
             else:
-                return self.renderlist("Query by Tags",
+                return self.renderlist(self.title,
                                        [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
-                                        self.render.QueryView(self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(target, files, urlquote)])
+                                        self.render.QueryView(target, self.qtarget(), self.predlist, dict(self.ops)),
+                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
 
         return self.dbtransact(body, postCommit)
