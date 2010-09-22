@@ -88,7 +88,7 @@ function getCookie(name) {
 }
 
 function setCookie(name, val) {
-    document.cookie = name + "=" val;
+    document.cookie = name + "=" + val;
 }
 
 function pollCookie() {
