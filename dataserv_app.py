@@ -865,7 +865,7 @@ class Application:
                     if tagdef.readpolicy == 'tag':
                         authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
                         authorized.append(tagdef.owner)
-                        if not roles.intersection(set(authorized)):
+                        if not set(roles).intersection(set(authorized)):
                             # warn or return an empty result set since nothing can match?
                             raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
                     # fall off, enforce dynamic security below
