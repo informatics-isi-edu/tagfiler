@@ -886,28 +886,35 @@ class LogFileIO (FileIO):
         filename = self.log_path + '/' + self.data_id
         try:
             f = open(filename, "rb")
-            content_type = "text/plain"
             
             f.seek(0, 2)
             length = f.tell()
             f.seek(0, 0)
 
-            if sendBody:
-                web.ctx.status = '200 OK'
-                web.header('Content-type', content_type)
+            web.ctx.status = '200 OK'
+            if disposition_name:
+                web.header('Content-type', "text/plain")
+                web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 web.header('Content-Length', length)
-                if disposition_name:
-                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-
+            else:
+                pollmins = 1
+                top = unicode(self.render.Top(self.home + web.ctx.homepath, "Log %s" % self.data_id, self.subtitle, self.logo,
+                                              self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome,
+                                              self.help, self.jira, pollmins)) + "<pre>"
+                bottom = "</pre>" + unicode(self.render.Bottom())
+                web.header('Content-type', "text/html")
+                web.header('Content-Length', len(top) + length + len(bottom))
+                    
+            if sendBody:
+                if not disposition_name:
+                    yield top
                 for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
                     self.midDispatch()
                     yield buf
-            else:
-                web.header('Content-type', content_type)
-                web.header('Content-Length', length)
+                if not disposition_name:
+                    yield bottom
 
             f.close()
-
         
         except:
             et, ev, tb = sys.exc_info()
