@@ -88,6 +88,7 @@ function getCookie(name) {
 }
 
 function setCookie(name, val) {
+    log("setCookie: " + name + " = " + val);
     document.cookie = name + "=" + val;
 }
 
