@@ -1,7 +1,7 @@
 $def with (tvars)
-$ # many parameters (some optional) are passed in this tvars dictionary
+$# many parameters (some optional) are passed in this tvars dictionary
 $ title = tvars.get('title')
-$ subtitle = tvars.get('subtitle')
+$ appsubtitle = tvars.get('subtitle')
 $ logo = tvars.get('logo')
 $ home = tvars.get('home')
 $ help = tvars.get('help')
@@ -12,10 +12,10 @@ $ user = tvars.get('user')
 $ roles = tvars.get('roles')
 $ loginsince = tvars.get('loginsince')
 $ loginuntil = tvars.get('loginuntil')
-$if subtitle and title:
-	$ titles = subtitle + ': ' + title
-$elif subtitle:
-	$ titles = subtitle
+$if appsubtitle and title:
+	$ titles = appsubtitle + ': ' + title
+$elif appsubtitle:
+	$ titles = appsubtitle
 $elif title:
 	$ titles = title
 $else:
@@ -38,8 +38,8 @@ $else:
 <tr>
 $if logo:
 	<td align="left">$:{logo}</td>
-$if subtitle:
-	<td align="center"><h1>${subtitle}</h1></td>
+$if appsubtitle:
+	<td align="center"><h1>${appsubtitle}</h1></td>
 <td align="right">
 <table align="right">
 $if user:
