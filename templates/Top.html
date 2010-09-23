@@ -1,4 +1,17 @@
-$def with (home, title, subtitle, logo, user, roles, loginsince, loginuntil, webauthnhome, help, jira, pollmins)
+$def with (tvars)
+$ # many parameters (some optional) are passed in this tvars dictionary
+$ title = tvars.get('title')
+$ subtitle = tvars.get('subtitle')
+$ logo = tvars.get('logo')
+$ home = tvars.get('home')
+$ help = tvars.get('help')
+$ jira = tvars.get('bugs')
+$ webauthnhome = tvars.get('webauthnhome')
+$ pollmins = tvars.get('pollmins')
+$ user = tvars.get('user')
+$ roles = tvars.get('roles')
+$ loginsince = tvars.get('loginsince')
+$ loginuntil = tvars.get('loginuntil')
 $if subtitle and title:
 	$ titles = subtitle + ': ' + title
 $elif subtitle:

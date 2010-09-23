@@ -265,12 +265,28 @@ class Application:
         self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
 
     def renderlist(self, title, renderlist, refresh=True):
+        tvars = dict()
         if refresh:
-            pollmins = 1
-        else:
-            pollmins = None
+            tvars['pollmins'] = 1
+
+        tvars['title'] = title
+        tvars['subtitle'] = self.subtitle
+        tvars['logo'] = self.logo
+
+        tvars['home'] = self.home + web.ctx.homepath
+        tvars['help'] = self.help
+        tvars['bugs'] = self.jira
+        tvars['webauthnhome'] = self.webauthnhome
+
+        tvars['user'] = self.role
+        tvars['roles'] = self.roles
+        tvars['loginsince'] = self.loginsince
+        tvars['loginuntil'] = self.loginuntil
+
         return "".join([unicode(r) for r in 
-                        [self.render.Top(self.home + web.ctx.homepath, title, self.subtitle, self.logo, self.user(), self.roles, self.loginsince, self.loginuntil, self.webauthnhome, self.help, self.jira, pollmins)] + renderlist + [self.render.Bottom()]])
+                        [self.render.Top(tvars)] 
+                        + renderlist
+                        + [self.render.Bottom(tvars)]])
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
