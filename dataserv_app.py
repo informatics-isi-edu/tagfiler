@@ -159,6 +159,7 @@ class Application:
         self.logo = getParam('logo', '')
         self.subtitle = getParam('subtitle', '')
         self.contact = getParam('contact', None)
+        self.appletTest = getParam('appletTest', None)
         self.db = None
         self.logmsgs = []
         self.middispatchtime = None
