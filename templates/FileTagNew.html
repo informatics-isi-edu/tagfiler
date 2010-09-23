@@ -1,4 +1,12 @@
-$def with (title, apptarget, tagspace, data_id, typenames, taginfo, urlquote, roleinfo)
+$def with (tvars)
+$ title = tvars.get('title')
+$ apptarget = tvars.get('apptarget')
+$ tagspace = tvars.get('tagspace')
+$ data_id = tvars.get('data_id')
+$ taginfo = tvars.get('taginfo')
+$ typenames = tvars.get('typenames')
+$ urlquote = tvars.get('urlquote')
+$ roleinfo = tvars.get('roleinfo')
 $ excludes, tagdefs, tagdefsdict, tags, tagvals, length = taginfo
 $ tagvals = dict( [ (tag, vals) for file, tag, vals in tagvals ] )
 $ allroles = roleinfo

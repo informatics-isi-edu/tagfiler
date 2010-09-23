@@ -1,4 +1,9 @@
-$def with (target, type, name, referer, quote)
+$def with (tvars)
+$ target = tvars.get('target')
+$ type = tvars.get('type')
+$ name = tvars.get('name')
+$ referer = tvars.get('referer')
+$ urlquote = tvars.get('urlquote')
 $ typeLong = dict(file="file", url="saved URL", tagdef="tag definition", imgset="image set").get(type, '')
 $ typeUri = dict(file='file', url='file', tagdef='tagdef', imgset='file').get(type, type)
 $ suffix = dict(imgset=' and all associated image files').get(type, '')
@@ -7,7 +12,7 @@ $ suffix = dict(imgset=' and all associated image files').get(type, '')
 		  <table>
 		    <tr>
 		      <td>
-		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${typeUri}/${quote(name)}" method="post">
+		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${typeUri}/${urlquote(name)}" method="post">
 				  <input type="hidden" name="action" value="ConfirmDelete" />
 				  <input type="hidden" name="referer" value="${referer}" />
 				  <input type="submit" value="Yes" />

@@ -1,4 +1,7 @@
-$def with (target, taginfo, urlquote)
+$def with (tvars)
+$ target = tvars.get('target')
+$ taginfo = tvars.get('taginfo')
+$ urlquote = tvars.get('urlquote')
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code

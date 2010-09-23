@@ -1,4 +1,10 @@
-$def with (title, apptarget, tagspace, data_id, taginfo, urlquote)
+$def with (tvars)
+$ title = tvars.get('title')
+$ apptarget = tvars.get('apptarget')
+$ tagspace = tvars.get('tagspace')
+$ data_id = tvars.get('data_id')
+$ taginfo = tvars.get('taginfo')
+$ urlquote = tvars.get('urlquote')
 $if title != '':
 	<h2>${title}</h2>
 $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo

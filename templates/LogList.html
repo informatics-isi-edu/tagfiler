@@ -1,4 +1,7 @@
-$def with (target, files, urlquote)
+$def with (tvars)
+$ target = tvars.get('target')
+$ files = tvars.get('files')
+$ urlquote = tvars.get('urlquote')
 <h3>Current active log file</h3>
 $if 'messages' in files:
 	<ul><li><a href="${target}/log/messages?action=view">messages</a>

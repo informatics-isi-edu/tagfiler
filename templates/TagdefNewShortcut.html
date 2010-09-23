@@ -1,4 +1,6 @@
-$def with (title, apptarget)
+$def with (tvars)
+$ title = tvars.get('title')
+$ apptarget = tvars.get('apptarget')
 <h2>${title}</h2>
 <p>You may go to the <a href="${apptarget + '/tagdef/'}">Tag definitions</a> page to
 create tag definitions, and then come back to this page to annotate your file.</p>

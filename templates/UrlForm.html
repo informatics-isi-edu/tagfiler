@@ -1,4 +1,5 @@
-$def with (target)
+$def with (tvars)
+$ target = tvars.get('target')
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 Enter the URL of the remote dataset: 
 <input name="url" type="text" /> <br />

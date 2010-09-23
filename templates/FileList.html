@@ -1,22 +1,28 @@
-$def with (target, files, referer, role, roles, quote)
+$def with (tvars)
+$ apptarget = tvars.get('apptarget')
+$ files = tvars.get('files')
+$ referer = tvars.get('referer')
+$ role = tvars.get('role')
+$ roles = tvars.get('roles')
+$ urlquote = tvars.get('urlquote')
 $if len(files) > 0:
 	$for name, local, writeok, imgset, downloaded in files:
 		$ links = []
 		$if imgset and 'downloader' in roles:
 			<!-- Download/View -->
 		$elif local:
-			$ links.append( '<a href="%s/file/%s">Download</a>' % (target, quote(name)) )
+			$ links.append( '<a href="%s/file/%s">Download</a>' % (apptarget, urlquote(name)) )
 		$else:
-			$ links.append( '<a href="%s/file/%s">View</a>' % (target, quote(name)) )
+			$ links.append( '<a href="%s/file/%s">View</a>' % (apptarget, urlquote(name)) )
 		$if imgset:
-			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (target, quote(name)) )
+			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (apptarget, urlquote(name)) )
 		$if 'downloader' in roles:
 			<!-- Tags -->
 		$else:
-			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (target, quote(name)) )
+			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (apptarget, urlquote(name)) )
 		$if writeok:
 			$for type in [ 'file', 'url' ]:
-				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (target, quote(name), type, type) )
+				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (apptarget, urlquote(name), type, type) )
 		<fieldset>
 		  <legend>${name}</legend>
 		  <table>
@@ -27,7 +33,7 @@ $if len(files) > 0:
 		  $if imgset:
 		  	<td>&nbsp;&nbsp;&nbsp;</td>
 		  	<td>
-			<form enctype="application/x-www-form-urlencoded" action="${target}/tags/${quote(name)}" method="post">
+			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(name)}" method="post">
 			    <div>
 			    <input type="hidden" name="referer" value="${referer}" />
 			    $if downloaded:
@@ -45,7 +51,7 @@ $if len(files) > 0:
 		  	</td>
 		  $if writeok:
 		  	<td>
-		  	<form enctype="application/x-www-form-urlencoded" action="${target}/file/${quote(name)}" method="post">
+		  	<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(name)}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />

@@ -305,7 +305,7 @@ class FileIO (Application):
                                            [self.render.FileForm(target)])
                 elif self.filetype == 'url':
                     return self.renderlist("Register a remote URL",
-                                           [self.render.UrlForm(target)])
+                                           [self.render.UrlForm(dict(target=target))])
                 else:
                     raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
 

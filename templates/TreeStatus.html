@@ -1,4 +1,10 @@
-$def with (transmissionnum, tags, files, direction, success, error)
+$def with (tvars)
+$ transmissionnum = tvars.get('transmissionnum')
+$ tags = tvars.get('tags')
+$ files = tvars.get('files')
+$ direction = tvars.get('direction')
+$ success = tvars.get('success')
+$ error = tvars.get('error')
 $if success:
 	<h2>Completed</h2>
 	<p>

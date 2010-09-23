@@ -17,6 +17,10 @@ def listmax(list):
     else:
         return 0
         
+def dictmerge(base, custom):
+    custom.update(base)
+    return custom
+
 class Node (object, Application):
     """Abstract AST node for all URI patterns"""
 
@@ -93,14 +97,20 @@ class Study (Node):
 
     def postCommit(self, results):
         tags, files = results
+        target = self.home + web.ctx.homepath
+        tvars = dict(target=target,
+                     transmissionnum=self.data_id,
+                     tags=tags,
+                     files=files,
+                     direction=self.direction,
+                     expiremins=self.webauthnexpiremins,
+                     testfile=self.appletTest)
         if self.action == 'upload':
-            target = self.home + web.ctx.homepath
             return self.renderlist("Study Upload",
-                                   [self.render.TreeUpload(target, self.webauthnexpiremins, self.appletTest)])
+                                   [self.render.TreeUpload(tvars)])
         elif self.action == 'download':
-            target = self.home + web.ctx.homepath
             return self.renderlist("Study Download",
-                                   [self.render.TreeDownload(target, self.data_id, self.webauthnexpiremins, self.appletTest)])
+                                   [self.render.TreeDownload(tvars)])
         elif self.action == 'get':
             success = None
             error = None
@@ -110,10 +120,13 @@ class Study (Node):
                 error = 'An unknown error prevented a complete %s.' % self.direction
             else:
                 error = self.status
+
+            tvars['success'] = success
+            tvars['error'] = error
                 
             if self.data_id:
                 return self.renderlist(None,
-                                       [self.render.TreeStatus(self.data_id, tags, files, self.direction, success, error)])
+                                       [self.render.TreeStatus(tvars)])
             else:
                 url = '/appleterror'
                 if self.status:
@@ -165,7 +178,7 @@ class AppletError (Node):
         # since it may be active while the html page is idle
         target = self.home + web.ctx.homepath
         return self.renderlist("Study Transfer Applet",
-                               [self.render.AppletError(self.status)])
+                               [self.render.AppletError(dict(status=self.status))])
 
 class FileList (Node):
     """Represents a bare FILE/ URI
@@ -205,9 +218,18 @@ class FileList (Node):
         def postCommit(results):
             target = self.home + web.ctx.homepath
             files = results
+            tvars=dict(apptarget=web.ctx.homepath,
+                       webauthnhome=self.webauthnhome,
+                       help=self.help,
+                       bugs=self.jira,
+                       files=files,
+                       referer=self.home + uri,
+                       role=self.role,
+                       roles=self.roles,
+                       urlquote=urlquote)
             return self.renderlist(None,
-                                   [self.render.Commands(target, self.roles, urlquote, self.webauthnhome, self.help, self.jira),
-                                    self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
+                                   [self.render.Commands(tvars),
+                                    self.render.FileList(tvars)])
 
         storage = web.input()
         action = None
@@ -245,9 +267,8 @@ class FileList (Node):
                     url += '&write%20users=*'
                 raise web.seeother(url)
             else:
-                target = self.home + web.ctx.homepath + '/file'
                 return self.renderlist("Define a dataset",
-                                       [self.render.NameForm(target)])
+                                       [self.render.NameForm(dict(apptarget=self.home + web.ctx.homepath))])
         else:
             return self.dbtransact(body, postCommit)
 
@@ -288,14 +309,18 @@ class LogList (Node):
             lognames = []
         
         target = self.home + web.ctx.homepath
+        tvars = dict(target=target,
+                     files=lognames,
+                     urlquote=urlquote)
+        
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
                 # return raw results for REST client
-                return self.render.LogUriList(target, lognames, urlquote)
+                return self.render.LogUriList(tvars)
             elif acceptType == 'text/html':
                 break
         return self.renderlist("Available logs",
-                               [self.render.LogList(target, lognames, urlquote)])
+                               [self.render.LogList(tvars)])
 
 class Contact (Node):
     """Represents a bare CONTACT URI
@@ -308,9 +333,10 @@ class Contact (Node):
 
     def GET(self, uri):
         
-        target = self.home + web.ctx.homepath
+        tvars = dict(target=self.home + web.ctx.homepath,
+                     contact=self.contact)
         return self.renderlist("Contact Us",
-                               [self.render.Contact(target, self.contact)])
+                               [self.render.Contact(tvars)])
 
 class FileId(Node, FileIO):
     """Represents a direct FILE/data_id URI
@@ -380,10 +406,14 @@ class Tagdef (Node):
         def postCommit(tagdefs):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             predefined, userdefined = tagdefs
+            tvars = dict(target=self.target,
+                         typenames=self.typenames,
+                         test_tagdef_authz=lambda mode, tag: self.test_tagdef_authz(mode, tag),
+                         urlquote=urlquote)
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(self.target, predefined, self.typenames, 'System', lambda mode, tag: self.test_tagdef_authz(mode, tag), urlquote),
-                                    self.render.TagdefExisting(self.target, userdefined, self.typenames, 'User', lambda mode, tag: self.test_tagdef_authz(mode, tag), urlquote),
-                                    self.render.TagdefNew(self.target, tagdefs, self.typenames)])
+                                   [self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=predefined, title='System'))),
+                                    self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=userdefined, title='User'))),
+                                    self.render.TagdefNew(tvars)])
 
         if len(self.queryopts) > 0:
             raise BadRequest(data="Query options are not supported on this interface.")
@@ -544,7 +574,11 @@ class Tagdef (Node):
         def postCommit(results):
             if self.action == 'delete':
                 return self.renderlist("Delete Confirmation",
-                                       [self.render.ConfirmForm(self.home + web.ctx.homepath, 'tagdef', self.tag_id, self.uri2referer(uri), urlquote)])
+                                       [self.render.ConfirmForm(dict(target=self.home + web.ctx.homepath,
+                                                                     type='tagdef',
+                                                                     name=self.tag_id,
+                                                                     referer=self.uri2referer(uri),
+                                                                     urlquote=urlquote))])
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
@@ -651,25 +685,34 @@ class FileTags (Node):
 
     def get_all_html_render(self, results):
         system, userdefined, all, roleinfo = results
+        tvars = dict(apptarget=self.apptarget,
+                     tagspace='tags',
+                     typenames=self.typenames,
+                     data_id=self.data_id,
+                     roleinfo=roleinfo,
+                     urlquote=urlquote)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('User', self.apptarget, 'tags', self.data_id, userdefined, urlquote),
-                                    self.render.FileTagExisting('System', self.apptarget, 'tags', self.data_id, system, urlquote),
-                                    self.render.FileTagNew('Set tag values', self.apptarget, 'tags', self.data_id, self.typenames, all, urlquote, roleinfo),
-                                    self.render.TagdefNewShortcut('Define more tags', self.apptarget)])
+                                   [self.render.FileTagExisting(dictmerge(tvars, dict(title='User', taginfo=userdefined))),
+                                    self.render.FileTagExisting(dictmerge(tvars, dict(title='System', taginfo=system))),
+                                    self.render.FileTagNew(dictmerge(tvars, dict(title='Set tag values', taginfo=all))),
+                                    self.render.TagdefNewShortcut(dictmerge(tvars, dict(title='Define more tags')))])
         else:
             return self.renderlist(self.get_title_all(),
-                                   [self.render.FileTagValExisting('', self.apptarget, 'tags', self.data_id, all, urlquote)])       
+                                   [self.render.FileTagValExisting(dictmerge(tvars, dict(title='', taginfo=all)))])      
 
     def get_all_postCommit(self, results):
         system, userdefined, all, roleinfo = results
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 
+        tvars = dict(target=self.home + web.ctx.homepath,
+                     taginfo=all,
+                     urlquote=urlquote)
+
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
-                target = self.home + web.ctx.homepath
-                return self.render.FileTagUriList(target, all, urlquote)
+                return self.render.FileTagUriList(tvars)
             elif acceptType == 'application/x-www-form-urlencoded':
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 body = []
@@ -935,13 +978,19 @@ class TagdefACL (FileTags):
 
     def get_all_html_render(self, results):
         system, userdefined, all, roleinfo = results
+        tvars = dict(apptarget=self.apptarget,
+                     tagspace='tagdefacl',
+                     typenames=self.typenames,
+                     data_id=self.data_id,
+                     roleinfo=roleinfo,
+                     urlquote=urlquote)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote),
-                                    self.render.FileTagNew('Add an authorized user', self.apptarget, 'tagdefacl', self.data_id, self.typenames, all, urlquote, roleinfo)])
+                                   [self.render.FileTagExisting(dictmerge(tvars, dict(title='', taginfo=all))),
+                                    self.render.FileTagNew(dictmerge(tvars, dict(title='Add an authorized user', taginfo=all)))])
         else:
             return self.renderlist(self.get_title_all(),
-                                   [self.render.FileTagValExisting('', self.apptarget, 'tagdefacl', self.data_id, all, urlquote)])       
+                                   [self.render.FileTagValExisting(dictmerge(tvars, dict(title='', taginfo=all)))])       
 
     def put_body(self):
         """Override FileTags.put_body to consult tagdef ACL instead"""
@@ -1058,8 +1107,19 @@ class Query (Node):
 
         def postCommit(results):
             files, alltags = results
-            target = self.home + web.ctx.homepath
             apptarget = self.home + web.ctx.homepath
+
+            tvars = dict(role=self.role,
+                         roles=self.roles,
+                         files=files,
+                         tags=alltags,
+                         ops=self.ops,
+                         home=web.ctx.homepath,
+                         apptarget=apptarget,
+                         qtarget=self.qtarget(),
+                         predlist=self.predlist,
+                         urlquote=urlquote,
+                         referer=self.home + uri)
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
@@ -1074,16 +1134,16 @@ class Query (Node):
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
                         # return raw results for REST client
-                        return self.render.FileUriList(target, files, urlquote)
+                        return self.render.FileUriList(tvars)
                     elif acceptType == 'text/html':
                         break
                 return self.renderlist(self.title,
-                                       [self.render.QueryViewStatic(self.qtarget(), self.predlist, dict(self.ops), self.roles),
-                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
+                                       [self.render.QueryViewStatic(tvars),
+                                        self.render.FileList(tvars)])
             else:
                 return self.renderlist(self.title,
-                                       [self.render.QueryAdd(target, self.qtarget(), alltags, self.ops),
-                                        self.render.QueryView(target, self.qtarget(), self.predlist, dict(self.ops)),
-                                        self.render.FileList(web.ctx.homepath, files, self.home + uri, self.role, self.roles, urlquote)])
+                                       [self.render.QueryAdd(tvars),
+                                        self.render.QueryView(tvars),
+                                        self.render.FileList(tvars)])
 
         return self.dbtransact(body, postCommit)

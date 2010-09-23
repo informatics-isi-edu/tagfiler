@@ -1,9 +1,17 @@
-$def with (apptarget, querytarget, tags, ops)
+$def with (tvars)
+$ apptarget = tvars.get('apptarget')
+$ qtarget = tvars.get('qtarget')
+$ tags = tvars.get('tags')
+$ ops = tvars.get('ops')
+$ referer = tvars.get('referer')
+$ role = tvars.get('role')
+$ roles = tvars.get('roles')
+$ urlquote = tvars.get('urlquote')
 $if len(tags) > 0:
 	<h3>Add a Query Term</h3>
 	<p>Select an available tag and click 'Add' to build a query:
 	</p>
-	<form enctype="application/x-www-form-urlencoded" action="${querytarget}" method="get">
+	<form enctype="application/x-www-form-urlencoded" action="${qtarget}" method="get">
 	  <table><tr valign='top'>
 	  <td><select name="tag">
 		$for tag in tags:

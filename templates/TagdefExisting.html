@@ -1,4 +1,10 @@
-$def with (target, tagdefs, typenames, title, test_tagdef_authz, urlquote)
+$def with (tvars)
+$ title = tvars.get('title')
+$ target = tvars.get('target')
+$ typenames = tvars.get('typenames')
+$ tagdefs = tvars.get('tagdefs')
+$ test_tagdef_authz = tvars.get('test_tagdef_authz')
+$ urlquote = tvars.get('urlquote')
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code

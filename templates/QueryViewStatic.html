@@ -1,4 +1,8 @@
-$def with (target, predlist, ops, roles)
+$def with (tvars)
+$ target = tvars.get('qtarget')
+$ predlist = tvars.get('predlist')
+$ ops = dict(tvars.get('ops'))
+$ roles = tvars.get('roles')
 $if 'downloader' not in roles:
 	<h3>Query Terms</h3>
 	<p><a href="${target}">Permanent link to this query</a></p>

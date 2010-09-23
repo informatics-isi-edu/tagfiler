@@ -1,4 +1,10 @@
-$def with (target, roles, urlquote, webauthnhome, help, jira)
+$def with (tvars)
+$ apptarget = tvars.get('apptarget')
+$ roles = tvars.get('roles')
+$ urlquote = tvars.get('urlquote')
+$ webauthnhome = tvars.get('webauthnhome')
+$ help = tvars.get('help')
+$ bugs = tvars.get('bugs')
 <p><b>Welcome to the DIRC Client Data Uploader System.
 $if len(set(roles).intersection(['dirc', 'uploader'])) > 0:
 	Click Upload Study to start image submission.
@@ -9,12 +15,12 @@ $if len(set(roles).intersection(['dirc', 'downloader'])) > 0:
   $if 'admin' in roles:
   	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
   $if 'dirc' in roles:
-  	<li><a href="${target}/study?action=upload">Upload DIRC study</a></li>
-  	<li><a href="${target}/study?action=download">Download DIRC study</a></li>
-	<li><a href="${target}/query?action=edit">Query by tags</a></li>
+  	<li><a href="${apptarget}/study?action=upload">Upload DIRC study</a></li>
+  	<li><a href="${apptarget}/study?action=download">Download DIRC study</a></li>
+	<li><a href="${apptarget}/query?action=edit">Query by tags</a></li>
 	<li><a href="${help}">Help and documentation</a></li>
-	<li><a href="${jira}">View or submit bug reports/issues</a></li>
-	<li><a href="${target}/tagdef">Manage available tag definitions (expert mode)</a></li>
-	<li><a href="${target}/file?action=define">Create custom dataset (expert mode)</a></li>
+	<li><a href="${bugs}">View or submit bug reports/issues</a></li>
+	<li><a href="${apptarget}/tagdef">Manage available tag definitions (expert mode)</a></li>
+	<li><a href="${apptarget}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>
 
