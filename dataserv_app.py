@@ -176,7 +176,14 @@ class Application:
         self.db = None
         self.logmsgs = []
         self.middispatchtime = None
-        
+
+        self.filelisttags = getParam('filelisttags', '')
+        self.filelisttags = [ urllib.unquote(t)
+                              for t in self.filelisttags.split(',') ]
+        self.filelisttagswrite = getParam('filelisttagswrite', '')
+        self.filelisttagswrite = set([ urllib.unquote(t)
+                                       for t in self.filelisttagswrite.split(',') ])
+                
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:
@@ -901,6 +908,15 @@ class Application:
                     # fall off, enforce dynamic security below
                 tagdefs[tagdef.tagname] = tagdef
 
+        # also prefetch custom per-file tags
+        for tagname in self.filelisttags:
+            if not tagdefs.has_key(tagname):
+                results = self.select_tagdef(tagname)
+                if len(results) == 0:
+                    raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+                tagdef = results[0]
+                tagdefs[tagname] = tagdef
+
         innertables = ['files',
                        '_owner ON (files.name = _owner.file)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
@@ -950,11 +966,13 @@ class Application:
                     # this tag rule is more restrictive than file or static checks already done
                     wheres.append('ownrole.role IS NOT NULL' % p)
 
-        # DEI hacks... extra columns in all results
-        outertables.append('"_Image Set" ON (files.name = "_Image Set".file)')
-        outertables.append('"_Downloaded" ON (files.name = "_Downloaded".file)')
-        selects.append('("_Image Set".file IS NOT NULL) AS imgset')
-        selects.append('("_Downloaded".file IS NOT NULL) AS downloaded')
+        # add custom per-file tags to results
+        for tagname in self.filelisttags:
+            outertables.append('"_%s" ON (files.name = "_%s".file)' % (tagname, tagname))
+            if tagdefs[tagname].typestr == '':
+                selects.append('("_%s".file IS NOT NULL) AS "%s"' % (tagname, tagname))
+            else:
+                selects.append('"_%s".value AS "%s"' % (tagname, tagname))
 
         groupbys = ", ".join([ t.split(" AS ")[0] for t in selects ])
         selects = ", ".join(selects)

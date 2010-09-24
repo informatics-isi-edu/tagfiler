@@ -198,26 +198,27 @@ class FileList (Node):
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
 
         def body():
-            results = self.select_tagdef(tagname='list on homepage')
-            if len(results) > 0:
+            tagdefs = [ (tagdef.tagname, tagdef)
+                        for tagdef in self.select_tagdef() ]
+            tagdefs = dict(tagdefs)
+            
+            if tagdefs.has_key('list on homepage'):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
             else:
                 self.predlist=[]
 
-            #results = self.select_tagdef(tagname='Image Set')
-            #if len(results) > 0:
-            #    self.predlist.append( { 'tag' : 'Image Set', 'op' : None, 'vals' : [] } )
-                
-            return [ (res.file,
-                      res.local,
-                      self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
-                      res.imgset,
-                      res.downloaded)
-                      for res in self.select_files_by_predlist() ]
+            files = [ res for res in self.select_files_by_predlist() ]
+            for res in files:
+                # decorate each result with writeok information
+                res.writeok = self.gui_test_file_authz('write',
+                                                       owner=res.owner,
+                                                       data_id=res.file,
+                                                       local=res.local)
+            return (files, tagdefs)
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
-            files = results
+            files, tagdefs = results
             tvars=dict(apptarget=web.ctx.homepath,
                        webauthnhome=self.webauthnhome,
                        help=self.help,
@@ -226,7 +227,10 @@ class FileList (Node):
                        referer=self.home + uri,
                        role=self.role,
                        roles=self.roles,
-                       urlquote=urlquote)
+                       urlquote=urlquote,
+                       filelisttags=self.filelisttags,
+                       filelisttagswrite=self.filelisttagswrite,
+                       tagdefs=tagdefs)
             return self.renderlist(None,
                                    [self.render.Commands(tvars),
                                     self.render.FileList(tvars)])
@@ -1096,30 +1100,34 @@ class Query (Node):
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
-            files = [ (res.file,
-                       res.local,
-                       self.gui_test_file_authz('write', owner=res.owner, data_id=res.file, local=res.local),
-                       res.imgset,
-                       res.downloaded)
-                      for res in self.select_files_by_predlist() ]
-            alltags = [ tagdef.tagname for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
-            return ( files, alltags )
+            files = [ res for res in self.select_files_by_predlist() ]
+            for res in files:
+                # decorate each result with writeok information
+                res.writeok = self.gui_test_file_authz('write',
+                                                       owner=res.owner,
+                                                       data_id=res.file,
+                                                       local=res.local)
+            alltagdefs = [ tagdef for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
+            return ( files, alltagdefs )
 
         def postCommit(results):
-            files, alltags = results
+            files, tagdefs = results
             apptarget = self.home + web.ctx.homepath
 
             tvars = dict(role=self.role,
                          roles=self.roles,
                          files=files,
-                         tags=alltags,
+                         tags=[tagdef.tagname for tagdef in tagdefs],
                          ops=self.ops,
                          home=web.ctx.homepath,
                          apptarget=apptarget,
                          qtarget=self.qtarget(),
                          predlist=self.predlist,
                          urlquote=urlquote,
-                         referer=self.home + uri)
+                         referer=self.home + uri,
+                         filelisttags=self.filelisttags,
+                         filelisttagswrite=self.filelisttagswrite,
+                         tagdefs=dict([(tagdef.tagname, tagdef) for tagdef in tagdefs]))
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')

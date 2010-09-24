@@ -6,37 +6,37 @@ $ role = tvars.get('role')
 $ roles = tvars.get('roles')
 $ urlquote = tvars.get('urlquote')
 $if len(files) > 0:
-	$for name, local, writeok, imgset, downloaded in files:
+	$for file in files:
 		$ links = []
-		$if imgset and 'downloader' in roles:
+		$if file['Image Set'] and 'downloader' in roles:
 			<!-- Download/View -->
-		$elif local:
-			$ links.append( '<a href="%s/file/%s">Download</a>' % (apptarget, urlquote(name)) )
+		$elif file.local:
+			$ links.append( '<a href="%s/file/%s">Download</a>' % (apptarget, urlquote(file.file)) )
 		$else:
-			$ links.append( '<a href="%s/file/%s">View</a>' % (apptarget, urlquote(name)) )
-		$if imgset:
-			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (apptarget, urlquote(name)) )
+			$ links.append( '<a href="%s/file/%s">View</a>' % (apptarget, urlquote(file.file)) )
+		$if file['Image Set']:
+			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (apptarget, urlquote(file.file)) )
 		$if 'downloader' in roles:
 			<!-- Tags -->
 		$else:
-			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (apptarget, urlquote(name)) )
-		$if writeok:
+			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (apptarget, urlquote(file.file)) )
+		$if file.writeok:
 			$for type in [ 'file', 'url' ]:
-				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (apptarget, urlquote(name), type, type) )
+				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (apptarget, urlquote(file.file), type, type) )
 		<fieldset>
-		  <legend>${name}</legend>
+		  <legend>${file.file}</legend>
 		  <table>
 		  <tr>
 		  <td>
 			  $:{', '.join(links)}
 		  </td>
-		  $if imgset:
+		  $if file['Image Set']:
 		  	<td>&nbsp;&nbsp;&nbsp;</td>
 		  	<td>
-			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(name)}" method="post">
+			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
 			    <div>
 			    <input type="hidden" name="referer" value="${referer}" />
-			    $if downloaded:
+			    $if file['Downloaded']:
 			    	    Downloaded: <input type="checkbox" name="downloaded" value="true" checked />
 				    <input type="hidden" name="tag" value="Downloaded" />
 				    <input type="hidden" name="action" value="delete" />
@@ -49,9 +49,9 @@ $if len(files) > 0:
 			    </div>
 			</form>
 		  	</td>
-		  $if writeok:
+		  $if file.writeok:
 		  	<td>
-		  	<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(name)}" method="post">
+		  	<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />
