@@ -2,13 +2,39 @@ div.title {
   color: #4b0722;
 }
 div.link {
-  font-weight: bold
+  font-weight: bold;
 }
 div.transmissionnum {
   font-weight: bold;
-  color: #00aa00
+  color: #00aa00;
 }
 div.error {
   font-weight: bold;
-  color: #ff0000
+  color: #ff0000;
 }
+table.file-list {
+  border-collapse: collapse;
+}
+table.file-tag-list {
+  border-collapse: collapse;
+}
+.file-list, .file-heading, .file, .file-tag, .file-name, .file-update, .file-tags, .file-tag, .file-delete {
+  border: 1px solid black;
+}
+.file-tag.multivalue {
+  border-style: hidden;
+}
+tr.file-heading {
+  background-color: #990000;
+  color: #ffcc00;
+}
+tr.file.odd {
+  background-color: #cccccc;
+}
+tr.file.even {
+
+}
+td.bytes {
+  text-align: right;
+}
+

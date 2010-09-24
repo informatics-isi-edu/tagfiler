@@ -10,6 +10,7 @@ import datetime
 import traceback
 import distutils.sysconfig
 import sys
+import string
 from logging.handlers import SysLogHandler
 try:
     import webauthn
@@ -49,6 +50,13 @@ logger.setLevel(logging.INFO)
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
     return urllib.quote(url, safe="")
+
+def make_filter(allowed):
+    allchars = string.maketrans('', '')
+    delchars = ''.join([c for c in allchars if c not in allowed])
+    return lambda s,a=allchars,d=delchars: s.translate(a, d)
+
+idquote = make_filter(string.letters + string.digits + '_-:.' )
 
 class WebException (web.HTTPError):
     def __init__(self, status, data='', headers={}):
@@ -924,6 +932,9 @@ class Application:
         selects = ['files.name AS file',
                    'files.local AS local',
                    '_owner.value AS owner']
+        groupbys = ['files.name',
+                    'files.local',
+                    '_owner.value']
         wheres = []
         values = dict()
 
@@ -966,15 +977,29 @@ class Application:
                     # this tag rule is more restrictive than file or static checks already done
                     wheres.append('ownrole.role IS NOT NULL' % p)
 
-        # add custom per-file tags to results
-        for tagname in self.filelisttags:
+        # add custom per-file single-val tags to results
+        singlevaltags = [ tagname for tagname in self.filelisttags
+                          if not tagdefs[tagname].multivalue and tagname != 'owner' ]
+        for tagname in singlevaltags:
             outertables.append('"_%s" ON (files.name = "_%s".file)' % (tagname, tagname))
             if tagdefs[tagname].typestr == '':
                 selects.append('("_%s".file IS NOT NULL) AS "%s"' % (tagname, tagname))
             else:
                 selects.append('"_%s".value AS "%s"' % (tagname, tagname))
+            groupbys.append('"%s"' % tagname)
 
-        groupbys = ", ".join([ t.split(" AS ")[0] for t in selects ])
+        # add custom per-file multi-val tags to results
+        multivaltags = [ tagname for tagname in self.filelisttags
+                         if tagdefs[tagname].multivalue ]
+        for tagname in multivaltags:
+            if tagname != 'read users':
+                outertables.append('(SELECT file, array_agg(value) AS value FROM "_%s" GROUP BY file) AS "%s" ON (files.name = "%s".file)' % (tagname, tagname, tagname))
+                selects.append('"%s".value AS "%s"' % (tagname, tagname))
+                groupbys.append('"%s".value' % tagname)
+            else:
+                selects.append('(array_agg("_%s".value)) AS "%s"' % (tagname, tagname))
+
+        groupbys = ", ".join(groupbys)
         selects = ", ".join(selects)
         tables = " JOIN ".join(innertables) + " LEFT OUTER JOIN ".join(outertables)
 

@@ -303,6 +303,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
     SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
     SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
+    SetEnv tagfiler.filelisttags 'Image%20Set,Downloaded,bytes,owner,read%20users,write%20users'
+    SetEnv tagfiler.filelisttagswrite 'Downloaded'
     SetEnv ${SVCPREFIX}.localFilesImmutable true
 #    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn

@@ -5,63 +5,83 @@ $ referer = tvars.get('referer')
 $ role = tvars.get('role')
 $ roles = tvars.get('roles')
 $ urlquote = tvars.get('urlquote')
+$ filelisttags = tvars.get('filelisttags')
+$ filelisttagswrite = tvars.get('filelisttagswrite')
+$ tagdefs = tvars.get('tagdefs')
+$ idquote = tvars.get('idquote')
+$ skiptags =  ['Image Set']
+$ odd = True
 $if len(files) > 0:
+	<table class="file-list">
+	<tr class="file-heading">
+	<th class="file-name">Dataset</th>
+	<th class="file-tags">Tags</th>
+	<th class="file-update">Update</th>
+	$for tag in filelisttags:
+		$if tag not in skiptags:
+			<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
+	<th class="file-delete">Delete</th>
+	</tr>
 	$for file in files:
-		$ links = []
-		$if file['Image Set'] and 'downloader' in roles:
-			<!-- Download/View -->
-		$elif file.local:
-			$ links.append( '<a href="%s/file/%s">Download</a>' % (apptarget, urlquote(file.file)) )
+		$if odd:
+			<tr class="file odd">
 		$else:
-			$ links.append( '<a href="%s/file/%s">View</a>' % (apptarget, urlquote(file.file)) )
+			<tr class="file even">
+		$ odd = not odd
+		<td class="file-name">
+		$if file['Image Set'] and 'downloader' in roles:
+			${file.file}
+		$else:
+			$if file.local:
+				$ label = 'Download'
+			$else:
+				$ label = 'View'
+			<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
 		$if file['Image Set']:
-			$ links.append( '<a href="%s/study/%s?action=download">Download study</a>' % (apptarget, urlquote(file.file)) )
+			<a href="${apptarget}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
+		</td>
+		<td class="file-tags">
 		$if 'downloader' in roles:
 			<!-- Tags -->
 		$else:
-			$ links.append( '<a href="%s/tags/%s">Tags</a>' % (apptarget, urlquote(file.file)) )
+			<a href="${apptarget}/tags/${urlquote(file.file)}">Tags</a>
+		</td>
+		<td class="file-update">
 		$if file.writeok:
-			$for type in [ 'file', 'url' ]:
-				$ links.append( '<a href="%s/file/%s?action=define&amp;type=%s">Replace with %s</a>' % (apptarget, urlquote(file.file), type, type) )
-		<fieldset>
-		  <legend>${file.file}</legend>
-		  <table>
-		  <tr>
-		  <td>
-			  $:{', '.join(links)}
-		  </td>
-		  $if file['Image Set']:
-		  	<td>&nbsp;&nbsp;&nbsp;</td>
-		  	<td>
-			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
-			    <div>
-			    <input type="hidden" name="referer" value="${referer}" />
-			    $if file['Downloaded']:
-			    	    Downloaded: <input type="checkbox" name="downloaded" value="true" checked />
-				    <input type="hidden" name="tag" value="Downloaded" />
-				    <input type="hidden" name="action" value="delete" />
-				    <input type="submit" value="Clear" />
-			    $else:
-			    	    Downloaded: <input type="checkbox" name="downloaded" value="true" />
-				    <input type="hidden" name="set-Downloaded" value="true" />
-				    <input type="hidden" name="action" value="put" />
-				    <input type="submit" value="Mark" />
-			    </div>
-			</form>
-		  	</td>
-		  $if file.writeok:
-		  	<td>
-		  	<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
+			<a href="${apptarget}/file/${urlquote(file.file)}?action=define&amp;type=file">Replace&nbsp;with&nbsp;file</a><br />
+			<a href="${apptarget}/file/${urlquote(file.file)}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a>
+		</td>
+		$for tag in filelisttags:
+			$if tag in skiptags:
+				
+			$elif tagdefs.has_key(tag):
+				$if tagdefs[tag].typestr == '':
+					$if file[tag]:
+						<td class="file-tag ${idquote(tag)}">${tag}</td>
+					$else:
+						<td></td>
+				$else:
+					$if tagdefs[tag].multivalue and file[tag]:
+						<td><table class="file-tag-list">
+						$for val in file[tag]:
+							<tr><td class="file-tag ${idquote(tag)} multivalue">${val}</td></tr>
+						</table></td>
+					$else:
+						<td class="file-tag ${idquote(tag)}">${file[tag]}</td>
+			$else:
+				<td class="file-tag"></td>
+		$if file.writeok:
+			<td class="file-delete">
+			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />
 			    <input type="submit" value="Delete" />
 			    </div>
 			</form>
-		  	</td>
-		  </tr>
-		  </table>
-		</fieldset>
+			</td>
+		</tr>
+	</table>
 $elif 'uploader' in roles:
 	<p></p>
 $else:

@@ -7,7 +7,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, idquote
 from rest_fileio import FileIO, LogFileIO
 
 
@@ -230,7 +230,8 @@ class FileList (Node):
                        urlquote=urlquote,
                        filelisttags=self.filelisttags,
                        filelisttagswrite=self.filelisttagswrite,
-                       tagdefs=tagdefs)
+                       tagdefs=tagdefs,
+                       idquote=idquote)
             return self.renderlist(None,
                                    [self.render.Commands(tvars),
                                     self.render.FileList(tvars)])
@@ -1127,7 +1128,8 @@ class Query (Node):
                          referer=self.home + uri,
                          filelisttags=self.filelisttags,
                          filelisttagswrite=self.filelisttagswrite,
-                         tagdefs=dict([(tagdef.tagname, tagdef) for tagdef in tagdefs]))
+                         tagdefs=dict([(tagdef.tagname, tagdef) for tagdef in tagdefs]),
+                         idquote=idquote)
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
