@@ -4,8 +4,11 @@ import web
 import psycopg2
 import os
 import logging
+import subprocess
+import socket
 import datetime
 import traceback
+import distutils.sysconfig
 import sys
 from logging.handlers import SysLogHandler
 try:
@@ -139,16 +142,26 @@ class Application:
                     srcrole,dstrole,read,write = rule
                     remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
             return remap
+        
+        try:
+            p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)
+            line = p.stdout.readline()
+            self.daemonuser = line.strip()
+        except:
+            self.daemonuser = 'tagfiler'
+
+        self.hostname = socket.gethostname()
 
         self.help = getParam('help')
         self.jira = getParam('jira')
         self.remap = getPolicyRules(getParam('policyrules', None))
         self.dbnstr = getParam('dbnstr', 'postgres')
         self.dbstr = getParam('dbstr', '')
-        self.home = getParam('home')
-        self.store_path = getParam('store_path')
-        self.log_path = getParam('log_path')
-        self.template_path = getParam('template_path')
+        self.home = getParam('home', 'https://%s' % self.hostname)
+        self.store_path = getParam('store_path', '/var/www/%s-data' % self.daemonuser)
+        self.log_path = getParam('log_path', '/var/www/%s-logs' % self.daemonuser)
+        self.template_path = getParam('template_path',
+                                      '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
         self.chunkbytes = int(getParam('chunkbytes', 1048576))
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
