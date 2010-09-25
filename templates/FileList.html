@@ -59,10 +59,10 @@ $if len(files) > 0:
 					$if file[tag]:
 						<td class="file-tag ${idquote(tag)}">${tag}</td>
 					$else:
-						<td></td>
+						<td class="file-tag ${idquote(tag)}"></td>
 				$else:
 					$if tagdefs[tag].multivalue and file[tag]:
-						<td><table class="file-tag-list">
+						<td class="file-tag ${idquote(tag)}"><table class="file-tag-list">
 						$for val in file[tag]:
 							<tr><td class="file-tag ${idquote(tag)} multivalue">${val}</td></tr>
 						</table></td>
