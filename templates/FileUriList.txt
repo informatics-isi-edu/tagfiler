@@ -7,7 +7,7 @@ $for foo in [ 0 ]:
 $code
 	def renderfiles(files):
 		s = ""
-		for name, local, authz, imgset, downloaded in files:
-			s += target + "/file/" + urlquote(name) + "\n"
+		for f in files:
+			s += target + "/file/" + urlquote(f.file) + "\n"
 		return s
 ${renderfiles(files)[:-1]}
