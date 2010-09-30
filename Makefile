@@ -7,6 +7,8 @@ INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconf
 
 WSGIFILE=tagfiler.wsgi
 
+SCRIPTFILES=functions.js main.css
+
 FILES=dataserv_app.py rest_fileio.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
@@ -40,9 +42,11 @@ deploy: $(HOME)/.tagfiler.predeploy install
 install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
+	mkdir -p /var/www/html/$(INSTALLSVC)/static/
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
+	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 
 restart: force install
 	service httpd restart
