@@ -73,11 +73,11 @@ class Study (Node):
         self.direction = 'upload'
 
     def body(self):
+        tagnames = [ 'Sponsor', 'Protocol', 'Investigator Last Name',
+                     'Investigator First Name', 'Study Site Number',
+                     'Patient Study ID', 'Study Visit', 'Image Type',
+                     'Eye', 'Capture Date', 'Comment' ]
         if self.action == 'get' and self.data_id:
-            tagnames = [ 'Sponsor', 'Protocol', 'Investigator Last Name',
-                         'Investigator First Name', 'Study Site Number',
-                         'Patient Study ID', 'Study Visit', 'Image Type',
-                         'Eye', 'Capture Date', 'Comment' ]
             files = [ res.file for res
                       in self.select_files_by_predlist([{'tag' : 'Transmission Number',
                                                          'op' : '=',
@@ -93,15 +93,16 @@ class Study (Node):
         else:
             tags = []
             files = []
-        return (tags, files)
+        return (tags, files, tagnames)
 
     def postCommit(self, results):
-        tags, files = results
+        tags, files, tagnames = results
         target = self.home + web.ctx.homepath
         tvars = dict(target=target,
                      transmissionnum=self.data_id,
                      tags=tags,
                      files=files,
+                     tagnames=tagnames,
                      direction=self.direction,
                      expiremins=self.webauthnexpiremins,
                      testfile=self.appletTest)

@@ -38,3 +38,17 @@ td.bytes {
   text-align: right;
 }
 
+div.progress-wrapper {
+    position: relative;
+}
+
+div.progress-bar {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+}
+
+div.progress-text {
+    text-align: center;
+    position: relative;
+}

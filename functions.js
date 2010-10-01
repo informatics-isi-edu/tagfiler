@@ -217,6 +217,53 @@ function processSessionRequest() {
   }
 }
 
+/**
+ * Draw the progress bar
+ */
+function drawProgressBar(percent) {
+	if (width == 0) {
+		width = document.getElementById('Status').clientWidth;
+	}
+	var pixels = width * (percent / 100);  
+	var html = '<div id="progress-wrapper" class="progress-wrapper" style="width: ' + width + 'px">';  
+    html += '<div class="progress-bar" style="width: ' + pixels + 'px; background-color: #33cc33;"></div>';  
+    html += '<div class="progress-text" style="width: ' + width + 'px">' + percent + '%</div>';  
+    html += '</div>';  
+	document.getElementById("ProgressBar").innerHTML = html;
+}
+	
+/**
+ * Get the custom tags as pairs (name, value) separated by HTML newline
+ * Names are separated from their values also by HTML newline
+ */
+function getTags() {
+	doc = document.getElementById('Required Tags');
+	columns = doc.getElementsByTagName("td");
+	length = columns.length;
+	var ret=[];
+	for (i=0; i<length;i+=2) {
+		var name = columns[i].firstChild.nodeValue;
+		ret[i] = name.substr(0,name.length-1);
+		ret[i+1] = columns[i+1].firstChild.value;
+	}
+	return ret.join('<br/>');
+}
+
+/**
+ * Fill the list of files to be uploaded
+ * Files are separated by HTML newline
+ */
+function setFiles(files) {
+    document.getElementById("Files").innerHTML = files;
+}
+
+/**
+ * Set the status during the upload/download
+ */
+function setStatus(status) {
+    document.getElementById("Status").innerHTML = '<b>'+status+'</b>';
+}
+
 var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;
@@ -228,6 +275,7 @@ var warn_window_features = "height=400,width=600,resizable=yes,scrollbars=yes,st
 var ajax_request = null;
 var warn_window = null;
 var until = null;
+var width = 0;
 
 if(window.ActiveXObject) {
   ajax_request = new ActiveXObject("Microsoft.XMLHTTP");

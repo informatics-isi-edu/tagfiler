@@ -2,10 +2,43 @@ $def with (tvars)
 $ target = tvars.get('target')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
+$ tagnames = tvars.get('tagnames')
+$if tagnames:
+	<div>
+		<table>
+			<tr>
+				<td align="center"><table><tr><td><b>Required Tags</b></td></tr></table></td>
+				<td align="center"><table><tr><td><b>File(s) that will be uploaded</b></td></tr></table></td>
+			</tr>
+			<tr valign="top" >
+				<td>
+					<table frame="box" id="Required Tags">
+					$for tagname in tagnames:
+						<tr>
+							<td>${tagname}:</td>
+							<td><input type="text" /></td>
+						</tr>
+					</table>
+				</td>
+				<td valign="top" align="center">
+					<div style="overflow:auto; height: 512px; width: 100%">
+						<table frame="box">
+							<tr>
+								<td id="Files">
+								$for i in 'File(s) that will be uploaded':
+									&nbsp;
+								</td>
+							</tr>
+						</table>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
 <center>
 <APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
-  width=1010 height=600  MAYSCRIPT >
+  width=410 height=60  MAYSCRIPT >
 <PARAM name="tagfiler.server.url" value="${target}"/>
 <PARAM name="tagfiler.idle.mins" value="${expiremins}"/>
 <PARAM name="classloader_cache" value="false" />
@@ -16,4 +49,23 @@ $if testfile:
   Download JRE 1.5 for your system from the following link:</b><br/>
 <a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
 </APPLET>
+</center>
+<center>
+	<table>
+		<tr>
+			<td id="Status" align="center"><b>Click "Upload All" to begin file upload</b></td>
+		</tr>
+		<tr>
+			<td>
+				<table frame="box">
+					<tr>
+						<td id="ProgressBar">
+						$for i in 'Click "Upload All" to begin file upload':
+							&nbsp;
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
 </center>
