@@ -242,9 +242,35 @@ function getTags() {
 	length = columns.length;
 	var ret=[];
 	for (i=0; i<length;i+=2) {
-		var name = columns[i].firstChild.nodeValue;
-		ret[i] = name.substr(0,name.length-1);
+		ret[i] = columns[i].firstChild.nodeValue;
 		ret[i+1] = columns[i+1].firstChild.value;
+	}
+	return ret.join('<br/>');
+}
+
+/**
+ * Set the values for custom tags 
+ * they come as pairs (name, value) separated by HTML newline
+ * Names are separated from their values also by HTML newline
+ */
+function setTags(tags) {
+	var tokens = tags.split('<br/>');
+	for (i=0; i<tokens.length;i+=2) {
+		var id = tokens[i]+'_val';
+		document.getElementById(id).firstChild.nodeValue = tokens[i+1];
+	}
+}
+
+/**
+ * Get the custom tags name separated by HTML newline
+ */
+function getTagsName() {
+	doc = document.getElementById('Dataset Tags');
+	columns = doc.getElementsByTagName("td");
+	length = columns.length;
+	var ret=[];
+	for (i=0; i<length;i+=2) {
+		ret[i] = columns[i].firstChild.nodeValue;
 	}
 	return ret.join('<br/>');
 }
@@ -262,6 +288,29 @@ function setFiles(files) {
  */
 function setStatus(status) {
     document.getElementById("Status").innerHTML = '<b>'+status+'</b>';
+}
+
+/**
+ * Set the status during the upload/download
+ */
+function setDestinationDirectory(dir) {
+    document.getElementById("DestinationDirectory").value = dir;
+}
+
+/**
+ * Fill the form with the dataset info
+ */
+function getDatasetInfo() {
+	var node = document.getElementById("TransmissionNumber");
+	if (node != null) {
+		var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
+		if (value.length > 0) {
+			var tags = getTagsName();
+			document.TagFileDownloader.getDatasetInfo(value, tags);
+		} else {
+			alert('Transmission number can not be empty.');
+		}
+	}
 }
 
 var timer = 0;

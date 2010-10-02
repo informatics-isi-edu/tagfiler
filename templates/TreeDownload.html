@@ -3,10 +3,67 @@ $ target = tvars.get('target')
 $ transmissionnum = tvars.get('transmissionnum')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
+$ tagnames = tvars.get('tagnames')
+
+$if tagnames:
+	<center>
+		<table>
+			<tr>
+				<td align="center"><b>Enter Transmission Number</b></td>
+			</tr>
+			<tr>
+				<td align="center">
+					$if transmissionnum:
+						<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
+					$else:
+						<input id="TransmissionNumber" value="" type="text" />
+				</td>
+			</tr>
+			<tr>
+				<td align="center">
+					<button type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
+				</td>
+			</tr>
+		</table>
+	</center>
+	<div>
+		<table>
+			<tr>
+				<td align="center"><table><tr><td><b>Dataset tags</b></td></tr></table></td>
+				<td align="center"><table><tr><td><b>File(s) that will be downloaded</b></td></tr></table></td>
+			</tr>
+			<tr valign="top" >
+				<td>
+					<table frame="box" rules="all" id="Dataset Tags">
+					$for tagname in tagnames:
+						<tr>
+							<td style="background-color: aqua;">${tagname}</td>
+							<td id="${tagname}_val">
+								$for i in range(20):
+									&nbsp;
+							</td>
+						</tr>
+					</table>
+				</td>
+				<td valign="top" align="center">
+					<div style="overflow:auto; height: 412px; width: 100%">
+						<table frame="box">
+							<tr>
+								<td id="Files">
+								$for i in 'File(s) that will be uploaded':
+									&nbsp;
+								</td>
+							</tr>
+						</table>
+					</div>
+				</td>
+			</tr>
+		</table>
+	</div>
 <center>
 <APPLET NAME="TagFileDownloader" CODE="edu.isi.misd.tagfiler.TagFilerDownloadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
-  width=1010 height=500 MAYSCRIPT >
+  width=610 height=60 MAYSCRIPT >
 <PARAM name="tagfiler.server.url" value="${target}"/>
 <PARAM name="tagfiler.server.transmissionnum" value="${transmissionnum}"/>
 <PARAM name="tagfiler.idle.mins" value="${expiremins}"/>
@@ -18,4 +75,29 @@ $if testfile:
   Download JRE 1.5 for your system from the following link:</b><br/>
 <a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
 </APPLET>
+</center>
+<table>
+	<tr>
+		<td><b>Destination directory for saving files:&nbsp;</b></td>
+		<td><input id="DestinationDirectory" type="text" size="100" /></td>
+	</tr>
+</table>
+<center>
+	<table>
+		<tr>
+			<td id="Status" align="center"><b>Click "Update" to fill the form</b></td>
+		</tr>
+		<tr>
+			<td align="center">
+				<table frame="box">
+					<tr>
+						<td id="ProgressBar">
+						$for i in 'Click "Update" to fill the form':
+							&nbsp;
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
 </center>
