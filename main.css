@@ -34,6 +34,15 @@ tr.file.odd {
 tr.file.even {
 
 }
+tr.file-tag.odd {
+  background-color: #cccccc;
+}
+tr.file-tag.even {
+
+}
+th.file-tag {
+  text-align: left;
+}
 td.bytes {
   text-align: right;
 }

@@ -105,7 +105,8 @@ class Study (Node):
                      tagnames=tagnames,
                      direction=self.direction,
                      expiremins=self.webauthnexpiremins,
-                     testfile=self.appletTest)
+                     testfile=self.appletTest,
+                     idquote=idquote)
         if self.action == 'upload':
             return self.renderlist("Study Upload",
                                    [self.render.TreeUpload(tvars)])

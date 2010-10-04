@@ -5,6 +5,8 @@ $ files = tvars.get('files')
 $ direction = tvars.get('direction')
 $ success = tvars.get('success')
 $ error = tvars.get('error')
+$ idquote = tvars.get('idquote')
+$ odd = True
 $if success:
 	<h2>Completed</h2>
 	<p>
@@ -23,11 +25,16 @@ $if transmissionnum:
 	$if direction == 'upload':
 		Please write this transmission number on the visit inventory form.
 </p><p>
-<table border=1>
+<table class="file-tag-list">
 $for tag in tags:
 	$ tagname, vals = tag
-	<tr><td>${tagname}</td>
-	<td>
+	$if odd:
+		<tr class="file-tag odd">
+	$else:
+		<tr class="file-tag even">
+	$ odd = not odd
+	<th class="file-tag ${idquote(tagname)}">${tagname}</th>
+	<td class="file-tag ${idquote(tagname)}">
 	$for val in vals:
 		${val}
 	</td>
