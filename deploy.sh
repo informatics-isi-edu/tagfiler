@@ -315,9 +315,9 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 #    SetEnv ${SVCPREFIX}.chunkbytes 1048576
 #    SetEnv ${SVCPREFIX}.webauthnexpiremins 10
 #    SetEnv ${SVCPREFIX}.webauthnrotatemins 120
-    SetEnv ${SVCPREFIX}.subtitle 'DIRC Client Data Uploader (DIRC CDU)'
-    SetEnv ${SVCPREFIX}.logo '<img alt="DIRC logo" title="Doheny Image Reading Center" src="/${SVCPREFIX}/static/DIRC.png" width="208" height="60" />'
-    SetEnv tagfiler.contact '<h3>Service Operator</h3><p>Doheny Image Reading Center<br />1450 San Pablo Street, #3603<br />Los Angeles, California 90033<p><h3>Study Coordinators</h3><p><ol><li>Katie Aguilar<br />kaguilar@doheny.org<br />+1 (323) 442-6393</li><li>Khalid Mansoor<br />kmansoor@doheny.org<br />+1 (323) 442-6393</li></ol></p>'
+    SetEnv ${SVCPREFIX}.subtitle 'Tagfiler (trunk) on ${HOME_HOST}'
+    SetEnv ${SVCPREFIX}.logo '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
+    SetEnv tagfiler.contact '<p>Your HTML here</p>'
 
 </Directory>
 
@@ -327,7 +327,7 @@ deploydir=/var/www/html/${SVCPREFIX}/static/
 mkdir -p ${deploydir}
 cp main.css ${deploydir}
 cp functions.js ${deploydir}
-cp DIRC.png ${deploydir}
+cp logo.png ${deploydir}
 
 signedjar=signed-isi-misd-tagfiler-upload-applet.jar
 namespace=edu/isi/misd/tagfiler/util
