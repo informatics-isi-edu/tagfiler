@@ -302,14 +302,13 @@ function setDestinationDirectory(dir) {
  */
 function getDatasetInfo() {
 	var node = document.getElementById("TransmissionNumber");
-	if (node != null) {
-		var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
-		if (value.length > 0) {
-			var tags = getTagsName();
-			document.TagFileDownloader.getDatasetInfo(value, tags);
-		} else {
-			alert('Transmission number can not be empty.');
-		}
+	// Trim the value
+	var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
+	if (value.length > 0) {
+		var tags = getTagsName();
+		document.TagFileDownloader.getDatasetInfo(value, tags);
+	} else {
+		alert('Transmission number can not be empty.');
 	}
 }
 

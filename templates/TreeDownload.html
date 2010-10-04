@@ -21,7 +21,10 @@ $if tagnames:
 			</tr>
 			<tr>
 				<td align="center">
-					<button type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
+					$if transmissionnum:
+						<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
+					$else:
+						<button id="UpdateButton" type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
 				</td>
 			</tr>
 		</table>
@@ -101,3 +104,7 @@ $if testfile:
 		</tr>
 	</table>
 </center>
+$if transmissionnum:
+	<script type="text/javascript">
+		setTimeout("getDatasetInfo()", 1000);
+	</script>
