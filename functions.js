@@ -276,11 +276,18 @@ function getTagsName() {
 }
 
 /**
- * Fill the list of files to be uploaded
- * Files are separated by HTML newline
+ * Set the files to be uploaded or the first file to be downloaded
  */
 function setFiles(files) {
     document.getElementById("Files").innerHTML = files;
+}
+
+/**
+ * Add a file to be downloaded
+ * Files are separated by HTML newline
+ */
+function addFile(file) {
+    document.getElementById("Files").innerHTML += '<br/>'+file;
 }
 
 /**
