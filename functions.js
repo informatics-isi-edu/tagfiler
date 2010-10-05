@@ -319,6 +319,27 @@ function getDatasetInfo() {
 	}
 }
 
+/**
+ * Upload the files
+ */
+function uploadAll() {
+    document.TagFileUploader.uploadAll();
+}
+
+/**
+ * Download the files
+ */
+function downloadFiles() {
+    document.TagFileDownloader.downloadFiles();
+}
+
+/**
+ * Enables a button
+ */
+function setEnabled(id) {
+    document.getElementById(id).disabled = false;
+}
+
 var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;

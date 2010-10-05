@@ -74,7 +74,7 @@ $if tagnames:
 <center>
 <APPLET NAME="TagFileDownloader" CODE="edu.isi.misd.tagfiler.TagFilerDownloadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
-  width=610 height=60 MAYSCRIPT >
+  width=370 height=50 MAYSCRIPT >
 <PARAM name="tagfiler.server.url" value="${target}"/>
 <PARAM name="tagfiler.server.transmissionnum" value="${transmissionnum}"/>
 <PARAM name="tagfiler.idle.mins" value="${expiremins}"/>
@@ -86,6 +86,9 @@ $if testfile:
   Download JRE 1.5 for your system from the following link:</b><br/>
 <a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
 </APPLET>
+</center>
+<center>
+<button type="button" name="Download Files" id="Download Files" disabled="disabled" onclick="downloadFiles()" >Download Files</button>
 </center>
 <table>
 	<tr>
