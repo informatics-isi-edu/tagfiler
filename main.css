@@ -46,18 +46,35 @@ th.file-tag {
 td.bytes {
   text-align: right;
 }
-
 div.progress-wrapper {
-    position: relative;
+  position: relative;
 }
-
 div.progress-bar {
-    position: absolute;
-    top: 0; left: 0;
-    height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
 }
-
 div.progress-text {
-    text-align: center;
-    position: relative;
+  text-align: center;
+  position: relative;
+}
+table.topmargin {
+  width: 100%;
+}
+table.topmargin td.logo {
+  align: left;
+}
+table.topmargin td.title {
+  align: center;
+}
+table.topmargin td.authninfo {
+  align: right;
+  width: 20%;
+}
+table.authninfo > tr.noauthn > td {
+  color: green;
+  font-style: italic;
+}
+table.topmenu td {
+  padding: 10px;
 }

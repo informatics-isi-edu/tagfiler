@@ -34,14 +34,14 @@ $else:
 </td>
 </head>
 <body>
-<table width="100%">
+<table class="topmargin">
 <tr>
 $if logo:
-	<td align="left">$:{logo}</td>
+	<td class="logo">$:{logo}</td>
 $if appsubtitle:
-	<td align="center"><h1>${appsubtitle}</h1></td>
-<td align="right">
-<table align="right">
+	<td class="title"><h1>${appsubtitle}</h1></td>
+<td class="authninfo">
+<table class="authninfo">
 $if user:
 	$ rfc1123 = "%a, %d %b %Y %H:%M:%S UTC%z"
 	<tr><td>User:</td><td><a href="${webauthnhome}/status">${user}</a></td></tr>
@@ -59,7 +59,7 @@ $if user:
 		localizeDate("untiltime");
 		</script></tr>
 $else:
-	<tr style="color:green"><td>Login User:</td><td><em>not logged in</em></td></tr>
+	<tr class="noauthn"><td>Login User:</td><td>not logged in</td></tr>
 	$if webauthnhome:
 		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
 </table>
@@ -67,7 +67,7 @@ $else:
 </tr>
 </table>
 <div class="page">
-<table cellpadding="10">
+<table class="topmenu">
   <tr>
     <td>
       <a href="${home}/">Home</a>
