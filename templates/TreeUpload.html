@@ -11,26 +11,34 @@ $if tagnames:
 				<td align="center"><table><tr><td><b>File(s) that will be uploaded</b></td></tr></table></td>
 			</tr>
 			<tr valign="top" >
-				<td>
-					<table frame="box" id="Required Tags">
-					$for tagname in tagnames:
-						<tr>
-							<td style="background-color: aqua;">${tagname}</td>
-							<td><input type="text" /></td>
-						</tr>
-					</table>
-				</td>
-				<td valign="top" align="center">
-					<div style="overflow:auto; height: 512px; width: 100%">
-						<table frame="box">
+				<td align="center">
+					<div style="overflow:auto; width: 600px;">
+						<table frame="box" id="Required Tags">
+						$for tagname in tagnames:
 							<tr>
-								<td id="Files">
-								$for i in 'File(s) that will be uploaded':
-									&nbsp;
-								</td>
+								<td style="background-color: aqua;">${tagname}</td>
+								<td><input type="text" /></td>
 							</tr>
 						</table>
 					</div>
+				</td>
+				<td valign="top" align="center">
+					<table frame="box" style="width: 100%">
+						<tr>
+							<td>
+								<div style="overflow:auto; height: 512px; width: 1000px">
+									<table>
+										<tr>
+											<td NOWRAP id="Files">
+											$for i in 'File(s) that will be uploaded':
+												&nbsp;
+											</td>
+										</tr>
+									</table>
+								</div>
+							</td>
+						</tr>
+					</table>
 				</td>
 			</tr>
 		</table>

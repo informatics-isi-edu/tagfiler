@@ -36,29 +36,37 @@ $if tagnames:
 				<td align="center"><table><tr><td><b>File(s) that will be downloaded</b></td></tr></table></td>
 			</tr>
 			<tr valign="top" >
-				<td>
-					<table frame="box" rules="all" id="Dataset Tags">
-					$for tagname in tagnames:
-						<tr>
-							<td style="background-color: aqua;">${tagname}</td>
-							<td id="${tagname}_val">
-								$for i in range(20):
-									&nbsp;
-							</td>
-						</tr>
-					</table>
-				</td>
-				<td valign="top" align="center">
-					<div style="overflow:auto; height: 412px; width: 100%">
-						<table frame="box">
+				<td align="center">
+					<div style="overflow:auto; width: 600px;">
+						<table frame="box" rules="all" id="Dataset Tags">
+						$for tagname in tagnames:
 							<tr>
-								<td id="Files">
-								$for i in 'File(s) that will be uploaded':
-									&nbsp;
+								<td style="background-color: aqua;">${tagname}</td>
+								<td id="${tagname}_val">
+									$for i in range(40):
+										&nbsp;
 								</td>
 							</tr>
 						</table>
 					</div>
+				</td>
+				<td valign="top" align="center">
+					<table frame="box">
+						<tr>
+							<td>
+								<div style="overflow:auto; height: 412px; width: 1000px">
+									<table>
+										<tr>
+											<td NOWRAP id="Files">
+											$for i in 'File(s) that will be downloaded':
+												&nbsp;
+											</td>
+										</tr>
+									</table>
+								</div>
+							</td>
+						</tr>
+					</table>
 				</td>
 			</tr>
 		</table>
