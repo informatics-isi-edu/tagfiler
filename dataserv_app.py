@@ -664,14 +664,14 @@ class Application:
             policy = dict(read='readpolicy', write='writepolicy')[staticauthz]
             tables.append("%s USING (tagname)" % table)
             if user != None:
-                parts = [ "%s != 'tag'" % policy, "owner = $user" ]
+                parts = [ "%s != 'tag'" % policy ]
                 r = 0
                 for role in self.roles:
+                    parts.append("owner = $role%s" % r)
                     parts.append("value = $role%s" % r)
                     vars['role%s' % r] = role
                     r += 1
                 wheres.append(" OR ".join(parts))
-                vars['user'] = user
             else:
                 wheres.append("%s != 'tag'" % policy)
                 wheres.append("%s != 'fowner'" % policy)
