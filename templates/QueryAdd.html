@@ -12,7 +12,7 @@ $if len(tags) > 0:
 	<p>Select an available tag and click 'Add' to build a query:
 	</p>
 	<form enctype="application/x-www-form-urlencoded" action="${qtarget}" method="get">
-	  <table><tr valign='top'>
+	  <table class="query-add"><tr>
 	  <td><select name="tag">
 		$for tag in tags:
 			<option value="${tag}">${tag}</option>

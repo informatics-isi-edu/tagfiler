@@ -78,3 +78,6 @@ table.authninfo > tr.noauthn > td {
 table.topmenu td {
   padding: 10px;
 }
+table.query-add tr {
+  vertical-align: top;
+}
