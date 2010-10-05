@@ -11,18 +11,23 @@ $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
 $if title == 'System' and data_id:
 	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
 $if len(filetagvals) > 0:
-	<table border="1">
+	$ odd = True
+	<table class="file-list">
 	$if tagspace == 'tags':
-		<tr><th>File</th><th>Tag</th><th>Value(s)</th></tr>
+		<tr class="file-heading"><th class="file-name">File</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
 	$else:
-		<tr><th>Tag</th><th>ACL</th><th>Member(s)</th></tr>
+		<tr class="file-heading"><th class="file-name">Tag</th><th class="file-tag">ACL</th><th class="file-tag">Member(s)</th></tr>
 	$for data_id, tag, vals in filetagvals:
 		$ tagname, typestr, writeok = tagdefsdict[tag]
-		<tr><td>${data_id}</td><td>${tag}</td>
+		$if odd:
+			<tr class="file odd"><td class="file-name">${data_id}</td><td>${tag}</td>
+		$else:
+			<tr class="file even"><td class="file-name">${data_id}</td><td>${tag}</td>
+		$ odd = not odd
 			$if typestr:
-				<td><table>
+				<td class="file-tag"><table>
 				$for val in vals:
-					<tr><td>${val}</td></tr>
+					<tr><td class="file-tag multivalue">${val}</td></tr>
 				</table></td>
 		</tr>
 	</table>

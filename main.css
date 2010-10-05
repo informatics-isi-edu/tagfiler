@@ -40,7 +40,7 @@ tr.file-tag.odd {
 tr.file-tag.even {
 
 }
-th.file-tag {
+td.file-tag {
   text-align: left;
 }
 td.bytes {
