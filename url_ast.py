@@ -749,11 +749,9 @@ class FileTags (Node):
             if len(vals) == 1:
                 self.value = vals[0]
             elif len(vals) > 1:
-                web.debug(self.tagvals)
                 raise BadRequest(data="GET does not support multiple values in the URI.")
             return self.GETtag(uri)
         elif len(keys) > 1:
-            web.debug(self.tagvals)
             raise BadRequest(data="GET does not support multiple tag names in the URI.")
         else:
             return self.GETall(uri)

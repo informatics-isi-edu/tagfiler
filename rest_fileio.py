@@ -376,7 +376,7 @@ class FileIO (Application):
             self.txlog('CREATE', dataset=self.data_id)
             t = self.db.transaction()
             try:
-                web.debug('setting owner "%s"' % self.user())
+                #web.debug('setting owner "%s"' % self.user())
                 self.set_file_tag('owner', self.user())
                 t.commit()
             except:

@@ -334,7 +334,6 @@ class Application:
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
-                web.debug('no authn, requiring login, so sending 303 ' + self.webauthnhome)
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
     def postDispatch(self, uri=None):
@@ -776,7 +775,7 @@ class Application:
             vars['user'] = user
         wheres = " AND ".join(wheres)
         query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
-        web.debug(query)
+        #web.debug(query)
         return self.db.query(query, vars=vars)
 
     def set_tag_acl(self, mode, user, tag_id):
