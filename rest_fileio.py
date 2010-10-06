@@ -784,7 +784,11 @@ class FileIO (Application):
             target = self.home + web.ctx.homepath
             ftype = result
             return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(target, ftype, self.data_id, self.referer, urlquote)])
+                                   [self.render.ConfirmForm(dict(target=self.home + web.ctx.homepath,
+                                                                 type=ftype,
+                                                                 name=self.data_id,
+                                                                 referer=self.referer,
+                                                                 urlquote=urlquote))])
 
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
