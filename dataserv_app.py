@@ -817,9 +817,7 @@ class Application:
                  if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
     def delete_file_tag(self, tagname, value=None, data_id=None, owner=None):
-        if value == '':
-            whereval = " AND value IS NULL"
-        elif value:
+        if value or value == '':
             whereval = " AND value = $value"
         else:
             whereval = ""
