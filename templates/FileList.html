@@ -20,7 +20,6 @@ $if len(files) > 0:
 	$for tag in filelisttags:
 		$if tag not in skiptags:
 			<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
-	<th class="file-delete">Delete</th>
 	</tr>
 	$for file in files:
 		$if odd:
@@ -39,6 +38,14 @@ $if len(files) > 0:
 			<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
 		$if file['Image Set']:
 			<a href="${apptarget}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
+		$if file.writeok:
+			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
+			    <div>
+			    <input type="hidden" name="action" value="delete" />
+			    <input type="hidden" name="referer" value="${referer}" />
+			    <input type="submit" value="Delete" />
+			    </div>
+			</form>
 		</td>
 		<td class="file-tags">
 		$if 'downloader' in roles:
@@ -111,16 +118,6 @@ $if len(files) > 0:
 						</td></form></tr>
 					</table>
 				</td>
-		$if file.writeok:
-			<td class="file-delete">
-			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
-			    <div>
-			    <input type="hidden" name="action" value="delete" />
-			    <input type="hidden" name="referer" value="${referer}" />
-			    <input type="submit" value="Delete File" />
-			    </div>
-			</form>
-			</td>
 		</tr>
 	</table>
 $elif 'uploader' in roles:
