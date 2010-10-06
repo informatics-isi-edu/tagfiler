@@ -3,74 +3,62 @@ $ target = tvars.get('target')
 $ transmissionnum = tvars.get('transmissionnum')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
-$ tagnames = tvars.get('tagnames')
 
-$if tagnames:
-	<center>
-		<table>
-			<tr>
-				<td class="study-wrapper"><b>Enter Transmission Number</b></td>
-			</tr>
-			<tr>
-				<td class="study-wrapper">
-					$if transmissionnum:
-						<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
-					$else:
-						<input id="TransmissionNumber" value="" type="text" />
-				</td>
-			</tr>
-			<tr>
-				<td class="study-wrapper">
-					$if transmissionnum:
-						<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
-					$else:
-						<button id="UpdateButton" type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
-				</td>
-			</tr>
-		</table>
-	</center>
-	<div>
-		<table>
-			<tr>
-				<td class="study-wrapper"><b>Dataset tags</b></td>
-				<td class="study-wrapper"><b>File(s) that will be downloaded</b></td>
-			</tr>
-			<tr class="study-wrapper" >
-				<td>
-					<div class="custom-tags">
-						<table class="table-wrapper" rules="all" id="Dataset Tags">
-						$for tagname in tagnames:
-							<tr>
-								<td class="tag-name">${tagname}</td>
-								<td id="${tagname}_val">
-									$for i in range(40):
-										&nbsp;
-								</td>
-							</tr>
-						</table>
-					</div>
-				</td>
-				<td class="files-tree-wrapper">
-					<table class="files-tree-wrapper">
-						<tr>
-							<td>
-								<div class="files-tree">
-									<table>
-										<tr>
-											<td class="text-tree" id="Files">
-											$for i in 'File(s) that will be downloaded':
-												&nbsp;
-											</td>
-										</tr>
-									</table>
-								</div>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
-	</div>
+<center>
+	<table>
+		<tr>
+			<td class="study-wrapper"><b>Enter Transmission Number</b></td>
+		</tr>
+		<tr>
+			<td class="study-wrapper">
+				$if transmissionnum:
+					<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
+				$else:
+					<input id="TransmissionNumber" value="" type="text" />
+			</td>
+		</tr>
+		<tr>
+			<td class="study-wrapper">
+				$if transmissionnum:
+					<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
+				$else:
+					<button id="UpdateButton" type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
+			</td>
+		</tr>
+	</table>
+</center>
+<div>
+	<table>
+		<tr>
+			<td class="study-wrapper"><b>Dataset tags</b></td>
+			<td class="study-wrapper"><b>File(s) that will be downloaded</b></td>
+		</tr>
+		<tr class="study-wrapper" >
+			<td>
+				<div class="custom-tags" id="custom-tags" >
+				</div>
+			</td>
+			<td class="files-tree-wrapper">
+				<table class="files-tree-wrapper">
+					<tr>
+						<td>
+							<div class="files-tree">
+								<table>
+									<tr>
+										<td class="text-tree" id="Files">
+										$for i in 'File(s) that will be downloaded':
+											&nbsp;
+										</td>
+									</tr>
+								</table>
+							</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</div>
 <center>
 <APPLET NAME="TagFileDownloader" CODE="edu.isi.misd.tagfiler.TagFilerDownloadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
@@ -115,6 +103,9 @@ $if testfile:
 		</tr>
 	</table>
 </center>
+<script type="text/javascript">
+	setTimeout("setDatasetTags()", 1);
+</script>
 $if transmissionnum:
 	<script type="text/javascript">
 		setTimeout("getDatasetInfo()", 1000);

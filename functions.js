@@ -269,8 +269,9 @@ function getTagsName() {
 	columns = doc.getElementsByTagName("td");
 	length = columns.length;
 	var ret=[];
+	var j=0;
 	for (i=0; i<length;i+=2) {
-		ret[i] = columns[i].firstChild.nodeValue;
+		ret[j++] = columns[i].firstChild.nodeValue;
 	}
 	return ret.join('<br/>');
 }
@@ -320,10 +321,35 @@ function getDatasetInfo() {
 }
 
 /**
+ * Check if all required tags are present and have proper values
+ */
+function validateCustomTags() {
+    var tagnames = customTags.split(',');
+    for (i=0; i<tagnames.length; i++) {
+    	var node = document.getElementById(tagnames[i]+'_id');
+    	attr = node.attributes;
+    	if (attr['required']) {
+    		var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
+    		if (value.length == 0) {
+    			alert('Tag "' + tagnames[i] + '" is required.');
+    			return false;
+    		}
+    	}
+    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(node.value)) {
+    		alert('Bad value for tag "' + tagnames[i] + '".');
+    		return false;
+    	}
+    }
+    return true;
+}
+
+/**
  * Upload the files
  */
 function uploadAll() {
-    document.TagFileUploader.uploadAll();
+	if (validateCustomTags()) {
+    	document.TagFileUploader.uploadAll();
+	}
 }
 
 /**
@@ -338,6 +364,59 @@ function downloadFiles() {
  */
 function setEnabled(id) {
     document.getElementById(id).disabled = false;
+}
+
+/**
+ * Method "contains" for the Array object
+ * returns true if an element is in the array, and false otherwise
+ */
+Array.prototype.contains = function ( elem ) {
+   for (i in this) {
+       if (this[i] == elem) return true;
+   }
+   return false;
+}
+
+/**
+ * Set the required tags
+ */
+function setRequiredTags() {
+    var tagnames = customTags.split(',');
+    var tagtypes = typestr.split(',');
+    var required = requiredTags.split(',');
+    var html = '<table class="table-wrapper" id="Required Tags">\n';
+    for (i=0; i<tagnames.length; i++) {
+    	html += '<tr>\n'+
+    			'<td class="tag-name">'+tagnames[i]+'</td>\n'+
+    			'<td><input type="text" id="'+tagnames[i]+'_id" typestr="'+tagtypes[i]+'" ';
+    	if (required.contains(tagnames[i])) {
+    		html += 'required="required" ';
+    	}
+    	html += ' /></td>\n'+
+    			'</tr>\n';
+    }
+    html += '</table>';
+    document.getElementById('custom-tags').innerHTML = html;
+}
+
+/**
+ * Set the dataset tags
+ */
+function setDatasetTags() {
+    var tagnames = customTags.split(',');
+    var html = '<table class="table-wrapper" rules="all" id="Dataset Tags">\n';
+    for (i=0; i<tagnames.length; i++) {
+    	html += '<tr>\n'+
+    			'<td class="tag-name">'+tagnames[i]+'</td>\n'+
+    			'<td id="'+tagnames[i]+'_val">';
+    	for (j=0;j<40;j++) {
+    		html += '&nbsp;';
+    	}
+    	html += ' </td>\n'+
+    			'</tr>\n';
+    }
+    html += '</table>';
+    document.getElementById('custom-tags').innerHTML = html;
 }
 
 var timer = 0;
@@ -364,3 +443,9 @@ if(ajax_request) {
   ajax_request.onreadystatechange = processSessionRequest;
 }
 
+/**
+ * Add here the custom tags
+ */
+var customTags = 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment';
+var typestr = 'text,text,text,text,text,text,text,text,text,date,text';
+var requiredTags = 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date';

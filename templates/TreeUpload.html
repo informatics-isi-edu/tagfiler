@@ -2,47 +2,38 @@ $def with (tvars)
 $ target = tvars.get('target')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
-$ tagnames = tvars.get('tagnames')
-$if tagnames:
-	<div>
-		<table>
-			<tr>
-				<td class="study-wrapper"><b>Required Tags</b></td>
-				<td class="study-wrapper"><b>File(s) that will be uploaded</b></td>
-			</tr>
-			<tr class="study-wrapper" >
-				<td>
-					<div class="custom-tags">
-						<table class="table-wrapper" id="Required Tags">
-						$for tagname in tagnames:
-							<tr>
-								<td class="tag-name">${tagname}</td>
-								<td><input type="text" /></td>
-							</tr>
-						</table>
-					</div>
-				</td>
-				<td class="files-tree-wrapper">
-					<table class="files-tree-wrapper">
-						<tr>
-							<td>
-								<div class="files-tree">
-									<table>
-										<tr>
-											<td class="text-tree" id="Files">
-											$for i in 'File(s) that will be uploaded':
-												&nbsp;
-											</td>
-										</tr>
-									</table>
-								</div>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
-	</div>
+<div>
+	<table>
+		<tr>
+			<td class="study-wrapper"><b>Required Tags</b></td>
+			<td class="study-wrapper"><b>File(s) that will be uploaded</b></td>
+		</tr>
+		<tr class="study-wrapper" >
+			<td>
+				<div class="custom-tags" id="custom-tags">
+				</div>
+			</td>
+			<td class="files-tree-wrapper">
+				<table class="files-tree-wrapper">
+					<tr>
+						<td>
+							<div class="files-tree">
+								<table>
+									<tr>
+										<td class="text-tree" id="Files">
+										$for i in 'File(s) that will be uploaded':
+											&nbsp;
+										</td>
+									</tr>
+								</table>
+							</div>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</div>
 <center>
 <APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
@@ -80,3 +71,6 @@ $if testfile:
 		</tr>
 	</table>
 </center>
+<script type="text/javascript">
+	setTimeout("setRequiredTags()", 1);
+</script>
