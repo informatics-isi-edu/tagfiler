@@ -9,10 +9,10 @@ $if tagnames:
 	<center>
 		<table>
 			<tr>
-				<td align="center"><b>Enter Transmission Number</b></td>
+				<td class="study-wrapper"><b>Enter Transmission Number</b></td>
 			</tr>
 			<tr>
-				<td align="center">
+				<td class="study-wrapper">
 					$if transmissionnum:
 						<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
 					$else:
@@ -20,7 +20,7 @@ $if tagnames:
 				</td>
 			</tr>
 			<tr>
-				<td align="center">
+				<td class="study-wrapper">
 					$if transmissionnum:
 						<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
 					$else:
@@ -32,16 +32,16 @@ $if tagnames:
 	<div>
 		<table>
 			<tr>
-				<td align="center"><table><tr><td><b>Dataset tags</b></td></tr></table></td>
-				<td align="center"><table><tr><td><b>File(s) that will be downloaded</b></td></tr></table></td>
+				<td class="study-wrapper"><b>Dataset tags</b></td>
+				<td class="study-wrapper"><b>File(s) that will be downloaded</b></td>
 			</tr>
-			<tr valign="top" >
-				<td align="center">
-					<div style="overflow:auto; width: 600px;">
-						<table frame="box" rules="all" id="Dataset Tags">
+			<tr class="study-wrapper" >
+				<td>
+					<div class="custom-tags">
+						<table class="table-wrapper" rules="all" id="Dataset Tags">
 						$for tagname in tagnames:
 							<tr>
-								<td style="background-color: aqua;">${tagname}</td>
+								<td class="tag-name">${tagname}</td>
 								<td id="${tagname}_val">
 									$for i in range(40):
 										&nbsp;
@@ -50,14 +50,14 @@ $if tagnames:
 						</table>
 					</div>
 				</td>
-				<td valign="top" align="center">
-					<table frame="box">
+				<td class="files-tree-wrapper">
+					<table class="files-tree-wrapper">
 						<tr>
 							<td>
-								<div style="overflow:auto; height: 412px; width: 1000px">
+								<div class="files-tree">
 									<table>
 										<tr>
-											<td NOWRAP id="Files">
+											<td class="text-tree" id="Files">
 											$for i in 'File(s) that will be downloaded':
 												&nbsp;
 											</td>
@@ -99,11 +99,11 @@ $if testfile:
 <center>
 	<table>
 		<tr>
-			<td id="Status" align="center"><b>Click "Update" to fill the form</b></td>
+			<td class="status-wrapper" id="Status"><b>Click "Update" to fill the form</b></td>
 		</tr>
 		<tr>
-			<td align="center">
-				<table frame="box">
+			<td>
+				<table class="table-border">
 					<tr>
 						<td id="ProgressBar">
 						$for i in 'Click "Update" to fill the form':

@@ -7,29 +7,29 @@ $if tagnames:
 	<div>
 		<table>
 			<tr>
-				<td align="center"><table><tr><td><b>Required Tags</b></td></tr></table></td>
-				<td align="center"><table><tr><td><b>File(s) that will be uploaded</b></td></tr></table></td>
+				<td class="study-wrapper"><b>Required Tags</b></td>
+				<td class="study-wrapper"><b>File(s) that will be uploaded</b></td>
 			</tr>
-			<tr valign="top" >
-				<td align="center">
-					<div style="overflow:auto; width: 600px;">
-						<table frame="box" id="Required Tags">
+			<tr class="study-wrapper" >
+				<td>
+					<div class="custom-tags">
+						<table class="table-wrapper" id="Required Tags">
 						$for tagname in tagnames:
 							<tr>
-								<td style="background-color: aqua;">${tagname}</td>
+								<td class="tag-name">${tagname}</td>
 								<td><input type="text" /></td>
 							</tr>
 						</table>
 					</div>
 				</td>
-				<td valign="top" align="center">
-					<table frame="box" style="width: 100%">
+				<td class="files-tree-wrapper">
+					<table class="files-tree-wrapper">
 						<tr>
 							<td>
-								<div style="overflow:auto; height: 512px; width: 1000px">
+								<div class="files-tree">
 									<table>
 										<tr>
-											<td NOWRAP id="Files">
+											<td class="text-tree" id="Files">
 											$for i in 'File(s) that will be uploaded':
 												&nbsp;
 											</td>
@@ -64,11 +64,11 @@ $if testfile:
 <center>
 	<table>
 		<tr>
-			<td id="Status" align="center"><b>Click "Upload All" to begin file upload</b></td>
+			<td class="status-wrapper" id="Status" ><b>Click "Upload All" to begin file upload</b></td>
 		</tr>
 		<tr>
 			<td>
-				<table frame="box">
+				<table class="table-border">
 					<tr>
 						<td id="ProgressBar">
 						$for i in 'Click "Upload All" to begin file upload':
