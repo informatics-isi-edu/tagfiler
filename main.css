@@ -40,9 +40,6 @@ tr.file-tag.odd {
 tr.file-tag.even {
 
 }
-td.file-tag {
-  text-align: left;
-}
 td.bytes {
   text-align: right;
 }
@@ -58,7 +55,7 @@ div.progress-text {
   text-align: center;
   position: relative;
 }
-table.topmargin {
+table.topmargin, table.file-tag-list {
   width: 100%;
 }
 table.topmargin td.logo {
@@ -80,4 +77,10 @@ table.topmenu td {
 }
 table.query-add tr {
   vertical-align: top;
+}
+td.file-tag.set, td.file-tag.delete {
+  text-align: right;
+}
+table.file-tag-list tr {
+  border-style: solid;
 }
