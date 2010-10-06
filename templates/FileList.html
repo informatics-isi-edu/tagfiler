@@ -10,6 +10,7 @@ $ filelisttagswrite = tvars.get('filelisttagswrite')
 $ tagdefs = tvars.get('tagdefs')
 $ idquote = tvars.get('idquote')
 $ skiptags =  ['Image Set']
+$ allroles = tvars.get('roleinfo')
 $ odd = True
 $if len(files) > 0:
 	<table class="file-list">
@@ -109,7 +110,26 @@ $if len(files) > 0:
 						<tr><form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
 						<input type="hidden" name="referer" value="${referer}" />
 						<input type="hidden" name="set-${urlquote(tag)}" value="true" />
-						<td class="file-tag ${idquote(tag)} multivalue input"><input type="text" name="val-${urlquote(tag)}" /></td>
+						<td class="file-tag ${idquote(tag)} multivalue input">
+						$if tagdefs[tag].typestr == 'role':
+							$if tagdefs[tag].multivalue and file[tag]:
+								$ thisroles = file[tag]
+							$elif file.get(tag, None):
+								$ thisroles = [ file[tag] ]
+							$else:
+								$ thisroles = []
+							<!-- $:{thisroles} -->
+							<!-- $:{set(allroles)} -->
+							$ availroles = [ role for role in set(allroles).difference(set(thisroles)) ]
+							$ availroles.sort()
+							<select name="val-${urlquote(tag)}">
+							<option value="">Choose a role</option>
+							$for role in availroles:
+								<option	value="${role}">${role}</option>
+							</select>
+						$else:
+							<input type="text" name="val-${urlquote(tag)}" />
+						</td>
 						<input type="hidden" name="action" value="put" /><td class="file-tag ${idquote(tag)} multivalue set">
 						$if tagdefs[tag].multivalue:
 							<input type="submit" value="Add Value" />

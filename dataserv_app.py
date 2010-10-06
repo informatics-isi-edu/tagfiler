@@ -334,6 +334,7 @@ class Application:
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
+                web.debug('no authn, requiring login, so sending 303 ' + self.webauthnhome)
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
 
     def postDispatch(self, uri=None):
@@ -435,6 +436,9 @@ class Application:
             return None
         return user
 
+    def buildroleinfo(self):
+        return [ res.role for res in webauthn.role.db_select_role(self.db) ]
+    
     def test_file_authz(self, mode, data_id=None, owner=None):
         """Check whether access is allowed to user given mode and owner.
 

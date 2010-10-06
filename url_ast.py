@@ -216,11 +216,14 @@ class FileList (Node):
                                                        owner=res.owner,
                                                        data_id=res.file,
                                                        local=res.local)
-            return (files, tagdefs)
+
+            roleinfo = self.buildroleinfo()
+
+            return (files, tagdefs, roleinfo)
 
         def postCommit(results):
             target = self.home + web.ctx.homepath
-            files, tagdefs = results
+            files, tagdefs, roleinfo = results
             tvars=dict(apptarget=web.ctx.homepath,
                        webauthnhome=self.webauthnhome,
                        help=self.help,
@@ -229,6 +232,7 @@ class FileList (Node):
                        referer=self.home + uri,
                        role=self.role,
                        roles=self.roles,
+                       roleinfo=roleinfo,
                        urlquote=urlquote,
                        filelisttags=self.filelisttags,
                        filelisttagswrite=self.filelisttagswrite,
@@ -670,9 +674,6 @@ class FileTags (Node):
                  filetagvals,
                  length )
 
-    def buildroleinfo(self):
-        return [ res.role for res in webauthn.role.db_select_role(self.db) ]
-    
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
@@ -1111,14 +1112,16 @@ class Query (Node):
                                                        data_id=res.file,
                                                        local=res.local)
             alltagdefs = [ tagdef for tagdef in self.select_tagdef(order='tagname', staticauthz='read') ]
-            return ( files, alltagdefs )
+            roleinfo = self.buildroleinfo()
+            return ( files, alltagdefs, roleinfo )
 
         def postCommit(results):
-            files, tagdefs = results
+            files, tagdefs, roleinfo = results
             apptarget = self.home + web.ctx.homepath
 
             tvars = dict(role=self.role,
                          roles=self.roles,
+                         roleinfo=roleinfo,
                          files=files,
                          tags=[tagdef.tagname for tagdef in tagdefs],
                          ops=self.ops,
