@@ -78,13 +78,15 @@ function runSessionRequest() {
 
 function getCookie(name) {
     cookies = document.cookie.split(";");
+    cookie = null;
     for (c=0; c<cookies.length; c++) {
 	kv = cookies[c].split("=");
 	if (kv[0] == name) {
-	    return unescape(kv[1]);
+	    log ('getCookie: found ' + kv[1]);
+	    cookie = unescape(kv[1]);
 	}
     }
-    return null;
+    return cookie;
 }
 
 function setCookie(name, val) {
@@ -100,7 +102,7 @@ function pollCookie() {
 	now = new Date();
 	until = new Date(parts[1]);
 	remain = (until.getTime() - now.getTime()) / 1000;
-	log("pollCookie: " + cookie + " " + remain + "s remain until " + until);
+	log("pollCookie: " + remain + "s remain until " + until);
 	setLocaleDate("untiltime", until);
 	if (remain < expiration_warn_mins * 60) {
 	    log("pollCookie: cookie suggests session is near warning period");
