@@ -330,7 +330,7 @@ class Application:
             authn = webauthn.session.test_and_update_session(self.db,
                                                              expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                              rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                             referer=self.home + uri)
+                                                             referer=self.home + uri, setcookie=False)
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
@@ -345,8 +345,11 @@ class Application:
 
     def midDispatch(self):
         now = datetime.datetime.now()
-        if self.middispatchtime == None or (now - self.middispatchtime).seconds < 10:
-            self.postDispatch()
+        if self.middispatchtime == None or (now - self.middispatchtime).seconds > 10:
+            webauthn.session.test_and_update_session(self.db, self.sessguid,
+                                                     expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
+                                                     rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+                                                     ignoremustchange=True, setcookie=False)
             self.middispatchtime = now
 
     def dbtransact(self, body, postCommit):
