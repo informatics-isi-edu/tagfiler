@@ -367,6 +367,20 @@ function setEnabled(id) {
 }
 
 /**
+ * Select directory for upload
+ */
+function uploadBrowse() {
+    document.TagFileUploader.browse();
+}
+
+/**
+ * Select directory for download
+ */
+function downloadBrowse() {
+    document.TagFileDownloader.browse();
+}
+
+/**
  * Method "contains" for the Array object
  * returns true if an element is in the array, and false otherwise
  */

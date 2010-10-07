@@ -37,7 +37,7 @@ $ testfile = tvars.get('testfile')
 <center>
 <APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
  ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
-  width=270 height=50  MAYSCRIPT >
+  width=150 height=25  MAYSCRIPT >
 <PARAM name="tagfiler.server.url" value="${target}"/>
 <PARAM name="tagfiler.idle.mins" value="${expiremins}"/>
 <PARAM name="classloader_cache" value="false" />
@@ -50,6 +50,7 @@ $if testfile:
 </APPLET>
 </center>
 <center>
+<button type="button" name="Browse" id="Browse" onclick="uploadBrowse()" >Browse</button>
 <button type="button" name="Upload All" id="Upload All" disabled="disabled" onclick="uploadAll()" >Upload All</button>
 </center>
 <center>
