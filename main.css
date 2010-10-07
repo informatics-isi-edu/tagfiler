@@ -89,6 +89,7 @@ td.text-tree {
 }
 td.tag-name {
     background-color: aqua;
+    white-space:nowrap;
 }
 td.status-wrapper {
     text-align: center;
