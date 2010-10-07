@@ -84,41 +84,14 @@ td.file-tag.set, td.file-tag.delete {
 table.file-tag-list tr {
   border-style: solid;
 }
-div.custom-tags {
-    overflow:auto;
-    width: 600px;
-}
-div.files-tree {
-    overflow:auto;
-    width: 1000px;
-    height: 336px;
-}
 td.text-tree {
     white-space:nowrap;
 }
 td.tag-name {
     background-color: aqua;
 }
-td.files-tree-wrapper {
-    vertical-align: top;
-    text-align: left;
-}
-tr.study-wrapper {
-    vertical-align: top;
-    margin-left: auto;
-    margin-right: auto;
-}
-td.study-wrapper {
-    margin-left: auto;
-    margin-right: auto;
-    text-align: center;
-}
 td.status-wrapper {
     text-align: center;
-}
-table.files-tree-wrapper {
-    width: 100%;
-    border: 1px solid black;
 }
 table.table-border {
     border: 1px solid black;
@@ -127,4 +100,11 @@ table.table-wrapper {
     border: 1px solid black;
     margin-left: auto;
     margin-right: auto;
+}
+.applet {
+  vertical-align: bottom;
+}
+.directory {
+    border: 1px solid black;
+    white-space:nowrap;
 }

@@ -302,7 +302,7 @@ function setStatus(status) {
  * Set the status during the upload/download
  */
 function setDestinationDirectory(dir) {
-    document.getElementById("DestinationDirectory").value = dir;
+    document.getElementById("DestinationDirectory").innerHTML = dir;
 }
 
 /**
