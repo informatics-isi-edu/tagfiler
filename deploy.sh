@@ -323,12 +323,6 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 EOF
 
-deploydir=/var/www/html/${SVCPREFIX}/static/
-mkdir -p ${deploydir}
-cp main.css ${deploydir}
-cp functions.js ${deploydir}
-cp logo.png ${deploydir}
-
 signedjar=signed-isi-misd-tagfiler-upload-applet.jar
 namespace=edu/isi/misd/tagfiler/util
 props=tagfiler.properties

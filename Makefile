@@ -5,6 +5,9 @@ APPLETBUILD=../dei_applet-trunk
 
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
+WEBROOTDIR=/var/www
+WEBSTATICDIR=$(WEBROOTDIR)/$(INSTALLSVC)/static
+
 WSGIFILE=tagfiler.wsgi
 
 SCRIPTFILES=functions.js main.css
@@ -12,6 +15,10 @@ SCRIPTFILES=functions.js main.css
 FILES=dataserv_app.py rest_fileio.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
+
+WEBSTATICFILES=logo.png \
+	functions.js \
+	main.css
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
@@ -43,10 +50,12 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/
+	mkdir -p $(WEBSTATICDIR)
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
+	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
 
 restart: force install
 	service httpd restart
