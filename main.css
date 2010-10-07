@@ -109,3 +109,6 @@ table.table-wrapper {
     border: 1px solid black;
     white-space:nowrap;
 }
+#javascriptlog {
+  font-size: small;
+}
