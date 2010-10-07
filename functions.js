@@ -323,6 +323,14 @@ function getDatasetInfo() {
 }
 
 /**
+ * Fill the form with the dataset tags and info
+ */
+function setDatasetTagsAndInfo() {
+	setDatasetTags();
+	setTimeout("getDatasetInfo()", 1000);
+}
+
+/**
  * Check if all required tags are present and have proper values
  */
 function validateCustomTags() {

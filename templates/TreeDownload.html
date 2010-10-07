@@ -106,9 +106,8 @@ $ testfile = tvars.get('testfile')
 	</table>
 </div>
 <script type="text/javascript">
+$if transmissionnum:
+	setTimeout("setDatasetTagsAndInfo()", 1);
+$else:
 	setTimeout("setDatasetTags()", 1);
 </script>
-$if transmissionnum:
-	<script type="text/javascript">
-		setTimeout("getDatasetInfo()", 1000);
-	</script>
