@@ -323,14 +323,6 @@ function getDatasetInfo() {
 }
 
 /**
- * Fill the form with the dataset tags and info
- */
-function setDatasetTagsAndInfo() {
-	setDatasetTags();
-	setTimeout("getDatasetInfo()", 1000);
-}
-
-/**
  * Check if all required tags are present and have proper values
  */
 function validateCustomTags() {
@@ -399,48 +391,6 @@ Array.prototype.contains = function ( elem ) {
        if (this[i] == elem) return true;
    }
    return false;
-}
-
-/**
- * Set the required tags
- */
-function setRequiredTags() {
-    var tagnames = customTags.split(',');
-    var tagtypes = typestr.split(',');
-    var required = requiredTags.split(',');
-    var html = '<table class="table-wrapper" id="Required Tags">\n';
-    for (i=0; i<tagnames.length; i++) {
-    	html += '<tr>\n'+
-    			'<td class="tag-name">'+tagnames[i]+'</td>\n'+
-    			'<td><input type="text" id="'+tagnames[i]+'_id" typestr="'+tagtypes[i]+'" ';
-    	if (required.contains(tagnames[i])) {
-    		html += 'required="required" ';
-    	}
-    	html += ' /></td>\n'+
-    			'</tr>\n';
-    }
-    html += '</table>';
-    document.getElementById('custom-tags').innerHTML = html;
-}
-
-/**
- * Set the dataset tags
- */
-function setDatasetTags() {
-    var tagnames = customTags.split(',');
-    var html = '<table class="table-wrapper" rules="all" id="Dataset Tags">\n';
-    for (i=0; i<tagnames.length; i++) {
-    	html += '<tr>\n'+
-    			'<td class="tag-name">'+tagnames[i]+'</td>\n'+
-    			'<td id="'+tagnames[i]+'_val">';
-    	for (j=0;j<40;j++) {
-    		html += '&nbsp;';
-    	}
-    	html += ' </td>\n'+
-    			'</tr>\n';
-    }
-    html += '</table>';
-    document.getElementById('custom-tags').innerHTML = html;
 }
 
 var timer = 0;

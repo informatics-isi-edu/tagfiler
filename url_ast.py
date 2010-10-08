@@ -73,10 +73,7 @@ class Study (Node):
         self.direction = 'upload'
 
     def body(self):
-        tagnames = [ 'Sponsor', 'Protocol', 'Investigator Last Name',
-                     'Investigator First Name', 'Study Site Number',
-                     'Patient Study ID', 'Study Visit', 'Image Type',
-                     'Eye', 'Capture Date', 'Comment' ]
+        tagnames = self.customtags
         if self.action == 'get' and self.data_id:
             files = [ res.file for res
                       in self.select_files_by_predlist([{'tag' : 'Transmission Number',
@@ -90,6 +87,9 @@ class Study (Node):
                 self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
             else:
                 self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.data_id)
+        elif self.action == 'upload' or self.action == 'download':
+            tags = [ (res.tagname, res.typestr) for res in self.select_tagdef() if res.tagname in tagnames]
+            files = []
         else:
             tags = []
             files = []
@@ -103,6 +103,7 @@ class Study (Node):
                      tags=tags,
                      files=files,
                      tagnames=tagnames,
+                     requiredtags=self.requiredtags,
                      direction=self.direction,
                      expiremins=self.webauthnexpiremins,
                      testfile=self.appletTest,

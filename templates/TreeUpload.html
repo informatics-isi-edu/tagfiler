@@ -2,6 +2,8 @@ $def with (tvars)
 $ target = tvars.get('target')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
+$ tags = tvars.get('tags')
+$ requiredtags = tvars.get('requiredtags')
 <div>
 	<h3>Status</h3>
 	<table>
@@ -52,7 +54,7 @@ $ testfile = tvars.get('testfile')
 					&nbsp;
 			</td>
 			<td>
-				<button type="button" name="Browse" id="Browse" onclick="uploadBrowse()" >Browse</button>
+				<button type="button" name="Browse" id="Browse" disabled="disabled" onclick="uploadBrowse()" >Browse</button>
 			</td>
 		</tr>
 	</table>
@@ -67,6 +69,17 @@ $ testfile = tvars.get('testfile')
 		<tr>
 			<td>
 				<div id="custom-tags">
+					<table class="table-wrapper" id="Required Tags">
+						$for tag in tags:
+							<tr>
+								$ name, type = tag
+								<td class="tag-name">${name}</td>
+								<td><input type="text" id="${name}_id" typestr="${type}" 
+								$if name in requiredtags:
+									 required="required"
+								 /></td>
+							 </tr>
+					</table>
 				</div>
 			</td>
 		</tr>
@@ -83,6 +96,3 @@ $ testfile = tvars.get('testfile')
 		</tr>
 	</table>
 </div>
-<script type="text/javascript">
-	setTimeout("setRequiredTags()", 1);
-</script>

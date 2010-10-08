@@ -3,6 +3,8 @@ $ target = tvars.get('target')
 $ transmissionnum = tvars.get('transmissionnum')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
+$ tags = tvars.get('tags')
+$ requiredtags = tvars.get('requiredtags')
 
 <div>
 	<h3>Status</h3>
@@ -54,13 +56,10 @@ $ testfile = tvars.get('testfile')
 				$if transmissionnum:
 					<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
 				$else:
-					<input id="TransmissionNumber" value="" type="text" />
+					<input id="TransmissionNumber" value="" disabled="disabled" type="text" />
 			</td>
 			<td>
-				$if transmissionnum:
-					<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
-				$else:
-					<button id="UpdateButton" type="button" name="Update" onclick="getDatasetInfo()" >Update</button>
+				<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>
 			</td>
 		</tr>
 	</table>
@@ -89,6 +88,17 @@ $ testfile = tvars.get('testfile')
 		<tr>
 			<td>
 				<div id="custom-tags">
+					<table class="table-wrapper" rules="all" id="Dataset Tags">
+						$for tag in tags:
+							<tr>
+								$ name, type = tag
+								<td class="tag-name">${name}</td>
+								<td id="${name}_val"> 
+								$for i in range(20):
+									 &nbsp;
+								</td>
+							 </tr>
+					</table>
 				</div>
 			</td>
 		</tr>
@@ -105,9 +115,3 @@ $ testfile = tvars.get('testfile')
 		</tr>
 	</table>
 </div>
-<script type="text/javascript">
-$if transmissionnum:
-	setTimeout("setDatasetTagsAndInfo()", 1);
-$else:
-	setTimeout("setDatasetTags()", 1);
-</script>

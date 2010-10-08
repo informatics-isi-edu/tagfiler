@@ -192,6 +192,12 @@ class Application:
         self.filelisttagswrite = set([ urllib.unquote(t)
                                        for t in self.filelisttagswrite.split(',') ])
                 
+        self.customtags = getParam('customtags', '')
+        self.customtags = [ tag for tag in self.customtags.split(',') ]
+        
+        self.requiredtags = getParam('requiredtags', '')
+        self.requiredtags = [ tag for tag in self.requiredtags.split(',') ]
+        
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:

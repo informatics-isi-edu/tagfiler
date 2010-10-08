@@ -305,6 +305,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
     SetEnv tagfiler.filelisttags 'Image%20Set,Downloaded,bytes,owner,read%20users,write%20users'
     SetEnv tagfiler.filelisttagswrite 'Downloaded'
+    SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
+    SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'
     SetEnv ${SVCPREFIX}.localFilesImmutable true
 #    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn
