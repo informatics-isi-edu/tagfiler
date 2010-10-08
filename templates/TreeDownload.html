@@ -3,6 +3,7 @@ $ target = tvars.get('target')
 $ transmissionnum = tvars.get('transmissionnum')
 $ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
+$ appletlog = tvars.get('appletlog')
 $ tags = tvars.get('tags')
 $ requiredtags = tvars.get('requiredtags')
 
@@ -21,6 +22,8 @@ $ requiredtags = tvars.get('requiredtags')
 				<PARAM name="separate_jvm" value="true" />
 				$if testfile:
 					<PARAM name="tagfiler.applet.test" value="${testfile}"/>
+				$if appletlog:
+					<PARAM name="tagfiler.applet.log" value="${appletlog}"/>
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
 				  Download JRE 1.5 for your system from the following link:</b><br/>
 				<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>

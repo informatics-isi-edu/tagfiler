@@ -107,6 +107,7 @@ class Study (Node):
                      direction=self.direction,
                      expiremins=self.webauthnexpiremins,
                      testfile=self.appletTest,
+                     appletlog=self.appletlog,
                      idquote=idquote)
         if self.action == 'upload':
             return self.renderlist("Study Upload",

@@ -181,6 +181,7 @@ class Application:
         self.subtitle = getParam('subtitle', '')
         self.contact = getParam('contact', None)
         self.appletTest = getParam('appletTest', None)
+        self.appletlog = getParam('appletlog', None)
         self.db = None
         self.logmsgs = []
         self.middispatchtime = None
