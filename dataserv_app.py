@@ -425,9 +425,14 @@ class Application:
         return (q, t)
         
     def acceptTypesPreferedOrder(self):
+        try:
+            accept = web.ctx.env['HTTP_ACCEPT']
+        except:
+            accept = ""
+            
         return [ pair[1]
                  for pair in
-                 sorted([ self.acceptPair(s) for s in web.ctx.env['HTTP_ACCEPT'].lower().split(',') ],
+                 sorted([ self.acceptPair(s) for s in accept.lower().split(',') ],
                         key=lambda pair: pair[0]) ]
 
     # a bunch of little database access helpers for this app, to be run inside
