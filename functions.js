@@ -90,8 +90,9 @@ function getCookie(name) {
 }
 
 function setCookie(name, val) {
+    val = encodeURIComponent(unescape(val));
     log("setCookie: " + name + " = " + val);
-    document.cookie = name + "=" + val;
+    document.cookie = name + "=" + val + "; path=/";
 }
 
 function pollCookie() {
@@ -102,7 +103,7 @@ function pollCookie() {
 	now = new Date();
 	until = new Date(parts[1]);
 	remain = (until.getTime() - now.getTime()) / 1000;
-	log("pollCookie: " + remain + "s remain until " + until);
+	//log("pollCookie: " + remain + "s remain until " + until);
 	setLocaleDate("untiltime", until);
 	if (remain < expiration_warn_mins * 60) {
 	    log("pollCookie: cookie suggests session is near warning period");
