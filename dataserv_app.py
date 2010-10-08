@@ -7,6 +7,7 @@ import logging
 import subprocess
 import socket
 import datetime
+import pytz
 import traceback
 import distutils.sysconfig
 import sys
@@ -210,6 +211,8 @@ class Application:
         self.loginuntil = None
         self.sessguid = None
 
+        self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
+
         self.render = web.template.render(self.template_path)
         render = self.render # HACK: make this available to exception classes too
 
@@ -337,7 +340,7 @@ class Application:
             authn = webauthn.session.test_and_update_session(self.db,
                                                              expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                              rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                             referer=self.home + uri, setcookie=False)
+                                                             referer=self.home + uri, setcookie=True)
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
@@ -348,7 +351,7 @@ class Application:
             webauthn.session.test_and_update_session(self.db, self.sessguid,
                                                      expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                      rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                     ignoremustchange=True)
+                                                     ignoremustchange=True, setcookie=False)
 
     def midDispatch(self):
         now = datetime.datetime.now()
@@ -358,6 +361,12 @@ class Application:
                                                      rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
                                                      ignoremustchange=True, setcookie=False)
             self.middispatchtime = now
+
+    def setNoCache(self):
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        now_rfc1123 = now.strftime(self.rfc1123)
+        web.header('Cache-control', 'no-cache')
+        web.header('Expires', now_rfc1123)
 
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern

@@ -181,6 +181,7 @@ class AppletError (Node):
         # the applet needs to manage expiration itself
         # since it may be active while the html page is idle
         target = self.home + web.ctx.homepath
+        self.setNoCache()
         return self.renderlist("Study Transfer Applet",
                                [self.render.AppletError(dict(status=self.status))])
 
@@ -240,6 +241,7 @@ class FileList (Node):
                        filelisttagswrite=self.filelisttagswrite,
                        tagdefs=tagdefs,
                        idquote=idquote)
+            self.setNoCache()
             return self.renderlist(None,
                                    [self.render.Commands(tvars),
                                     self.render.FileList(tvars)])
@@ -348,6 +350,7 @@ class Contact (Node):
         
         tvars = dict(target=self.home + web.ctx.homepath,
                      contact=self.contact)
+        self.setNoCache()
         return self.renderlist("Contact Us",
                                [self.render.Contact(tvars)])
 
@@ -418,6 +421,7 @@ class Tagdef (Node):
 
         def postCommit(tagdefs):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
+            self.setNoCache()
             predefined, userdefined = tagdefs
             tvars = dict(target=self.target,
                          typenames=self.typenames,
@@ -444,6 +448,7 @@ class Tagdef (Node):
         def postCommit(tagdef):
             try:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
+                self.setNoCache()
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&readpolicy=' + urlquote(unicode(tagdef.readpolicy))
                         + '&writepolicy=' + urlquote(unicode(tagdef.writepolicy))
@@ -720,6 +725,7 @@ class FileTags (Node):
                      taginfo=all,
                      urlquote=urlquote)
 
+        self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
                 return self.render.FileTagUriList(tvars)
@@ -1135,6 +1141,8 @@ class Query (Node):
                          filelisttagswrite=self.filelisttagswrite,
                          tagdefs=dict([(tagdef.tagname, tagdef) for tagdef in tagdefs]),
                          idquote=idquote)
+
+            self.setNoCache()
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.qtarget() + '?action=edit')
