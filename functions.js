@@ -82,7 +82,7 @@ function getCookie(name) {
     for (c=0; c<cookies.length; c++) {
 	kv = cookies[c].split("=");
 	if (kv[0] == name) {
-	    log ('getCookie: found ' + kv[1]);
+	    //log ('getCookie: found ' + kv[1]);
 	    cookie = unescape(kv[1]);
 	}
     }
