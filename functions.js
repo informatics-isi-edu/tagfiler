@@ -242,9 +242,8 @@ function drawProgressBar(percent) {
 function getTags() {
 	doc = document.getElementById('Required Tags');
 	columns = doc.getElementsByTagName("td");
-	length = columns.length;
 	var ret=[];
-	for (i=0; i<length;i+=2) {
+	for (i=0; i<columns.length;i+=2) {
 		ret[i] = columns[i].firstChild.nodeValue;
 		ret[i+1] = columns[i+1].firstChild.value;
 	}
@@ -259,6 +258,7 @@ function getTags() {
 function setTags(tags) {
 	var tokens = tags.split('<br/>');
 	for (i=0; i<tokens.length;i+=2) {
+		if (tokens[i] == null || tokens[i+1] == null) continue;
 		var id = tokens[i]+'_val';
 		document.getElementById(id).firstChild.nodeValue = tokens[i+1];
 	}
@@ -270,10 +270,9 @@ function setTags(tags) {
 function getTagsName() {
 	doc = document.getElementById('Dataset Tags');
 	columns = doc.getElementsByTagName("td");
-	length = columns.length;
 	var ret=[];
 	var j=0;
-	for (i=0; i<length;i+=2) {
+	for (i=0; i<columns.length;i+=2) {
 		ret[j++] = columns[i].firstChild.nodeValue;
 	}
 	return ret.join('<br/>');
