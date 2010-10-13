@@ -308,6 +308,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
     SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'
     SetEnv ${SVCPREFIX}.localFilesImmutable true
+#    SetEnv tagfiler.appletTest /home/userid/appletTest.properties
+#    SetEnv tagfiler.appletlog /home/userid/applet.log
 #    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn
     SetEnv ${SVCPREFIX}.webauthnrequire Yes
