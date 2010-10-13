@@ -265,6 +265,20 @@ function setTags(tags) {
 }
 
 /**
+ * Set the values for custom tags in the input text boxes
+ * they come as pairs (name, value) separated by HTML newline
+ * Names are separated from their values also by HTML newline
+ */
+function setInputTags(tags) {
+	var tokens = tags.split('<br/>');
+	for (i=0; i<tokens.length;i+=2) {
+		if (tokens[i] == null || tokens[i+1] == null) continue;
+		var id = tokens[i]+'_id';
+		document.getElementById(id).value = tokens[i+1];
+	}
+}
+
+/**
  * Get the custom tags name separated by HTML newline
  */
 function getTagsName() {
