@@ -279,6 +279,13 @@ function setInputTags(tags) {
 }
 
 /**
+ * Set the transmission number
+ */
+function setTransmissionNumber(value) {
+	document.getElementById("TransmissionNumber").value = value;
+}
+
+/**
  * Get the custom tags name separated by HTML newline
  */
 function getTagsName() {
