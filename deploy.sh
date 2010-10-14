@@ -98,7 +98,6 @@ psql -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multival
 psql -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
 psql -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
-psql -c "CREATE SEQUENCE transmitnumber"
 
 # pre-establish core restricted tags used by codebase
 tagdef()
@@ -141,30 +140,7 @@ tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
-tagdef "list on homepage" ""      dirc    anonymous   tag        false
-
-# DEI specific tags
-
-tagdef "Image Set"    ""          dirc    file        file       false
-
-tagdef Sponsor        text        dirc    file        file       false
-tagdef Protocol       text        dirc    file        file       false
-tagdef "Investigator Last Name" \
-                      text        dirc    file        file       false
-tagdef "Investigator First Name" \
-                      text        dirc    file        file       false
-tagdef "Study Site Number" \
-                      text        dirc    file        file       false
-tagdef "Patient Study ID" \
-                      text        dirc    file        file       false
-tagdef "Study Visit"  text        dirc    file        file       false
-tagdef "Image Type"   text        dirc    file        file       false
-tagdef Eye            text        dirc    file        file       false
-tagdef "Capture Date" date        dirc    file        file       false
-tagdef Comment        text        dirc    file        file       false
-tagdef "Transmission Number" \
-                      int8        dirc    file        file       false
-tagdef Downloaded     ""          dirc    tag         tag        false
+tagdef "list on homepage" ""      ""      anonymous   tag        false
 
 tagacl()
 {
@@ -199,20 +175,12 @@ storedquery()
 {
    # args: name terms owner [readuser]...
    psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, 'https://${HOME_HOST}/${SVCPREFIX}/query/\$2' )"
-   tag "\$1" owner text "\$3"
    tag "\$1" "list on homepage"
-   file=\$1
-   shift 3
-   while [[ \$# -gt 0 ]]
-   do
-      tag "\$file" "read users" text "\$1"
-      shift
-   done
 }
 
-storedquery "New image studies" "Image%20Set;Downloaded:not:" dirc dirc downloader
-storedquery "Previous image studies" "Image%20Set;Downloaded" dirc dirc downloader
-storedquery "All image studies" "Image%20Set" dirc dirc downloader
+storedquery "New image studies" "Image%20Set;Downloaded:not:"
+storedquery "Previous image studies" "Image%20Set;Downloaded"
+storedquery "All image studies" "Image%20Set"
 
 EOF
 
@@ -302,12 +270,12 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
     SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
     SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
-    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
-    SetEnv tagfiler.filelisttags 'Image%20Set,Downloaded,bytes,owner,read%20users,write%20users'
-    SetEnv tagfiler.filelisttagswrite 'Downloaded'
-    SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
-    SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'
-    SetEnv ${SVCPREFIX}.localFilesImmutable true
+#    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
+    SetEnv tagfiler.filelisttags 'bytes,owner,read%20users,write%20users'
+    SetEnv tagfiler.filelisttagswrite 'read%20users,write%20users'
+#    SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
+#    SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'
+#    SetEnv ${SVCPREFIX}.localFilesImmutable true
 #    SetEnv tagfiler.appletTest /home/userid/appletTest.properties
 #    SetEnv tagfiler.appletlog /home/userid/applet.log
 #    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
@@ -321,7 +289,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 #    SetEnv ${SVCPREFIX}.webauthnrotatemins 120
     SetEnv ${SVCPREFIX}.subtitle 'Tagfiler (trunk) on ${HOME_HOST}'
     SetEnv ${SVCPREFIX}.logo '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
-    SetEnv tagfiler.contact '<p>Your HTML here</p>'
+    SetEnv ${SVCPREFIX}.contact '<p>Your HTML here</p>'
 
 </Directory>
 
