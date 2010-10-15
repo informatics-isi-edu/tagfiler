@@ -145,8 +145,8 @@ tagdef sha256sum      text        ""      file        file       false
 tagdef "Transmission Number" \
                       int8        ""    file        file       false
 
-tagdef "list on homepage" ""      ""   anonymous   tag        false
-tagdef "Image Set"    ""          ""   file        file       false
+tagdef "list on homepage" ""      "admin"   anonymous   tag        false
+tagdef "Image Set"    ""          "admin"   file        file       false
 
 tagacl()
 {
