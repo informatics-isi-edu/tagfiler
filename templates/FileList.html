@@ -90,19 +90,20 @@ $if len(files) > 0:
 						$ vals = []
 					<table class="file-tag-list">
 					$for val in vals:
-						<tr>
-						$if tag in filelisttagswrite:
-							<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
-							<td class="file-tag ${idquote(tag)} multivalue delete"><form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
-							<input type="hidden" name="referer" value="${referer}" />
-							<input type="hidden" name="tag" value="${tag}" />
-							<input type="hidden" name="value" value="${val}" />
-							<input type="hidden" name="action" value="delete" />
-							<input type="submit" value="Delete Value" />
-							</form></td>
-						$else:
-							<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
-						</tr>
+						$if val:
+							<tr>
+							$if tag in filelisttagswrite:
+								<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
+								<td class="file-tag ${idquote(tag)} multivalue delete"><form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
+								<input type="hidden" name="referer" value="${referer}" />
+								<input type="hidden" name="tag" value="${tag}" />
+								<input type="hidden" name="value" value="${val}" />
+								<input type="hidden" name="action" value="delete" />
+								<input type="submit" value="Delete Value" />
+								</form></td>
+							$else:
+								<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
+							</tr>
 					$if tag in filelisttagswrite:
 						<tr><form enctype="application/x-www-form-urlencoded" action="${apptarget}/tags/${urlquote(file.file)}" method="post">
 						<input type="hidden" name="referer" value="${referer}" />
