@@ -29,7 +29,7 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		<td class="file-name">
-		$if file['Image Set'] and 'downloader' in roles:
+		$if file['Image Set']:
 			${file.file}
 		$else:
 			$if file.local:
@@ -49,9 +49,6 @@ $if len(files) > 0:
 			</form>
 		</td>
 		<td class="file-tags">
-		$if 'downloader' in roles:
-			<!-- Tags -->
-		$else:
 			<a href="${apptarget}/tags/${urlquote(file.file)}">Tags</a>
 		</td>
 		<td class="file-update">
@@ -140,7 +137,5 @@ $if len(files) > 0:
 				</td>
 		</tr>
 	</table>
-$elif 'uploader' in roles:
-	<p></p>
 $else:
 	<p>There are no items to list with your current privileges.</p>

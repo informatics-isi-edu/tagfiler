@@ -3,23 +3,22 @@ $ target = tvars.get('qtarget')
 $ predlist = tvars.get('predlist')
 $ ops = dict(tvars.get('ops'))
 $ roles = tvars.get('roles')
-$if 'downloader' not in roles:
-	<h3>Query Terms</h3>
-	<p><a href="${target}">Permanent link to this query</a></p>
-	<p><a href="${target}?action=edit">Edit query terms</a></p>
-	$if len(predlist) == 0:
-		<p>Match all files.</p>
+<h3>Query Terms</h3>
+<p><a href="${target}">Permanent link to this query</a></p>
+<p><a href="${target}?action=edit">Edit query terms</a></p>
+$if len(predlist) == 0:
+	<p>Match all files.</p>
+$else:
+	<p>Match files tagged with all of the following tags:</p>
+<ul>
+$for pred in predlist:
+	<li><b>${pred['tag']}</b>
+	$if pred['op'] == None:
+		<i>${ops['']}</i>
 	$else:
-		<p>Match files tagged with all of the following tags:</p>
-	<ul>
-	$for pred in predlist:
-		<li><b>${pred['tag']}</b>
-		$if pred['op'] == None:
-			<i>${ops['']}</i>
-		$else:
-			<i>${ops[pred['op']]}</i>
-		$if pred['vals']:
-			"${','.join(pred['vals'])}"
-		</li>
-	</ul>
-	<h3>Matching Datasets</h3>
+		<i>${ops[pred['op']]}</i>
+	$if pred['vals']:
+		"${','.join(pred['vals'])}"
+	</li>
+</ul>
+<h3>Matching Datasets</h3>

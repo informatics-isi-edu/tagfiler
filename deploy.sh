@@ -140,7 +140,8 @@ tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
-tagdef "list on homepage" ""      ""      anonymous   tag        false
+tagdef "list on homepage" ""      ""   anonymous   tag        false
+tagdef "Image Set"    ""          ""   file        file       false
 
 tagacl()
 {
@@ -175,12 +176,20 @@ storedquery()
 {
    # args: name terms owner [readuser]...
    psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, 'https://${HOME_HOST}/${SVCPREFIX}/query/\$2' )"
+   tag "\$1" owner text "\$3"
    tag "\$1" "list on homepage"
+   file=\$1
+   shift 3
+   while [[ \$# -gt 0 ]]
+   do
+      tag "\$file" "read users" text "\$1"
+      shift
+   done
 }
 
-storedquery "New image studies" "Image%20Set;Downloaded:not:"
-storedquery "Previous image studies" "Image%20Set;Downloaded"
-storedquery "All image studies" "Image%20Set"
+storedquery "New image studies" "Image%20Set;Downloaded:not:" admin admin
+storedquery "Previous image studies" "Image%20Set;Downloaded" admin admin
+storedquery "All image studies" "Image%20Set" admin admin
 
 EOF
 
@@ -271,7 +280,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
     SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
 #    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
-    SetEnv tagfiler.filelisttags 'bytes,owner,read%20users,write%20users'
+    SetEnv tagfiler.filelisttags 'Image%20Set,bytes,owner,read%20users,write%20users'
     SetEnv tagfiler.filelisttagswrite 'read%20users,write%20users'
 #    SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
 #    SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'

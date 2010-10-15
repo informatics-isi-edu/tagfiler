@@ -74,29 +74,22 @@ $else:
     </td>
     $if webauthnhome and 'admin' in roles:
     	<td>
-	<a href="${webauthnhome}/role/">Manage roles</a>
-	</td>
-    $if 'dirc' in roles or 'uploader' in roles:
+			<a href="${webauthnhome}/role/">Manage roles</a>
+		</td>
 	<td>
-	<a href="${home}/study?action=upload">Upload study</a>
-	</td>
-    $if 'dirc' in roles or 'downloader' in roles:
-    	<td>
-	<a href="${home}/study?action=download">Download study</a>
-	</td>
-    $if 'dirc' in roles:
-    	<td>
-	<a href="${home}/query?action=edit">Query by tags</a>
+		<a href="${home}/study?action=upload">Upload study</a>
 	</td>
     <td>
-    $if 'uploader' in roles or 'downloader' in roles:
-	<a href="${home}/contact">Help</a>
-    $elif 'dirc' in roles:
-	<a href="${help}">Help</a>
+		<a href="${home}/study?action=download">Download study</a>
+	</td>
+    <td>
+		<a href="${home}/query?action=edit">Query by tags</a>
+	</td>
+    <td>
+		<a href="${help}">Help</a>
     </td>
-    $if 'dirc' in roles:
-    	<td>
-	<a href="${jira}">Bugs</a>
+    <td>
+		<a href="${jira}">Bugs</a>
 	</td>
     $if 'admin' in roles:
     	<td>

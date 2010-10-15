@@ -1,6 +1,6 @@
-$def with (target)
-target = "%s/file" % tvars.get('apptarget')
-<h2>Choose Name and Type of Data</h2>
+$def with (tvars)
+$ target = "%s/file" % tvars.get('apptarget')
+<h3>Choose Name and Type of Data</h3>
 <form enctype="application/x-www-form-urlencoded" action="${target}" method="get">
 Enter a name for the dataset: <input name="name" type="text" /><br />
 Select a type of dataset definition: 
