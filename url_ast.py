@@ -104,6 +104,7 @@ class Study (Node):
                      files=files,
                      tagnames=tagnames,
                      requiredtags=self.requiredtags,
+                     customproperties=self.customproperties,
                      direction=self.direction,
                      expiremins=self.webauthnexpiremins,
                      testfile=self.appletTest,

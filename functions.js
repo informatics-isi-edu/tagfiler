@@ -300,6 +300,20 @@ function getTagsName() {
 }
 
 /**
+ * Get the custom tags name
+ */
+function getRequiredTagsName() {
+	doc = document.getElementById('Required Tags');
+	columns = doc.getElementsByTagName("td");
+	var ret=[];
+	var j=0;
+	for (i=0; i<columns.length;i+=2) {
+		ret[j++] = columns[i].firstChild.nodeValue;
+	}
+	return ret;
+}
+
+/**
  * Set the files to be uploaded or the first file to be downloaded
  */
 function setFiles(files) {
@@ -347,7 +361,7 @@ function getDatasetInfo() {
  * Check if all required tags are present and have proper values
  */
 function validateCustomTags() {
-    var tagnames = customTags.split(',');
+	var tagnames = getRequiredTagsName();
     for (i=0; i<tagnames.length; i++) {
     	var node = document.getElementById(tagnames[i]+'_id');
     	attr = node.attributes;
@@ -438,9 +452,3 @@ if(ajax_request) {
   ajax_request.onreadystatechange = processSessionRequest;
 }
 
-/**
- * Add here the custom tags
- */
-var customTags = 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment';
-var typestr = 'text,text,text,text,text,text,text,text,text,date,text';
-var requiredTags = 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date';

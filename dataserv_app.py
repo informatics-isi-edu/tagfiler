@@ -200,6 +200,8 @@ class Application:
         self.requiredtags = getParam('requiredtags', '')
         self.requiredtags = [ tag for tag in self.requiredtags.split(',') ]
         
+        self.customproperties = getParam('customproperties', None)
+
         if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
             self.webauthnrequire = True
         else:

@@ -99,6 +99,8 @@ psql -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CAS
 psql -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
 psql -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
 
+psql -c "CREATE SEQUENCE transmitnumber"
+
 # pre-establish core restricted tags used by codebase
 tagdef()
 {
@@ -139,6 +141,9 @@ tagdef name           text        ""      anonymous   system     false
 tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
+
+tagdef "Transmission Number" \
+                      int8        ""    file        file       false
 
 tagdef "list on homepage" ""      ""   anonymous   tag        false
 tagdef "Image Set"    ""          ""   file        file       false
@@ -282,8 +287,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 #    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
     SetEnv tagfiler.filelisttags 'Image%20Set,bytes,owner,read%20users,write%20users'
     SetEnv tagfiler.filelisttagswrite 'read%20users,write%20users'
-#    SetEnv tagfiler.customtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date,Comment'
-#    SetEnv tagfiler.requiredtags 'Sponsor,Protocol,Investigator Last Name,Investigator First Name,Study Site Number,Patient Study ID,Study Visit,Image Type,Eye,Capture Date'
+    SetEnv tagfiler.customtags 'Image Type,Capture Date,Comment'
+    SetEnv tagfiler.requiredtags 'Image Type,Capture Date'
 #    SetEnv ${SVCPREFIX}.localFilesImmutable true
 #    SetEnv tagfiler.appletTest /home/userid/appletTest.properties
 #    SetEnv tagfiler.appletlog /home/userid/applet.log
