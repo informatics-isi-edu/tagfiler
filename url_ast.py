@@ -82,7 +82,7 @@ class Study (Node):
             tags = [ (tagname, [ res.value for res
                                  in self.select_file_tag(tagname=tagname,
                                                           data_id=self.data_id) ])
-                     for tagname in tagnames ]
+                     for tagname in tagnames if len(self.select_tagdef(tagname)) > 0]
             if self.status == 'success':
                 self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
             else:

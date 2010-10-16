@@ -242,12 +242,16 @@ function drawProgressBar(percent) {
 function getTags() {
 	doc = document.getElementById('Required Tags');
 	columns = doc.getElementsByTagName("td");
-	var ret=[];
-	for (i=0; i<columns.length;i+=2) {
-		ret[i] = columns[i].firstChild.nodeValue;
-		ret[i+1] = columns[i+1].firstChild.value;
+	if (columns != null && columns.length > 0) {
+		var ret=[];
+		for (i=0; i<columns.length;i+=2) {
+			ret[i] = columns[i].firstChild.nodeValue;
+			ret[i+1] = columns[i+1].firstChild.value;
+		}
+		return ret.join('<br/>');
+	} else {
+		return '';
 	}
-	return ret.join('<br/>');
 }
 
 /**
@@ -260,7 +264,9 @@ function setTags(tags) {
 	for (i=0; i<tokens.length;i+=2) {
 		if (tokens[i] == null || tokens[i+1] == null) continue;
 		var id = tokens[i]+'_val';
-		document.getElementById(id).firstChild.nodeValue = tokens[i+1];
+		if (tokens[i+1].length > 0) {
+			document.getElementById(id).firstChild.nodeValue = tokens[i+1];
+		}
 	}
 }
 
