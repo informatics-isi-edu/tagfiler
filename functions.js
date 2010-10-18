@@ -434,6 +434,17 @@ Array.prototype.contains = function ( elem ) {
    return false;
 }
 
+/**
+ * Enables/Disables the "Create Saved Query" button based on the query name value
+ */
+function checkQueryName() {
+	if (document.getElementById('SavedQueryName').value.replace(/^\s*/, "").replace(/\s*$/, "").length > 0) {
+    	document.getElementById('SavedQueryButton').disabled = false;
+	} else {
+    	document.getElementById('SavedQueryButton').disabled = true;
+	}
+}
+
 var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;

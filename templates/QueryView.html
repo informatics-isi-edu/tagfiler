@@ -9,10 +9,10 @@ $ roles = tvars.get('roles')
 <fieldset>
 <legend>Save named query</legend>
 Enter a descriptively unique name: <br />
-<input name="name" type="text" />
+<input name="name" id="SavedQueryName" onkeyup="checkQueryName()" type="text" />
 <input type="hidden" name="url" value="${qtarget}" />
 <input type="hidden" name="action" value="putsq" />
-<input type="submit" value="Create Saved Query" />
+<input type="submit" id="SavedQueryButton" disabled="disabled" value="Create Saved Query" />
 </fieldset>
 </form>
 </p>
