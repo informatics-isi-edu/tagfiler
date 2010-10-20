@@ -260,11 +260,22 @@ function getTags() {
  * Names are separated from their values also by HTML newline
  */
 function setTags(tags) {
+	var dirc = false;
+	var node = document.getElementById('custom-tags');
+	if (node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
+		node.style.width = '100%';
+		node.style.border = '0px';
+		dirc = true;
+	}
 	var tokens = tags.split('<br/>');
 	for (i=0; i<tokens.length;i+=2) {
 		if (tokens[i] == null || tokens[i+1] == null) continue;
 		var id = tokens[i]+'_val';
 		if (tokens[i+1].length > 0) {
+			if (dirc && tokens[i+1].length > 20) {
+				node.style.width = node.clientWidth+'px';
+				node.style.border = '1px solid black';
+			}
 			document.getElementById(id).firstChild.nodeValue = tokens[i+1];
 		}
 	}
