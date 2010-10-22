@@ -260,22 +260,18 @@ function getTags() {
  * Names are separated from their values also by HTML newline
  */
 function setTags(tags) {
-	var dirc = false;
 	var node = document.getElementById('custom-tags');
-	if (node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
-		node.style.width = '100%';
-		node.style.border = '0px';
-		dirc = true;
+	if (!hasSize && node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
+		var tree = document.getElementById('files-tree');
+		tree.style.width = node.style.width = node.clientWidth+'px';
+		tree.style.height = node.style.height = node.clientHeight+'px';
+		hasSize = true;
 	}
 	var tokens = tags.split('<br/>');
 	for (i=0; i<tokens.length;i+=2) {
 		if (tokens[i] == null || tokens[i+1] == null) continue;
 		var id = tokens[i]+'_val';
 		if (tokens[i+1].length > 0) {
-			if (dirc && tokens[i+1].length > 20) {
-				node.style.width = node.clientWidth+'px';
-				node.style.border = '1px solid black';
-			}
 			document.getElementById(id).firstChild.nodeValue = tokens[i+1];
 		}
 	}
@@ -334,6 +330,13 @@ function getRequiredTagsName() {
  * Set the files to be uploaded or the first file to be downloaded
  */
 function setFiles(files) {
+	var node = document.getElementById('custom-tags');
+	if (!hasSize && node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
+		var tree = document.getElementById('files-tree');
+		tree.style.width = node.style.width = node.clientWidth+'px';
+		tree.style.height = node.style.height = node.clientHeight+'px';
+		hasSize = true;
+	}
     document.getElementById("Files").innerHTML = files;
 }
 
@@ -468,6 +471,7 @@ var ajax_request = null;
 var warn_window = null;
 var until = null;
 var width = 0;
+var hasSize = false;
 
 if(window.ActiveXObject) {
   ajax_request = new ActiveXObject("Microsoft.XMLHTTP");
