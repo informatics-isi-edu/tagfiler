@@ -166,16 +166,23 @@ class Application:
         self.remap = getPolicyRules(getParam('policyrules', None))
         self.dbnstr = getParam('dbnstr', 'postgres')
         self.dbstr = getParam('dbstr', '')
+        self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
         self.home = getParam('home', 'https://%s' % self.hostname)
         self.store_path = getParam('store_path', '/var/www/%s-data' % self.daemonuser)
         self.log_path = getParam('log_path', '/var/www/%s-logs' % self.daemonuser)
         self.template_path = getParam('template_path',
                                       '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
         self.chunkbytes = int(getParam('chunkbytes', 1048576))
+        
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
         self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
         self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
+
+        self.roleProvider = webauthn.providers.roleProviders.get(getParam('role_provider', ''))
+        if self.roleProvider:
+            self.roleProvider = self.roleProvider(self.webauthnhome, self.db, getParam)
+        
         self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
         self.logo = getParam('logo', '')
@@ -183,7 +190,6 @@ class Application:
         self.contact = getParam('contact', None)
         self.appletTest = getParam('appletTest', None)
         self.appletlog = getParam('appletlog', None)
-        self.db = None
         self.logmsgs = []
         self.middispatchtime = None
 
@@ -272,17 +278,14 @@ class Application:
 
     def validateRole(self, role):
         if self.webauthnhome:
-            results = webauthn.role.db_select_role(self.db, role=role)
+            results = self.roleProvider.listRoles(role=role)
             if len(results) == 0:
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
 
     def validateRolePattern(self, role):
         if role in [ '*' ]:
             return
-        if self.webauthnhome:
-            results = webauthn.role.db_select_role(self.db, role=role)
-            if len(results) == 0:
-                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
+        return self.validateRole(role)
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
@@ -342,7 +345,9 @@ class Application:
             authn = webauthn.session.test_and_update_session(self.db,
                                                              expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                              rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                             referer=self.home + uri, setcookie=True)
+                                                             referer=self.home + uri,
+                                                             setcookie=True,
+                                                             roleProvider=self.roleProvider)
             if authn:
                 self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
             elif self.webauthnrequire:
@@ -353,7 +358,9 @@ class Application:
             webauthn.session.test_and_update_session(self.db, self.sessguid,
                                                      expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                      rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                     ignoremustchange=True, setcookie=False)
+                                                     ignoremustchange=True,
+                                                     setcookie=False,
+                                                     roleProvider=self.roleProvider)
 
     def midDispatch(self):
         now = datetime.datetime.now()
@@ -361,7 +368,9 @@ class Application:
             webauthn.session.test_and_update_session(self.db, self.sessguid,
                                                      expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
                                                      rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                     ignoremustchange=True, setcookie=False)
+                                                     ignoremustchange=True,
+                                                     setcookie=False,
+                                                     roleProvider=self.roleProvider)
             self.middispatchtime = now
 
     def setNoCache(self):
@@ -462,7 +471,8 @@ class Application:
         return user
 
     def buildroleinfo(self):
-        return [ res.role for res in webauthn.role.db_select_role(self.db) ]
+        for role in self.roleProvider.listRoles():
+            yield role
     
     def test_file_authz(self, mode, data_id=None, owner=None):
         """Check whether access is allowed to user given mode and owner.

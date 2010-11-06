@@ -294,6 +294,7 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 #    SetEnv tagfiler.appletlog /home/userid/applet.log
 #    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
     SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn
+    SetEnv ${SVCPREFIX}.role_provider internal
     SetEnv ${SVCPREFIX}.webauthnrequire Yes
 #    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
 #    SetEnv ${SVCPREFIX}.log_path ${LOGDIR}
