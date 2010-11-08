@@ -51,60 +51,38 @@ class Dispatcher:
         else:
             raise web.BadRequest()
 
-    # is there some fancier way to do this via introspection
-    # in one generic method?
-    def HEAD(self):
+    def METHOD(self, methodname):
         uri, ast = self.prepareDispatch()
-        if not hasattr(ast, 'HEAD'):
+        if not hasattr(ast, methodname):
             raise web.NoMethod()
         ast.preDispatch(uri)
-        result = ast.HEAD(uri)
+        astmethod = getattr(ast, methodname)
+        result = astmethod(uri)
         ast.postDispatch(uri)
         return result
+
+    def HEAD(self):
+        return self.METHOD('HEAD')
 
     def GET(self):
-        uri, ast = self.prepareDispatch()
-        if not hasattr(ast, 'GET'):
-            raise web.NoMethod()
-        ast.preDispatch(uri)
-        result = ast.GET(uri)
-        ast.postDispatch(uri)
-        return result
-
+        return self.METHOD('GET')
+        
     def PUT(self):
-        uri, ast = self.prepareDispatch()
-        if not hasattr(ast, 'PUT'):
-            raise web.NoMethod()
-        ast.preDispatch(uri)
-        result = ast.PUT(uri)
-        ast.postDispatch(uri)
-        return result
+        return self.METHOD('PUT')
 
     def DELETE(self):
-        uri, ast = self.prepareDispatch()
-        if not hasattr(ast, 'DELETE'):
-            raise web.NoMethod()
-        ast.preDispatch(uri)
-        result = ast.DELETE(uri)
-        ast.postDispatch(uri)
-        return result
+        return self.METHOD('DELETE')
 
     def POST(self):
-        uri, ast = self.prepareDispatch()
-        if not hasattr(ast, 'POST'):
-            raise web.NoMethod()
-        ast.preDispatch(uri)
-        result = ast.POST(uri)
-        ast.postDispatch(uri)
-        return result
+        return self.METHOD('POST')
 
 # this creates the WSGI app from the urls map
 application = web.application(urls, globals()).wsgifunc() 
 
 if __name__ == "__main__":
-		# Comment the below line in case of a RPM installation
-        # sys.path.append(os.path.dirname(sys.argv[0]))
+    # Comment the below line in case of a RPM installation
+    # sys.path.append(os.path.dirname(sys.argv[0]))
         
-	# Comment the below line in case of a RPM installation
-	# import url_parse
-	url_parse.make_parse()
+    # Comment the below line in case of a RPM installation
+    # import url_parse
+    url_parse.make_parse()
