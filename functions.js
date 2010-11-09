@@ -160,9 +160,14 @@ function redirectNow() {
 	warn_window.close();
     }
     if (node) {
-	alert("About to redirect to login page");
+	alert("About to redirect at end of session");
     }
-    window.location='/webauthn/login?referer=' + encodeURIComponent(window.location);
+    if (redirectToLogin) {
+	window.location='/webauthn/login?referer=' + encodeURIComponent(window.location);
+    }
+    else {
+	window.location = window.location;
+    }
 }
 
 /**
@@ -483,4 +488,6 @@ else if(window.XMLHttpRequest) {
 if(ajax_request) {
   ajax_request.onreadystatechange = processSessionRequest;
 }
+
+var redirectToLogin = false;
 

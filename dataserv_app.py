@@ -321,6 +321,7 @@ class Application:
         tvars['help'] = self.help
         tvars['bugs'] = self.jira
         tvars['webauthnhome'] = self.webauthnhome
+        tvars['webauthnrequire'] = self.webauthnrequire
         tvars['authn'] = self.authn
 
         return "".join([unicode(r) for r in 

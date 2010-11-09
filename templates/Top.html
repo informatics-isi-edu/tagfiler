@@ -7,6 +7,7 @@ $ home = tvars.get('home')
 $ help = tvars.get('help')
 $ jira = tvars.get('bugs')
 $ webauthnhome = tvars.get('webauthnhome')
+$ webauthnrequire = tvars.get('webauthnrequire')
 $ pollmins = tvars.get('pollmins')
 $ authn = tvars.get('authn')
 $if appsubtitle and title:
@@ -26,7 +27,9 @@ $else:
   <script type="text/javascript" src="${home}/static/functions.js"></script>
   <script type="text/javascript">
     $if pollmins and authn.role:
-      runSessionPolling(${pollmins}, ${2 * pollmins});
+    	runSessionPolling(${pollmins}, ${2 * pollmins});
+    $if webauthnrequire:
+    	redirectToLogin = true;
   </script>
 </td>
 </head>
