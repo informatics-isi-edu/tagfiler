@@ -59,13 +59,13 @@ table.topmargin, table.file-tag-list {
   width: 100%;
 }
 table.topmargin td.logo {
-  align: left;
+ text-align: left;
 }
 table.topmargin td.title {
-  align: center;
+ text-align: center;
 }
 table.topmargin td.authninfo {
-  align: right;
+ text-align: right;
   width: 20%;
 }
 table.authninfo > tr.noauthn > td {
