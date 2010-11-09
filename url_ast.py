@@ -234,8 +234,8 @@ class FileList (Node):
                        bugs=self.jira,
                        files=files,
                        referer=self.home + uri,
-                       role=self.role,
-                       roles=self.roles,
+                       role=self.authn.role,
+                       roles=self.authn.roles,
                        roleinfo=roleinfo,
                        urlquote=urlquote,
                        filelisttags=self.filelisttags,
@@ -315,7 +315,7 @@ class LogList (Node):
         Node.__init__(self, appname)
 
     def GET(self, uri):
-        if 'admin' not in self.roles:
+        if 'admin' not in self.authn.roles:
             raise Forbidden('listing of log files')
         
         if self.log_path:
@@ -1126,8 +1126,8 @@ class Query (Node):
             files, tagdefs, roleinfo = results
             apptarget = self.home + web.ctx.homepath
 
-            tvars = dict(role=self.role,
-                         roles=self.roles,
+            tvars = dict(role=self.authn.role,
+                         roles=self.authn.roles,
                          roleinfo=roleinfo,
                          files=files,
                          tags=[tagdef.tagname for tagdef in tagdefs],

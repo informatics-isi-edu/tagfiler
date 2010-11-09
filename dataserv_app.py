@@ -176,13 +176,7 @@ class Application:
         
         self.webauthnhome = getParam('webauthnhome')
         self.webauthnrequire = getParam('webauthnrequire')
-        self.webauthnexpiremins = int(getParam('webauthnexpiremins', '10'))
-        self.webauthnrotatemins = int(getParam('webauthnrotatemins', '120'))
 
-        self.roleProvider = webauthn.providers.roleProviders.get(getParam('role_provider', ''))
-        if self.roleProvider:
-            self.roleProvider = self.roleProvider(self.webauthnhome, self.db, getParam)
-        
         self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
         self.logo = getParam('logo', '')
@@ -213,11 +207,7 @@ class Application:
         else:
             self.webauthnrequire = False
 
-        self.role = None
-        self.roles = set([])
-        self.loginsince = None
-        self.loginuntil = None
-        self.sessguid = None
+        self.authn = None
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
@@ -277,11 +267,14 @@ class Application:
         self.ownerTags = ['read users', 'write users']
 
     def validateRole(self, role):
-        if self.webauthnhome:
-            results = self.roleProvider.listRoles(role=role)
-            if len(results) == 0:
+        if self.authn:
+            try:
+                valid = self.authn.roleProvider.testRole(role)
+            except NotImplemented:
+                valid = True
+            if not valid:
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
-
+                
     def validateRolePattern(self, role):
         if role in [ '*' ]:
             return
@@ -297,8 +290,10 @@ class Application:
             parts.append('value "%s"' % value)
         if mode:
             parts.append('mode "%s"' % mode)
-        if not user:
-            user = self.user()
+        if not self.authn.user:
+            user = 'anonymous'
+        else:
+            user = self.authn.user
         return ('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
@@ -320,11 +315,7 @@ class Application:
         tvars['help'] = self.help
         tvars['bugs'] = self.jira
         tvars['webauthnhome'] = self.webauthnhome
-
-        tvars['user'] = self.role
-        tvars['roles'] = self.roles
-        tvars['loginsince'] = self.loginsince
-        tvars['loginuntil'] = self.loginuntil
+        tvars['authn'] = self.authn
 
         return "".join([unicode(r) for r in 
                         [self.render.Top(tvars)] 
@@ -333,44 +324,38 @@ class Application:
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
-        self.role = app.role
-        self.roles = app.roles
-        self.loginsince = app.loginsince
-        self.loginuntil = app.loginuntil
+        self.authn = app.authn
 
     def preDispatch(self, uri):
         if self.webauthnhome:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-            authn = webauthn.session.test_and_update_session(self.db,
-                                                             expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
-                                                             rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
-                                                             referer=self.home + uri,
-                                                             setcookie=True,
-                                                             roleProvider=self.roleProvider)
-            if authn:
-                self.role, self.roles, self.loginsince, self.loginuntil, mustchange, self.sessguid = authn
-            elif self.webauthnrequire:
+            self.authn = webauthn.session.test_and_update_session(self.db,
+                                                                  referer=self.home + uri,
+                                                                  setcookie=True)
+            if not self.authn.role and self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
+        else:
+            try:
+                user = web.ctx.env['REMOTE_USER']
+                roles = set([ user ])
+            except:
+                user = None
+                roles = set()
+            self.authn = webauthn.providers.AuthnInfo(user, roles, None, None, False, None)
 
     def postDispatch(self, uri=None):
         if self.webauthnhome:
-            webauthn.session.test_and_update_session(self.db, self.sessguid,
-                                                     expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
-                                                     rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+            webauthn.session.test_and_update_session(self.db, self.authn.guid,
                                                      ignoremustchange=True,
-                                                     setcookie=False,
-                                                     roleProvider=self.roleProvider)
+                                                     setcookie=False)
 
     def midDispatch(self):
         now = datetime.datetime.now()
         if self.middispatchtime == None or (now - self.middispatchtime).seconds > 10:
-            webauthn.session.test_and_update_session(self.db, self.sessguid,
-                                                     expireperiod=datetime.timedelta(minutes=self.webauthnexpiremins),
-                                                     rotateperiod=datetime.timedelta(minutes=self.webauthnrotatemins),
+            webauthn.session.test_and_update_session(self.db, self.authn.guid,
                                                      ignoremustchange=True,
-                                                     setcookie=False,
-                                                     roleProvider=self.roleProvider)
+                                                     setcookie=False)
             self.middispatchtime = now
 
     def setNoCache(self):
@@ -404,6 +389,7 @@ class Application:
                 raise te
             except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                 t.rollback()
+                web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
                 raise BadRequest(data='Logical error: ' + str(te))
             except TypeError, te:
                 t.rollback()
@@ -459,20 +445,13 @@ class Application:
         except:
             return None
 
-    def user(self):
-        try:
-            if self.webauthnhome:
-                user = self.role
-            else:
-                user = web.ctx.env['REMOTE_USER']
-                self.roles = set([ user ])
-        except:
-            return None
-        return user
-
     def buildroleinfo(self):
-        for role in self.roleProvider.listRoles():
-            yield role
+        if self.authn.roleProvider:
+            try:
+                for role in self.authn.roleProvider.listRoles():
+                    yield role
+            except NotImplemented:
+                pass
     
     def test_file_authz(self, mode, data_id=None, owner=None):
         """Check whether access is allowed to user given mode and owner.
@@ -480,7 +459,6 @@ class Application:
            True: access allowed
            False: access forbidden
            None: user needs to authenticate to be sure"""
-        user = self.user() # initializes self.roles if needed...
         if data_id == None:
             data_id = self.data_id
         if owner == None:
@@ -497,7 +475,7 @@ class Application:
 
         authorized.append('root') # allow root to do everything in case of trouble?
 
-        roles = self.roles.copy()
+        roles = self.authn.roles.copy()
         if roles:
             roles.add('*')
             if roles.intersection(set(authorized)):
@@ -518,7 +496,7 @@ class Application:
         if tagname == None:
             tagname = self.tag_id
         if user == None:
-            user = self.user() # initializes self.roles if needed...
+            user = self.authn.role
         if fowner == None and data_id:
             fowner = self.owner(data_id)
         
@@ -559,7 +537,7 @@ class Application:
 
         authorized.append('root') # allow root to do everything in case of trouble?
 
-        roles = self.roles.copy()
+        roles = self.authn.roles.copy()
         if roles:
             roles.add('*')
             if roles.intersection(set(authorized)):
@@ -572,14 +550,14 @@ class Application:
     def test_tagdef_authz(self, mode, tagname, user=None):
         """Check whether access is allowed."""
         if user == None:
-            user = self.user()
+            user = self.authn.role
         try:
             tagdef = self.select_tagdef(tagname)[0]
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tag_id)
         if mode == 'write':
-            if self.roles:
-                return tagdef.owner in self.roles
+            if self.authn.roles:
+                return tagdef.owner in self.authn.roles
             else:
                 return None
         else:
@@ -621,7 +599,7 @@ class Application:
         if data_id == None:
             data_id = self.data_id
         fowner = self.owner(data_id=data_id)
-        user = self.user()
+        user = self.authn.role
         if tagname == None:
             tagname = self.tag_id
         results = self.select_file(data_id=data_id)
@@ -639,7 +617,7 @@ class Application:
         """Check whether access is allowed and throw web exception if not."""
         if tag_id == None:
             tag_id = self.tag_id
-        user = self.user()
+        user = self.authn.role
         allow = self.test_tagdef_authz(mode, tag_id, user)
         if allow == False:
             raise Forbidden(data="access to tag definition %s" % tag_id)
@@ -698,14 +676,14 @@ class Application:
         else:
             order = ''
         if staticauthz != None:
-            user = self.user()
+            user = self.authn.role
             table = dict(read='tagreaders', write='tagwriters')[staticauthz]
             policy = dict(read='readpolicy', write='writepolicy')[staticauthz]
             tables.append("%s USING (tagname)" % table)
             if user != None:
                 parts = [ "%s != 'tag'" % policy ]
                 r = 0
-                for role in self.roles:
+                for role in self.authn.roles:
                     parts.append("owner = $role%s" % r)
                     parts.append("value = $role%s" % r)
                     vars['role%s' % r] = role
@@ -726,7 +704,7 @@ class Application:
         
     def insert_tagdef(self):
         self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.user()))
+                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.authn.role))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
@@ -754,7 +732,7 @@ class Application:
 
     def select_file_tag(self, tagname, value=None, data_id=None, tagdef=None, user=None, owner=None):
         if user == None:
-            user = self.user()
+            user = self.authn.user
         if tagdef == None:
             tagdef = self.select_tagdef(tagname)[0]
             
@@ -928,7 +906,7 @@ class Application:
         if predlist == None:
             predlist = self.predlist
 
-        roles = [ r for r in self.roles ]
+        roles = [ r for r in self.authn.roles ]
         if roles:
             roles.append('*')
 
@@ -941,7 +919,7 @@ class Application:
                     raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
                 tagdef = results[0]
                 if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
-                    user = self.user()
+                    user = self.authn.role
                     if user == None:
                         raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
                     if tagdef.readpolicy == 'tag':
@@ -975,7 +953,7 @@ class Application:
         wheres = []
         values = dict()
 
-        roletable = []
+        roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
         for r in range(0, len(roles)):
             roletable.append("('%s')" % dbquote(roles[r]))
         roletable = ", ".join(roletable)
@@ -1048,7 +1026,7 @@ class Application:
 
         query += " ORDER BY files.name"
         
-        #web.debug(query)
+        web.debug(query)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)

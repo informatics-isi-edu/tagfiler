@@ -8,10 +8,7 @@ $ help = tvars.get('help')
 $ jira = tvars.get('bugs')
 $ webauthnhome = tvars.get('webauthnhome')
 $ pollmins = tvars.get('pollmins')
-$ user = tvars.get('user')
-$ roles = tvars.get('roles')
-$ loginsince = tvars.get('loginsince')
-$ loginuntil = tvars.get('loginuntil')
+$ authn = tvars.get('authn')
 $if appsubtitle and title:
 	$ titles = appsubtitle + ': ' + title
 $elif appsubtitle:
@@ -42,26 +39,30 @@ $if appsubtitle:
 	<td class="title"><h1>${appsubtitle}</h1></td>
 <td class="authninfo">
 <table class="authninfo">
-$if user:
+$if authn.role:
 	$ rfc1123 = "%a, %d %b %Y %H:%M:%S UTC%z"
-	<tr><td>User:</td><td><a href="${webauthnhome}/status">${user}</a></td></tr>
-	$if webauthnhome:
-		<tr><td></td><td><a href="${webauthnhome}/logout">log&nbsp;out</a></td></tr>
-		<tr><td></td><td><a href="${webauthnhome}/password">change&nbsp;password</a></td></tr>
-	$if loginsince:
-		<tr><td>Since:</td><td><span id="sincetime">${loginsince.strftime(rfc1123)}</span></td>
+	<tr><td>User:</td><td><a href="${webauthnhome}/status">${authn.role}</a></td></tr>
+	$ passwdurl = authn.getPasswdUrl()
+	$ logouturl = authn.getLogoutUrl()
+	$if logouturl:
+		<tr><td></td><td><a href="${logouturl}">log&nbsp;out</a></td></tr>
+	$if passwdurl:
+		<tr><td></td><td><a href="${passwdurl}">change&nbsp;password</a></td></tr>
+	$if authn.since:
+		<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span></td>
 		<script type="text/javascript">
 		localizeDate("sincetime");
 		</script></tr>
-	$if loginuntil:
-		<tr><td>Expires:</td><td><span id="untiltime">${loginuntil.strftime(rfc1123)}</span></td>
+	$if authn.until:
+		<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span></td>
 		<script type="text/javascript">
 		localizeDate("untiltime");
 		</script></tr>
 $else:
 	<tr class="noauthn"><td>Login User:</td><td>not logged in</td></tr>
-	$if webauthnhome:
-		<tr><td><a href="${webauthnhome}/login">Log in now</a></td></tr>
+	$ loginurl = authn.getLoginUrl()
+	$if loginurl:
+		<tr><td><a href="${loginurl}">Log in now</a></td></tr>
 </table>
 </td>
 </tr>
@@ -72,7 +73,7 @@ $else:
     <td>
       <a href="${home}/">Home</a>
     </td>
-    $if webauthnhome and 'admin' in roles:
+    $if webauthnhome and 'admin' in authn.roles:
     	<td>
 			<a href="${webauthnhome}/role/">Manage roles</a>
 		</td>
@@ -91,7 +92,7 @@ $else:
     <td>
 		<a href="${jira}">Bugs</a>
 	</td>
-    $if 'admin' in roles:
+    $if 'admin' in authn.roles:
     	<td>
 	<a href="${home}/log">Logs</a>
 	</td>
