@@ -1,6 +1,5 @@
 $def with (tvars)
 $ target = tvars.get('target')
-$ expiremins = tvars.get('expiremins')
 $ testfile = tvars.get('testfile')
 $ appletlog = tvars.get('appletlog')
 $ tags = tvars.get('tags')
@@ -15,7 +14,6 @@ $ customproperties = tvars.get('customproperties')
 				 ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
 				  width=25 height=25 MAYSCRIPT >
 				<PARAM name="tagfiler.server.url" value="${target}"/>
-				<PARAM name="tagfiler.idle.mins" value="${expiremins}"/>
 				<PARAM name="classloader_cache" value="false" />
 				<PARAM name="separate_jvm" value="true" />
 				$if testfile:

@@ -106,7 +106,6 @@ class Study (Node):
                      requiredtags=self.requiredtags,
                      customproperties=self.customproperties,
                      direction=self.direction,
-                     expiremins=self.webauthnexpiremins,
                      testfile=self.appletTest,
                      appletlog=self.appletlog,
                      idquote=idquote)
