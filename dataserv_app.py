@@ -55,7 +55,7 @@ def urlquote(url):
 def make_filter(allowed):
     allchars = string.maketrans('', '')
     delchars = ''.join([c for c in allchars if c not in allowed])
-    return lambda s,a=allchars,d=delchars: s.translate(a, d)
+    return lambda s, a=allchars, d=delchars: (str(s)).translate(a, d)
 
 idquote = make_filter(string.letters + string.digits + '_-:.' )
 
@@ -127,29 +127,41 @@ class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
+    def getParamDb(self, suffix, default=None):
+        results = self.getParamsDb(suffix)
+        if len(results) == 1:
+            return results[0]
+        elif len(results) == 0:
+            return default
+        else:
+            raise ValueError
+
+    def getParamsDb(self, suffix):
+        results = self.gettagvals('_%s' % suffix, data_id='tagfiler configuration')
+        #web.debug(suffix, results)
+        return results
+
     def __init__(self):
         "store common configuration data for all service classes"
         global render
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
-        def getParam(suffix, default=None):
+        def getParamEnv(suffix, default=None):
             return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
         def parseBoolString(theString):
-            if theString[0].upper() == 'T':
+            if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
                 return True
             else:
                 return False
               
-        def getPolicyRules(rules):
+        def buildPolicyRules(rules):
             remap = dict()
-            if rules:
-                rules = rules.split(';')
-                for rule in rules:
-                    rule = tuple(rule.split(','))
-                    srcrole,dstrole,read,write = rule
-                    remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
+            for rule in rules:
+                rule = tuple(rule.split(','))
+                srcrole,dstrole,read,write = rule
+                remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
             return remap
         
         try:
@@ -161,58 +173,52 @@ class Application:
 
         self.hostname = socket.gethostname()
 
-        self.help = getParam('help')
-        self.jira = getParam('jira')
-        self.remap = getPolicyRules(getParam('policyrules', None))
-        self.dbnstr = getParam('dbnstr', 'postgres')
-        self.dbstr = getParam('dbstr', '')
+        self.dbnstr = getParamEnv('dbnstr', 'postgres')
+        self.dbstr = getParamEnv('dbstr', '')
         self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-        self.home = getParam('home', 'https://%s' % self.hostname)
-        self.store_path = getParam('store_path', '/var/www/%s-data' % self.daemonuser)
-        self.log_path = getParam('log_path', '/var/www/%s-logs' % self.daemonuser)
-        self.template_path = getParam('template_path',
-                                      '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
-        self.chunkbytes = int(getParam('chunkbytes', 1048576))
-        
-        self.webauthnhome = getParam('webauthnhome')
-        self.webauthnrequire = getParam('webauthnrequire')
 
-        self.localFilesImmutable = parseBoolString(getParam('localFilesImmutable', 'False'))
-        self.remoteFilesImmutable = parseBoolString(getParam('remoteFilesImmutable', 'False'))
-        self.logo = getParam('logo', '')
-        self.subtitle = getParam('subtitle', '')
-        self.contact = getParam('contact', None)
-        self.appletTest = getParam('appletTest', None)
-        self.appletlog = getParam('appletlog', None)
+        t = self.db.transaction()
+        
+        self.authn = webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None)
+        
+        self.store_path = self.getParamDb('store path', '/var/www/%s-data' % self.daemonuser)
+        self.log_path = self.getParamDb('log path', '/var/www/%s-logs' % self.daemonuser)
+        self.template_path = self.getParamDb('template path',
+                                        '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
+        self.render = web.template.render(self.template_path)
+        render = self.render # HACK: make this available to exception classes too
+
+        self.home = self.getParamDb('home', 'https://%s' % self.hostname)
+        self.help = self.getParamDb('help')
+        self.jira = self.getParamDb('bugs')
+        
+        self.remap = buildPolicyRules(self.getParamsDb('policy remappings'))
+        self.localFilesImmutable = parseBoolString(self.getParamDb('local files immutable', 'False'))
+        self.remoteFilesImmutable = False # parseBoolString(self.getParamDb('remote files immutable', 'False'))
+        self.webauthnhome = self.getParamDb('webauthn home')
+        self.webauthnrequire = parseBoolString(self.getParamDb('webauthn require', 'False'))
+
+        self.chunkbytes = int(self.getParamDb('chunk bytes', 1048576))
+        
+
+        self.logo = self.getParamDb('logo', '')
+        self.subtitle = self.getParamDb('subtitle', '')
+        self.contact = self.getParamDb('contact', None)
+        self.appletTest = self.getParamDb('applet test properties', None)
+        self.appletlog = self.getParamDb('applet test log', None)
         self.logmsgs = []
         self.middispatchtime = None
 
-        self.filelisttags = getParam('filelisttags', '')
-        self.filelisttags = [ urllib.unquote(t)
-                              for t in self.filelisttags.split(',') ]
-        self.filelisttagswrite = getParam('filelisttagswrite', '')
-        self.filelisttagswrite = set([ urllib.unquote(t)
-                                       for t in self.filelisttagswrite.split(',') ])
+        self.filelisttags = self.getParamsDb('file list tags')
+        self.filelisttagswrite = self.getParamsDb('file list tags write')
                 
-        self.customtags = getParam('customtags', '')
-        self.customtags = [ tag for tag in self.customtags.split(',') ]
-        
-        self.requiredtags = getParam('requiredtags', '')
-        self.requiredtags = [ tag for tag in self.requiredtags.split(',') ]
-        
-        self.customproperties = getParam('customproperties', None)
+        self.customtags = self.getParamsDb('applet tags')
+        self.requiredtags = self.getParamsDb('applet tags require')
+        self.customproperties = None # self.getParamDb('applet properties', None)
 
-        if self.webauthnrequire and self.webauthnrequire.lower() in ['t', 'true', 'y', 'yes', '1']:
-            self.webauthnrequire = True
-        else:
-            self.webauthnrequire = False
-
-        self.authn = None
+        t.commit()
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
-
-        self.render = web.template.render(self.template_path)
-        render = self.render # HACK: make this available to exception classes too
 
         # TODO: pull this from database?
         self.typenames = { '' : 'No content',
@@ -290,10 +296,10 @@ class Application:
             parts.append('value "%s"' % value)
         if mode:
             parts.append('mode "%s"' % mode)
-        if not self.authn.user:
+        if not self.authn.role:
             user = 'anonymous'
         else:
-            user = self.authn.user
+            user = self.authn.role
         return ('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
@@ -629,8 +635,8 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def gettagvals(self, tagname, data_id=None, owner=None):
-        results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
+    def gettagvals(self, tagname, data_id=None, owner=None, user=None):
+        results = self.select_file_tag(tagname, data_id=data_id, owner=owner, user=user)
         values = [ ]
         for result in results:
             try:
@@ -732,7 +738,7 @@ class Application:
 
     def select_file_tag(self, tagname, value=None, data_id=None, tagdef=None, user=None, owner=None):
         if user == None:
-            user = self.authn.user
+            user = self.authn.role
         if tagdef == None:
             tagdef = self.select_tagdef(tagname)[0]
             

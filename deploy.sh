@@ -129,7 +129,31 @@ tagdef()
    fi
 }
 
+
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+
+tagdef _home          text        ""      tag         tag        false
+tagdef '_webauthn home' text      ""      tag         tag        false
+tagdef '_webauthn require' text   ""      tag         tag        false
+tagdef '_store path'  text        ""      tag         tag        false
+tagdef '_log path'    text        ""      tag         tag        false
+tagdef '_template path' text      ""      tag         tag        false
+tagdef '_chunk bytes' text        ""      tag         tag        false
+tagdef '_file list tags' text     ""      tag         tag        true
+tagdef '_file list tags write' text ""    tag         tag        true
+tagdef '_applet tags' text        ""      tag         tag        true
+tagdef '_applet tags require' text ""     tag         tag        true
+tagdef '_applet properties' text  ""      tag         tag        false
+tagdef '_local files immutable' text ""   tag         tag        false
+tagdef '_remote files immutable' text ""  tag         tag        false
+tagdef '_policy remappings' text  ""      tag         tag        true
+tagdef '_applet test log' text    ""      tag         tag        false
+tagdef _subtitle      text        ""      tag         tag        false
+tagdef _logo          text        ""      tag         tag        false
+tagdef _contact       text        ""      tag         tag        false
+tagdef _help	      text        ""      tag         tag        false
+tagdef _bugs          text        ""      tag         tag        false
+
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
 tagdef "read users"   text        ""      anonymous   fowner     true       role
@@ -156,23 +180,51 @@ tagacl()
    shift 2
    while [[ \$# -gt 0 ]]
    do
-      "INSERT INTO tag\${mode}ers (tagname, value) VALUES ('\$tag', '\$1')"
+      psql -c "INSERT INTO tag\${mode}ers (tagname, value) VALUES ('\$tag', '\$1')"
       shift
    done
 }
 
+for tagname in _home '_webauthn home' '_webauthn require' '_store path' '_log path' \
+   '_template path' '_chunk bytes' '_file list tags' '_file list tags write' \
+   '_applet tags' '_applet tags require' '_local files immutable' '_policy remappings' \
+   '_applet test properties' '_applet test log' _subtitle _logo _contact _help _bugs
+do
+   tagacl "\$tagname" read admin
+   tagacl "\$tagname" write admin
+done
+
+
 tag()
 {
-   # args: file tag typestr [value]
-   if [[ -n "\$3" ]]
+   # args: file tag typestr [value]...
+   # for non-empty typestr
+   #     does one default value insert for 0 values
+   #     does N value inserts for N>0 values
+
+   file="\$1"
+   tagname="\$2"
+   typestr="\$3"
+
+   shift 3
+
+   if [[ -z "\$typestr" ]] || [[ \$# -eq 0 ]]
    then
-      psql -c "INSERT INTO \\"_\$2\\" ( file, value ) VALUES ( '\$1', '\$4' )"
-   else
-      psql -c "INSERT INTO \\"_\$2\\" ( file ) VALUES ( '\$1' )"
+      psql -c "INSERT INTO \\"_\$tagname\\" ( file ) VALUES ( '\$file' )"
+   elif [[ \$# -gt 0 ]]
+   then
+      while [[ \$# -gt 0 ]]
+      do
+         psql -c "INSERT INTO \\"_\$tagname\\" ( file, value ) VALUES ( '\$file', '\$1' )"
+         shift
+      done
    fi
-   if [[ -z "\$(psql -A -t -c "SELECT * FROM \\"_\$2\\" WHERE file = '\$1'")" ]]
+
+   # add to filetags only if this insert changes status
+   if [[ -z "\$(psql -A -t -c "SELECT * FROM filetags WHERE file = '\$file' AND tagname = '\$tagname'")" ]] \
+     && [[ -n "\$(psql -A -t -c "SELECT * FROM \\"_\$tagname\\" WHERE file = '\$file'")" ]]
    then
-      psql -c "INSERT INTO filetags (file, tagname) VALUES ('\$1', '\$2')"
+      psql -c "INSERT INTO filetags (file, tagname) VALUES ('\$file', '\$tagname')"
    fi
 }
 
@@ -180,7 +232,16 @@ tag()
 storedquery()
 {
    # args: name terms owner [readuser]...
-   psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, 'https://${HOME_HOST}/${SVCPREFIX}/query/\$2' )"
+   case \$2 in
+      http:*|/*)
+          url=\$2
+          ;;
+      *)
+          url="https://${HOME_HOST}/${SVCPREFIX}/query/\$2"
+          ;;
+   esac
+
+   psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, '\$url' )"
    tag "\$1" owner text "\$3"
    tag "\$1" "list on homepage"
    file=\$1
@@ -192,9 +253,38 @@ storedquery()
    done
 }
 
-storedquery "New image studies" "Image%20Set;Downloaded:not:" admin admin
-storedquery "Previous image studies" "Image%20Set;Downloaded" admin admin
-storedquery "All image studies" "Image%20Set" admin admin
+storedquery "New image studies" "Image%20Set;Downloaded:not:" admin
+storedquery "Previous image studies" "Image%20Set;Downloaded" admin
+storedquery "All image studies" "Image%20Set" admin
+
+storedquery "tagfiler configuration" "name=tagfiler%20configuration" admin
+
+#tag "tagfiler configuration" "_home" text 'https://${HOME_HOST}'
+tag "tagfiler configuration" "_webauthn home" text 'https://${HOME_HOST}/webauthn'
+#tag "tagfiler configuration" "_webauthn require" text 'True'
+
+#tag "tagfiler configuration" "_store path" text '${DATADIR}'
+#tag "tagfiler configuration" "_log path" text '${LOGDIR}'
+#tag "tagfiler configuration" "_template path" text '${TAGFILERDIR}/templates'
+#tag "tagfiler configuration" "_chunk bytes" text '1048576'
+
+tag "tagfiler configuration" "_file list tags" text 'Image Set' bytes owner 'read users' 'write users'
+tag "tagfiler configuration" "_file list tags write" text 'read users' 'write users'
+tag "tagfiler configuration" "_applet tags" text 'Image Type' 'Capture Date' Comment
+tag "tagfiler configuration" "_applet tags require" text 'Image Type' 'Capture Date'
+#tag "tagfiler configuration" "_applet properties" text 'tagfiler.properties'
+
+#tag "tagfiler configuration" "_local files immutable" text 'True'
+#tag "tagfiler configuration" "_policy remappings" text 'uploader,dirc,true,false' 'accessioner,dirc,true,true' 'grader,dirc,true,false'
+
+#tag "tagfiler configuration" "_applet test properties" text '/home/userid/appletTest.properties'
+#tag "tagfiler configuration" "_applet test log" text '/home/userid/applet.log'
+
+tag "tagfiler configuration" "_subtitle" text 'Tagfiler (trunk) on ${HOME_HOST}'
+tag "tagfiler configuration" "_logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
+tag "tagfiler configuration" "_contact" text '<p>Your HTML here</p>'
+tag "tagfiler configuration" "_help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
+tag "tagfiler configuration" "_bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
 
 EOF
 
@@ -282,28 +372,10 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 <Directory ${TAGFILERDIR}/wsgi>
 
-    SetEnv ${SVCPREFIX}.help https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home
-    SetEnv ${SVCPREFIX}.jira https://jira.misd.isi.edu:8444/browse/DEIIMGUP
-#    SetEnv ${SVCPREFIX}.policyrules uploader,dirc,true,false;accessioner,dirc,true,true;grader,dirc,true,false
-    SetEnv tagfiler.filelisttags 'Image%20Set,bytes,owner,read%20users,write%20users'
-    SetEnv tagfiler.filelisttagswrite 'read%20users,write%20users'
-    SetEnv tagfiler.customtags 'Image Type,Capture Date,Comment'
-    SetEnv tagfiler.requiredtags 'Image Type,Capture Date'
-#    SetEnv ${SVCPREFIX}.localFilesImmutable true
-#    SetEnv tagfiler.appletTest /home/userid/appletTest.properties
-#    SetEnv tagfiler.appletlog /home/userid/applet.log
-#    SetEnv ${SVCPREFIX}.home https://${HOME_HOST}
-    SetEnv ${SVCPREFIX}.webauthnhome https://${HOME_HOST}/webauthn
-    SetEnv ${SVCPREFIX}.webauthnrequire Yes
-#    SetEnv ${SVCPREFIX}.store_path ${DATADIR}
-#    SetEnv ${SVCPREFIX}.log_path ${LOGDIR}
-#    SetEnv ${SVCPREFIX}.template_path ${TAGFILERDIR}/templates
-#    SetEnv ${SVCPREFIX}.chunkbytes 1048576
-#    SetEnv ${SVCPREFIX}.webauthnexpiremins 10
-#    SetEnv ${SVCPREFIX}.webauthnrotatemins 120
-    SetEnv ${SVCPREFIX}.subtitle 'Tagfiler (trunk) on ${HOME_HOST}'
-    SetEnv ${SVCPREFIX}.logo '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
-    SetEnv ${SVCPREFIX}.contact '<p>Your HTML here</p>'
+#    SetEnv ${SVCPREFIX}.dbnstr postgres
+#    SetEnv ${SVCPREFIX}.dbstr  ${SVCUSER}
+
+     # All other settings are tagged on dataset 'tagfiler configuration' now
 
 </Directory>
 
