@@ -484,18 +484,18 @@ class FileIO (Application):
             self.set_file_tag(tagname, self.queryopts[tagname])
             self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
 
-        srcroles = set(self.remap.keys()).intersection(self.roles)
+        srcroles = set(self.remap.keys()).intersection(self.authn.roles)
         if len(srcroles) == 1:
             try:
                 t = self.db.transaction()
                 srcrole = srcroles.pop()
                 dstrole, readuser, writeuser = self.remap[srcrole]
                 if readuser:
-                    self.set_file_tag('read users', self.role)
-                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=self.role)
+                    self.set_file_tag('read users', self.authn.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=self.authn.role)
                 if writeuser:
-                    self.set_file_tag('write users', self.role)
-                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=self.role)
+                    self.set_file_tag('write users', self.authn.role)
+                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=self.authn.role)
                 self.set_file_tag('owner', dstrole)
                 self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
                 t.commit()
@@ -876,7 +876,7 @@ class LogFileIO (FileIO):
 
     def GET(self, uri, sendBody=True):
 
-        if 'admin' not in self.roles:
+        if 'admin' not in self.authn.roles:
             raise Forbidden('read access to log file "%s"' % self.data_id)
 
         if not self.log_path:
@@ -903,6 +903,7 @@ class LogFileIO (FileIO):
             else:
                 pollmins = 1
                 tvars = dict()
+                tvars['authn'] = self.authn
                 tvars['title'] = "Log %s" % self.data_id
                 tvars['subtitle'] = self.subtitle
                 tvars['logo'] = self.logo
@@ -912,10 +913,10 @@ class LogFileIO (FileIO):
                 tvars['bugs'] = self.jira
                 tvars['webauthnhome'] = self.webauthnhome
 
-                tvars['user'] = self.role
-                tvars['roles'] = self.roles
-                tvars['loginsince'] = self.loginsince
-                tvars['loginuntil'] = self.loginuntil
+                tvars['user'] = self.authn.role
+                tvars['roles'] = self.authn.roles
+                tvars['loginsince'] = self.authn.since
+                tvars['loginuntil'] = self.authn.until
 
 
                 top = unicode(self.render.Top(tvars)) + "<pre>"

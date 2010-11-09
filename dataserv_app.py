@@ -1032,7 +1032,7 @@ class Application:
 
         query += " ORDER BY files.name"
         
-        web.debug(query)
+        #web.debug(query)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)
