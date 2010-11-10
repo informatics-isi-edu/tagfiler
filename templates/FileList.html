@@ -73,7 +73,7 @@ $if len(files) > 0:
 							<input type="submit" value="Clear" />
 					$else:
 						$if tag in filelisttagswrite:
-							<input type="hidden" name="set-${tag}" value="true" />
+							<input type="hidden" name="set-${urlquote(tag)}" value="true" />
 							<input type="hidden" name="action" value="put" />
 							<input type="submit" value="Set ${tag}" />
 					$if tag in filelisttagswrite:
@@ -116,15 +116,16 @@ $if len(files) > 0:
 								$ thisroles = [ file[tag] ]
 							$else:
 								$ thisroles = []
-							<!-- $:{thisroles} -->
-							<!-- $:{set(allroles)} -->
-							$ availroles = [ role for role in set(allroles).difference(set(thisroles)) ]
-							$ availroles.sort()
-							<select name="val-${urlquote(tag)}">
-							<option value="">Choose a role</option>
-							$for role in availroles:
-								<option	value="${role}">${role}</option>
-							</select>
+							$if allroles != None:
+								$ availroles = [ role for role in set(allroles).difference(set(thisroles)) ]
+								$ availroles.sort()
+								<select name="val-${urlquote(tag)}">
+								<option value="">Choose a role</option>
+								$for role in availroles:
+									<option	value="${role}">${role}</option>
+								</select>
+							$else:
+								<input type="text" name="val-${urlquote(tag)}" />
 						$else:
 							<input type="text" name="val-${urlquote(tag)}" />
 						</td>

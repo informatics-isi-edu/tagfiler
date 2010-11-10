@@ -455,9 +455,11 @@ class Application:
     def buildroleinfo(self):
         if self.authn.roleProvider:
             try:
-                return [ role for role in self.authn.roleProvider.listRoles() ]
+                roleinfo = [ role for role in self.authn.roleProvider.listRoles() ]
+                roleinfo.append('*')
+                return roleinfo
             except NotImplemented:
-                return []
+                return None
     
     def test_file_authz(self, mode, data_id=None, owner=None):
         """Check whether access is allowed to user given mode and owner.

@@ -22,13 +22,16 @@ $if len(tagdefs) > 0:
 		  <input type="checkbox" name="set-${urlquote(tagname)}" value="true" /> Set
 		$if typestr != '':
 			$if typestr == 'role':
-				$ availroles = [ role for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
-				$ availroles.sort()
-				<select name="val-${urlquote(tagname)}">
-					<option value="">Choose a role</option>
-					$for role in availroles:
-						<option value="${role}">${role}</option>
-				</select>
+				$if allroles != None:
+					$ availroles = [ role for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
+					$ availroles.sort()
+					<select name="val-${urlquote(tagname)}">
+						<option value="">Choose a role</option>
+						$for role in availroles:
+							<option value="${role}">${role}</option>
+					</select>
+				$else:
+					<input type="text" name="val-${urlquote(tagname)}" />
 			$else:
 				<input type="text" name="val-${urlquote(tagname)}" size="${length}" /> (${typenames[typestr]})
 		</fieldset>
