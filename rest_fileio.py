@@ -377,7 +377,7 @@ class FileIO (Application):
             t = self.db.transaction()
             try:
                 #web.debug('setting owner "%s"' % self.user())
-                self.set_file_tag('owner', self.user())
+                self.set_file_tag('owner', self.authn.role)
                 t.commit()
             except:
                 t.rollback()
@@ -398,7 +398,7 @@ class FileIO (Application):
     
         t = self.db.transaction()
         try:
-            self.set_file_tag('modified by', self.user())
+            self.set_file_tag('modified by', self.authn.role)
             t.commit()
         except:
             t.rollback()
@@ -551,7 +551,7 @@ class FileIO (Application):
     def getTemporary(self, mode):
         """get a temporary file"""
 
-        prefix = self.user()
+        prefix = self.authn.role
         if prefix != None:
             prefix += '-'
         else:
