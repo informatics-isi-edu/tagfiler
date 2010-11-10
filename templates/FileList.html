@@ -29,14 +29,7 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		<td class="file-name">
-		$if file['Image Set']:
-			${file.file}
-		$else:
-			$if file.local:
-				$ label = 'Download'
-			$else:
-				$ label = 'View'
-			<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
+		<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
 		$if file['Image Set']:
 			<a href="${apptarget}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
 		$if file.writeok:
@@ -90,7 +83,7 @@ $if len(files) > 0:
 						$ vals = []
 					<table class="file-tag-list">
 					$for val in vals:
-						$if val:
+						$if val != None:
 							<tr>
 							$if tag in filelisttagswrite:
 								<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
