@@ -73,7 +73,7 @@ $if len(files) > 0:
 							<input type="submit" value="Clear" />
 					$else:
 						$if tag in filelisttagswrite:
-							<input type="hidden" name="set-Downloaded" value="true" />
+							<input type="hidden" name="set-${tag}" value="true" />
 							<input type="hidden" name="action" value="put" />
 							<input type="submit" value="Set ${tag}" />
 					$if tag in filelisttagswrite:
