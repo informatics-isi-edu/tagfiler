@@ -340,6 +340,7 @@ class Application:
             self.authn = webauthn.session.test_and_update_session(self.db,
                                                                   referer=self.home + uri,
                                                                   setcookie=True)
+            self.middispatchtime = datetime.datetime.now()
             if not self.authn.role and self.webauthnrequire:
                 raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
         else:
@@ -353,16 +354,16 @@ class Application:
 
     def postDispatch(self, uri=None):
         if self.webauthnhome:
+            t = self.db.transaction()
             webauthn.session.test_and_update_session(self.db, self.authn.guid,
                                                      ignoremustchange=True,
                                                      setcookie=False)
+            t.commit()
 
     def midDispatch(self):
         now = datetime.datetime.now()
-        if self.middispatchtime == None or (now - self.middispatchtime).seconds > 10:
-            webauthn.session.test_and_update_session(self.db, self.authn.guid,
-                                                     ignoremustchange=True,
-                                                     setcookie=False)
+        if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
+            self.postDispatch()
             self.middispatchtime = now
 
     def setNoCache(self):

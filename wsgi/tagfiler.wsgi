@@ -58,7 +58,7 @@ class Dispatcher:
         ast.preDispatch(uri)
         astmethod = getattr(ast, methodname)
         result = astmethod(uri)
-        ast.postDispatch(uri)
+        # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         return result
 
     def HEAD(self):
