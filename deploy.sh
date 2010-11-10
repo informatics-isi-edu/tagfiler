@@ -148,6 +148,7 @@ tagdef '_local files immutable' text ""   tag         tag        false
 tagdef '_remote files immutable' text ""  tag         tag        false
 tagdef '_policy remappings' text  ""      tag         tag        true
 tagdef '_applet test log' text    ""      tag         tag        false
+tagdef '_applet test properties' text ""  tag         tag        true
 tagdef _subtitle      text        ""      tag         tag        false
 tagdef _logo          text        ""      tag         tag        false
 tagdef _contact       text        ""      tag         tag        false
