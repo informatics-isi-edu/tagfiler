@@ -368,7 +368,10 @@ class FileIO (Application):
             # check permissions and update existing file
             remote = not results[0].local
             self.enforce_file_authz('write', local=not remote)
-            self.update_file()
+            if (results[0].location != self.location):
+                self.update_file()
+            else:
+                results = []
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
@@ -545,6 +548,7 @@ class FileIO (Application):
             f.seek(0,2)
             flen = f.tell()
 
+        #web.debug('stored %d of %d bytes' %( bytes, flen))
         return (bytes, flen)
 
 
@@ -645,7 +649,10 @@ class FileIO (Application):
                     if result.local:
                         self.location = result.location
                         filename = self.store_path + '/' + self.location
-                        return open(filename, 'r+b')
+                        self.local = result.local
+                        f = open(filename, 'r+b')
+                        #web.debug('reopen', self.location, self.local, filename, f)
+                        return f
                     else:
                         raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
                 else:
