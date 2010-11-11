@@ -12,7 +12,6 @@ $ allroles = roleinfo
 $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
 $ tagvals = dict( [ (tag, vals) for file, tag, vals in filetagvals ] )
 $ excludes = [ x for x in excludes ]
-$ tagdefs = [ tagdef for tagdef in tagdefs if tagdef[0] not in excludes and tagdef[2] ]
 $ odd = True
 $if title == 'User' and data_id:
 	<p><a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>

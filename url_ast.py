@@ -953,9 +953,8 @@ class TagdefACL (FileTags):
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
-        user = self.authn.role
-        acldefs = [ ('readers', 'role', tagdef.owner == user and tagdef.readpolicy == 'tag'),
-                    ('writers', 'role', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
+        acldefs = [ ('readers', 'role', tagdef.owner in self.authn.roles and tagdef.readpolicy == 'tag'),
+                    ('writers', 'role', tagdef.owner in self.authn.roles and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
         readacls = [ (result.tagname, 'readers')
                      for result in self.select_tagdef(tagname=self.data_id,
@@ -980,7 +979,6 @@ class TagdefACL (FileTags):
     def get_all_body(self):
         """Override FileTags.get_all_body to consult tagdef ACL instead"""
         aclinfo = self.buildaclinfo()
-        web.debug(aclinfo)
         return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
                  aclinfo,
@@ -999,7 +997,8 @@ class TagdefACL (FileTags):
                      typenames=self.typenames,
                      data_id=self.data_id,
                      roleinfo=roleinfo,
-                     urlquote=urlquote)
+                     urlquote=urlquote,
+                     idquote=idquote)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting(dictmerge(tvars, dict(title='', taginfo=all))),
