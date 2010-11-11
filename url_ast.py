@@ -428,9 +428,8 @@ class Tagdef (Node):
                          test_tagdef_authz=lambda mode, tag: self.test_tagdef_authz(mode, tag),
                          urlquote=urlquote)
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=predefined, title='System'))),
-                                    self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=userdefined, title='User'))),
-                                    self.render.TagdefNew(tvars)])
+                                   [self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=userdefined, title='User'))),
+                                    self.render.TagdefExisting(dictmerge(tvars, dict(tagdefs=predefined, title='System')))])
 
         if len(self.queryopts) > 0:
             raise BadRequest(data="Query options are not supported on this interface.")
