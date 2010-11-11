@@ -953,7 +953,7 @@ class TagdefACL (FileTags):
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
-        user = self.user()
+        user = self.authn.role
         acldefs = [ ('readers', 'role', tagdef.owner == user and tagdef.readpolicy == 'tag'),
                     ('writers', 'role', tagdef.owner == user and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
@@ -980,6 +980,7 @@ class TagdefACL (FileTags):
     def get_all_body(self):
         """Override FileTags.get_all_body to consult tagdef ACL instead"""
         aclinfo = self.buildaclinfo()
+        web.debug(aclinfo)
         return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
                  aclinfo,
