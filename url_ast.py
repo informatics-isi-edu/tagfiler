@@ -705,7 +705,8 @@ class FileTags (Node):
                      typenames=self.typenames,
                      data_id=self.data_id,
                      roleinfo=roleinfo,
-                     urlquote=urlquote)
+                     urlquote=urlquote,
+                     idquote=idquote)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting(dictmerge(tvars, dict(title='User', taginfo=userdefined))),
