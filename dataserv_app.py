@@ -720,6 +720,8 @@ class Application:
         indexdef = ''
         if self.dbtypes.get(self.typestr, '') != '':
             tabledef += ", value %s" % (self.dbtypes[self.typestr])
+            if self.dbtypes.get(self.typestr, '') == 'text':
+                tabledef += " DEFAULT ''"
         if not self.multivalue:
             if self.typestr != '':
                 tabledef += ", UNIQUE(file, value)"
