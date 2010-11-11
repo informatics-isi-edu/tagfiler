@@ -137,7 +137,7 @@ class Application:
             raise ValueError
 
     def getParamsDb(self, suffix):
-        results = self.gettagvals('_%s' % suffix, data_id='tagfiler configuration')
+        results = self.gettagvals('_cfg_%s' % suffix, data_id='tagfiler configuration')
         #web.debug(suffix, results)
         return results
 

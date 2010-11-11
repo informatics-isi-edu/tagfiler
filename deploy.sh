@@ -135,31 +135,40 @@ tagdef()
    fi
 }
 
+cfgtagdef()
+{
+   tagname="_cfg_\$1"
+   shift
+   tagdef "\$tagname" "\$@"
+}
+
+
+#         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+
+cfgtagdef home          text        ""      tag         tag        false
+cfgtagdef 'webauthn home' text      ""      tag         tag        false
+cfgtagdef 'webauthn require' text   ""      tag         tag        false
+cfgtagdef 'store path'  text        ""      tag         tag        false
+cfgtagdef 'log path'    text        ""      tag         tag        false
+cfgtagdef 'template path' text      ""      tag         tag        false
+cfgtagdef 'chunk bytes' text        ""      tag         tag        false
+cfgtagdef 'file list tags' text     ""      tag         tag        true
+cfgtagdef 'file list tags write' text ""    tag         tag        true
+cfgtagdef 'applet tags' text        ""      tag         tag        true
+cfgtagdef 'applet tags require' text ""     tag         tag        true
+cfgtagdef 'applet properties' text  ""      tag         tag        false
+cfgtagdef 'local files immutable' text ""   tag         tag        false
+cfgtagdef 'remote files immutable' text ""  tag         tag        false
+cfgtagdef 'policy remappings' text  ""      tag         tag        true
+cfgtagdef 'applet test log' text    ""      tag         tag        false
+cfgtagdef 'applet test properties' text ""  tag         tag        true
+cfgtagdef subtitle      text        ""      tag         tag        false
+cfgtagdef logo          text        ""      tag         tag        false
+cfgtagdef contact       text        ""      tag         tag        false
+cfgtagdef help          text        ""      tag         tag        false
+cfgtagdef bugs          text        ""      tag         tag        false
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-
-tagdef _home          text        ""      tag         tag        false
-tagdef '_webauthn home' text      ""      tag         tag        false
-tagdef '_webauthn require' text   ""      tag         tag        false
-tagdef '_store path'  text        ""      tag         tag        false
-tagdef '_log path'    text        ""      tag         tag        false
-tagdef '_template path' text      ""      tag         tag        false
-tagdef '_chunk bytes' text        ""      tag         tag        false
-tagdef '_file list tags' text     ""      tag         tag        true
-tagdef '_file list tags write' text ""    tag         tag        true
-tagdef '_applet tags' text        ""      tag         tag        true
-tagdef '_applet tags require' text ""     tag         tag        true
-tagdef '_applet properties' text  ""      tag         tag        false
-tagdef '_local files immutable' text ""   tag         tag        false
-tagdef '_remote files immutable' text ""  tag         tag        false
-tagdef '_policy remappings' text  ""      tag         tag        true
-tagdef '_applet test log' text    ""      tag         tag        false
-tagdef '_applet test properties' text ""  tag         tag        true
-tagdef _subtitle      text        ""      tag         tag        false
-tagdef _logo          text        ""      tag         tag        false
-tagdef _contact       text        ""      tag         tag        false
-tagdef _help	      text        ""      tag         tag        false
-tagdef _bugs          text        ""      tag         tag        false
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -192,13 +201,13 @@ tagacl()
    done
 }
 
-for tagname in _home '_webauthn home' '_webauthn require' '_store path' '_log path' \
-   '_template path' '_chunk bytes' '_file list tags' '_file list tags write' \
-   '_applet tags' '_applet tags require' '_local files immutable' '_policy remappings' \
-   '_applet test properties' '_applet test log' _subtitle _logo _contact _help _bugs
+for tagname in home 'webauthn home' 'webauthn require' 'store path' 'log path' \
+   'template path' 'chunk bytes' 'file list tags' 'file list tags write' \
+   'applet tags' 'applet tags require' 'local files immutable' 'policy remappings' \
+   'applet test properties' 'applet test log' subtitle logo contact help bugs
 do
-   tagacl "\$tagname" read admin
-   tagacl "\$tagname" write admin
+   tagacl "_cfg_\$tagname" read admin
+   tagacl "_cfg_\$tagname" write admin
 done
 
 
@@ -264,34 +273,41 @@ storedquery "New image studies" "Image%20Set;Downloaded:not:" admin
 storedquery "Previous image studies" "Image%20Set;Downloaded" admin
 storedquery "All image studies" "Image%20Set" admin
 
-storedquery "tagfiler configuration" "name=tagfiler%20configuration" admin
+storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin
 
-#tag "tagfiler configuration" "_home" text 'https://${HOME_HOST}'
-tag "tagfiler configuration" "_webauthn home" text 'https://${HOME_HOST}/webauthn'
-#tag "tagfiler configuration" "_webauthn require" text 'True'
+cfgtag()
+{
+   tagname="_cfg_\$1"
+   shift
+   tag "tagfiler configuration" "\$tagname" "\$@"
+}
 
-#tag "tagfiler configuration" "_store path" text '${DATADIR}'
-#tag "tagfiler configuration" "_log path" text '${LOGDIR}'
-#tag "tagfiler configuration" "_template path" text '${TAGFILERDIR}/templates'
-#tag "tagfiler configuration" "_chunk bytes" text '1048576'
+#cfgtag "home" text 'https://${HOME_HOST}'
+cfgtag "webauthn home" text 'https://${HOME_HOST}/webauthn'
+#cfgtag "webauthn require" text 'True'
 
-tag "tagfiler configuration" "_file list tags" text 'Image Set' bytes owner 'read users' 'write users'
-tag "tagfiler configuration" "_file list tags write" text 'read users' 'write users'
-tag "tagfiler configuration" "_applet tags" text 'Image Type' 'Capture Date' Comment
-tag "tagfiler configuration" "_applet tags require" text 'Image Type' 'Capture Date'
-#tag "tagfiler configuration" "_applet properties" text 'tagfiler.properties'
+#cfgtag "store path" text '${DATADIR}'
+#cfgtag "log path" text '${LOGDIR}'
+#cfgtag "template path" text '${TAGFILERDIR}/templates'
+#cfgtag "chunk bytes" text '1048576'
 
-#tag "tagfiler configuration" "_local files immutable" text 'True'
-#tag "tagfiler configuration" "_policy remappings" text 'uploader,dirc,true,false' 'accessioner,dirc,true,true' 'grader,dirc,true,false'
+cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
+cfgtag "file list tags write" text 'read users' 'write users'
+cfgtag "applet tags" text 'Image Type' 'Capture Date' Comment
+cfgtag "applet tags require" text 'Image Type' 'Capture Date'
+#cfgtag "applet properties" text 'tagfiler.properties'
 
-#tag "tagfiler configuration" "_applet test properties" text '/home/userid/appletTest.properties'
-#tag "tagfiler configuration" "_applet test log" text '/home/userid/applet.log'
+#cfgtag "local files immutable" text 'True'
+#cfgtag "policy remappings" text 'uploader,dirc,true,false' 'accessioner,dirc,true,true' 'grader,dirc,true,false'
 
-tag "tagfiler configuration" "_subtitle" text 'Tagfiler (trunk) on ${HOME_HOST}'
-tag "tagfiler configuration" "_logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
-tag "tagfiler configuration" "_contact" text '<p>Your HTML here</p>'
-tag "tagfiler configuration" "_help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
-tag "tagfiler configuration" "_bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
+#cfgtag "applet test properties" text '/home/userid/appletTest.properties'
+#cfgtag "applet test log" text '/home/userid/applet.log'
+
+cfgtag "subtitle" text 'Tagfiler (trunk) on ${HOME_HOST}'
+cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
+cfgtag "contact" text '<p>Your HTML here</p>'
+cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
+cfgtag "bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
 
 EOF
 
