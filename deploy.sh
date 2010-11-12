@@ -168,6 +168,11 @@ cfgtagdef logo          text        ""      tag         tag        false
 cfgtagdef contact       text        ""      tag         tag        false
 cfgtagdef help          text        ""      tag         tag        false
 cfgtagdef bugs          text        ""      tag         tag        false
+cfgtagdef 'connections' text        ""      tag         tag        false
+cfgtagdef 'upload chunks' text        ""      tag         tag        false
+cfgtagdef 'download chunks' text        ""      tag         tag        false
+cfgtagdef 'socket buffer size' text        ""      tag         tag        false
+cfgtagdef 'applet chunk bytes' text        ""      tag         tag        false
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 
@@ -205,7 +210,8 @@ tagacl()
 for tagname in home 'webauthn home' 'webauthn require' 'store path' 'log path' \
    'template path' 'chunk bytes' 'file list tags' 'file list tags write' \
    'applet tags' 'applet tags require' 'local files immutable' 'policy remappings' \
-   'applet test properties' 'applet test log' subtitle logo contact help bugs
+   'applet test properties' 'applet test log' subtitle logo contact help bugs \
+   'upload chunks' 'download chunks' 'socket buffer size' 'applet chunk bytes' connections
 do
    tagacl "_cfg_\$tagname" read admin
    tagacl "_cfg_\$tagname" write admin
@@ -291,6 +297,12 @@ cfgtag "webauthn home" text 'https://${HOME_HOST}/webauthn'
 #cfgtag "log path" text '${LOGDIR}'
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
 #cfgtag "chunk bytes" text '1048576'
+
+#cfgtag "connections" text '2'
+#cfgtag "upload chunks" text 'true'
+#cfgtag "download chunks" text 'true'
+#cfgtag "socket buffer size" text '8192'
+#cfgtag "applet chunk bytes" text '4194304'
 
 cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
 cfgtag "file list tags write" text 'read users' 'write users'
@@ -398,12 +410,6 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 #    SetEnv ${SVCPREFIX}.dbnstr postgres
 #    SetEnv ${SVCPREFIX}.dbstr  ${SVCUSER}
-
-#    SetEnv ${SVCPREFIX}.connections 8
-#    SetEnv ${SVCPREFIX}.uploadchunks true
-#    SetEnv ${SVCPREFIX}.downloadchunks true
-#    SetEnv ${SVCPREFIX}.socketbuffersize 8192
-#    SetEnv ${SVCPREFIX}.appletchunkbytes 4194304
 
      # All other settings are tagged on dataset 'tagfiler configuration' now
 

@@ -210,11 +210,11 @@ class Application:
         self.appletlog = self.getParamDb('applet test log', None)
         self.logmsgs = []
         self.middispatchtime = None
-        self.connections = getParam('connections', '1')
-        self.uploadchunks = parseBoolString(getParam('uploadchunks', 'False'))
-        self.downloadchunks = parseBoolString(getParam('downloadchunks', 'False'))
-        self.socketbuffersize = int(getParam('socketbuffersize', 8192))
-        self.appletchunkbytes = int(getParam('appletchunkbytes', 4194304))
+        self.connections = self.getParamDb('connections', '2')
+        self.uploadchunks = parseBoolString(self.getParamDb('upload chunks', 'False'))
+        self.downloadchunks = parseBoolString(self.getParamDb('download chunks', 'False'))
+        self.socketbuffersize = int(self.getParamDb('socket buffer size', 8192))
+        self.appletchunkbytes = int(self.getParamDb('applet chunk bytes', 4194304))
 
         self.filelisttags = self.getParamsDb('file list tags')
         self.filelisttagswrite = self.getParamsDb('file list tags write')
