@@ -676,6 +676,15 @@ class Application:
                 for val in res['_type_values']:
                     key, desc = val.split(" ", 1)
                     key = urllib.unquote(key)
+                    dbtype = res['_type_dbtype']
+                    if dbtype == 'int8':
+                        key = int(key)
+                    elif dbtype == 'float8':
+                        key = float(key)
+                    elif dbtype in [ 'date', 'timestamptz' ]:
+                        key = dateutil.parser.parse(key)
+                    else:
+                        pass # leave key as text
                     vals.append( (key, desc) )
                 res['_type_values'] = vals
             return res

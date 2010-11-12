@@ -39,7 +39,7 @@ WSGI=$(WSGIFILE:%=wsgi/%)
 
 $(HOME)/.tagfiler.predeploy:
 	yum -y --skip-broken install postgresql{,-devel,-server} || true
-	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply} || true
+	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil} || true
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
 

@@ -4,7 +4,7 @@ $ apptarget = tvars.get('apptarget')
 $ tagspace = tvars.get('tagspace')
 $ data_id = tvars.get('data_id')
 $ taginfo = tvars.get('taginfo')
-$ typenames = tvars.get('typenames')
+$ types = tvars.get('types')
 $ urlquote = tvars.get('urlquote')
 $ idquote = tvars.get('idquote')
 $ roleinfo = tvars.get('roleinfo')
@@ -18,6 +18,14 @@ $if title == 'User' and data_id:
 	<p><a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
 $if title != '':
 	<h2>${title}</h2>
+$for type in types:
+	$ values = type['_type_values']
+	$if values:
+		$ values = dict(values)
+	$else:
+		$ values = None
+	$ type['_type_values'] = values
+$ typesdict = dict( [ (type['_type_name'], type) for type in types ] )
 $if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
@@ -26,6 +34,8 @@ $if len(tagdefs) > 0:
 	</tr>
 	$for tagdef in tagdefs:
 		$ tag, typestr, writeok = tagdef
+		$ type = typesdict[typestr]
+		$ typevals = type['_type_values']
 		$ tagname, typestr, writeok = tagdefsdict[tag]
 		$ vals = tagvals.get(tagname, None)
 		$if odd:
@@ -43,7 +53,12 @@ $if len(tagdefs) > 0:
 				$ itervals = vals
 			$for val in itervals:
 				<tr>
-				<td class="file-tag ${idquote(tag)} multivalue">${val}</td>
+				<td class="file-tag ${idquote(tag)} multivalue">
+				$if typevals:
+					${val} (${typevals.get(val, '')})
+				$else:
+					${val}
+				</td>
 				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
 				<input type="hidden" name="tag" value="${tag}" />
 				<input type="hidden" name="value" value="${val}" />
@@ -59,22 +74,24 @@ $if len(tagdefs) > 0:
 				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
 				<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
 				<td class="file-tag ${idquote(tagname)} multivalue input">
-				$if typestr in ['role', 'tagname']:
-					$if typestr == 'role':
+				$if typestr in ['role', 'tagname'] or typevals:
+					$if typevals:
+						$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
+					$elif typestr == 'role':
 						$if allroles != None:
-							$ options = [ role for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
+							$ options = [ (role, role) for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
 						$else:
 							$ options = []
 					$elif typestr == 'tagname':
-						$ options = [ tag for tag in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
+						$ options = [ (tag, tag) for tag in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
 					$else:
 						$ options = []
 					$if options:
-						$ options.sort()
+						$ options.sort(key=lambda x: x[0])
 						<select name="val-${urlquote(tagname)}">
 						<option value="">Choose a ${typestr}</option>
 						$for option in options:
-							<option value="${option}">${option}</option>
+							<option value="${option[0]}">${option[1]}</option>
 						</select>
 					$else:
 						<input type="text" name="val-${urlquote(tagname)}" />
@@ -89,18 +106,22 @@ $if len(tagdefs) > 0:
 				</tr>
 			</table>
 		$else:
+			<table class="file-tag-list">
+			<tr>
 			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
 			<input type="hidden" name="tag" value="${tag}" />
 			$if writeok:
 				$if vals != None:
-					${tag} is set
+					<td class="file-tag ${idquote(tag)} multivalue">${tag} is set</td>
 					<input type="hidden" name="action" value="delete" />
-					<input type="submit" value="Remove Tag" />
+					<td class="file-tag ${idquote(tag)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
 				$else:
-					not set
+					<td class="file-tag ${idquote(tag)} multivalue">not set</td>
 					<input type="hidden" name="action" value="put" />
-					<input type="submit" value="Set Tag" />
+					<td class="file-tag ${idquote(tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
 			</form>
+			</tr>
+			</table>
 		</td>
 		</tr>
 	</table>
