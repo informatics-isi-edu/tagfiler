@@ -113,6 +113,10 @@ def p_tags(p):
             | slash string slash TAGS slash string slash"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
 
+def p_tags_opts(p):
+    """tags : slash string slash TAGS slash string queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], queryopts=p[7])
+
 def p_tagsvalrest(p):
     """tags : slash string slash TAGS slash string slash tagvals"""
     p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tagvals=p[8])

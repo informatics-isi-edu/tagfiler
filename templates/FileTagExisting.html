@@ -18,7 +18,7 @@ $if title == 'User' and data_id:
 	<p><a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
 $if title != '':
 	<h2>${title}</h2>
-$if len(filetagvals) > 0:
+$if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
 	<th class="tag-name">Tag name</th>
@@ -66,7 +66,7 @@ $if len(filetagvals) > 0:
 						$else:
 							$ options = []
 					$elif typestr == 'tagname':
-						$ options = [ tagname for tagname in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
+						$ options = [ tag for tag in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
 					$else:
 						$ options = []
 					$if options:

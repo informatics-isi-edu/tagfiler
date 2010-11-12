@@ -615,12 +615,13 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None):
+    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None, queryopts={}):
         Node.__init__(self, appname)
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
         self.apptarget = self.home + web.ctx.homepath
+        self.view_type = None
         self.referer = None
         if tagvals:
             self.tagvals = tagvals
@@ -666,16 +667,26 @@ class FileTags (Node):
         else:
             return urlquote(self.tag_id)
 
-    def buildtaginfo(self, where1, where2):
+    def buildtaginfo(self, ownerwhere):
         owner = self.owner()
+        where1 = ''
+        where2 = ''
+        if ownerwhere:
+            where1 = 'owner %s' % ownerwhere
+            where2 = 'tagdefs.owner %s' % ownerwhere
+        filtered_tagdefs = self.select_tagdef(where=where1, order='tagname')
+        filtered_filetags = self.select_filetags(where=where2)
+        custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
         tagdefs = [ (tagdef.tagname,
                      tagdef.typestr,
                      self.test_tag_authz('write', tagdef.tagname, fowner=owner))
-                    for tagdef in self.select_tagdef(where=where1, order='tagname') ]
+                    for tagdef in filtered_tagdefs
+                    if (not custom_tags or tagdef.tagname in custom_tags) ]
         tagdefsdict = dict([ (tagdef[0], tagdef) for tagdef in tagdefs ])
         filetags = [ (result.file, result.tagname)
-                     for result in self.select_filetags(where=where2)
-                     if self.test_tag_authz('read', result.tagname, fowner=owner) ]
+                     for result in filtered_filetags
+                     if self.test_tag_authz('read', result.tagname, fowner=owner)
+                     and (not custom_tags or result.tagname in custom_tags) ]
         filetagvals = [ (file,
                          tag,
                          [self.mystr(val) for val in self.gettagvals(tag, data_id=file, owner=owner)])
@@ -694,11 +705,11 @@ class FileTags (Node):
 
     def get_all_body(self):
         self.txlog('GET ALL TAGS', dataset=self.data_id)
-        return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
-                self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
-                self.buildtaginfo('', ''),                                            # all
-                self.buildroleinfo(),                                                 # roleinfo
-                self.buildtagnameinfo())                                              # tagnameinfo
+        return (self.buildtaginfo('is null'),     # system
+                self.buildtaginfo('is not null'), # userdefined
+                self.buildtaginfo(''),            # all
+                self.buildroleinfo(),             # roleinfo
+                self.buildtagnameinfo())          # tagnameinfo
 
     def get_title_one(self):
         return 'Tags for dataset "%s"' % self.data_id
@@ -708,6 +719,7 @@ class FileTags (Node):
 
     def get_all_html_render(self, results):
         system, userdefined, all, roleinfo, tagnameinfo = results
+        web.debug(system, userdefined, all)
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tags',
                      typenames=self.typenames,
@@ -720,7 +732,6 @@ class FileTags (Node):
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting(dictmerge(tvars, dict(title='User', taginfo=userdefined))),
                                     self.render.FileTagExisting(dictmerge(tvars, dict(title='System', taginfo=system))),
-                                    self.render.FileTagNew(dictmerge(tvars, dict(title='Set tag values', taginfo=all))),
                                     self.render.TagdefNewShortcut(dictmerge(tvars, dict(title='Define more tags')))])
         else:
             return self.renderlist(self.get_title_all(),
@@ -760,6 +771,11 @@ class FileTags (Node):
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
+        storage = web.input()
+        try:
+            self.view_type = storage.view
+        except:
+            pass
         keys = self.tagvals.keys()
         if len(keys) == 1:
             self.tag_id = keys[0]
