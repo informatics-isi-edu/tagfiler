@@ -41,7 +41,6 @@ chkconfig postgresql on
 mkdir -p ${DATADIR}
 mkdir -p ${RUNDIR}
 mkdir -p ${LOGDIR}
-chown ${SVCUSER}: ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -50,6 +49,8 @@ fi
 
 chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
+chown ${SVCUSER}: ${LOGDIR}
+chmod og= ${LOGDIR}
 
 # try some blind database setup as well
 if grep -e '^extra_float_digits = 2[^0-9].*' < ${PGCONF}
@@ -128,7 +129,7 @@ tagdef()
       else
          default=""
       fi
-      psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 ${default}, UNIQUE(file, value) )"
+      psql -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 \${default}, UNIQUE(file, value) )"
       psql -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
    else
       psql -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
@@ -145,29 +146,29 @@ cfgtagdef()
 
 #         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 
-cfgtagdef home          text        ""      tag         tag        false
-cfgtagdef 'webauthn home' text      ""      tag         tag        false
-cfgtagdef 'webauthn require' text   ""      tag         tag        false
-cfgtagdef 'store path'  text        ""      tag         tag        false
-cfgtagdef 'log path'    text        ""      tag         tag        false
-cfgtagdef 'template path' text      ""      tag         tag        false
-cfgtagdef 'chunk bytes' text        ""      tag         tag        false
-cfgtagdef 'tag list tags' text      ""      tag         tag        true       tagname
-cfgtagdef 'file list tags' text     ""      tag         tag        true       tagname
-cfgtagdef 'file list tags write' text ""    tag         tag        true       tagname
-cfgtagdef 'applet tags' text        ""      tag         tag        true       tagname
-cfgtagdef 'applet tags require' text ""     tag         tag        true       tagname
-cfgtagdef 'applet properties' text  ""      tag         tag        false
-cfgtagdef 'local files immutable' text ""   tag         tag        false
-cfgtagdef 'remote files immutable' text ""  tag         tag        false
-cfgtagdef 'policy remappings' text  ""      tag         tag        true
-cfgtagdef 'applet test log' text    ""      tag         tag        false
-cfgtagdef 'applet test properties' text ""  tag         tag        true
-cfgtagdef subtitle      text        ""      tag         tag        false
-cfgtagdef logo          text        ""      tag         tag        false
-cfgtagdef contact       text        ""      tag         tag        false
-cfgtagdef help          text        ""      tag         tag        false
-cfgtagdef bugs          text        ""      tag         tag        false
+cfgtagdef home          text        ""      file        file       false
+cfgtagdef 'webauthn home' text      ""      file        file       false
+cfgtagdef 'webauthn require' text   ""      file        file       false
+cfgtagdef 'store path'  text        ""      file        file       false
+cfgtagdef 'log path'    text        ""      file        file       false
+cfgtagdef 'template path' text      ""      file        file       false
+cfgtagdef 'chunk bytes' text        ""      file        file       false
+cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
+cfgtagdef 'file list tags' text     ""      file        file       true       tagname
+cfgtagdef 'file list tags write' text ""    file        file       true       tagname
+cfgtagdef 'applet tags' text        ""      file        file       true       tagname
+cfgtagdef 'applet tags require' text ""     file        file       true       tagname
+cfgtagdef 'applet properties' text  ""      file        file       false
+cfgtagdef 'local files immutable' text ""   file        file       false
+cfgtagdef 'remote files immutable' text ""  file        file       false
+cfgtagdef 'policy remappings' text  ""      file        file       true
+cfgtagdef 'applet test log' text    ""      file        file       false
+cfgtagdef 'applet test properties' text ""  file        file       true
+cfgtagdef subtitle      text        ""      file        file       false
+cfgtagdef logo          text        ""      file        file       false
+cfgtagdef contact       text        ""      file        file       false
+cfgtagdef help          text        ""      file        file       false
+cfgtagdef bugs          text        ""      file        file       false
 cfgtagdef 'connections' text        ""      tag         tag        false
 cfgtagdef 'upload chunks' text        ""      tag         tag        false
 cfgtagdef 'download chunks' text        ""      tag         tag        false
@@ -175,6 +176,11 @@ cfgtagdef 'socket buffer size' text        ""      tag         tag        false
 cfgtagdef 'applet chunk bytes' text        ""      tag         tag        false
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+
+tagdef '_type_name'   text        ""      file        file       false
+tagdef '_type_description' text   ""      file        file       false
+tagdef '_type_dbtype' text        ""      file        file       false
+tagdef '_type_values' text        ""      file        file       true
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -206,17 +212,6 @@ tagacl()
       shift
    done
 }
-
-for tagname in home 'webauthn home' 'webauthn require' 'store path' 'log path' \
-   'template path' 'chunk bytes' 'file list tags' 'file list tags write' \
-   'applet tags' 'applet tags require' 'local files immutable' 'policy remappings' \
-   'applet test properties' 'applet test log' subtitle logo contact help bugs \
-   'upload chunks' 'download chunks' 'socket buffer size' 'applet chunk bytes' connections
-do
-   tagacl "_cfg_\$tagname" read admin
-   tagacl "_cfg_\$tagname" write admin
-done
-
 
 tag()
 {
@@ -266,7 +261,6 @@ storedquery()
 
    psql -c "INSERT INTO files (name, local, location) VALUES ( '\$1', False, '\$url' )"
    tag "\$1" owner text "\$3"
-   tag "\$1" "list on homepage"
    file=\$1
    shift 3
    while [[ \$# -gt 0 ]]
@@ -280,7 +274,37 @@ storedquery "New image studies" "Image%20Set;Downloaded:not:" admin
 storedquery "Previous image studies" "Image%20Set;Downloaded" admin
 storedquery "All image studies" "Image%20Set" admin
 
-storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin
+for x in "New image studies" "Previous image studies" "All image studies"
+do
+   tag "\$x" "list on homepage"
+done
+
+storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin "*"
+
+typedef()
+{
+   typename="\$1"
+   dbtype="\$2"
+   desc="\$3"
+   shift 3
+   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin "*"
+   tag "_type_def_\${typename}" "_type_name" text "\${typename}"
+   tag "_type_def_\${typename}" "_type_dbtype" text "\${dbtype}"
+   tag "_type_def_\${typename}" "_type_description" text "\${desc}"
+   if [[ \$# -gt 0 ]]
+   then
+      tag "_type_def_\${typename}" "_type_values" text "\$@"
+   fi
+}
+
+typedef ''           ''            'No content'
+typedef int8         int8          'Integer'
+typedef float8       float8        'Floating point'
+typedef date         date          'Date'
+typedef timestamptz  timestamptz   'Date and time with timezone'
+typedef text         text          'Text'
+typedef role         text          'Role'
+typedef tagname      text          'Tag name'
 
 cfgtag()
 {

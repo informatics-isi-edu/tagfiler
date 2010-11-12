@@ -6,7 +6,7 @@ APPLETBUILD=../dei_applet-trunk
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
 WEBROOTDIR=/var/www
-WEBSTATICDIR=$(WEBROOTDIR)/$(INSTALLSVC)/static
+WEBSTATICDIR=$(WEBROOTDIR)/html/$(INSTALLSVC)/static
 
 WSGIFILE=tagfiler.wsgi
 

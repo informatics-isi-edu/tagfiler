@@ -429,15 +429,16 @@ class Tagdef (Node):
                      for tagdef in self.select_tagdef(where='owner is null', order='tagname') ]
             userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
                      for tagdef in self.select_tagdef(where='owner is not null', order='tagname') ]
+            types = self.get_type()
             
-            return (predefined, userdefined)
+            return (predefined, userdefined, types)
 
-        def postCommit(tagdefs):
+        def postCommit(defs):
             web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             self.setNoCache()
-            predefined, userdefined = tagdefs
+            predefined, userdefined, types = defs
             tvars = dict(target=self.target,
-                         typenames=self.typenames,
+                         types=types,
                          test_tagdef_authz=lambda mode, tag: self.test_tagdef_authz(mode, tag),
                          urlquote=urlquote)
             return self.renderlist("Tag definitions",
@@ -714,7 +715,8 @@ class FileTags (Node):
                 self.buildtaginfo('is not null'), # userdefined
                 self.buildtaginfo(''),            # all
                 self.buildroleinfo(),             # roleinfo
-                self.buildtagnameinfo())          # tagnameinfo
+                self.buildtagnameinfo(),          # tagnameinfo
+                self.get_type())                  # types
 
     def get_title_one(self):
         return 'Tags for dataset "%s"' % self.data_id
@@ -723,11 +725,11 @@ class FileTags (Node):
         return 'Tags for all datasets'
 
     def get_all_html_render(self, results):
-        system, userdefined, all, roleinfo, tagnameinfo = results
+        system, userdefined, all, roleinfo, tagnameinfo, types = results
         #web.debug(system, userdefined, all)
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tags',
-                     typenames=self.typenames,
+                     types=types,
                      data_id=self.data_id,
                      roleinfo=roleinfo,
                      tagnameinfo=tagnameinfo,
@@ -743,7 +745,7 @@ class FileTags (Node):
                                    [self.render.FileTagValExisting(dictmerge(tvars, dict(title='', taginfo=all)))])      
 
     def get_all_postCommit(self, results):
-        system, userdefined, all, roleinfo, tagnameinfo = results
+        system, userdefined, all, roleinfo, tagnameinfo, types = results
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 
@@ -1028,10 +1030,10 @@ class TagdefACL (FileTags):
         return 'ACLs for all tags'
 
     def get_all_html_render(self, results):
-        system, userdefined, all, roleinfo = results
+        system, userdefined, all, roleinfo, types = results
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tagdefacl',
-                     typenames=self.typenames,
+                     types=types,
                      data_id=self.data_id,
                      roleinfo=roleinfo,
                      urlquote=urlquote,

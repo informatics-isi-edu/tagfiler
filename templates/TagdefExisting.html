@@ -1,7 +1,10 @@
 $def with (tvars)
 $ title = tvars.get('title')
 $ target = tvars.get('target')
-$ typenames = tvars.get('typenames')
+$ types = tvars.get('types')
+$ typenames = [ (type['_type_name'], type['_type_description']) for type in types ]
+$ typenames.sort(key=lambda x: x[1])
+$ typedict = dict(typenames)
 $ tagdefs = tvars.get('tagdefs')
 $ test_tagdef_authz = tvars.get('test_tagdef_authz')
 $ urlquote = tvars.get('urlquote')
@@ -44,10 +47,11 @@ $if title == 'User':
     <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
     <td><input name="tag-1" type="text" /></td>
     <td><select name="type-1">
-    $ typestr = typenames.keys()[0]
-    <option value="${typestr}">${typenames[typestr]}</option>
-    $for typestr in typenames.keys()[1:]:
-	    <option value="${typestr}">${typenames[typestr]}</option>
+    $ deftypestr = ''
+    <option value="${deftypestr}">${typedict[deftypestr]}</option>
+    $for type in [ type for type in typenames[1:] if type[0] != deftypestr ]:
+    	$ typestr = type[0]
+	<option value="${typestr}">${typedict[typestr]}</option>
     </select></td>
     <td><select name="multivalue-1">
     <option value="false">0 or 1</option>
@@ -78,7 +82,7 @@ $for tagdef in tagdefs:
 		<tr class="file even">
 	$ odd = not odd
 	<td class="tag name">${tagname}</td>
-	<td class="tag type">${typenames[typestr]}</td>
+	<td class="tag type">${typedict[typestr]}</td>
 	<td class="tag cardinality>">
 	$if multivalue:
 		0 or more

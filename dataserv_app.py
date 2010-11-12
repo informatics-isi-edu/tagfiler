@@ -125,7 +125,7 @@ class RuntimeError (WebException):
 
 class Application:
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
+    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
     def getParamDb(self, suffix, default=None, data_id=None):
         results = self.getParamsDb(suffix, data_id)
@@ -210,6 +210,7 @@ class Application:
         self.appletlog = self.getParamDb('applet test log', None)
         self.logmsgs = []
         self.middispatchtime = None
+
         self.connections = self.getParamDb('connections', '2')
         self.uploadchunks = parseBoolString(self.getParamDb('upload chunks', 'False'))
         self.downloadchunks = parseBoolString(self.getParamDb('download chunks', 'False'))
@@ -224,24 +225,6 @@ class Application:
         t.commit()
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
-
-        # TODO: pull this from database?
-        self.typenames = { '' : 'No content',
-                           'int8' : 'Integer',
-                           'float8' : 'Floating point',
-                           'date' : 'Date',
-                           'timestamptz' : 'Date and time with timezone',
-                           'text' : 'Text',
-                           'role' : 'Role',
-                           'tagname' : 'Tag name' }
-
-        self.dbtypes = { 'int8' : 'int8',
-                         'float8' : 'float8',
-                         'date' : 'date',
-                         'timestamptz' : 'timestamptz',
-                         'text' : 'text',
-                         'role' : 'text',
-                         'tagname' : 'text' }
 
         self.ops = [ ('', 'Tagged'),
                      (':not:', 'Not tagged'),
@@ -685,6 +668,23 @@ class Application:
                 pass
         return values
 
+    def get_type(self, typename=None):
+        def valexpand(res):
+            # replace raw "key desc" string with (key, desc) pair
+            if res['_type_values'] != None:
+                vals = []
+                for val in res['_type_values']:
+                    key, desc = val.split(" ", 1)
+                    key = urllib.unquote(key)
+                    vals.append( (key, desc) )
+                res['_type_values'] = vals
+            return res
+        predlist = [ dict(tag='_type_dbtype', op=None, vals=[]) ]
+        if typename != None:
+            predlist.append( dict(tag='_type_name', op='=', vals=[typename]) )
+        listtags = [ '_type_name', '_type_description', '_type_dbtype', '_type_values' ]
+        return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
+
     def select_file(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
@@ -752,12 +752,18 @@ class Application:
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
         indexdef = ''
-        if self.dbtypes.get(self.typestr, '') != '':
-            tabledef += ", value %s" % (self.dbtypes[self.typestr])
-            if self.dbtypes.get(self.typestr, '') == 'text':
+
+        results = self.get_type(typename=self.typestr)
+        if len(results) == 0:
+            raise BadRequest('Referenced type "%s" is not defined.' % self.typestr)
+        type = results[0]
+        dbtype = type['_type_dbtype']
+        if dbtype != '':
+            tabledef += ", value %s" % dbtype
+            if dbtype == 'text':
                 tabledef += " DEFAULT ''"
         if not self.multivalue:
-            if self.typestr != '':
+            if dbtype != '':
                 tabledef += ", UNIQUE(file, value)"
                 indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
                 indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
@@ -944,12 +950,15 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def select_files_by_predlist(self, predlist=None):
+    def select_files_by_predlist(self, predlist=None, listtags=None):
         def dbquote(s):
             return s.replace("'", "''")
         
         if predlist == None:
             predlist = self.predlist
+
+        if listtags == None:
+            listtags = self.filelisttags
 
         roles = [ r for r in self.authn.roles ]
         if roles:
@@ -977,7 +986,7 @@ class Application:
                 tagdefs[tagdef.tagname] = tagdef
 
         # also prefetch custom per-file tags
-        for tagname in self.filelisttags:
+        for tagname in listtags:
             if not tagdefs.has_key(tagname):
                 results = self.select_tagdef(tagname)
                 if len(results) == 0:
@@ -1038,7 +1047,7 @@ class Application:
                     wheres.append('ownrole.role IS NOT NULL' % p)
 
         # add custom per-file single-val tags to results
-        singlevaltags = [ tagname for tagname in self.filelisttags
+        singlevaltags = [ tagname for tagname in listtags
                           if not tagdefs[tagname].multivalue and tagname != 'owner' ]
         for tagname in singlevaltags:
             outertables.append('"_%s" ON (files.name = "_%s".file)' % (tagname, tagname))
@@ -1049,7 +1058,7 @@ class Application:
             groupbys.append('"%s"' % tagname)
 
         # add custom per-file multi-val tags to results
-        multivaltags = [ tagname for tagname in self.filelisttags
+        multivaltags = [ tagname for tagname in listtags
                          if tagdefs[tagname].multivalue ]
         for tagname in multivaltags:
             if tagname != 'read users':
