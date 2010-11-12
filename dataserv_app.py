@@ -127,8 +127,8 @@ class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'typenames', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
-    def getParamDb(self, suffix, default=None):
-        results = self.getParamsDb(suffix)
+    def getParamDb(self, suffix, default=None, data_id=None):
+        results = self.getParamsDb(suffix, data_id)
         if len(results) == 1:
             return results[0]
         elif len(results) == 0:
@@ -136,8 +136,10 @@ class Application:
         else:
             raise ValueError
 
-    def getParamsDb(self, suffix):
-        results = self.gettagvals('_cfg_%s' % suffix, data_id='tagfiler configuration')
+    def getParamsDb(self, suffix, data_id=None):
+        if data_id == None:
+            data_id = 'tagfiler configuration'
+        results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
         #web.debug(suffix, results)
         return results
 
@@ -212,8 +214,6 @@ class Application:
         self.filelisttags = self.getParamsDb('file list tags')
         self.filelisttagswrite = self.getParamsDb('file list tags write')
                 
-        self.customtags = self.getParamsDb('applet tags')
-        self.requiredtags = self.getParamsDb('applet tags require')
         self.customproperties = None # self.getParamDb('applet properties', None)
 
         t.commit()

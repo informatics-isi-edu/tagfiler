@@ -68,12 +68,15 @@ class Study (Node):
     def __init__(self, appname, data_id=None, queryopts={}):
         Node.__init__(self, appname)
         self.action = 'get'
+        self.study_type = None
         self.data_id = data_id
         self.status = None
         self.direction = 'upload'
 
     def body(self):
-        tagnames = self.customtags
+        tagnames = self.getParamsDb('applet tags', data_id=self.study_type)
+        requiredtags = self.getParamsDb('applet tags require', data_id=self.study_type)
+        
         if self.action == 'get' and self.data_id:
             files = [ res.file for res
                       in self.select_files_by_predlist([{'tag' : 'Transmission Number',
@@ -93,17 +96,17 @@ class Study (Node):
         else:
             tags = []
             files = []
-        return (tags, files, tagnames)
+        return (tags, files, tagnames, requiredtags)
 
     def postCommit(self, results):
-        tags, files, tagnames = results
+        tags, files, tagnames, requiredtags = results
         target = self.home + web.ctx.homepath
         tvars = dict(target=target,
                      transmissionnum=self.data_id,
                      tags=tags,
                      files=files,
                      tagnames=tagnames,
-                     requiredtags=self.requiredtags,
+                     requiredtags=requiredtags,
                      customproperties=self.customproperties,
                      direction=self.direction,
                      testfile=self.appletTest,
@@ -143,6 +146,11 @@ class Study (Node):
         storage = web.input()
         try:
             self.action = storage.action
+        except:
+            pass
+
+        try:
+            self.study_type = storage.type
         except:
             pass
 
