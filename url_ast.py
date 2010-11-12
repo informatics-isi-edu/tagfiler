@@ -719,7 +719,7 @@ class FileTags (Node):
 
     def get_all_html_render(self, results):
         system, userdefined, all, roleinfo, tagnameinfo = results
-        web.debug(system, userdefined, all)
+        #web.debug(system, userdefined, all)
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tags',
                      typenames=self.typenames,
@@ -889,6 +889,7 @@ class FileTags (Node):
         return self.dbtransact(self.delete_body, self.delete_postCommit)
 
     def post_nullBody(self):
+        web.debug('post_nullBody')
         return None
 
     def post_postCommit(self, results):
@@ -910,11 +911,16 @@ class FileTags (Node):
                         value = None
                     self.tagvals[urllib.unquote(tag_id)] = [ value ]
             try:
+                # look for single tag/value for backwards compatibility
                 self.tag_id = storage.tag
-                self.value = storage.value
+                try:
+                    self.value = storage.value
+                except:
+                    pass
+                if self.tag_id:
+                    self.tagvals[self.tag_id] = [ self.value ]
             except:
                 pass
-
             try:
                 self.referer = storage.referer
             except:
@@ -924,6 +930,7 @@ class FileTags (Node):
 
         if action == 'put':
             if len(self.tagvals) > 0:
+                web.debug(self.tagvals)
                 return self.dbtransact(self.put_body, self.post_postCommit)
             else:
                 return self.dbtransact(self.post_nullBody, self.post_postCommit)
