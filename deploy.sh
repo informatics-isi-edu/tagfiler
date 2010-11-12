@@ -293,8 +293,8 @@ cfgtag "webauthn home" text 'https://${HOME_HOST}/webauthn'
 
 cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
 cfgtag "file list tags write" text 'read users' 'write users'
-cfgtag "applet tags" text 'Image Type' 'Capture Date' Comment
-cfgtag "applet tags require" text 'Image Type' 'Capture Date'
+#cfgtag "applet tags" text ...
+#cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'
 
 #cfgtag "local files immutable" text 'True'
