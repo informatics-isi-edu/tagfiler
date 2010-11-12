@@ -536,6 +536,8 @@ class Application:
         model = tagdef[column[mode]]
         # model is in [ anonymous, users, file, fowner, tag, system ]
 
+        authorized = []
+
         if model == 'anonymous':
             return True
         elif model == 'users' and user:
