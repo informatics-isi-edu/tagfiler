@@ -227,14 +227,16 @@ class Application:
                            'date' : 'Date',
                            'timestamptz' : 'Date and time with timezone',
                            'text' : 'Text',
-                           'role' : 'Role' }
+                           'role' : 'Role',
+                           'tagname' : 'Tag name' }
 
         self.dbtypes = { 'int8' : 'int8',
                          'float8' : 'float8',
                          'date' : 'date',
                          'timestamptz' : 'timestamptz',
                          'text' : 'text',
-                         'role' : 'text' }
+                         'role' : 'text',
+                         'tagname' : 'text' }
 
         self.ops = [ ('', 'Tagged'),
                      (':not:', 'Not tagged'),
@@ -452,6 +454,9 @@ class Application:
                 return None
         except:
             return None
+
+    def buildtagnameinfo(self):
+        return [ tagdef.tagname for tagdef in self.select_tagdef() ]
 
     def buildroleinfo(self):
         if self.authn.roleProvider:

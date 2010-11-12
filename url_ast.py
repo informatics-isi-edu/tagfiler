@@ -697,7 +697,8 @@ class FileTags (Node):
         return (self.buildtaginfo('owner is null', ' tagdefs.owner is null'),         # system
                 self.buildtaginfo('owner is not null', ' tagdefs.owner is not null'), # userdefined
                 self.buildtaginfo('', ''),                                            # all
-                self.buildroleinfo())                                                 # roleinfo
+                self.buildroleinfo(),                                                 # roleinfo
+                self.buildtagnameinfo())                                              # tagnameinfo
 
     def get_title_one(self):
         return 'Tags for dataset "%s"' % self.data_id
@@ -706,12 +707,13 @@ class FileTags (Node):
         return 'Tags for all datasets'
 
     def get_all_html_render(self, results):
-        system, userdefined, all, roleinfo = results
+        system, userdefined, all, roleinfo, tagnameinfo = results
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tags',
                      typenames=self.typenames,
                      data_id=self.data_id,
                      roleinfo=roleinfo,
+                     tagnameinfo=tagnameinfo,
                      urlquote=urlquote,
                      idquote=idquote)
         if self.data_id:
@@ -725,7 +727,7 @@ class FileTags (Node):
                                    [self.render.FileTagValExisting(dictmerge(tvars, dict(title='', taginfo=all)))])      
 
     def get_all_postCommit(self, results):
-        system, userdefined, all, roleinfo = results
+        system, userdefined, all, roleinfo, tagnameinfo = results
         all = ( all[0], all[1], all[2], all[3], all[4],
                 max(system[5], userdefined[5]) ) # use maximum length for user input boxes
 

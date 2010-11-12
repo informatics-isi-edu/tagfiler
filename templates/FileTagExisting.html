@@ -8,6 +8,7 @@ $ typenames = tvars.get('typenames')
 $ urlquote = tvars.get('urlquote')
 $ idquote = tvars.get('idquote')
 $ roleinfo = tvars.get('roleinfo')
+$ tagnames = tvars.get('tagnameinfo')
 $ allroles = roleinfo
 $ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
 $ tagvals = dict( [ (tag, vals) for file, tag, vals in filetagvals ] )
@@ -58,14 +59,22 @@ $if len(filetagvals) > 0:
 				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
 				<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
 				<td class="file-tag ${idquote(tagname)} multivalue input">
-				$if typestr == 'role':
-					$if allroles != None:
-						$ availroles = [ role for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
-						$ availroles.sort()
+				$if typestr in ['role', 'tagname']:
+					$if typestr == 'role':
+						$if allroles != None:
+							$ options = [ role for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
+						$else:
+							$ options = []
+					$elif typestr == 'tagname':
+						$ options = [ tagname for tagname in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
+					$else:
+						$ options = []
+					$if options:
+						$ options.sort()
 						<select name="val-${urlquote(tagname)}">
-						<option value="">Choose a role</option>
-						$for role in availroles:
-							<option value="${role}">${role}</option>
+						<option value="">Choose a ${typestr}</option>
+						$for option in options:
+							<option value="${option}">${option}</option>
 						</select>
 					$else:
 						<input type="text" name="val-${urlquote(tagname)}" />

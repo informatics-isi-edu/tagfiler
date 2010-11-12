@@ -152,10 +152,10 @@ cfgtagdef 'store path'  text        ""      tag         tag        false
 cfgtagdef 'log path'    text        ""      tag         tag        false
 cfgtagdef 'template path' text      ""      tag         tag        false
 cfgtagdef 'chunk bytes' text        ""      tag         tag        false
-cfgtagdef 'file list tags' text     ""      tag         tag        true
-cfgtagdef 'file list tags write' text ""    tag         tag        true
-cfgtagdef 'applet tags' text        ""      tag         tag        true
-cfgtagdef 'applet tags require' text ""     tag         tag        true
+cfgtagdef 'file list tags' text     ""      tag         tag        true       tagname
+cfgtagdef 'file list tags write' text ""    tag         tag        true       tagname
+cfgtagdef 'applet tags' text        ""      tag         tag        true       tagname
+cfgtagdef 'applet tags require' text ""     tag         tag        true       tagname
 cfgtagdef 'applet properties' text  ""      tag         tag        false
 cfgtagdef 'local files immutable' text ""   tag         tag        false
 cfgtagdef 'remote files immutable' text ""  tag         tag        false
