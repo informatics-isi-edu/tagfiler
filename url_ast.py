@@ -930,7 +930,7 @@ class FileTags (Node):
 
         if action == 'put':
             if len(self.tagvals) > 0:
-                web.debug(self.tagvals)
+                #web.debug(self.tagvals)
                 return self.dbtransact(self.put_body, self.post_postCommit)
             else:
                 return self.dbtransact(self.post_nullBody, self.post_postCommit)
