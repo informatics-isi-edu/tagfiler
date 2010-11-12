@@ -2,6 +2,7 @@ import web
 import sys
 import os
 import sys
+import traceback
 
 # Uncomment the below line in case of a RPM installation
 from tagfiler import url_lex, url_parse, url_parse_func
@@ -41,6 +42,7 @@ class Dispatcher:
             ast = None
         except url_parse.ParseError, te:
             web.debug('parse error on URI %s' % uri)
+            #web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
             ast = None
         except:
             web.debug('unknown parse error on URI %s' % uri)

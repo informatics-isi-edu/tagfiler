@@ -1,5 +1,6 @@
 import ply.yacc as yacc
 import threading
+import web
 
 from url_lex import make_lexer, tokens
 
@@ -296,6 +297,7 @@ def p_stringany(p):
               | TAGS
               | TAGDEF
               | QUERY
+              | STUDY
               | STRING
               | LT
               | LEQ
@@ -315,11 +317,12 @@ def p_stringplus_concat(p):
 class ParseError:
     """Exception for parse errors"""
 
-    def __init__(self):
+    def __init__(self, t):
+        web.debug('URL parse error at token:', t)
         pass
 
 def p_error(t):
-    raise ParseError()
+    raise ParseError(t)
 
 
 
