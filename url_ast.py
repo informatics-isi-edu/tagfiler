@@ -111,7 +111,12 @@ class Study (Node):
                      direction=self.direction,
                      testfile=self.appletTest,
                      appletlog=self.appletlog,
-                     idquote=idquote)
+                     idquote=idquote,
+                     connections=self.connections,
+                     uploadchunks=self.uploadchunks,
+                     downloadchunks=self.downloadchunks,
+                     socketbuffersize=self.socketbuffersize,
+                     appletchunkbytes=self.appletchunkbytes)
         if self.action == 'upload':
             return self.renderlist("Study Upload",
                                    [self.render.TreeUpload(tvars)])

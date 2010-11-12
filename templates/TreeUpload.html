@@ -5,6 +5,11 @@ $ appletlog = tvars.get('appletlog')
 $ tags = tvars.get('tags')
 $ requiredtags = tvars.get('requiredtags')
 $ customproperties = tvars.get('customproperties')
+$ connections = tvars.get('connections')
+$ allowchunks = tvars.get('uploadchunks')
+$ socketbuffersize = tvars.get('socketbuffersize')
+$ chunkbytes = tvars.get('appletchunkbytes')
+
 <div>
 	<h3>Status</h3>
 	<table>
@@ -22,6 +27,14 @@ $ customproperties = tvars.get('customproperties')
 					<PARAM name="tagfiler.applet.log" value="${appletlog}"/>
 				$if customproperties:
 					<PARAM name="custom.properties" value="${customproperties}"/>
+				$if connections:
+					<PARAM name="tagfiler.connections" value="${connections}"/>
+				$if allowchunks:
+					<PARAM name="tagfiler.allow.chunks" value="${allowchunks}"/>
+				$if socketbuffersize:
+					<PARAM name="tagfiler.socket.buffer.size" value="${socketbuffersize}"/>
+				$if chunkbytes:
+					<PARAM name="tagfiler.chunkbytes" value="${chunkbytes}"/>
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
 				  Download JRE 1.5 for your system from the following link:</b><br/>
 				<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>

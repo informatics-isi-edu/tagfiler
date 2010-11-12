@@ -399,6 +399,12 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 #    SetEnv ${SVCPREFIX}.dbnstr postgres
 #    SetEnv ${SVCPREFIX}.dbstr  ${SVCUSER}
 
+#    SetEnv ${SVCPREFIX}.connections 8
+#    SetEnv ${SVCPREFIX}.uploadchunks true
+#    SetEnv ${SVCPREFIX}.downloadchunks true
+#    SetEnv ${SVCPREFIX}.socketbuffersize 8192
+#    SetEnv ${SVCPREFIX}.appletchunkbytes 4194304
+
      # All other settings are tagged on dataset 'tagfiler configuration' now
 
 </Directory>

@@ -210,6 +210,11 @@ class Application:
         self.appletlog = self.getParamDb('applet test log', None)
         self.logmsgs = []
         self.middispatchtime = None
+        self.connections = getParam('connections', '1')
+        self.uploadchunks = parseBoolString(getParam('uploadchunks', 'False'))
+        self.downloadchunks = parseBoolString(getParam('downloadchunks', 'False'))
+        self.socketbuffersize = int(getParam('socketbuffersize', 8192))
+        self.appletchunkbytes = int(getParam('appletchunkbytes', 4194304))
 
         self.filelisttags = self.getParamsDb('file list tags')
         self.filelisttagswrite = self.getParamsDb('file list tags write')
@@ -336,31 +341,43 @@ class Application:
         self.authn = app.authn
 
     def preDispatch(self, uri):
-        if self.webauthnhome:
-            if not self.db:
-                self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-            self.authn = webauthn.session.test_and_update_session(self.db,
-                                                                  referer=self.home + uri,
-                                                                  setcookie=True)
-            self.middispatchtime = datetime.datetime.now()
-            if not self.authn.role and self.webauthnrequire:
-                raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
-        else:
-            try:
-                user = web.ctx.env['REMOTE_USER']
-                roles = set([ user ])
-            except:
-                user = None
-                roles = set()
-            self.authn = webauthn.providers.AuthnInfo(user, roles, None, None, False, None)
+        def body():
+            if self.webauthnhome:
+                if not self.db:
+                    self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+                self.authn = webauthn.session.test_and_update_session(self.db,
+                                                                      referer=self.home + uri,
+                                                                      setcookie=True)
+                self.middispatchtime = datetime.datetime.now()
+                if not self.authn.role and self.webauthnrequire:
+                    raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
+            else:
+                try:
+                    user = web.ctx.env['REMOTE_USER']
+                    roles = set([ user ])
+                except:
+                    user = None
+                    roles = set()
+                self.authn = webauthn.providers.AuthnInfo(user, roles, None, None, False, None)
+
+        def postCommit(results):
+            pass
+
+        self.dbtransact(body, postCommit)
 
     def postDispatch(self, uri=None):
-        if self.webauthnhome:
-            t = self.db.transaction()
-            webauthn.session.test_and_update_session(self.db, self.authn.guid,
-                                                     ignoremustchange=True,
-                                                     setcookie=False)
-            t.commit()
+        def body():
+            if self.webauthnhome:
+                t = self.db.transaction()
+                webauthn.session.test_and_update_session(self.db, self.authn.guid,
+                                                         ignoremustchange=True,
+                                                         setcookie=False)
+                t.commit()
+
+        def postCommit(results):
+            pass
+
+        self.dbtransact(body, postCommit)
 
     def midDispatch(self):
         now = datetime.datetime.now()
@@ -382,40 +399,52 @@ class Application:
         """
         if not self.db:
             self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-        count = 0
-        limit = 10
-        while True:
-            t = self.db.transaction()
-            self.logmsgs = []
-            count = count + 1
-            try:
-                bodyval = body()
-                t.commit()
-                break
-            # syntax "Type as var" not supported by Python 2.4
-            except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
-                t.rollback()
-                web.debug(te)
-                raise te
-            except (psycopg2.DataError, psycopg2.ProgrammingError), te:
-                t.rollback()
-                web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
-                raise BadRequest(data='Logical error: ' + str(te))
-            except TypeError, te:
-                t.rollback()
-                web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
-                raise RuntimeError(data=str(te))
-            except (psycopg2.IntegrityError, IOError), te:
-                t.rollback()
-                if count > limit:
-                    web.debug('exceeded retry limit')
-                    web.debug(te)
-                    raise IntegrityError(data=str(te))
-                # else fall through to retry...
-            except:
-                t.rollback()
-                web.debug('got unknown exception from body in dbtransact')
-                raise
+
+        try:
+            count = 0
+            limit = 10
+            while True:
+                try:
+                    t = self.db.transaction()
+                    
+                    try:
+                        self.logmsgs = []
+                        count = count + 1
+                        bodyval = body()
+                        t.commit()
+                        break
+                        # syntax "Type as var" not supported by Python 2.4
+                    except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
+                        t.rollback()
+                        web.debug(te)
+                        raise te
+                    except (psycopg2.DataError, psycopg2.ProgrammingError), te:
+                        t.rollback()
+                        web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
+                        raise BadRequest(data='Logical error: ' + str(te))
+                    except TypeError, te:
+                        t.rollback()
+                        web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
+                        raise RuntimeError(data=str(te))
+                    except (psycopg2.IntegrityError, IOError), te:
+                        t.rollback()
+                        if count > limit:
+                            web.debug('exceeded retry limit')
+                            web.debug(te)
+                            raise IntegrityError(data=str(te))
+                        # else fall through to retry...
+                    except:
+                        t.rollback()
+                        web.debug('got unknown exception from body in dbtransact')
+                        raise
+
+                except psycopg2.InterfaceError:
+                    # try reopening the database connection
+                    self.db = web.database(db=self.dbstr, dbn=self.dbnstr)
+
+        finally:
+            pass
+                    
         for msg in self.logmsgs:
             logger.info(msg)
         self.logmsgs = []

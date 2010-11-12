@@ -162,6 +162,11 @@ class FileIO (Application):
 
         if sendBody:
 
+            try:
+                self.db._db_cursor().connection.close()
+            except:
+                pass
+
             # parse Range: header if it exists
             rangeset = []
             invalid = False
@@ -631,6 +636,7 @@ class FileIO (Application):
             flen = clen
             cfirst = 0
             clast = None
+            content_range = None
 
         # at this point we have these data:
         # clen -- content length (body of PUT)
@@ -661,14 +667,23 @@ class FileIO (Application):
         def preWritePostCommit(f):
             return f
         
-        if cfirst and clast:
+        if cfirst != None and clast:
             # try update-in-place if user is doing Range: partial PUT
             self.update = True
+            self.local = True
+            # if checksum is not set, then allow chunk updates
+            if len(self.gettagvals('sha256sum')) == 0:
+                self.localFilesImmutable = False
         else:
             self.update = False
 
         # this retries if a file was found but could not be opened due to races
         f = self.dbtransact(preWriteBody, preWritePostCommit)
+
+        try:
+            self.db._db_cursor().connection.close()
+        except:
+            pass
 
         # we get here if write is not disallowed
         if f == None:
@@ -695,7 +710,7 @@ class FileIO (Application):
             return self.insertForStore()
 
         def postWritePostCommit(results):
-            if len(results) > 0:
+            if not content_range and len(results) > 0:
                 self.deletePrevious(results)
             uri = self.home + self.store_path + '/' + urlquote(self.data_id)
             web.header('Location', uri)
@@ -814,6 +829,10 @@ class FileIO (Application):
                 self.client_content_type = None
 
             try:
+                try:
+                    self.db._db_cursor().connection.close()
+                except:
+                    pass
                 wbytes, flen = self.storeInput(inf, f)
         
                 # now we have to remove the trailing part boundary we
