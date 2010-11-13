@@ -265,7 +265,7 @@ class Application:
     def validateRole(self, role):
         if self.authn:
             try:
-                valid = self.authn.roleProvider.testRole(role)
+                valid = self.authn.roleProvider.testRole(self.db, role)
             except NotImplemented:
                 valid = True
             if not valid:
@@ -914,6 +914,7 @@ class Application:
     def set_file_tag(self, tagname, value=None, data_id=None, owner=None):
         validator = self.validators.get(tagname)
         if validator:
+            #web.debug("set_file_tag: %s=%s with validator %s" % (tagname, value, validator))
             validator(value)
         try:
             results = self.select_tagdef(tagname)

@@ -383,12 +383,10 @@ class FileIO (Application):
             self.insert_file()
             self.txlog('CREATE', dataset=self.data_id)
             t = self.db.transaction()
-            try:
-                #web.debug('setting owner "%s"' % self.user())
-                self.set_file_tag('owner', self.authn.role)
-                t.commit()
-            except:
-                t.rollback()
+
+            web.debug('setting owner "%s"' % self.authn.role)
+            self.set_file_tag('owner', self.authn.role)
+            t.commit()
     
             t = self.db.transaction()
             try:
