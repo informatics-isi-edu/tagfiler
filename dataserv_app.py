@@ -258,12 +258,13 @@ class Application:
         self.validators = { 'owner' : self.validateRole,
                             'read users' : self.validateRolePattern,
                             'write users' : self.validateRolePattern,
-                            'modified by' : self.validateRole }
+                            'modified by' : self.validateRole,
+                            '_type_values' : self.validateEnumeration }
 
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
 
-    def validateRole(self, role):
+    def validateRole(self, role, tagname=None, data_id=None):
         if self.authn:
             try:
                 valid = self.authn.roleProvider.testRole(self.db, role)
@@ -272,10 +273,32 @@ class Application:
             if not valid:
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
                 
-    def validateRolePattern(self, role):
+    def validateRolePattern(self, role, tagname=None, data_id=None):
         if role in [ '*' ]:
             return
         return self.validateRole(role)
+
+    def validateEnumeration(self, enum, tagname=None, data_id=None):
+        try:
+            key, desc = enum.split(" ", 1)
+            key = urllib.unquote(key)
+        except:
+            raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
+
+        if tagname == '_type_values':
+            results = self.gettagvals('_type_name', data_id=data_id)
+            if len(results) == 0:
+                raise Conflict('Set the "_type_name" tag before trying to set "_type_values".')
+            typename = results[0]
+            results = self.get_type(typename)
+            if len(results) == 0:
+                raise Conflict('The type "%s" is not defined!' % typename)
+            type = results[0]
+            dbtype = type['_type_dbtype']
+            try:
+                key = self.downcast_value(dbtype, key)
+            except:
+                raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['_type_description'], dbtype))
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
@@ -680,14 +703,7 @@ class Application:
                     key, desc = val.split(" ", 1)
                     key = urllib.unquote(key)
                     dbtype = res['_type_dbtype']
-                    if dbtype == 'int8':
-                        key = int(key)
-                    elif dbtype == 'float8':
-                        key = float(key)
-                    elif dbtype in [ 'date', 'timestamptz' ]:
-                        key = dateutil.parser.parse(key)
-                    else:
-                        pass # leave key as text
+                    key = self.downcast_value(dbtype, key)
                     vals.append( (key, desc) )
                 res['_type_values'] = vals
             return res
@@ -912,11 +928,24 @@ class Application:
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
                            vars=dict(file=data_id, tagname=tagname))
 
+    def downcast_value(self, dbtype, value):
+        if dbtype == 'int8':
+            value = int(value)
+        elif dbtype == 'float8':
+            value = float(value)
+        elif dbtype in [ 'date', 'timestamptz' ]:
+            if value == 'now':
+                value = datetime.datetime.now(pytz.timezone('UTC'))
+            else:
+                value = dateutil.parser.parse(value)
+        else:
+            pass
+        return value
+            
     def set_file_tag(self, tagname, value=None, data_id=None, owner=None):
-        validator = self.validators.get(tagname)
-        if validator:
-            #web.debug("set_file_tag: %s=%s with validator %s" % (tagname, value, validator))
-            validator(value)
+        if data_id == None:
+            data_id = self.data_id
+
         try:
             results = self.select_tagdef(tagname)
             result = results[0]
@@ -925,8 +954,21 @@ class Application:
         except:
             raise BadRequest(data="The tag %s is not defined on this server." % tagname)
 
-        if data_id == None:
-            data_id = self.data_id
+        results = self.get_type(tagtype)
+        if len(results) == 0:
+            raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
+        type = results[0]
+        dbtype = type['_type_dbtype']
+        
+        validator = self.validators.get(tagname)
+        if validator:
+            #web.debug("set_file_tag: %s=%s with validator %s" % (tagname, value, validator))
+            validator(value, tagname, data_id)
+
+        try:
+            value = self.downcast_value(dbtype, value)
+        except:
+            raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
         if not multivalue:
             results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
