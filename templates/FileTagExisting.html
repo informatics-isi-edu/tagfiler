@@ -35,6 +35,7 @@ $if len(tagdefs) > 0:
 	$for tagdef in tagdefs:
 		$ tag, typestr, writeok = tagdef
 		$ type = typesdict[typestr]
+		$ typename = type['_type_description']
 		$ typevals = type['_type_values']
 		$ tagname, typestr, writeok = tagdefsdict[tag]
 		$ vals = tagvals.get(tagname, None)
@@ -74,12 +75,15 @@ $if len(tagdefs) > 0:
 				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
 				<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
 				<td class="file-tag ${idquote(tagname)} multivalue input">
-				$if typestr in ['role', 'tagname'] or typevals:
+				$if typestr in ['role', 'rolepat', 'tagname'] or typevals:
 					$if typevals:
 						$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
-					$elif typestr == 'role':
+					$elif typestr in [ 'role', 'rolepat' ]:
 						$if allroles != None:
-							$ options = [ (role, role) for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
+							$if typestr == 'rolepat':
+								$ options = [ (role, role) for role in set(allroles).union(set(['*'])).difference(set(tagvals.get(tagname, []))) ]
+							$else:
+								$ options = [ (role, role) for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
 						$else:
 							$ options = []
 					$elif typestr == 'tagname':
@@ -89,7 +93,7 @@ $if len(tagdefs) > 0:
 					$if options:
 						$ options.sort(key=lambda x: x[0])
 						<select name="val-${urlquote(tagname)}">
-						<option value="">Choose a ${typestr}</option>
+						<option value="">Choose a ${typename}</option>
 						$for option in options:
 							<option value="${option[0]}">${option[1]}</option>
 						</select>

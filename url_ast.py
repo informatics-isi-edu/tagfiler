@@ -992,8 +992,8 @@ class TagdefACL (FileTags):
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.data_id)
         tagdef = results[0]
-        acldefs = [ ('readers', 'role', tagdef.owner in self.authn.roles and tagdef.readpolicy == 'tag'),
-                    ('writers', 'role', tagdef.owner in self.authn.roles and tagdef.writepolicy == 'tag') ]
+        acldefs = [ ('readers', 'rolepat', tagdef.owner in self.authn.roles and tagdef.readpolicy == 'tag'),
+                    ('writers', 'rolepat', tagdef.owner in self.authn.roles and tagdef.writepolicy == 'tag') ]
         acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
         readacls = [ (result.tagname, 'readers')
                      for result in self.select_tagdef(tagname=self.data_id,

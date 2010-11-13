@@ -498,7 +498,6 @@ class Application:
         if self.authn.roleProvider:
             try:
                 roleinfo = [ role for role in self.authn.roleProvider.listRoles(self.db) ]
-                roleinfo.append('*')
                 return roleinfo
             except NotImplemented:
                 return None

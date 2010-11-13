@@ -184,8 +184,8 @@ tagdef '_type_values' text        ""      file        file       true
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
-tagdef "read users"   text        ""      anonymous   fowner     true       role
-tagdef "write users"  text        ""      anonymous   fowner     true       role
+tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
+tagdef "write users"  text        ""      anonymous   fowner     true       rolepat
 tagdef "modified by"  text        ""      anonymous   system     false      role
 tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
@@ -304,6 +304,7 @@ typedef date         date          'Date'
 typedef timestamptz  timestamptz   'Date and time with timezone'
 typedef text         text          'Text'
 typedef role         text          'Role'
+typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
 
 cfgtag()

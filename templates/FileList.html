@@ -102,7 +102,7 @@ $if len(files) > 0:
 						<input type="hidden" name="referer" value="${referer}" />
 						<input type="hidden" name="set-${urlquote(tag)}" value="true" />
 						<td class="file-tag ${idquote(tag)} multivalue input">
-						$if tagdefs[tag].typestr == 'role':
+						$if tagdefs[tag].typestr in [ 'role', 'rolepat' ]:
 							$if tagdefs[tag].multivalue and file[tag]:
 								$ thisroles = file[tag]
 							$elif file.get(tag, None):
@@ -110,7 +110,10 @@ $if len(files) > 0:
 							$else:
 								$ thisroles = []
 							$if allroles != None:
-								$ availroles = [ role for role in set(allroles).difference(set(thisroles)) ]
+								$if tagdefs[tag].typestr == 'rolepat':
+									$ availroles = [ role for role in set(allroles).union(set(['*'])).difference(set(thisroles)) ]
+								$else:
+									$ availroles = [ role for role in set(allroles).difference(set(thisroles)) ]
 								$ availroles.sort()
 								<select name="val-${urlquote(tag)}">
 								<option value="">Choose a role</option>
