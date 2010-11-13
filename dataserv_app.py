@@ -473,7 +473,7 @@ class Application:
     def buildroleinfo(self):
         if self.authn.roleProvider:
             try:
-                roleinfo = [ role for role in self.authn.roleProvider.listRoles() ]
+                roleinfo = [ role for role in self.authn.roleProvider.listRoles(self.db) ]
                 roleinfo.append('*')
                 return roleinfo
             except NotImplemented:
