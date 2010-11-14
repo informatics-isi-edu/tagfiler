@@ -35,6 +35,10 @@ def p_filelist(p):
                 | slash string slash FILE slash"""
     p[0] = url_ast.FileList(appname=p[2])
     
+def p_filelist_opts1(p):
+    """filelist : slash string queryopts"""
+    p[0] = url_ast.FileList(appname=p[2], queryopts=p[3])
+    
 def p_loglist(p):
     """loglist : slash string slash LOG
                | slash string slash LOG slash"""
@@ -44,7 +48,7 @@ def p_contact(p):
     """contact : slash string slash CONTACT"""
     p[0] = url_ast.Contact(appname=p[2])
     
-def p_filelist_opts(p):
+def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 

@@ -210,6 +210,7 @@ class FileList (Node):
 
     def __init__(self, appname, queryopts={}):
         Node.__init__(self, appname)
+        self.view_type = None
 
     def GET(self, uri):
         
@@ -219,13 +220,16 @@ class FileList (Node):
             tagdefs = [ (tagdef.tagname, tagdef)
                         for tagdef in self.select_tagdef() ]
             tagdefs = dict(tagdefs)
+
+            self.listtags = self.getParamsDb('file list tags', data_id=self.view_type)
+            self.listtagswrite = self.getParamsDb('file list tags write', data_id=self.view_type)
             
             if tagdefs.has_key('list on homepage'):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
             else:
                 self.predlist=[]
 
-            files = [ res for res in self.select_files_by_predlist() ]
+            files = [ res for res in self.select_files_by_predlist(listtags=self.listtags) ]
             for res in files:
                 # decorate each result with writeok information
                 res.writeok = self.gui_test_file_authz('write',
@@ -250,8 +254,8 @@ class FileList (Node):
                        roles=self.authn.roles,
                        roleinfo=roleinfo,
                        urlquote=urlquote,
-                       filelisttags=self.filelisttags,
-                       filelisttagswrite=self.filelisttagswrite,
+                       filelisttags=self.listtags,
+                       filelisttagswrite=self.listtagswrite,
                        tagdefs=tagdefs,
                        idquote=idquote)
             self.setNoCache()
@@ -298,6 +302,10 @@ class FileList (Node):
                 return self.renderlist("Define a dataset",
                                        [self.render.NameForm(dict(apptarget=self.home + web.ctx.homepath))])
         else:
+            try:
+                self.view_type = storage.view
+            except:
+                pass
             return self.dbtransact(body, postCommit)
 
     def POST(self, uri):
@@ -643,17 +651,20 @@ class FileTags (Node):
     def get_tag_body(self):
         results = self.select_tagdef(self.tag_id)
         if len(results) == 0:
-            raise NotFound(data='tag definition %s' % self.tag_id)
+            raise NotFound(data='tag definition "%s"' % self.tag_id)
+        results = self.select_file()
+        if len(results) == 0:
+            raise NotFound(data='data set "%s"' % self.data_id)
         tagdef = results[0]
         owner = self.owner()
         results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
         if len(results) == 0:
             if self.value == None:
-                raise NotFound(data='tag %s on dataset %s' % (self.tag_id, self.data_id))
+                raise NotFound(data='tag "%s" on dataset "%s"' % (self.tag_id, self.data_id))
             elif self.value == '':
-                raise NotFound(data='tag %s = "" on dataset %s' % (self.tag_id, self.data_id))
+                raise NotFound(data='tag "%s" = "" on dataset "%s"' % (self.tag_id, self.data_id))
             else:
-                raise NotFound(data='tag %s = %s on dataset %s' % (self.tag_id, self.value, self.data_id))
+                raise NotFound(data='tag "%s" = "%s" on dataset "%s"' % (self.tag_id, self.value, self.data_id))
         values = []
         for res in results:
             try:
@@ -710,6 +721,9 @@ class FileTags (Node):
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
+        results = self.select_file()
+        if len(results) == 0:
+            raise NotFound(data='data set "%s"' % self.data_id)
         self.txlog('GET ALL TAGS', dataset=self.data_id)
         return (self.buildtaginfo('is null'),     # system
                 self.buildtaginfo('is not null'), # userdefined
