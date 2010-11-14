@@ -93,7 +93,11 @@ $if len(tagdefs) > 0:
 					$if options:
 						$ options.sort(key=lambda x: x[0])
 						<select name="val-${urlquote(tagname)}">
-						<option value="">Choose a ${typename}</option>
+						$if typename.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
+							$ article = 'an'
+						$else:
+							$ article = 'a'
+						<option value="">Choose ${article} ${typename}</option>
 						$for option in options:
 							<option value="${option[0]}">${option[1]}</option>
 						</select>
