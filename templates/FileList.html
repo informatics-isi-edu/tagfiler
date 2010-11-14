@@ -42,7 +42,9 @@ $if len(files) > 0:
 			</form>
 		</td>
 		<td class="file-tags">
-			<a href="${apptarget}/tags/${urlquote(file.file)}">Tags</a>
+			<a href="${apptarget}/tags/${urlquote(file.file)}">All Tags</a>
+			$if 'Modality' in filelisttags and file['Modality'] == 'OCT':
+				<br /><a href="${apptarget}/tags/${urlquote(file.file)}?view=OCT+tags">OCT Grade</a>
 		</td>
 		<td class="file-update">
 		$if file.writeok:

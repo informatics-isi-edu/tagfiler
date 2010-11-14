@@ -372,24 +372,24 @@ neitagdef()
    tag "\$modality tags" "_cfg_tag list tags" tagname "\$tagname"
 }
 
-typedef Modality            text 'OCT OCT' 'eyecare eyecare' 'Icam Icam'
+typedef Modality            text 'Modality' 'OCT OCT' 'eyecare eyecare' 'Icam Icam'
 
 # OCT
-typedef '# 0-9'             int8 '# (0-9)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9'
-typedef '# 0-16'            int8 '# (0-16)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9' '10 10' '11 11' '12 12' '13 13' '14 14' '15 15' '16 16'
-typedef 'no/yes'            int8 'no/yes' '0 No' '2 Yes'
-typedef 'no/yes/CG'         int8 'no/yes' '0 No' '2 Yes' '8 CG'
-typedef 'Max DRU Size'      int8 'Max DRU Size' '0 None' '1 Questionable/HI' '2 <C0' '3 <C1' '4 <C2' '5 C2' '6 Retic' '8 CG'
-typedef 'DRU Area'          int8 'DRU Area' '0 None/NA' '10 <63 (C0)' '20 <105' '25 <125 (C1)' '30 <250 (C2)' '35 <350 (I2)' '40 <500' '45 <650 (O2)' '50 <0.5 DA' '60 <1 DA' '70 1 DA' '8 CG'
-typedef 'Max DRU Type'      int8 'Max DRU Type' '0 None' '1 HI' '2 HD' '3 SD' '4 SI/Retic' '8 CG'
-typedef 'DRU Grid Type'     int8 'DRU Grid Type' '0 Absent' '1 Questionable' '2 Present' '3 Predom/#' '8 CG'
-typedef 'Inc Pigment'       int8 'Inc Pigment' '0 None' '1 Questionable' '2 <C0' '3 <C1' '4 <C2' '5 <O2' '6 O2' '7 Pig/Other' '8 CG'
-typedef 'RPE Depigment'     int8 'RPE Depigment' '0 None' '1 Questionable' '20 <C1' '30 <C2' '35 <I2' '40 <O2' '50 <0.5DA' '60 <1DA' '70 1DA' '8 CG'
-typedef 'Inc/RPE Lesions'   int8 'Inc/RPE Lesions' '0 N' '1 Q' '2 CC' '3 CPT' '8 CG'
-typedef 'GA/Ex DA Lesions'  int8 'GA/Ex DA Lesions' '0 N' '1 Q' '2 Y' '3 CC' '4 CPT' '8 CG'
-typedef 'Other Lesions'     int8 'Other Lesions' '0 N' '1 Q' '2 Y' '8 CG'
-typedef 'Other Lesions +PT' int8 'Other Lesions +PT' '0 N' '1 Q' '2 Y' '3 PT' '8 CG'
-typedef 'Diabetic Retinopathy Level' int8 'Diabetic Retinopathy Level' '10 DR Abset' '12 Non-Diabetic' '13 Questionable' '14 HE, SE, IRMA w/o MAs' '15 Hem Only w/o MAs' '20 Microaneurysms Only' '31 Mild NPDR' '37 Mild/Moderate NPDR' '43 Moderate NPDR' '47 Moderate/Severe NPDR' '53 Severe NPDR' '60 FP Only' '61 No Ret w/ RX' '62 MAs Only w/ RX' '63 Early NPDR w/ RX' '64 Moderate/Severe NPDR w/ RX' '65 Moderate PDR' '71 DRS HRC' '75 Severe DRS HRC' '81 Advanced PDR' '85 End-Stage PDR' '90 Cannot Grade'
+typedef '# 0-9'             int8 'Count (0-9)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9'
+typedef '# 0-16'            int8 'Count (0-16)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9' '10 10' '11 11' '12 12' '13 13' '14 14' '15 15' '16 16'
+typedef 'no/yes'            int8 'Grade (no/yes)' '0 No' '2 Yes'
+typedef 'no/yes/CG'         int8 'Grade (no/yes/CG)' '0 No' '2 Yes' '8 CG'
+typedef 'Max DRU Size'      int8 'Grade (Max DRU Size)' '0 None' '1 Questionable/HI' '2 <C0' '3 <C1' '4 <C2' '5 C2' '6 Retic' '8 CG'
+typedef 'DRU Area'          int8 'Grade (DRU Area)' '0 None/NA' '10 <63 (C0)' '20 <105' '25 <125 (C1)' '30 <250 (C2)' '35 <350 (I2)' '40 <500' '45 <650 (O2)' '50 <0.5 DA' '60 <1 DA' '70 1 DA' '8 CG'
+typedef 'Max DRU Type'      int8 'Grade (Max DRU Type)' '0 None' '1 HI' '2 HD' '3 SD' '4 SI/Retic' '8 CG'
+typedef 'DRU Grid Type'     int8 'Grade (DRU Grid Type)' '0 Absent' '1 Questionable' '2 Present' '3 Predom/#' '8 CG'
+typedef 'Inc Pigment'       int8 'Grade (Inc Pigment)' '0 None' '1 Questionable' '2 <C0' '3 <C1' '4 <C2' '5 <O2' '6 O2' '7 Pig/Other' '8 CG'
+typedef 'RPE Depigment'     int8 'Grade (RPE Depigment)' '0 None' '1 Questionable' '20 <C1' '30 <C2' '35 <I2' '40 <O2' '50 <0.5DA' '60 <1DA' '70 1DA' '8 CG'
+typedef 'Inc/RPE Lesions'   int8 'Grade (Inc/RPE)' '0 N' '1 Q' '2 CC' '3 CPT' '8 CG'
+typedef 'GA/Ex DA Lesions'  int8 'Grade (GA/Ex DA)' '0 N' '1 Q' '2 Y' '3 CC' '4 CPT' '8 CG'
+typedef 'Other Lesions'     int8 'Grade (Other w/o PT)' '0 N' '1 Q' '2 Y' '8 CG'
+typedef 'Other Lesions +PT' int8 'Grade (Other w/ PT)' '0 N' '1 Q' '2 Y' '3 PT' '8 CG'
+typedef 'Diabetic Retinopathy Level' int8 'Grade (Diabetic Retinopathy Level)' '10 DR Abset' '12 Non-Diabetic' '13 Questionable' '14 HE, SE, IRMA w/o MAs' '15 Hem Only w/o MAs' '20 Microaneurysms Only' '31 Mild NPDR' '37 Mild/Moderate NPDR' '43 Moderate NPDR' '47 Moderate/Severe NPDR' '53 Severe NPDR' '60 FP Only' '61 No Ret w/ RX' '62 MAs Only w/ RX' '63 Early NPDR w/ RX' '64 Moderate/Severe NPDR w/ RX' '65 Moderate PDR' '71 DRS HRC' '75 Severe DRS HRC' '81 Advanced PDR' '85 End-Stage PDR' '90 Cannot Grade'
 
 #        TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 tagdef   Modality                     text   admin   file        file       false      Modality
