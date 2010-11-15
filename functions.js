@@ -289,6 +289,7 @@ function getTags() {
  * Names are separated from their values also by HTML newline
  */
 function setTags(tags) {
+    log("setTags(" + tags + ")");
     var tokens = tags.split('<br/>');
     for (i=0; i<tokens.length;i+=2) {
 	if (tokens[i] == null || tokens[i+1] == null) continue;
@@ -297,20 +298,6 @@ function setTags(tags) {
 	    document.getElementById(id).value = tokens[i+1];
 	}
     }
-}
-
-/**
- * Set the values for custom tags in the input text boxes
- * they come as pairs (name, value) separated by HTML newline
- * Names are separated from their values also by HTML newline
- */
-function setInputTags(tags) {
-	var tokens = tags.split('<br/>');
-	for (i=0; i<tokens.length;i+=2) {
-		if (tokens[i] == null || tokens[i+1] == null) continue;
-		var id = tokens[i]+'_id';
-		document.getElementById(id).value = tokens[i+1];
-	}
 }
 
 /**
@@ -339,6 +326,7 @@ function getRequiredTagsName() {
     for (i=0; i<tagsArray.length; i+=2) {
 	ret[pos++] = tagsArray[i];
     }
+    log("getRequiredTagsName() = " + ret);
     return ret;
 }
 
