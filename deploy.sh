@@ -330,7 +330,7 @@ cfgtag()
 
 #cfgtag "home" text 'https://${HOME_HOST}'
 cfgtag "webauthn home" text 'https://${HOME_HOST}/webauthn'
-#cfgtag "webauthn require" text 'True'
+cfgtag "webauthn require" text 'True'
 
 #cfgtag "store path" text '${DATADIR}'
 #cfgtag "log path" text '${LOGDIR}'

@@ -103,17 +103,14 @@ $ chunkbytes = tvars.get('appletchunkbytes')
 	<table>
 		<tr>
 			<td>
-				<div id="custom-tags">
+				<div id="Required Tags">
 					<table class="table-wrapper" rules="all" id="Dataset Tags">
 						$for tag in tags:
 							<tr>
 								$ name, type = tag
 								<td class="tag-name">${name}</td>
-								<td id="${name}_val"> 
-								$for i in range(20):
-									 &nbsp;
-								</td>
-							 </tr>
+								<td><input name="${name}" id="${name}_val" width="20" value="" readonly /></td>
+							</tr>
 					</table>
 				</div>
 			</td>

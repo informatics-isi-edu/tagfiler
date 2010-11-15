@@ -658,10 +658,10 @@ class FileTags (Node):
         results = self.select_tagdef(self.tag_id)
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.tag_id)
+        tagdef = results[0]
         results = self.select_file()
         if len(results) == 0:
             raise NotFound(data='data set "%s"' % self.data_id)
-        tagdef = results[0]
         owner = self.owner()
         results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
         if len(results) == 0:

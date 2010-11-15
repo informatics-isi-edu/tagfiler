@@ -245,6 +245,7 @@ function getTagsArray() {
     var pos=0;
     
     tagblock = document.getElementById('Required Tags');
+    if (!tagblock) return ret;
 
     inputtags = tagblock.getElementsByTagName("input");
     log ('got '  + inputtags.length + ' input elements');
@@ -276,7 +277,9 @@ function getTagsArray() {
  * Names are separated from their values also by HTML newline
  */
 function getTags() {
-    return getTagsArray().join('<br/>');
+    var ret = getTagsArray().join('<br/>');
+    log("getTags() = " + ret );
+    return ret;
 }
 
 
@@ -286,21 +289,17 @@ function getTags() {
  * Names are separated from their values also by HTML newline
  */
 function setTags(tags) {
-	var node = document.getElementById('custom-tags');
-	if (!hasSize && node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
-		var tree = document.getElementById('files-tree');
-		tree.style.width = node.style.width = node.clientWidth+'px';
-		tree.style.height = node.style.height = node.clientHeight+'px';
-		hasSize = true;
+    tagblock = document.getElementById('Required Tags');
+    if (!tagblock) return ret;
+
+    var tokens = tags.split('<br/>');
+    for (i=0; i<tokens.length;i+=2) {
+	if (tokens[i] == null || tokens[i+1] == null) continue;
+	var id = tokens[i]+'_val';
+	if (tokens[i+1].length > 0) {
+	    tagblock.getElementById(id).value = tokens[i+1];
 	}
-	var tokens = tags.split('<br/>');
-	for (i=0; i<tokens.length;i+=2) {
-		if (tokens[i] == null || tokens[i+1] == null) continue;
-		var id = tokens[i]+'_val';
-		if (tokens[i+1].length > 0) {
-			document.getElementById(id).firstChild.nodeValue = tokens[i+1];
-		}
-	}
+    }
 }
 
 /**
@@ -328,7 +327,9 @@ function setTransmissionNumber(value) {
  * Get the custom tags name separated by HTML newline
  */
 function getTagsName() {
-    return getRequiredTagsName().join('<br/>');
+    var ret = getRequiredTagsName().join('<br/>');
+    log ("getTagsName() = " + ret);
+    return ret;
 }
 
 /**

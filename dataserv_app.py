@@ -824,6 +824,8 @@ class Application:
             user = self.authn.role
         if tagdef == None:
             tagdef = self.select_tagdef(tagname)[0]
+        if data_id == None:
+            data_id = self.data_id
             
         joins = ''
         wheres = ''
@@ -854,8 +856,6 @@ class Application:
         elif value:
             query += " AND value = $value ORDER BY VALUE"
         #web.debug(query)
-        if data_id == None:
-            data_id = self.data_id
         return self.db.query(query, vars=dict(file=data_id, value=value))
 
     def select_file_acl(self, mode, data_id=None):
