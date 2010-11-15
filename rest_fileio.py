@@ -108,12 +108,12 @@ class FileIO (Application):
                 opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
                 if len(opts) > 0:
                     querystr = '&'.join(opts)
+                    if len(result.location.split("?")) > 1:
+                        querystr = '&' + querystr
+                    else:
+                        querystr = '?' + querystr
                 else:
                     querystr = ''
-                if len(result.location.split("?")) > 1:
-                    querystr = '&' + querystr
-                else:
-                    querystr = '?' + querystr
                 raise web.seeother(result.location + querystr)
             else:
                 self.location = result.location
