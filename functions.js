@@ -289,15 +289,12 @@ function getTags() {
  * Names are separated from their values also by HTML newline
  */
 function setTags(tags) {
-    tagblock = document.getElementById('Required Tags');
-    if (!tagblock) return ret;
-
     var tokens = tags.split('<br/>');
     for (i=0; i<tokens.length;i+=2) {
 	if (tokens[i] == null || tokens[i+1] == null) continue;
 	var id = tokens[i]+'_val';
 	if (tokens[i+1].length > 0) {
-	    tagblock.getElementById(id).value = tokens[i+1];
+	    document.getElementById(id).value = tokens[i+1];
 	}
     }
 }
@@ -349,7 +346,7 @@ function getRequiredTagsName() {
  * Set the files to be uploaded or the first file to be downloaded
  */
 function setFiles(files) {
-	var node = document.getElementById('custom-tags');
+	var node = document.getElementById('Required Tags');
 	if (!hasSize && node.attributes['template'] != null && node.attributes['template'].value == 'DIRC') {
 		var tree = document.getElementById('files-tree');
 		tree.style.width = node.style.width = node.clientWidth+'px';
