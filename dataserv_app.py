@@ -141,7 +141,7 @@ class Application:
         if data_id == None:
             data_id = 'tagfiler configuration'
         results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
-        #web.debug(suffix, results)
+        #web.debug(data_id, suffix, results)
         return results
 
     def __init__(self):
@@ -398,6 +398,13 @@ class Application:
         web.header('Cache-control', 'no-cache')
         web.header('Expires', now_rfc1123)
 
+    def logException(self, context=None):
+        if context == None:
+            context = 'unspecified'
+        et, ev, tb = sys.exc_info()
+        web.debug('exception "%s"' % context,
+                  traceback.format_exception(et, ev, tb))
+
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
 
@@ -421,28 +428,30 @@ class Application:
                         t.commit()
                         break
                         # syntax "Type as var" not supported by Python 2.4
+                    except (psycopg2.InterfaceError), te:
+                        # pass this to outer handler
+                        raise te
                     except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                         t.rollback()
-                        web.debug(te)
+                        self.logException('web error in transaction body')
                         raise te
                     except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                         t.rollback()
-                        web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
+                        self.logException('database error in transaction body')
                         raise BadRequest(data='Logical error: ' + str(te))
                     except TypeError, te:
                         t.rollback()
-                        web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
+                        self.logException('programming error in transaction body')
                         raise RuntimeError(data=str(te))
                     except (psycopg2.IntegrityError, IOError), te:
                         t.rollback()
                         if count > limit:
-                            web.debug('exceeded retry limit')
-                            web.debug(te)
+                            self.logException('too many retries during transaction body')
                             raise IntegrityError(data=str(te))
                         # else fall through to retry...
                     except:
                         t.rollback()
-                        web.debug('got unknown exception from body in dbtransact')
+                        self.logException('unmatched error in transaction body')
                         raise
 
                 except psycopg2.InterfaceError:
@@ -1013,6 +1022,11 @@ class Application:
 
         if listtags == None:
             listtags = self.filelisttags
+        else:
+            listtags = [ x for x in listtags ]
+
+        if not 'Image Set' in listtags:
+            listtags.append('Image Set')
 
         roles = [ r for r in self.authn.roles ]
         if roles:

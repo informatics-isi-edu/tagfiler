@@ -91,7 +91,7 @@ function getCookie(name) {
 
 function setCookie(name, val) {
     val = encodeURIComponent(unescape(val));
-    log("setCookie: " + name + " = " + val);
+    //log("setCookie: " + name + " = " + val);
     document.cookie = name + "=" + val + "; path=/";
 }
 
@@ -239,25 +239,46 @@ function drawProgressBar(percent) {
     html += '</div>';  
 	document.getElementById("ProgressBar").innerHTML = html;
 }
-	
+
+function getTagsArray() {
+    var ret=[];
+    var pos=0;
+    
+    tagblock = document.getElementById('Required Tags');
+
+    inputtags = tagblock.getElementsByTagName("input");
+    log ('got '  + inputtags.length + ' input elements');
+    for (i=0; i<inputtags.length; i++) {
+	var tagname = inputtags[i].getAttribute("name");
+	var tagval = inputtags[i].value;
+	log ('got input tag ' + tagname + ' = ' + tagval);
+	ret[pos] = tagname;
+	ret[pos+1] = tagval;
+	pos += 2;
+    }
+
+    selecttags = tagblock.getElementsByTagName("select");
+    log ('got '  + selecttags.length + ' select elements');
+    for (i=0; i<selecttags.length; i++) {
+	var tagname = selecttags[i].getAttribute("name");
+	var tagval = selecttags[i].value;
+	log ('got select tag ' + tagname + ' = ' + tagval);
+	ret[pos] = tagname;
+	ret[pos+1] = tagval;
+	pos += 2;
+    }
+
+    return ret;
+}
+
 /**
  * Get the custom tags as pairs (name, value) separated by HTML newline
  * Names are separated from their values also by HTML newline
  */
 function getTags() {
-	doc = document.getElementById('Required Tags');
-	columns = doc.getElementsByTagName("td");
-	if (columns != null && columns.length > 0) {
-		var ret=[];
-		for (i=0; i<columns.length;i+=2) {
-			ret[i] = columns[i].firstChild.nodeValue;
-			ret[i+1] = columns[i+1].firstChild.value;
-		}
-		return ret.join('<br/>');
-	} else {
-		return '';
-	}
+    return getTagsArray().join('<br/>');
 }
+
 
 /**
  * Set the values for custom tags 
@@ -307,28 +328,20 @@ function setTransmissionNumber(value) {
  * Get the custom tags name separated by HTML newline
  */
 function getTagsName() {
-	doc = document.getElementById('Dataset Tags');
-	columns = doc.getElementsByTagName("td");
-	var ret=[];
-	var j=0;
-	for (i=0; i<columns.length;i+=2) {
-		ret[j++] = columns[i].firstChild.nodeValue;
-	}
-	return ret.join('<br/>');
+    return getRequiredTagsName().join('<br/>');
 }
 
 /**
  * Get the custom tags name
  */
 function getRequiredTagsName() {
-	doc = document.getElementById('Required Tags');
-	columns = doc.getElementsByTagName("td");
-	var ret=[];
-	var j=0;
-	for (i=0; i<columns.length;i+=2) {
-		ret[j++] = columns[i].firstChild.nodeValue;
-	}
-	return ret;
+    var ret = [];
+    var pos=0;
+    var tagsArray = getTagsArray();
+    for (i=0; i<tagsArray.length; i+=2) {
+	ret[pos++] = tagsArray[i];
+    }
+    return ret;
 }
 
 /**
@@ -386,8 +399,9 @@ function getDatasetInfo() {
  * Check if all required tags are present and have proper values
  */
 function validateCustomTags() {
-	var tagnames = getRequiredTagsName();
+    var tagnames = getRequiredTagsName();
     for (i=0; i<tagnames.length; i++) {
+	log("validating tag " + tagnames[i]);
     	var node = document.getElementById(tagnames[i]+'_id');
     	attr = node.attributes;
     	if (attr['required']) {

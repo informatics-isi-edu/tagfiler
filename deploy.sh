@@ -161,14 +161,14 @@ tagdef sha256sum      text        ""      file        file       false
 tagdef "Transmission Number" \
                       int8        ""    file        file       false
 
-tagdef "list on homepage" ""      "admin"   anonymous   tag        false
+tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "admin"   file        file       false
 
 tagacl()
 {
    # args: tagname {read|write} [value]...
-   tag=\$1
-   mode=\${2:0:4}
+   local tag=\$1
+   local mode=\${2:0:4}
    shift 2
    while [[ \$# -gt 0 ]]
    do
@@ -176,6 +176,9 @@ tagacl()
       shift
    done
 }
+
+tagacl "list on homepage" read "*"
+tagacl "list on homepage" write "admin"
 
 tag()
 {
@@ -236,9 +239,9 @@ storedquery()
    done
 }
 
-storedquery "New image studies" "Image%20Set;Downloaded:not:" admin
-storedquery "Previous image studies" "Image%20Set;Downloaded" admin
-storedquery "All image studies" "Image%20Set" admin
+storedquery "New image studies" 'Image%20Set;Downloaded:not:?view=study%20tags' admin
+storedquery "Previous image studies" 'Image%20Set;Downloaded?view=study%20tags' admin
+storedquery "All image studies" 'Image%20Set?view=study%20tags' admin
 
 for x in "New image studies" "Previous image studies" "All image studies"
 do
@@ -274,14 +277,14 @@ typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
 
 
-storedquery "config tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/config%20tags" admin "*"
+storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" admin "*"
 
 cfgtagdef()
 {
-   tagname="_cfg_\$1"
+   local tagname="_cfg_\$1"
    shift
    tagdef "\$tagname" "\$@"
-   tag "config tags" "_cfg_file list tags" tagname "\$tagname"
+   tag "configuration tags" "_cfg_file list tags" tagname "\$tagname"
 }
 
 #         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
@@ -359,13 +362,14 @@ cfgtag "bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
 
 ## Types and Tags for NEI MISD/DEI demo...
 
+storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" admin "*"
 storedquery "OCT tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/OCT%20tags" admin "*"
 storedquery "OCT brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/OCT%20brief%20tags" admin "*"
 
-neitagdef()
+modtagdef()
 {
-   modality="\$1"
-   tagname="\$2"
+   local modality="\$1"
+   local tagname="\$2"
    shift 2
    tagdef "\$tagname" "\$@"
    tag "\$modality tags" "_cfg_file list tags" tagname "\$tagname"
@@ -373,6 +377,7 @@ neitagdef()
 }
 
 typedef Modality            text 'Modality' 'OCT OCT' 'eyecare eyecare' 'Icam Icam'
+typedef 'Study Name'        text 'Study Name' 'CHES CHES' 'MEPED MEPED' 'LALES LALES'
 
 # OCT
 typedef '# 0-9'             int8 'Count (0-9)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9'
@@ -395,54 +400,68 @@ typedef 'Diabetic Retinopathy Level' int8 'Grade (Diabetic Retinopathy Level)' '
 tagdef   Modality                     text   admin   file        file       false      Modality
 tag "OCT tags" "_cfg_file list tags" tagname "Modality"
 
+tagdef   'Study Name'                 text   admin   file        file       false      'Study Name'
+tagdef   'Study Participant'          int8   admin   file        file       false
+tagdef   'Study Date'                 date   admin   file        file       false
+
+# set default applet tags and configure named views too...
+cfgtag "applet tags" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
+cfgtag "applet tags require" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
+
+for tag in '_cfg_file list tags' '_cfg_applet tags' '_cfg_applet tags require'
+do 
+   tag 'study tags' "\$tag" tagname "Modality" "Study Name" "Study Participant" "Study Date"
+done
+
+
 #         MOD    TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-neitagdef OCT    'Max DRU Size'               int8   admin   file        file       false      'Max DRU Size'
-neitagdef OCT    '# DRU Size Subfields'       int8   admin   file        file       false      '# 0-9'
-neitagdef OCT    'DRU Area'                   int8   admin   file        file       false      'DRU Area'
-neitagdef OCT    'Max DRU Type'               int8   admin   file        file       false      'Max DRU Type'
-neitagdef OCT    '# DRU Type Subfields'       int8   admin   file        file       false      '# 0-9'
-neitagdef OCT    'DRU Grid Type'              int8   admin   file        file       false      'DRU Grid Type'
-neitagdef OCT    'Inc Pignment'               int8   admin   file        file       false      'Inc Pigment'
-neitagdef OCT    'RPE Depigment'              int8   admin   file        file       false      'RPE Depigment'
-neitagdef OCT    '# RPE Depigment Subfields'  int8   admin   file        file       false      '# 0-9'
+modtagdef OCT    'Max DRU Size'               int8   admin   file        file       false      'Max DRU Size'
+modtagdef OCT    '# DRU Size Subfields'       int8   admin   file        file       false      '# 0-9'
+modtagdef OCT    'DRU Area'                   int8   admin   file        file       false      'DRU Area'
+modtagdef OCT    'Max DRU Type'               int8   admin   file        file       false      'Max DRU Type'
+modtagdef OCT    '# DRU Type Subfields'       int8   admin   file        file       false      '# 0-9'
+modtagdef OCT    'DRU Grid Type'              int8   admin   file        file       false      'DRU Grid Type'
+modtagdef OCT    'Inc Pignment'               int8   admin   file        file       false      'Inc Pigment'
+modtagdef OCT    'RPE Depigment'              int8   admin   file        file       false      'RPE Depigment'
+modtagdef OCT    '# RPE Depigment Subfields'  int8   admin   file        file       false      '# 0-9'
 
-neitagdef OCT    'Inc Pigment CC/CPT'         int8   admin   file        file       false      'Inc/RPE Lesions'
-neitagdef OCT    'RPE Depigment CC/CPT'       int8   admin   file        file       false      'Inc/RPE Lesions'
+modtagdef OCT    'Inc Pigment CC/CPT'         int8   admin   file        file       false      'Inc/RPE Lesions'
+modtagdef OCT    'RPE Depigment CC/CPT'       int8   admin   file        file       false      'Inc/RPE Lesions'
 
-neitagdef OCT    'Geographic Atrophy'         int8   admin   file        file       false      'GA/Ex DA Lesions'
-neitagdef OCT    'PED/RD'                     int8   admin   file        file       false      'GA/Ex DA Lesions'
-neitagdef OCT    'SubRet Hem'                 int8   admin   file        file       false      'GA/Ex DA Lesions'
-neitagdef OCT    'SubRet Scar'                int8   admin   file        file       false      'GA/Ex DA Lesions'
-neitagdef OCT    'ARM RX'                     int8   admin   file        file       false      'GA/Ex DA Lesions'
-neitagdef OCT    'Lesions Summary'            int8   admin   file        file       false      'no/yes/CG'
+modtagdef OCT    'Geographic Atrophy'         int8   admin   file        file       false      'GA/Ex DA Lesions'
+modtagdef OCT    'PED/RD'                     int8   admin   file        file       false      'GA/Ex DA Lesions'
+modtagdef OCT    'SubRet Hem'                 int8   admin   file        file       false      'GA/Ex DA Lesions'
+modtagdef OCT    'SubRet Scar'                int8   admin   file        file       false      'GA/Ex DA Lesions'
+modtagdef OCT    'ARM RX'                     int8   admin   file        file       false      'GA/Ex DA Lesions'
+modtagdef OCT    'Lesions Summary'            int8   admin   file        file       false      'no/yes/CG'
 
-neitagdef OCT    'GA # DAs in Grid'           int8   admin   file        file       false      '# 0-16'
-neitagdef OCT    'Ex # DAs in Grid'           int8   admin   file        file       false      '# 0-16'
+modtagdef OCT    'GA # DAs in Grid'           int8   admin   file        file       false      '# 0-16'
+modtagdef OCT    'Ex # DAs in Grid'           int8   admin   file        file       false      '# 0-16'
 
-neitagdef OCT    'Calcified Drusen'           int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Peripheral Drusen'          int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Peripap Atrophy'            int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Art Sheathing'              int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Cen Art Occlus'             int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Br Art Occlus'              int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Cen Vein Occlus'            int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Br Vein Occlus'             int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Hollen Plaque'              int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Ast Hyalosis'               int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Nevus'                      int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Chorioret Scar'             int8   admin   file        file       false      'Other Lesions +PT'
-neitagdef OCT    'SWR Tension'                int8   admin   file        file       false      'Other Lesions +PT'
-neitagdef OCT    'SWR Cello Reflex'           int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Mac Hole'                   int8   admin   file        file       false      'Other Lesions +PT'
-neitagdef OCT    'Histoplasmosis'             int8   admin   file        file       false      'Other Lesions +PT'
-neitagdef OCT    'Ret Detach'                 int8   admin   file        file       false      'Other Lesions +PT'
-neitagdef OCT    'Large C/D'                  int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Thick Vit/Glial'            int8   admin   file        file       false      'Other Lesions'
-neitagdef OCT    'Other (comments)'           int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'Calcified Drusen'           int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Peripheral Drusen'          int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Peripap Atrophy'            int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Art Sheathing'              int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Cen Art Occlus'             int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Br Art Occlus'              int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Cen Vein Occlus'            int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Br Vein Occlus'             int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Hollen Plaque'              int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Ast Hyalosis'               int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Nevus'                      int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Chorioret Scar'             int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'SWR Tension'                int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'SWR Cello Reflex'           int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Mac Hole'                   int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'Histoplasmosis'             int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'Ret Detach'                 int8   admin   file        file       false      'Other Lesions +PT'
+modtagdef OCT    'Large C/D'                  int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Thick Vit/Glial'            int8   admin   file        file       false      'Other Lesions'
+modtagdef OCT    'Other (comments)'           int8   admin   file        file       false      'Other Lesions +PT'
 
-neitagdef OCT    'Other Lesions Summary'      int8   admin   file        file       false      'no/yes'
+modtagdef OCT    'Other Lesions Summary'      int8   admin   file        file       false      'no/yes'
 
-neitagdef OCT    'Diabetic Retinopathy Level' int8   admin   file        file       false      'Diabetic Retinopathy Level'
+modtagdef OCT    'Diabetic Retinopathy Level' int8   admin   file        file       false      'Diabetic Retinopathy Level'
 
 tag "OCT brief tags" "_cfg_file list tags" tagname "Modality"
 tag "OCT brief tags" "_cfg_file list tags" tagname "Lesions Summary"

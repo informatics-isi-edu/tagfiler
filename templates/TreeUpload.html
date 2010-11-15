@@ -3,13 +3,22 @@ $ target = tvars.get('target')
 $ testfile = tvars.get('testfile')
 $ appletlog = tvars.get('appletlog')
 $ tags = tvars.get('tags')
+$ tagdefs = tvars.get('tagdefs')
+$ types = tvars.get('types')
 $ requiredtags = tvars.get('requiredtags')
 $ customproperties = tvars.get('customproperties')
 $ connections = tvars.get('connections')
 $ allowchunks = tvars.get('uploadchunks')
 $ socketbuffersize = tvars.get('socketbuffersize')
 $ chunkbytes = tvars.get('appletchunkbytes')
-
+$for type in types:
+	$ values = type['_type_values']
+	$if values:
+		$ values = dict(values)
+	$else:
+		$ values = None
+	$ type['_type_values'] = values
+$ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 <div>
 	<h3>Status</h3>
 	<table>
@@ -81,25 +90,48 @@ $ chunkbytes = tvars.get('appletchunkbytes')
 	<button type="button" name="Upload All" id="Upload All" disabled="disabled" onclick="uploadAll()" >Upload All</button>
 </div>
 <div>
-	<h3>Tags</h3>
+	<h3>Study Tags</h3>
 	<table>
+	<tr>
+	<td>
+	<div id="custom-tags">
+	<table class="table-wrapper" id="Required Tags">
+	$for tag in tags:
+		$ tagname, typestr = tag
+		$ type = typesdict[typestr]
+		$ typedesc = type['_type_description']
+		$ typevals = type['_type_values']		
 		<tr>
-			<td>
-				<div id="custom-tags">
-					<table class="table-wrapper" id="Required Tags">
-						$for tag in tags:
-							<tr>
-								$ name, type = tag
-								<td class="tag-name">${name}</td>
-								<td><input type="text" id="${name}_id" typestr="${type}" 
-								$if name in requiredtags:
-									 required="required"
-								 /></td>
-							 </tr>
-					</table>
-				</div>
-			</td>
+		<td class="tag-name">${tagname} (${typedesc})</td>
+		<td>
+		$ options = []
+		$if typevals:
+			$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
+		$if options:
+			$ options.sort(key=lambda x: x[0])
+			$if typedesc.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
+				$ article = 'an'
+			$else:
+				$ article = 'a'
+			<select name="${tagname}" id="${tagname}_id" typestr="${typestr}"
+			$if tagname in requiredtags:
+				required="required"
+			>
+			<option value="" selected="selected">Choose ${article} ${typedesc}</option>
+			$for option in options:
+				<option value="${option[0]}">${option[1]}</option>
+			</select>
+		$else:
+			<input type="text" name="${tagname}" id="${tagname}_id" typestr="${typestr}" 
+			$if tagname in requiredtags:
+				 required="required"
+			/>
+		</td>
 		</tr>
+	</table>
+	</div>
+	</td>
+	</tr>
 	</table>
 </div>
 <div>

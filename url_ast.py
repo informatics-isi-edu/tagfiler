@@ -77,6 +77,9 @@ class Study (Node):
         tagnames = self.getParamsDb('applet tags', data_id=self.study_type)
         requiredtags = self.getParamsDb('applet tags require', data_id=self.study_type)
         
+        tagdefs = self.select_tagdef()
+        tagdefs = dict ( [ (tagdef.tagname, tagdef) for tagdef in tagdefs ] )
+        types = self.get_type()
         if self.action == 'get' and self.data_id:
             files = [ res.file for res
                       in self.select_files_by_predlist([{'tag' : 'Transmission Number',
@@ -85,7 +88,7 @@ class Study (Node):
             tags = [ (tagname, [ res.value for res
                                  in self.select_file_tag(tagname=tagname,
                                                           data_id=self.data_id) ])
-                     for tagname in tagnames if len(self.select_tagdef(tagname)) > 0]
+                     for tagname in tagnames if tagdefs.has_key(tagname) ]
             if self.status == 'success':
                 self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
             else:
@@ -96,14 +99,16 @@ class Study (Node):
         else:
             tags = []
             files = []
-        return (tags, files, tagnames, requiredtags)
+        return (tags, tagdefs, types, files, tagnames, requiredtags)
 
     def postCommit(self, results):
-        tags, files, tagnames, requiredtags = results
+        tags, tagdefs, types, files, tagnames, requiredtags = results
         target = self.home + web.ctx.homepath
         tvars = dict(target=target,
                      transmissionnum=self.data_id,
                      tags=tags,
+                     tagdefs=tagdefs,
+                     types=types,
                      files=files,
                      tagnames=tagnames,
                      requiredtags=requiredtags,
@@ -1104,6 +1109,7 @@ class Query (Node):
         self.queryopts = queryopts
         self.action = 'query'
         self.title = None
+        self.view_type = None
 
     def qtarget(self):
         terms = []
@@ -1143,6 +1149,11 @@ class Query (Node):
         except:
             self.title = None
 
+        try:
+            self.view_type = self.queryopts['view']
+        except:
+            pass
+
         if op == '':
             op = None
 
@@ -1164,7 +1175,9 @@ class Query (Node):
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
-            files = [ res for res in self.select_files_by_predlist() ]
+            self.listtags = self.getParamsDb('file list tags', data_id=self.view_type)
+            self.listtagswrite = self.getParamsDb('file list tags write', data_id=self.view_type)
+            files = [ res for res in self.select_files_by_predlist(listtags=self.listtags) ]
             for res in files:
                 # decorate each result with writeok information
                 res.writeok = self.gui_test_file_authz('write',
@@ -1191,8 +1204,8 @@ class Query (Node):
                          predlist=self.predlist,
                          urlquote=urlquote,
                          referer=self.home + uri,
-                         filelisttags=self.filelisttags,
-                         filelisttagswrite=self.filelisttagswrite,
+                         filelisttags=self.listtags,
+                         filelisttagswrite=self.listtagswrite,
                          tagdefs=dict([(tagdef.tagname, tagdef) for tagdef in tagdefs]),
                          idquote=idquote)
 

@@ -30,7 +30,7 @@ $if len(files) > 0:
 		$ odd = not odd
 		<td class="file-name">
 		<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
-		$if 'Image Set' in filelisttags and file['Image Set']:
+		$if file['Image Set']:
 			<a href="${apptarget}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
 		$if file.writeok:
 			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file/${urlquote(file.file)}" method="post">
@@ -43,7 +43,7 @@ $if len(files) > 0:
 		</td>
 		<td class="file-tags">
 			<a href="${apptarget}/tags/${urlquote(file.file)}">All Tags</a>
-			$if 'Modality' in filelisttags and file['Modality'] == 'OCT':
+			$if 'Modality' in filelisttags and file['Modality'] == 'OCT' and not file['Image Set']:
 				<br /><a href="${apptarget}/tags/${urlquote(file.file)}?view=OCT+tags">OCT Grade</a>
 		</td>
 		<td class="file-update">
