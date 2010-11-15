@@ -162,9 +162,11 @@ class Application:
         def buildPolicyRules(rules):
             remap = dict()
             for rule in rules:
-                rule = tuple(rule.split(','))
-                srcrole,dstrole,read,write = rule
-                remap[srcrole.strip()] = (dstrole.strip(), parseBoolString(read.strip()), parseBoolString(write.strip()))
+                rule = rule.split(';')
+                srcrole, dstrole, readers, writers = rule
+                readers = [ reader.strip() for reader in readers.split(',') ]
+                writers = [ writer.strip() for writer in writers.split(',') ]
+                remap[srcrole.strip()] = (dstrole.strip(), readers, writers)
             return remap
         
         try:

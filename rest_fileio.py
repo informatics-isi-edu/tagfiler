@@ -515,13 +515,13 @@ class FileIO (Application):
             try:
                 t = self.db.transaction()
                 srcrole = srcroles.pop()
-                dstrole, readuser, writeuser = self.remap[srcrole]
-                if readuser:
-                    self.set_file_tag('read users', self.authn.role)
-                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=self.authn.role)
-                if writeuser:
-                    self.set_file_tag('write users', self.authn.role)
-                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=self.authn.role)
+                dstrole, readusers, writeusers = self.remap[srcrole]
+                for readuser in readusers:
+                    self.set_file_tag('read users', readuser)
+                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=readuser)
+                for writeuser in writeusers:
+                    self.set_file_tag('write users', writeuser)
+                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=writeuser)
                 self.set_file_tag('owner', dstrole)
                 self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
                 t.commit()

@@ -76,17 +76,19 @@ $else:
     <td>
       <a href="${home}/">Home</a>
     </td>
-    $if webauthnhome and 'admin' in authn.roles:
+    $if 'admin' in authn.roles:
     	<td>
 			<a href="${webauthnhome}/role/">Manage roles</a>
 		</td>
+    $if 'uploader' in authn.roles:
 	<td>
 		<a href="${home}/study?action=upload">Upload study</a>
 	</td>
-    <td>
+    $if 'downloader' in authn.roles:
+	<td>
 		<a href="${home}/study?action=download">Download study</a>
 	</td>
-    <td>
+	<td>
 		<a href="${home}/query?action=edit">Query by tags</a>
 	</td>
     <td>

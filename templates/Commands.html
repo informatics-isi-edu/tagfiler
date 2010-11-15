@@ -8,12 +8,15 @@ $ bugs = tvars.get('bugs')
 <ol>
   $if 'admin' in roles:
   	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
-  <li><a href="${apptarget}/study?action=upload">Upload study</a></li>
-  <li><a href="${apptarget}/study?action=download">Download study</a></li>
-  <li><a href="${apptarget}/query?action=edit">Query by tags</a></li>
+  $if 'uploader' in roles:
+	<li><a href="${apptarget}/study?action=upload">Upload study</a></li>
+  $if 'downloader' in roles:
+	<li><a href="${apptarget}/study?action=download">Download study</a></li>
+	<li><a href="${apptarget}/query?action=edit">Query by tags</a></li>
   <li><a href="${help}">Help and documentation</a></li>
   <li><a href="${bugs}">View or submit bug reports/issues</a></li>
-  <li><a href="${apptarget}/tagdef">Manage available tag definitions (expert mode)</a></li>
-  <li><a href="${apptarget}/file?action=define">Create custom dataset (expert mode)</a></li>
+  $if 'admin' in roles:
+	<li><a href="${apptarget}/tagdef">Manage available tag definitions (expert mode)</a></li>
+	<li><a href="${apptarget}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>
 
