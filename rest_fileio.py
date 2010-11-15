@@ -105,7 +105,16 @@ class FileIO (Application):
             # if the dataset is a remote URL, just redirect client
             result, content_type = result
             if not result.local:
-                raise web.seeother(result.location)
+                opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
+                if len(opts) > 0:
+                    querystr = '&'.join(opts)
+                else:
+                    querystr = ''
+                if len(result.location.split("?")) > 1:
+                    querystr = '&' + querystr
+                else:
+                    querystr = '?' + querystr
+                raise web.seeother(result.location + querystr)
             else:
                 self.location = result.location
                 filename = self.store_path + '/' + self.location
@@ -483,12 +492,23 @@ class FileIO (Application):
             except:
                 t.rollback()
 
+        # custom demo hack, proxy tag ops on Image Set to all member files
+        if self.queryopts.has_key('Image Set'):
+            predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+            subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+        else:
+            subfiles = []
+                
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
             self.enforce_tag_authz('write', tagname)
             self.set_file_tag(tagname, self.queryopts[tagname])
             self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
+            # custom demo hack, proxy tag ops on Image Set to all member files
+            if tagname != 'Image Set':
+                for subfile in subfiles:
+                    self.set_file_tag(tagname, self.queryopts[tagname], data_id=subfile)
 
         srcroles = set(self.remap.keys()).intersection(self.authn.roles)
         if len(srcroles) == 1:

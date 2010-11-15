@@ -2,6 +2,7 @@ $def with (tvars)
 $ apptarget = tvars.get('apptarget')
 $ files = tvars.get('files')
 $ referer = tvars.get('referer')
+$ view = tvars.get('view')
 $ role = tvars.get('role')
 $ roles = tvars.get('roles')
 $ urlquote = tvars.get('urlquote')
@@ -12,6 +13,10 @@ $ idquote = tvars.get('idquote')
 $ skiptags =  ['Image Set']
 $ allroles = tvars.get('roleinfo')
 $ odd = True
+$if view:
+	$ querystr = '?view=%s' % urlquote(view)
+$else:
+	$ querystr = ''
 $if len(files) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
@@ -29,7 +34,7 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		<td class="file-name">
-		<a href="${apptarget}/file/${urlquote(file.file)}">${file.file}</a>
+		<a href="${apptarget}/file/${urlquote(file.file)}${querystr}">${file.file}</a>
 		$if file['Image Set']:
 			<a href="${apptarget}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
 		$if file.writeok:
