@@ -393,7 +393,7 @@ function validateCustomTags() {
     	var attr = node.attributes;
     	if (value.length > 0) {
 	    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(value) || 
-	    		attr['typestr'].value == 'int8' && (isNaN(parseInt(value)) || value.length != ("" + parseInt(value)).length) ||
+	    		attr['typestr'].value == 'int8' && (isNaN(parseInt(value)) || value.match('^[0-9]*$') == null) ||
 	    		attr['typestr'].value == 'float8' && isNaN(parseFloat(value)))
 	    	{
 	    		alert('Bad value for tag "' + tagnames[i] + '".');
