@@ -396,10 +396,10 @@ function validateCustomTags() {
     			alert('Tag "' + tagnames[i] + '" is required.');
     			return false;
     		}
-    	}
-    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(node.value)) {
-    		alert('Bad value for tag "' + tagnames[i] + '".');
-    		return false;
+	    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(node.value)) {
+	    		alert('Bad value for tag "' + tagnames[i] + '".');
+	    		return false;
+	    	}
     	}
     }
     return true;
