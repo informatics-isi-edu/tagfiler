@@ -316,11 +316,11 @@ cfgtagdef logo          text        ""      file        file       false
 cfgtagdef contact       text        ""      file        file       false
 cfgtagdef help          text        ""      file        file       false
 cfgtagdef bugs          text        ""      file        file       false
-cfgtagdef 'connections' text        ""      tag         tag        false
-cfgtagdef 'upload chunks' text        ""      tag         tag        false
-cfgtagdef 'download chunks' text        ""      tag         tag        false
-cfgtagdef 'socket buffer size' text        ""      tag         tag        false
-cfgtagdef 'applet chunk bytes' text        ""      tag         tag        false
+cfgtagdef 'connections' text        ""      file         file        false
+cfgtagdef 'upload chunks' text        ""      file         file        false
+cfgtagdef 'download chunks' text        ""      file         file        false
+cfgtagdef 'socket buffer size' text        ""      file         file        false
+cfgtagdef 'applet chunk bytes' text        ""      file         file        false
 
 cfgtag()
 {
@@ -338,11 +338,11 @@ cfgtag "webauthn require" text 'True'
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
 #cfgtag "chunk bytes" text '1048576'
 
-#cfgtag "connections" text '2'
-#cfgtag "upload chunks" text 'true'
-#cfgtag "download chunks" text 'true'
-#cfgtag "socket buffer size" text '8192'
-#cfgtag "applet chunk bytes" text '4194304'
+cfgtag "connections" text '4'
+cfgtag "upload chunks" text 'True'
+cfgtag "download chunks" text 'True'
+cfgtag "socket buffer size" text '8192'
+cfgtag "applet chunk bytes" text '4194304'
 
 cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
 #cfgtag "file list tags write" text 'read users' 'write users'
