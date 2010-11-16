@@ -1041,7 +1041,9 @@ class TagdefACL (FileTags):
         return ( ( [], [], {}, [], [], 0 ),
                  ( [], [], {}, [], [], 0 ),
                  aclinfo,
-                 self.buildroleinfo() )
+                 self.buildroleinfo(),
+                 self.buildaclnameinfo(),
+                 self.get_type() )
 
     def get_title_one(self):
         return 'ACLs for tag "%s"' % self.data_id
@@ -1050,7 +1052,7 @@ class TagdefACL (FileTags):
         return 'ACLs for all tags'
 
     def get_all_html_render(self, results):
-        system, userdefined, all, roleinfo, types = results
+        system, userdefined, all, roleinfo, tagnameinfo, types = results
         tvars = dict(apptarget=self.apptarget,
                      tagspace='tagdefacl',
                      types=types,

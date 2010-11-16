@@ -505,6 +505,9 @@ class Application:
     def buildtagnameinfo(self):
         return [ tagdef.tagname for tagdef in self.select_tagdef() ]
 
+    def buildaclnameinfo(self):
+        return [ 'readers', 'writers' ]
+
     def buildroleinfo(self):
         if self.authn.roleProvider:
             try:
