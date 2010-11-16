@@ -224,7 +224,7 @@ storedquery()
    shift 3
 
    case "\$url" in
-      http:*|/*)
+      http*:*|/*)
           url="\$url"
           ;;
       *)
@@ -367,6 +367,10 @@ cfgtag "bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
 
 
 ## Types and Tags for NEI MISD/DEI demo...
+
+tagdef "Downloaded"   ""          ""      tag         tag        false
+tagacl "Downloaded" read downloader
+tagacl "Downloaded" write downloader
 
 storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" admin "*"
 storedquery "OCT tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/OCT%20tags" admin "*"
