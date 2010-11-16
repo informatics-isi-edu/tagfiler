@@ -287,6 +287,7 @@ cfgtagdef()
    shift
    tagdef "\$tagname" "\$@"
    tag "configuration tags" "_cfg_file list tags" tagname "\$tagname"
+   tag "configuration tags" "_cfg_tag list tags" tagname "\$tagname"
 }
 
 #         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
