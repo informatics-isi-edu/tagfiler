@@ -313,14 +313,14 @@ cfgtagdef logo          text        ""      file        file       false
 cfgtagdef contact       text        ""      file        file       false
 cfgtagdef help          text        ""      file        file       false
 cfgtagdef bugs          text        ""      file        file       false
-cfgtagdef 'client connections' text        ""      tag         tag        false
-cfgtagdef 'client upload chunks' text        ""      tag         tag        false
-cfgtagdef 'client download chunks' text        ""      tag         tag        false
-cfgtagdef 'client socket buffer size' text        ""      tag         tag        false
-cfgtagdef 'client chunk bytes' text        ""      tag         tag        false
+cfgtagdef 'client connections' text ""      file        file       false
+cfgtagdef 'client upload chunks' text ""    file        file       false
+cfgtagdef 'client download chunks' text ""  file        file       false
+cfgtagdef 'client socket buffer size' text "" file      file       false
+cfgtagdef 'client chunk bytes' text ""      file        file       false
 cfgtagdef 'applet tags' text        ""      file        file       true       tagname
 cfgtagdef 'applet tags require' text ""     file        file       true       tagname
-cfgtagdef 'applet custom properties' text  ""      file        file       false
+cfgtagdef 'applet custom properties' text "" file       file       false
 cfgtagdef 'applet test log' text    ""      file        file       false
 cfgtagdef 'applet test properties' text ""  file        file       true
 
