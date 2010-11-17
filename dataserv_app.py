@@ -522,12 +522,6 @@ class Application:
         except:
             return None
 
-    def buildtagnameinfo(self):
-        return [ tagdef.tagname for tagdef in self.select_tagdef() ]
-
-    def buildaclnameinfo(self):
-        return [ 'readers', 'writers' ]
-
     def buildroleinfo(self):
         if self.authn.roleProvider:
             try:
@@ -1055,8 +1049,6 @@ class Application:
 
         if not 'Image Set' in listtags:
             listtags.append('Image Set')
-
-        web.debug(predlist)
 
         roles = [ r for r in self.authn.roles ]
         if roles:

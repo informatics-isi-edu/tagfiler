@@ -11,7 +11,7 @@ $def restriction(tagdef, mode):
 	$elif policy == 'fowner':
 		$ parts.append('owner of file')
 	$elif policy == 'tag':
-		$ parts.append('clients in <a href="%s%s/%s">tagdef ACL</a>' % (home, 'acl', urlquote(tagdef.tagname)))
+		$ parts.append('clients in <a href="%s/%s/%s">tagdef ACL</a>' % (home, 'tagdefacl', urlquote(tagdef.tagname)))
 	$elif policy == 'system':
 		$ parts.append('the service')
 	$:{" and ".join(parts)}

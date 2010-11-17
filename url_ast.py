@@ -181,7 +181,7 @@ class AppletError (Node):
         target = self.home + web.ctx.homepath
         self.setNoCache()
         return self.renderlist("Study Transfer Applet",
-                               [self.render.AppletError(dict(status=self.status))])
+                               [self.render.AppletError(self.status)])
 
 class FileList (Node):
     """Represents a bare FILE/ URI
@@ -925,6 +925,7 @@ class TagdefACL (FileTags):
     __slots__ = [ ]
     def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None):
         FileTags.__init__(self, appname, data_id, tag_id, value, tagvals)
+        self.globals['tagspace'] = 'tagdefacl'
 
     def get_tag_body(self):
         """Override FileTags.get_tag_body to consult tagdef ACL instead"""
@@ -961,43 +962,29 @@ class TagdefACL (FileTags):
                 pass
         return values
 
-    def buildaclinfo(self):
-        results = self.select_tagdef(self.data_id)
-        if len(results) == 0:
-            raise NotFound(data='tag definition "%s"' % self.data_id)
-        tagdef = results[0]
-        acldefs = [ ('readers', 'rolepat', tagdef.owner in self.authn.roles and tagdef.readpolicy == 'tag'),
-                    ('writers', 'rolepat', tagdef.owner in self.authn.roles and tagdef.writepolicy == 'tag') ]
-        acldefsdict = dict([ (acldef[0], acldef) for acldef in acldefs ])
-        readacls = [ (result.tagname, 'readers')
-                     for result in self.select_tagdef(tagname=self.data_id,
-                                                      where="readpolicy = 'tag'") ]
-        writeacls = [ (result.tagname, 'writers')
-                      for result in self.select_tagdef(tagname=self.data_id,
-                                                       where="writepolicy = 'tag'") ]
-        tagacls = readacls + writeacls
-        m = dict(readers='read', writers='write')
-        tagaclvals = [ (tag,
-                        acl,
-                        [result.value for result in self.select_tag_acl(m[acl], tag_id=tag)])
-                       for tag, acl in tagacls ]
-        length = listmax([listmax([ len(val) for val in vals]) for tag, acl, vals in tagaclvals])
-        return ( [],
-                 acldefs,
-                 acldefsdict,
-                 tagacls,
-                 tagaclvals,
-                 length )
-
     def get_all_body(self):
         """Override FileTags.get_all_body to consult tagdef ACL instead"""
-        aclinfo = self.buildaclinfo()
-        return ( ( [], [], {}, [], [], 0 ),
-                 ( [], [], {}, [], [], 0 ),
-                 aclinfo,
-                 self.buildroleinfo(),
-                 self.buildaclnameinfo(),
-                 self.get_type() )
+        tagdefs = [ tagdef for tagdef in self.select_tagdef(self.data_id) ]
+        if len(tagdefs) == 0:
+            raise NotFound(data='tag definition "%s"' % self.data_id)
+        
+        acldefs = [ web.storage(tagname='readers', typestr='rolepat', multivalue=True),
+                    web.storage(tagname='writers', typestr='rolepat', multivalue=True) ]
+
+        length = 0
+        for tagdef in tagdefs:
+            tagdef.file = tagdef.tagname
+            for acldef in acldefs:
+                mode = dict(readers='read', writers='write')[acldef.tagname]
+                aclvals = [ res.value for res in self.select_tag_acl(mode, tag_id=tagdef.tagname) ]
+                length = max(length, listmax(aclvals))
+                tagdef[dict(read='readers', write='writers')[mode]] = aclvals
+                if tagdef.owner in self.authn.roles:
+                    tagdef.writeok = True
+                else:
+                    tagdef.writeok = False
+
+        return (tagdefs, [], [], acldefs, length)
 
     def get_title_one(self):
         return 'ACLs for tag "%s"' % self.data_id
@@ -1006,21 +993,14 @@ class TagdefACL (FileTags):
         return 'ACLs for all tags'
 
     def get_all_html_render(self, results):
-        system, userdefined, all, roleinfo, tagnameinfo, types = results
-        tvars = dict(apptarget=self.apptarget,
-                     tagspace='tagdefacl',
-                     types=types,
-                     data_id=self.data_id,
-                     roleinfo=roleinfo,
-                     urlquote=urlquote,
-                     idquote=idquote)
+        tagdefs, system, userdefined, all, length = results
+        self.globals['tagdefsdict'] = dict([ (x.tagname, x) for x in all ])
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting(dictmerge(tvars, dict(title='', taginfo=all))),
-                                    self.render.FileTagNew(dictmerge(tvars, dict(title='Add an authorized user', taginfo=all)))])
+                                   [self.render.FileTagExisting('', tagdefs, all)])
         else:
             return self.renderlist(self.get_title_all(),
-                                   [self.render.FileTagValExisting(dictmerge(tvars, dict(title='', taginfo=all)))])       
+                                   [self.render.FileTagValExisting('', tagdefs, all)])       
 
     def put_body(self):
         """Override FileTags.put_body to consult tagdef ACL instead"""

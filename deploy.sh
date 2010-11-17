@@ -430,7 +430,7 @@ done
 cfgtag "applet tags" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
 cfgtag "applet tags require" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
 
-for tag in '_cfg_file list tags' '_cfg_applet tags' '_cfg_applet tags require'
+for tag in '_cfg_file list tags' '_cfg_file list tags write' '_cfg_applet tags' '_cfg_applet tags require'
 do 
    tag 'study tags' "\$tag" tagname "Modality" "Study Name" "Study Participant" "Study Date"
 done
