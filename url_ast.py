@@ -783,7 +783,7 @@ class FileTags (Node):
                 for file, tag, vals in all[4]:
                     if len(vals) > 0:
                         for val in vals:
-                            body.append("%s=%s" % (urlquote(tag), urlquote(val)))
+                            body.append("%s=%s" % (urlquote(tag), urlquote(str(val))))
                     else:
                         body.append("%s" % (urlquote(tag)))
                 return '&'.join(body)
