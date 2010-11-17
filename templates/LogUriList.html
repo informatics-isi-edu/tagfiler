@@ -1,13 +1,10 @@
-$def with (tvars)
-$ target = tvars.get('target')
-$ files = tvars.get('files')
-$ urlquote = tvars.get('urlquote')
+$def with (lognames)
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code
         def renderfiles(files):
                 s = ""
                 for f in files:
-                        s += target + "/log/" + urlquote(f) + "\n"
+                        s += home + "/log/" + urlquote(f) + "\n"
                 return s
-${renderfiles(files)[:-1]}
+${renderfiles(lognames)[:-1]}

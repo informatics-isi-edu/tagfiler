@@ -303,7 +303,6 @@ class FileIO (Application):
         if len(params) > 0:
             suffix = '?' + '&'.join(params)
 
-        target = self.home + web.ctx.homepath + '/file/' + urlquote(self.data_id) + suffix
         if self.action == 'define':
 
             def body():
@@ -316,10 +315,10 @@ class FileIO (Application):
             def postCommit(results):
                 if self.filetype == 'file':
                     return self.renderlist("Upload data file",
-                                           [self.render.FileForm(target)])
+                                           [self.render.FileForm(suffix)])
                 elif self.filetype == 'url':
                     return self.renderlist("Register a remote URL",
-                                           [self.render.UrlForm(dict(target=target))])
+                                           [self.render.UrlForm(suffix)])
                 else:
                     raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
 
@@ -824,12 +823,8 @@ class FileIO (Application):
             target = self.home + web.ctx.homepath
             ftype = result
             return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(dict(target=self.home + web.ctx.homepath,
-                                                                 type=ftype,
-                                                                 name=self.data_id,
-                                                                 referer=self.referer,
-                                                                 urlquote=urlquote))])
-
+                                   [self.render.ConfirmForm(ftype)])
+        
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way

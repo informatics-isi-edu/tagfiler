@@ -151,6 +151,7 @@ class Application:
         "store common configuration data for all service classes"
         global render
 
+        self.data_id = None
         self.globals = dict()
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
@@ -442,9 +443,12 @@ class Application:
                         self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
                         self.globals['roleinfo'] = self.buildroleinfo()
                         self.globals['typeinfo'] = self.get_type()
+
+                        # and set defaults if they weren't overridden by caller
                         self.globals['view'] = self.globals.get('view', None)
                         self.globals['referer'] = self.globals.get('referer', web.ctx.env.get('HTTP_REFERER', None))
                         self.globals['tagspace'] = self.globals.get('tagspace', 'tags')
+                        self.globals['data_id'] = self.globals.get('data_id', self.data_id)
 
                         bodyval = body()
                         t.commit()

@@ -270,7 +270,7 @@ class FileList (Node):
                 raise web.seeother(url)
             else:
                 return self.renderlist("Define a dataset",
-                                       [self.render.NameForm(dict(apptarget=self.home + web.ctx.homepath))])
+                                       [self.render.NameForm()])
         else:
             try:
                 self.globals['view'] = storage.view
