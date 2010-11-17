@@ -752,6 +752,7 @@ class FileTags (Node):
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
+        self.globals['referer'] = self.home + uri
         storage = web.input()
         try:
             self.view_type = storage.view
@@ -874,8 +875,6 @@ class FileTags (Node):
         return None
 
     def post_postCommit(self, results):
-        if self.referer == None:
-            self.referer = '/tags/' + urlquote(self.data_id)
         raise web.seeother(self.referer)
 
     def POST(self, uri):
@@ -905,7 +904,7 @@ class FileTags (Node):
             try:
                 self.referer = storage.referer
             except:
-                self.referer = None
+                self.referer = '/tags/' + urlquote(self.data_id)
         except:
             raise BadRequest(data="Error extracting form data.")
 
