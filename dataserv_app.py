@@ -140,13 +140,18 @@ class Application:
     def getParamsDb(self, suffix, data_id=None):
         if data_id == None:
             data_id = 'tagfiler configuration'
-        results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
-        #web.debug(data_id, suffix, results)
-        return results
+        try:
+            results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
+            #web.debug(data_id, suffix, results)
+            return results
+        except:
+            return []
 
     def __init__(self):
         "store common configuration data for all service classes"
         global render
+
+        self.globals = dict()
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -178,53 +183,62 @@ class Application:
 
         self.hostname = socket.gethostname()
 
+        self.logmsgs = []
+        self.middispatchtime = None
+
         self.dbnstr = getParamEnv('dbnstr', 'postgres')
         self.dbstr = getParamEnv('dbstr', '')
         self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
 
-        t = self.db.transaction()
-        
-        self.authn = webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None)
-        
-        self.store_path = self.getParamDb('store path', '/var/www/%s-data' % self.daemonuser)
-        self.log_path = self.getParamDb('log path', '/var/www/%s-logs' % self.daemonuser)
-        self.template_path = self.getParamDb('template path',
-                                        '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
-        self.render = web.template.render(self.template_path)
-        render = self.render # HACK: make this available to exception classes too
+        # set default anonymous authn info
+        self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
 
+        t = self.db.transaction()
+        # BEGIN: get runtime parameters from database
+
+        # these properties are used by Python code but not templates
+        self.store_path = self.getParamDb('store path', '/var/www/%s-data' % self.daemonuser)
+        self.chunkbytes = int(self.getParamDb('chunk bytes', 1048576))
+        self.log_path = self.getParamDb('log path', '/var/www/%s-logs' % self.daemonuser)
+        self.template_path = self.getParamDb('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
         self.home = self.getParamDb('home', 'https://%s' % self.hostname)
-        self.help = self.getParamDb('help')
-        self.jira = self.getParamDb('bugs')
         
         self.remap = buildPolicyRules(self.getParamsDb('policy remappings'))
         self.localFilesImmutable = parseBoolString(self.getParamDb('local files immutable', 'False'))
-        self.remoteFilesImmutable = False # parseBoolString(self.getParamDb('remote files immutable', 'False'))
-        self.webauthnhome = self.getParamDb('webauthn home')
-        self.webauthnrequire = parseBoolString(self.getParamDb('webauthn require', 'False'))
+        self.remoteFilesImmutable = parseBoolString(self.getParamDb('remote files immutable', 'False'))
 
-        self.chunkbytes = int(self.getParamDb('chunk bytes', 1048576))
+        self.render = web.template.render(self.template_path, globals=self.globals)
+        render = self.render # HACK: make this available to exception classes too
         
+        # 'globals' are local to this Application instance and also used by its templates
+        self.globals['render'] = self.render # HACK: make render available to templates too
+        self.globals['urlquote'] = urlquote
+        self.globals['idquote'] = idquote
 
-        self.logo = self.getParamDb('logo', '')
-        self.subtitle = self.getParamDb('subtitle', '')
-        self.contact = self.getParamDb('contact', None)
-        self.appletTest = self.getParamDb('applet test properties', None)
-        self.appletlog = self.getParamDb('applet test log', None)
-        self.logmsgs = []
-        self.middispatchtime = None
+        self.globals['home'] = self.home + web.ctx.homepath
+        self.globals['homepath'] = web.ctx.homepath
+        self.globals['help'] = self.getParamDb('help')
+        self.globals['bugs'] = self.getParamDb('bugs')
+        self.globals['subtitle'] = self.getParamDb('subtitle', '')
+        self.globals['logo'] = self.getParamDb('logo', '')
+        self.globals['contact'] = self.getParamDb('contact', None)
 
-        self.connections = self.getParamDb('connections', '2')
-        self.uploadchunks = parseBoolString(self.getParamDb('upload chunks', 'False'))
-        self.downloadchunks = parseBoolString(self.getParamDb('download chunks', 'False'))
-        self.socketbuffersize = int(self.getParamDb('socket buffer size', 8192))
-        self.appletchunkbytes = int(self.getParamDb('applet chunk bytes', 4194304))
+        self.globals['webauthnhome'] = self.getParamDb('webauthn home')
+        self.globals['webauthnrequire'] = parseBoolString(self.getParamDb('webauthn require', 'False'))
 
-        self.filelisttags = self.getParamsDb('file list tags')
-        self.filelisttagswrite = self.getParamsDb('file list tags write')
+        self.globals['filelisttags'] = self.getParamsDb('file list tags')
+        self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write')
                 
-        self.customproperties = None # self.getParamDb('applet properties', None)
-
+        self.globals['appletTestProperties'] = self.getParamDb('applet test properties', None)
+        self.globals['appletLogfile'] = self.getParamDb('applet test log', None)
+        self.globals['appletCustomProperties'] = None # self.getParamDb('applet custom properties', None)
+        self.globals['clientChunkbytes'] = int(self.getParamDb('client chunk bytes', 4194304))
+        self.globals['clientConnections'] = self.getParamDb('client connections', '2')
+        self.globals['clientUploadChunks'] = parseBoolString(self.getParamDb('client upload chunks', 'False'))
+        self.globals['clientDownloadChunks'] = parseBoolString(self.getParamDb('client download chunks', 'False'))
+        self.globals['clientSocketBufferSize'] = int(self.getParamDb('client socket buffer size', 8192))
+        
+        # END: get runtime parameters from database
         t.commit()
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
@@ -324,42 +338,39 @@ class Application:
     def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
 
+    def set_authn(self, authn):
+        self.authn = authn
+        self.globals['authn'] = authn
+
     def renderlist(self, title, renderlist, refresh=True):
         tvars = dict()
         if refresh:
-            tvars['pollmins'] = 1
+            self.globals['pollmins'] = 1
+        else:
+            self.globals['pollmins'] = None
 
-        tvars['title'] = title
-        tvars['subtitle'] = self.subtitle
-        tvars['logo'] = self.logo
-
-        tvars['home'] = self.home + web.ctx.homepath
-        tvars['help'] = self.help
-        tvars['bugs'] = self.jira
-        tvars['webauthnhome'] = self.webauthnhome
-        tvars['webauthnrequire'] = self.webauthnrequire
-        tvars['authn'] = self.authn
-
+        self.globals['title'] = title
+ 
         return "".join([unicode(r) for r in 
-                        [self.render.Top(tvars)] 
+                        [self.render.Top()] 
                         + renderlist
-                        + [self.render.Bottom(tvars)]])
+                        + [self.render.Bottom()]])
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
-        self.authn = app.authn
+        self.set_authn(app.authn)
 
     def preDispatch(self, uri):
         def body():
-            if self.webauthnhome:
+            if self.globals['webauthnhome']:
                 if not self.db:
                     self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-                self.authn = webauthn.session.test_and_update_session(self.db,
-                                                                      referer=self.home + uri,
-                                                                      setcookie=True)
+                self.set_authn(webauthn.session.test_and_update_session(self.db,
+                                                                        referer=self.home + uri,
+                                                                        setcookie=True))
                 self.middispatchtime = datetime.datetime.now()
-                if not self.authn.role and self.webauthnrequire:
-                    raise web.seeother(self.webauthnhome + '/login?referer=%s' % self.home + uri)
+                if not self.authn.role and self.globals['webauthnrequire']:
+                    raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % self.home + uri)
             else:
                 try:
                     user = web.ctx.env['REMOTE_USER']
@@ -367,7 +378,7 @@ class Application:
                 except:
                     user = None
                     roles = set()
-                self.authn = webauthn.providers.AuthnInfo(user, roles, None, None, False, None)
+                self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
 
         def postCommit(results):
             pass
@@ -376,7 +387,7 @@ class Application:
 
     def postDispatch(self, uri=None):
         def body():
-            if self.webauthnhome:
+            if self.globals['webauthnhome']:
                 t = self.db.transaction()
                 webauthn.session.test_and_update_session(self.db, self.authn.guid,
                                                          ignoremustchange=True,
@@ -426,6 +437,15 @@ class Application:
                     try:
                         self.logmsgs = []
                         count = count + 1
+
+                        # build up globals useful to almost all classes, to avoid redundant coding
+                        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
+                        self.globals['roleinfo'] = self.buildroleinfo()
+                        self.globals['typeinfo'] = self.get_type()
+                        self.globals['view'] = self.globals.get('view', None)
+                        self.globals['referer'] = self.globals.get('referer', web.ctx.env.get('HTTP_REFERER', None))
+                        self.globals['tagspace'] = self.globals.get('tagspace', 'tags')
+
                         bodyval = body()
                         t.commit()
                         break
@@ -729,7 +749,10 @@ class Application:
     def select_file(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
-        results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
+        if data_id == None:
+            results = self.db.select('files', vars=dict(name=data_id))
+        else:
+            results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
         return results
 
     def insert_file(self):
@@ -1026,12 +1049,14 @@ class Application:
             predlist = self.predlist
 
         if listtags == None:
-            listtags = self.filelisttags
+            listtags = self.globals['filelisttags']
         else:
             listtags = [ x for x in listtags ]
 
         if not 'Image Set' in listtags:
             listtags.append('Image Set')
+
+        web.debug(predlist)
 
         roles = [ r for r in self.authn.roles ]
         if roles:
@@ -1126,9 +1151,10 @@ class Application:
             outertables.append('"_%s" ON (files.name = "_%s".file)' % (tagname, tagname))
             if tagdefs[tagname].typestr == '':
                 selects.append('("_%s".file IS NOT NULL) AS "%s"' % (tagname, tagname))
+                groupbys.append('"%s"' % tagname)
             else:
                 selects.append('"_%s".value AS "%s"' % (tagname, tagname))
-            groupbys.append('"%s"' % tagname)
+                groupbys.append('"_%s".value' % tagname)
 
         # add custom per-file multi-val tags to results
         multivaltags = [ tagname for tagname in listtags

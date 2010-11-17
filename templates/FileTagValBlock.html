@@ -1,0 +1,104 @@
+$def with (file, tagdef, writetags)
+$ writetags = [ tag for tag in writetags ]
+$for type in typeinfo:
+	$ values = type['_type_values']
+	$if values:
+		$ values = dict(values)
+	$else:
+		$ values = None
+	$ type['_type_values'] = values
+$ tagnames = tagdefsdict.iterkeys()
+$ typesdict = dict( [ (type['_type_name'], type) for type in typeinfo ] )
+$ type = typesdict[tagdef.typestr]
+$ typename = type['_type_description']
+$ typevals = type['_type_values']
+$ writeok = tagdef.get('writeok', True)
+$ vals = file[tagdef.tagname]
+$if vals == None:
+	$ itervals = []
+$else:
+	$if tagdef.multivalue:
+		$ itervals = vals
+	$else:
+		$ itervals = [ vals ]
+$if tagdef.typestr:
+	<table class="file-tag-list">
+	$for val in itervals:
+		<tr>
+		<td class="file-tag ${idquote(tagdef.tagname)} multivalue">
+		$if typevals:
+			$# this lambda is to simulate ternary operator in Python 2.4
+			${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
+		$else:
+			${val}
+		</td>
+		<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
+		$if tagdef.tagname in writetags and writeok:
+			<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+			<input type="hidden" name="tag" value="${tagdef.tagname}" />
+			<input type="hidden" name="value" value="${val}" />
+			<input type="hidden" name="action" value="delete" />
+			<input type="submit" value="Remove Value" />
+			</form>
+		</td>
+		</tr>
+	$if tagdef.tagname in writetags and writeok:
+		<tr>
+		<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+		<input type="hidden" name="set-${urlquote(tagdef.tagname)}" value="true" />
+		<td class="file-tag ${idquote(tagdef.tagname)} multivalue input">
+		$if tagdef.typestr in ['role', 'rolepat', 'tagname'] or typevals:
+			$if typevals:
+				$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
+			$elif tagdef.typestr in [ 'role', 'rolepat' ]:
+				$if roleinfo != None:
+					$if tagdef.typestr == 'rolepat':
+						$ options = [ (role, role) for role in set(roleinfo).union(set(['*'])).difference(set(itervals)) ]
+					$else:
+						$ options = [ (role, role) for role in set(roleinfo).difference(set(itervals)) ]
+				$else:
+					$ options = []
+			$elif tagdef.typestr == 'tagname':
+				$ options = [ (tag, tag) for tag in set(tagnames).difference(set(itervals)) ]
+			$else:
+				$ options = []
+			$if options:
+				$ options.sort(key=lambda x: x[0])
+				<select name="val-${urlquote(tagdef.tagname)}">
+				$if typename.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
+					$ article = 'an'
+				$else:
+					$ article = 'a'
+				<option value="">Choose ${article} ${typename}</option>
+				$for option in options:
+					<option value="${option[0]}">${option[1]}</option>
+				</select>
+			$else:
+				<input type="text" name="val-${urlquote(tagdef.tagname)}" />
+		$else:
+			<input type="text" name="val-${urlquote(tagdef.tagname)}" />
+		</td>
+		<input type="hidden" name="action" value="put" />
+		<td class="file-tag ${idquote(tagdef.tagname)} multivalue set">
+		<input type="submit" value="Set Value" />
+		</td>
+		</form>
+		</tr>
+	</table>
+$else:
+	<table class="file-tag-list">
+	<tr>
+	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+	<input type="hidden" name="tag" value="${tagdef.tagname}" />
+	$if writeok:
+		$if vals != None:
+			<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${tagdef.tagname} is set</td>
+			<input type="hidden" name="action" value="delete" />
+			<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
+		$else:
+			<td class="file-tag ${idquote(tagdef.tagname)} multivalue">not set</td>
+			<input type="hidden" name="action" value="put" />
+			<td class="file-tag ${idquote(tagdef.tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
+	</form>
+	</tr>
+	</table>

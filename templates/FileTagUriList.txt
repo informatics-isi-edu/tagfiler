@@ -1,17 +1,18 @@
-$def with (tvars)
-$ target = tvars.get('target')
-$ taginfo = tvars.get('taginfo')
-$ urlquote = tvars.get('urlquote')
+$def with (files, tagdefs)
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code
 	def rendertagvals(filetagvals):
 		s = ""
-		for file, tag, vals in filetagvals:
-			if len(vals) > 0:
-				for val in vals:
-					s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "=" + urlquote(val) + "\n"
-			else:
-				s += target + "/tags/" + urlquote(file) + "/" + urlquote(tag) + "\n"
+		for file in files:
+			for tagdef in tagdefs:
+				if file[tagdef.tagname]:
+					if tagdef.typestr == '':
+						s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "\n"
+					elif tagdef.multivalue:
+						for val in file[tagdef.tagname]:
+							s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "=" + urlquote(val) + "\n"
+					else:
+						s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname])
 		return s
 ${rendertagvals(taginfo[4])[:-1]}

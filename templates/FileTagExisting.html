@@ -1,31 +1,9 @@
-$def with (tvars)
-$ title = tvars.get('title')
-$ apptarget = tvars.get('apptarget')
-$ tagspace = tvars.get('tagspace')
-$ data_id = tvars.get('data_id')
-$ taginfo = tvars.get('taginfo')
-$ types = tvars.get('types')
-$ urlquote = tvars.get('urlquote')
-$ idquote = tvars.get('idquote')
-$ roleinfo = tvars.get('roleinfo')
-$ tagnames = tvars.get('tagnameinfo')
-$ allroles = roleinfo
-$ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
-$ tagvals = dict( [ (tag, vals) for file, tag, vals in filetagvals ] )
-$ excludes = [ x for x in excludes ]
+$def with (title, files, tagdefs)
 $ odd = True
 $if title == 'User' and data_id:
-	<p><a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
+	<p><a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
 $if title != '':
 	<h2>${title}</h2>
-$for type in types:
-	$ values = type['_type_values']
-	$if values:
-		$ values = dict(values)
-	$else:
-		$ values = None
-	$ type['_type_values'] = values
-$ typesdict = dict( [ (type['_type_name'], type) for type in types ] )
 $if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
@@ -33,103 +11,14 @@ $if len(tagdefs) > 0:
 	<th class="file-tags">Current Value(s)</th>
 	</tr>
 	$for tagdef in tagdefs:
-		$ tag, typestr, writeok = tagdef
-		$ type = typesdict[typestr]
-		$ typename = type['_type_description']
-		$ typevals = type['_type_values']
-		$ tagname, typestr, writeok = tagdefsdict[tag]
-		$ vals = tagvals.get(tagname, None)
 		$if odd:
 			<tr class="file odd">
 		$else:
 			<tr class="file even">
 		$ odd = not odd
-		<td class="tag name">${tagname}</td>
-		<td class="file-tag ${idquote(tagname)}">
-		$if typestr:
-			<table class="file-tag-list">
-			$if vals == None:
-				$ itervals = []
-			$else:
-				$ itervals = vals
-			$for val in itervals:
-				<tr>
-				<td class="file-tag ${idquote(tag)} multivalue">
-				$if typevals:
-					${val} (${typevals.get(val, '')})
-				$else:
-					${val}
-				</td>
-				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
-				<input type="hidden" name="tag" value="${tag}" />
-				<input type="hidden" name="value" value="${val}" />
-				<td class="file-tag ${idquote(tag)} multivalue delete">
-				$if writeok:
-					<input type="hidden" name="action" value="delete" />
-					<input type="submit" value="Remove Value" />
-				</td>
-				</form>
-			 	</tr>
-			$if writeok:
-				<tr>
-				<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
-				<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
-				<td class="file-tag ${idquote(tagname)} multivalue input">
-				$if typestr in ['role', 'rolepat', 'tagname'] or typevals:
-					$if typevals:
-						$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
-					$elif typestr in [ 'role', 'rolepat' ]:
-						$if allroles != None:
-							$if typestr == 'rolepat':
-								$ options = [ (role, role) for role in set(allroles).union(set(['*'])).difference(set(tagvals.get(tagname, []))) ]
-							$else:
-								$ options = [ (role, role) for role in set(allroles).difference(set(tagvals.get(tagname, []))) ]
-						$else:
-							$ options = []
-					$elif typestr == 'tagname':
-						$ options = [ (tag, tag) for tag in set(tagnames).difference(set(tagvals.get(tagname, []))) ]
-					$else:
-						$ options = []
-					$if options:
-						$ options.sort(key=lambda x: x[0])
-						<select name="val-${urlquote(tagname)}">
-						$if typename.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
-							$ article = 'an'
-						$else:
-							$ article = 'a'
-						<option value="">Choose ${article} ${typename}</option>
-						$for option in options:
-							<option value="${option[0]}">${option[1]}</option>
-						</select>
-					$else:
-						<input type="text" name="val-${urlquote(tagname)}" />
-				$else:
-					<input type="text" name="val-${urlquote(tagname)}" />
-				</td>
-				<input type="hidden" name="action" value="put" />
-				<td class="file-tag ${idquote(tagname)} multivalue set">
-				<input type="submit" value="Set Value" />
-				</td>
-				</form>
-				</tr>
-			</table>
-		$else:
-			<table class="file-tag-list">
-			<tr>
-			<form enctype="application/x-www-form-urlencoded" action="${apptarget}/${tagspace}/${urlquote(data_id)}" method="post">
-			<input type="hidden" name="tag" value="${tag}" />
-			$if writeok:
-				$if vals != None:
-					<td class="file-tag ${idquote(tag)} multivalue">${tag} is set</td>
-					<input type="hidden" name="action" value="delete" />
-					<td class="file-tag ${idquote(tag)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
-				$else:
-					<td class="file-tag ${idquote(tag)} multivalue">not set</td>
-					<input type="hidden" name="action" value="put" />
-					<td class="file-tag ${idquote(tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
-			</form>
-			</tr>
-			</table>
+		<td class="tag name">${tagdef.tagname}</td>
+		<td class="file-tag ${idquote(tagdef.tagname)}">
+		$:{render.FileTagValBlock(files[0], tagdef, tagdefsdict.iterkeys())}
 		</td>
 		</tr>
 	</table>

@@ -234,6 +234,8 @@ storedquery()
 
    echo "create stored query: '\$file' --> '\$url'..."
    psql -t -q -c "INSERT INTO files (name, local, location) VALUES ( '\$file', False, '\$url' )"
+   tag "\$file" name text "\$file"
+   tag "\$file" url text "\$url"
    tag "\$file" owner text "\$owner"
    while [[ \$# -gt 0 ]]
    do
@@ -303,24 +305,24 @@ cfgtagdef 'log path'    text        ""      file        file       false
 cfgtagdef 'template path' text      ""      file        file       false
 cfgtagdef 'chunk bytes' text        ""      file        file       false
 cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
-cfgtagdef 'applet tags' text        ""      file        file       true       tagname
-cfgtagdef 'applet tags require' text ""     file        file       true       tagname
-cfgtagdef 'applet properties' text  ""      file        file       false
 cfgtagdef 'local files immutable' text ""   file        file       false
 cfgtagdef 'remote files immutable' text ""  file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
-cfgtagdef 'applet test log' text    ""      file        file       false
-cfgtagdef 'applet test properties' text ""  file        file       true
 cfgtagdef subtitle      text        ""      file        file       false
 cfgtagdef logo          text        ""      file        file       false
 cfgtagdef contact       text        ""      file        file       false
 cfgtagdef help          text        ""      file        file       false
 cfgtagdef bugs          text        ""      file        file       false
-cfgtagdef 'connections' text        ""      tag         tag        false
-cfgtagdef 'upload chunks' text        ""      tag         tag        false
-cfgtagdef 'download chunks' text        ""      tag         tag        false
-cfgtagdef 'socket buffer size' text        ""      tag         tag        false
-cfgtagdef 'applet chunk bytes' text        ""      tag         tag        false
+cfgtagdef 'client connections' text        ""      tag         tag        false
+cfgtagdef 'client upload chunks' text        ""      tag         tag        false
+cfgtagdef 'client download chunks' text        ""      tag         tag        false
+cfgtagdef 'client socket buffer size' text        ""      tag         tag        false
+cfgtagdef 'client chunk bytes' text        ""      tag         tag        false
+cfgtagdef 'applet tags' text        ""      file        file       true       tagname
+cfgtagdef 'applet tags require' text ""     file        file       true       tagname
+cfgtagdef 'applet custom properties' text  ""      file        file       false
+cfgtagdef 'applet test log' text    ""      file        file       false
+cfgtagdef 'applet test properties' text ""  file        file       true
 
 cfgtag()
 {
@@ -351,6 +353,7 @@ cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
 #cfgtag "applet properties" text 'tagfiler.properties'
 
 #cfgtag "local files immutable" text 'True'
+#cfgtag "remote files immutable" text 'True'
 
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...

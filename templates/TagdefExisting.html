@@ -1,35 +1,9 @@
-$def with (tvars)
-$ title = tvars.get('title')
-$ target = tvars.get('target')
-$ types = tvars.get('types')
-$ typenames = [ (type['_type_name'], type['_type_description']) for type in types ]
+$def with (title, test_tagdef_authz)
+$ target = home + '/tagdef'
+$ typenames = [ (type['_type_name'], type['_type_description']) for type in typeinfo ]
 $ typenames.sort(key=lambda x: x[1])
 $ typedict = dict(typenames)
-$ tagdefs = tvars.get('tagdefs')
-$ test_tagdef_authz = tvars.get('test_tagdef_authz')
-$ urlquote = tvars.get('urlquote')
 $ odd = True
-$# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
-$for foo in [ 0 ]:
-$code
-	def tagpolicy(tagname, policy, mode):
-		aclurl = target + 'acl/' + urlquote(tagname)
-		acldesc = []
-		if owner != None:
-			acldesc.append(owner)
-		acldesc.append('clients in <a href="%s">tagdef ACL</a>' % aclurl)
-		acldesc = " and ".join(acldesc)
-		m = dict(anonymous=None, 
-			users='any authenticated user', 
-			file=('same clients who can %s file' % mode),
-			fowner='owner of file',
-			tag=acldesc, 
-			system='system')
-		r = m[policy]
-		if r:
-			return 'only %s' % ( r)
-		else:
-			return ''
 <h2>${title}</h2>
 <p>
 <table class="file-list">
@@ -74,37 +48,32 @@ $if title == 'User':
     </form>
     </tr>
     $ odd = not odd
-$for tagdef in tagdefs:
-	$ tagname, typestr, multivalue, readpolicy, writepolicy, owner = tagdef
+$for tagdef in tagdefsdict.itervalues():
 	$if odd:
 		<tr class="file odd">
 	$else:
 		<tr class="file even">
 	$ odd = not odd
-	<td class="tag name">${tagname}</td>
-	<td class="tag type">${typedict[typestr]}</td>
+	<td class="tag name">${tagdef.tagname}</td>
+	<td class="tag type">${typedict[tagdef.typestr]}</td>
 	<td class="tag cardinality>">
-	$if multivalue:
+	$if tagdef.multivalue:
 		0 or more
 	$else:
 		0 or 1
 	</td>
-	<td class="tag owner">${owner}</td>
+	<td class="tag owner">${tagdef.owner}</td>
 	<td class="tag read acl">
-	$ readrestriction = tagpolicy(tagname, readpolicy, 'read')
-	$if readrestriction:
-		$:readrestriction
+	$:{render.TagdefPolicy(tagdef, 'read')}
 	</td>
 	<td class="tag write acl">
-	$ writerestriction = tagpolicy(tagname, writepolicy, 'write')
-	$if writerestriction:
-		$:writerestriction
+	$:{render.TagdefPolicy(tagdef, 'write')}
 	</td>
 	<td class="tag delete">
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-	<input type="hidden" name="tag" value="${tagname}" />
+	<input type="hidden" name="tag" value="${tagdef.tagname}" />
 	<input type="hidden" name="action" value="delete" />
-	$if test_tagdef_authz('write', tagname):
+	$if test_tagdef_authz('write', tagdef.tagname):
 		<input type="submit" value="Delete" />
 	</form>
 	</td>

@@ -1,29 +1,25 @@
-$def with (tvars)
-$ apptarget = tvars.get('apptarget')
-$ qtarget = tvars.get('qtarget')
-$ predlist = tvars.get('predlist')
-$ ops = dict(tvars.get('ops'))
-$ roles = tvars.get('roles')
+$def with (ops, predlist)
+$ opsdict = dict(ops)
 <p>
-<form enctype="application/x-www-form-urlencoded" action="${apptarget}/file" method="post">
+<form enctype="application/x-www-form-urlencoded" action="${home}/file" method="post">
 <fieldset>
 <legend>Save named query</legend>
 Enter a descriptively unique name: <br />
 <input name="name" id="SavedQueryName" onkeyup="checkQueryName()" type="text" />
-<input type="hidden" name="url" value="${qtarget}" />
+<input type="hidden" name="url" value="${queryTarget}" />
 <input type="hidden" name="action" value="putsq" />
 <input type="submit" id="SavedQueryButton" disabled="disabled" value="Create Saved Query" />
 </fieldset>
 </form>
 </p>
 <h3>Current Query</h3>
-<p><a href="${qtarget}">Permanent link to this query</a></p>
+<p><a href="${queryTarget}">Permanent link to this query</a></p>
 $if len(predlist) == 0:
 	<p>Match all files.</p>
 $else:
 	<p>Match files tagged with all of the following tags:</p>
 $for pred in predlist:
-	<form enctype="application/x-www-form-urlencoded" action="${qtarget}" method="get">
+	<form enctype="application/x-www-form-urlencoded" action="${queryTarget}" method="get">
 	<fieldset>
 	<legend>${pred['tag']}</legend>
 	$if pred['op'] in [ '', None ]:
@@ -31,7 +27,7 @@ $for pred in predlist:
 	$if pred['op'] == ':not:':
 		${ops[pred['op']]}
 	$elif pred['op']:
-		${ops[pred['op']]}
+		${opsdict[pred['op']]}
 		$ count = 0
 		$for val in pred['vals']:
 			$if count == 0:

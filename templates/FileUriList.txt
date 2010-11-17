@@ -1,13 +1,3 @@
-$def with (tvars)
-$ target = tvars.get('apptarget')
-$ files = tvars.get('files')
-$ urlquote = tvars.get('urlquote')
-$# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
-$for foo in [ 0 ]:
-$code
-	def renderfiles(files):
-		s = ""
-		for f in files:
-			s += target + "/file/" + urlquote(f.file) + "\n"
-		return s
-${renderfiles(files)[:-1]}
+$def with (files)
+$# this lambda is to do a ternary operator in old Python 2.4
+$:{ (lambda s: s + ("", "\n")[len(s) > 0])("\n".join([ "%s/file/%s" % (home, urlquote(file.file)) for file in files]))}

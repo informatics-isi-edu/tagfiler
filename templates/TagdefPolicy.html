@@ -1,0 +1,20 @@
+$def with (tagdef, mode)
+$def restriction(tagdef, mode):
+	$ policy = dict(read=tagdef.readpolicy, write=tagdef.writepolicy)[mode]
+	$ parts = []
+	$if tagdef.owner:
+		$ parts.append(tagdef.owner)
+	$if policy == 'users':
+		$ parts.append('any authenticated user')
+	$elif policy == 'file':
+		$ parts.append('same clients who can %s file' % mode)
+	$elif policy == 'fowner':
+		$ parts.append('owner of file')
+	$elif policy == 'tag':
+		$ parts.append('clients in <a href="%s%s/%s">tagdef ACL</a>' % (home, 'acl', urlquote(tagdef.tagname)))
+	$elif policy == 'system':
+		$ parts.append('the service')
+	$:{" and ".join(parts)}
+$ content = restriction(tagdef, mode)
+$if content:
+	only $:{content}

@@ -1,11 +1,8 @@
-$def with (tvars)
-$ target = tvars.get('qtarget')
-$ predlist = tvars.get('predlist')
-$ ops = dict(tvars.get('ops'))
-$ roles = tvars.get('roles')
+$def with (ops, predlist)
+$ opsdict = dict(ops)
 <h3>Query Terms</h3>
-<p><a href="${target}">Permanent link to this query</a></p>
-<p><a href="${target}?action=edit">Edit query terms</a></p>
+<p><a href="${queryTarget}">Permanent link to this query</a></p>
+<p><a href="${queryTarget}?action=edit">Edit query terms</a></p>
 $if len(predlist) == 0:
 	<p>Match all files.</p>
 $else:
@@ -14,9 +11,9 @@ $else:
 $for pred in predlist:
 	<li><b>${pred['tag']}</b>
 	$if pred['op'] == None:
-		<i>${ops['']}</i>
+		<i>${opsdict['']}</i>
 	$else:
-		<i>${ops[pred['op']]}</i>
+		<i>${opsdict[pred['op']]}</i>
 	$if pred['vals']:
 		"${','.join(pred['vals'])}"
 	</li>

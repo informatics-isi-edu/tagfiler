@@ -1,19 +1,8 @@
-$def with (tvars)
-$# many parameters (some optional) are passed in this tvars dictionary
-$ title = tvars.get('title')
-$ appsubtitle = tvars.get('subtitle')
-$ logo = tvars.get('logo')
-$ home = tvars.get('home')
-$ help = tvars.get('help')
-$ jira = tvars.get('bugs')
-$ webauthnhome = tvars.get('webauthnhome')
-$ webauthnrequire = tvars.get('webauthnrequire')
-$ pollmins = tvars.get('pollmins')
-$ authn = tvars.get('authn')
-$if appsubtitle and title:
-	$ titles = appsubtitle + ': ' + title
-$elif appsubtitle:
-	$ titles = appsubtitle
+$def with ()
+$if subtitle and title:
+	$ titles = subtitle + ': ' + title
+$elif subtitle:
+	$ titles = subtitle
 $elif title:
 	$ titles = title
 $else:
@@ -38,8 +27,8 @@ $else:
 <tr>
 $if logo:
 	<td class="logo">$:{logo}</td>
-$if appsubtitle:
-	<td class="title"><h1>${appsubtitle}</h1></td>
+$if subtitle:
+	<td class="title"><h1>${subtitle}</h1></td>
 <td class="authninfo">
 <table class="authninfo">
 $if authn.role:
@@ -95,7 +84,7 @@ $else:
 		<a href="${help}">Help</a>
     </td>
     <td>
-		<a href="${jira}">Bugs</a>
+		<a href="${bugs}">Bugs</a>
 	</td>
     $if 'admin' in authn.roles:
 	<td>

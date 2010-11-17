@@ -953,8 +953,6 @@ class LogFileIO (FileIO):
                 tvars['logo'] = self.logo
 
                 tvars['home'] = self.home + web.ctx.homepath
-                tvars['help'] = self.help
-                tvars['bugs'] = self.jira
                 tvars['webauthnhome'] = self.webauthnhome
 
                 tvars['user'] = self.authn.role
