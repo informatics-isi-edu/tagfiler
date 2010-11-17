@@ -713,8 +713,8 @@ class FileTags (Node):
         #web.debug(system, userdefined, all)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('User', files, userdefined),
-                                    self.render.FileTagExisting('System', files, system),
+                                   [self.render.FileTagExisting('User', files[0], userdefined),
+                                    self.render.FileTagExisting('System', files[0], system),
                                     self.render.TagdefNewShortcut('Define more tags')])
         else:
             return self.renderlist(self.get_title_all(),
@@ -967,7 +967,7 @@ class TagdefACL (FileTags):
         tagdefs = [ tagdef for tagdef in self.select_tagdef(self.data_id) ]
         if len(tagdefs) == 0:
             raise NotFound(data='tag definition "%s"' % self.data_id)
-        
+
         acldefs = [ web.storage(tagname='readers', typestr='rolepat', multivalue=True),
                     web.storage(tagname='writers', typestr='rolepat', multivalue=True) ]
 
@@ -997,7 +997,7 @@ class TagdefACL (FileTags):
         self.globals['tagdefsdict'] = dict([ (x.tagname, x) for x in all ])
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('', tagdefs, all)])
+                                   [self.render.FileTagExisting('', tagdefs[0], all)])
         else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', tagdefs, all)])       

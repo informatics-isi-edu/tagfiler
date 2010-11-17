@@ -1,4 +1,4 @@
-$def with (title, files, tagdefs)
+$def with (title, file, tagdefs)
 $ odd = True
 $if title == 'User' and data_id:
 	<p><a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
@@ -7,8 +7,12 @@ $if title != '':
 $if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
-	<th class="tag-name">Tag name</th>
-	<th class="file-tags">Current Value(s)</th>
+	$if tagspace == 'tagdefacl':
+		<th class="tag-name">ACL name</th>
+		<th class="file-tags">Current Member(s)</th>
+	$else:
+		<th class="tag-name">Tag name</th>
+		<th class="file-tags">Current Value(s)</th>
 	</tr>
 	$for tagdef in tagdefs:
 		$if odd:
@@ -18,11 +22,9 @@ $if len(tagdefs) > 0:
 		$ odd = not odd
 		<td class="tag name">${tagdef.tagname}</td>
 		<td class="file-tag ${idquote(tagdef.tagname)}">
-		$:{render.FileTagValBlock(files[0], tagdef, tagdefsdict.iterkeys())}
+		$:{render.FileTagValBlock(file, tagdef, tagdefsdict.iterkeys())}
 		</td>
 		</tr>
 	</table>
-$elif data_id:
-	<p>There are no existing tags on "${data_id}".</p>
 $else:
-	<p>There are no existing tags in the catalog.</p>
+	There are no applicable ${dict(tags="tag", tagdefacl="tagdefacl")[tagspace]}s.

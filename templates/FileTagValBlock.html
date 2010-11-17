@@ -21,7 +21,9 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
-$if tagdef.typestr:
+$if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
+	<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
+$elif tagdef.typestr:
 	<table class="file-tag-list">
 	$for val in itervals:
 		<tr>
@@ -38,6 +40,7 @@ $if tagdef.typestr:
 			<input type="hidden" name="tag" value="${tagdef.tagname}" />
 			<input type="hidden" name="value" value="${val}" />
 			<input type="hidden" name="action" value="delete" />
+			<input type="hidden" name="referer" value="${referer}" />
 			<input type="submit" value="Remove Value" />
 			</form>
 		</td>
@@ -80,6 +83,7 @@ $if tagdef.typestr:
 		</td>
 		<input type="hidden" name="action" value="put" />
 		<td class="file-tag ${idquote(tagdef.tagname)} multivalue set">
+		<input type="hidden" name="referer" value="${referer}" />
 		<input type="submit" value="Set Value" />
 		</td>
 		</form>
@@ -91,11 +95,13 @@ $else:
 	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
 	<input type="hidden" name="tag" value="${tagdef.tagname}" />
 	$if writeok:
-		$if vals != None:
+		$if vals:
 			<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${tagdef.tagname} is set</td>
+			<input type="hidden" name="referer" value="${referer}" />
 			<input type="hidden" name="action" value="delete" />
 			<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
 		$else:
+			<input type="hidden" name="referer" value="${referer}" />
 			<td class="file-tag ${idquote(tagdef.tagname)} multivalue">not set</td>
 			<input type="hidden" name="action" value="put" />
 			<td class="file-tag ${idquote(tagdef.tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
