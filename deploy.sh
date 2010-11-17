@@ -289,13 +289,18 @@ cfgtagdef()
    shift
    tagdef "\$tagname" "\$@"
    tag "configuration tags" "_cfg_file list tags" tagname "\$tagname"
-   tag "configuration tags" "_cfg_tag list tags" tagname "\$tagname"
+   [[ "\$tagname" == "_cfg_file list tags" ]] ||  tag "configuration tags" "_cfg_tag list tags" tagname "\$tagname"
 }
 
 #         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 
 # file list tags MUST BE DEFINED FIRST
 cfgtagdef 'file list tags' text     ""      file        file       true       tagname
+# tag list tags MUST BE DEFINED NEXT...
+cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
+# THEN, need to do this manually to break dependency loop
+tag "configuration tags" "_cfg_tag list tags" tagname "\$tagname"
+
 cfgtagdef 'file list tags write' text ""    file        file       true       tagname
 cfgtagdef home          text        ""      file        file       false
 cfgtagdef 'webauthn home' text      ""      file        file       false
@@ -304,7 +309,6 @@ cfgtagdef 'store path'  text        ""      file        file       false
 cfgtagdef 'log path'    text        ""      file        file       false
 cfgtagdef 'template path' text      ""      file        file       false
 cfgtagdef 'chunk bytes' text        ""      file        file       false
-cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
 cfgtagdef 'local files immutable' text ""   file        file       false
 cfgtagdef 'remote files immutable' text ""  file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
