@@ -414,7 +414,7 @@ tagdef   Modality                     text   admin   tag         tag        fals
 tag "fundus tags" "_cfg_file list tags" tagname "Modality"
 
 tagdef   'Study Name'                 text   admin   tag         tag        false      'Study Name'
-tagdef   'Study Participant'          int8   admin   tag         tag        false
+tagdef   'Study Participant'          text   admin   tag         tag        false
 tagdef   'Study Date'                 date   admin   tag         tag        false
 
 for tag in 'Modality' 'Study Name' 'Study Participant' 'Study Date'
