@@ -350,7 +350,7 @@ cfgtag "webauthn require" text 'True'
 #cfgtag "socket buffer size" text '8192'
 #cfgtag "applet chunk bytes" text '4194304'
 
-cfgtag "file list tags" text 'Image Set' bytes owner 'read users' 'write users'
+cfgtag "file list tags" text bytes owner 'read users' 'write users'
 #cfgtag "file list tags write" text 'read users' 'write users'
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...

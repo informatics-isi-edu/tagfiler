@@ -457,7 +457,7 @@ class Application:
                     except (psycopg2.InterfaceError), te:
                         # pass this to outer handler
                         raise te
-                    except (SeeOther), te:
+                    except (web.SeeOther), te:
                         t.commit()
                         raise te
                     except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
@@ -1056,6 +1056,9 @@ class Application:
 
         if not 'Image Set' in listtags:
             listtags.append('Image Set')
+
+        # make sure we have no repeats in listtags before embedding in query
+        listtags = [ t for t in set(listtags) ]
 
         roles = [ r for r in self.authn.roles ]
         if roles:
