@@ -48,8 +48,8 @@ $if len(files) > 0:
 		</td>
 		<td class="file-tags">
 			<a href="${apptarget}/tags/${urlquote(file.file)}">All Tags</a>
-			$if 'Modality' in filelisttags and file['Modality'] == 'OCT' and not file['Image Set']:
-				<br /><a href="${apptarget}/tags/${urlquote(file.file)}?view=OCT+tags">OCT Grade</a>
+			$if 'Modality' in filelisttags and file['Modality'] == 'fundus' and not file['Image Set']:
+				<br /><a href="${apptarget}/tags/${urlquote(file.file)}?view=fundus+tags">Fundus Grade</a>
 		</td>
 		<td class="file-update">
 		$if file.writeok:
