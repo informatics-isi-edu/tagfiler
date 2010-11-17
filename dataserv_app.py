@@ -457,6 +457,9 @@ class Application:
                     except (psycopg2.InterfaceError), te:
                         # pass this to outer handler
                         raise te
+                    except (SeeOther), te:
+                        t.commit()
+                        raise te
                     except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                         t.rollback()
                         self.logException('web error in transaction body')
