@@ -9,7 +9,7 @@ import os
 import webauthn
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, idquote
 from rest_fileio import FileIO, LogFileIO
-
+import json
 
 def listmax(list):
     if list:
@@ -196,6 +196,7 @@ class FileList (Node):
     def __init__(self, appname, queryopts={}):
         Node.__init__(self, appname)
         self.globals['view'] = None
+        self.queryopts = queryopts
 
     def GET(self, uri):
         
@@ -206,9 +207,13 @@ class FileList (Node):
             tagdefs = [ (tagdef.tagname, tagdef)
                         for tagdef in self.select_tagdef() ]
 
-            web.debug(self.globals['view'])
-            
-            self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
+            listtags = self.queryopts.get('list', None)
+            if listtags:
+                if type(listtags) != set:
+                    listtags = [ listtags ]
+                self.globals['filelisttags'] = [ tag for tag in listtags if tag ]
+            else:
+                self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
@@ -601,6 +606,7 @@ class FileTags (Node):
             self.tagvals = tagvals
         else:
             self.tagvals = dict()
+        self.queryopts = queryopts
 
         self.globals['data_id'] = self.data_id
 
@@ -723,6 +729,21 @@ class FileTags (Node):
     def get_all_postCommit(self, results):
         files, system, userdefined, all, length = results
 
+        listtags = self.queryopts.get('list', set([ tagdef.tagname for tagdef in all]))
+        if type(listtags) != set:
+            listtags = set([listtags])
+
+        if 'name' not in listtags:
+            addName = True
+        else:
+            addName = False
+
+        def dictFile(file):
+            tagvals = [ ( tag, file[tag] ) for tag in listtags ]
+            if addName:
+                 tagvals.append( ( 'name', file.file ) )
+            return dict(tagvals)
+
         self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
@@ -741,6 +762,14 @@ class FileTags (Node):
                             else:
                                 body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 return '&'.join(body)
+            elif acceptType == 'application/json':
+                if hasattr(json, 'write'):
+                    jsonWriter = json.write
+                elif hasattr(json, 'dumps'):
+                    jsonWriter = json.dumps
+                else:
+                    raise RuntimeError('Could not configure JSON library.')
+                return jsonWriter( [ dictFile(file) for file in files ])
             elif acceptType == 'text/html':
                 break
         # render HTML result
@@ -758,6 +787,7 @@ class FileTags (Node):
             self.view_type = storage.view
         except:
             pass
+        
         keys = self.tagvals.keys()
         if len(keys) == 1:
             self.tag_id = keys[0]
@@ -1110,7 +1140,14 @@ class Query (Node):
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         def body():
-            self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
+            listtags = self.queryopts.get('list', None)
+            web.debug(listtags)
+            if listtags:
+                if type(listtags) != set:
+                    listtags = [ listtags ]
+                self.globals['filelisttags'] = [ tag for tag in listtags if tag ]
+            else:
+                self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
             files = [ res for res in self.select_files_by_predlist(listtags=self.globals['filelisttags'] + ['Image Set']) ]
             for res in files:
@@ -1122,6 +1159,24 @@ class Query (Node):
             return files
 
         def postCommit(files):
+            listtags = self.globals['filelisttags']
+            if 'name' not in listtags:
+                addName = True
+            else:
+                addName = False
+
+            if hasattr(json, 'write'):
+                jsonWriter = json.write
+            elif hasattr(json, 'dumps'):
+                jsonWriter = json.dumps
+            else:
+                raise RuntimeError('Could not configure JSON library.')
+            
+            def jsonFile(file):
+                tagvals = [ ( tag, file[tag] ) for tag in listtags ]
+                if addName:
+                    tagvals.append( ( 'name', file.file ) )
+                return jsonWriter(dict(tagvals))
 
             self.globals['queryTarget'] = self.qtarget()
             
@@ -1140,16 +1195,27 @@ class Query (Node):
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
                         # return raw results for REST client
-                        return self.render.FileUriList(files)
+                        yield self.render.FileUriList(files)
+                        return
+                    elif acceptType == 'application/json':
+                        yield '['
+                        if files:
+                            yield jsonFile(files[0])
+                        if len(files) > 1:
+                            for file in files[1:]:
+                                yield ',' + jsonFile(file)
+                        yield ']'
+                        return
                     elif acceptType == 'text/html':
                         break
-                return self.renderlist(self.title,
+                yield self.renderlist(self.title,
                                        [self.render.QueryViewStatic(self.ops, self.predlist),
                                         self.render.FileList(files)])
             else:
-                return self.renderlist(self.title,
+                yield self.renderlist(self.title,
                                        [self.render.QueryAdd(self.ops),
                                         self.render.QueryView(self.ops, self.predlist),
                                         self.render.FileList(files)])
 
-        return self.dbtransact(body, postCommit)
+        for res in self.dbtransact(body, postCommit):
+            yield res

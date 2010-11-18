@@ -281,6 +281,13 @@ class Application:
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
 
+    def validateTagname(self, tag, tagname=None, data_id=None):
+        if tag == '':
+            raise Conflict('You must specify a defined tag name to set values for "%s".' % tagname)
+        results = self.select_tagdef(tag)
+        if len(results) == 0:
+            raise Conflict('Supplied tag name "%s" is not defined.' % tag)
+
     def validateRole(self, role, tagname=None, data_id=None):
         if self.authn:
             try:
@@ -1001,6 +1008,9 @@ class Application:
         if validator:
             #web.debug("set_file_tag: %s=%s with validator %s" % (tagname, value, validator))
             validator(value, tagname, data_id)
+
+        if tagtype == 'tagname':
+            self.validateTagname(value, tagname, data_id)
 
         try:
             value = self.downcast_value(dbtype, value)
