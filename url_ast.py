@@ -655,9 +655,8 @@ class FileTags (Node):
             where2 = 'tagdefs.owner %s' % ownerwhere
         filtered_tagdefs = self.select_tagdef(where=where1, order='tagname')
         filtered_filetags = self.select_filetags(where=where2)
-        custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
-
-        tagdefs = [ tagdef for tagdef in filtered_tagdefs if (not custom_tags or tagdef.tagname in custom_tags) ]
+        
+        tagdefs = [ tagdef for tagdef in filtered_tagdefs if (len(self.listtags)==0 or tagdef.tagname in self.listtags) ]
         for tagdef in tagdefs:
             tagdef.writeok = self.test_tag_authz('write', tagdef.tagname, fowner=owner)
 
@@ -673,9 +672,16 @@ class FileTags (Node):
             raise NotFound(data='data set "%s"' % self.data_id)
         self.txlog('GET ALL TAGS', dataset=self.data_id)
 
+        custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
+        self.listtags = self.queryopts.get('list', set(custom_tags))
+        if type(self.listtags) != set:
+            self.listtags = set([self.listtags])
+
         system = self.buildtaginfo('is null')
         userdefined = self.buildtaginfo('is not null')
         all = self.buildtaginfo('')
+
+        self.listtags = set([tagdef.tagname for tagdef in all])
 
         if self.data_id:
             predlist = [ dict(tag='name', op='=', vals=[self.data_id]) ]
@@ -729,17 +735,13 @@ class FileTags (Node):
     def get_all_postCommit(self, results):
         files, system, userdefined, all, length = results
 
-        listtags = self.queryopts.get('list', set([ tagdef.tagname for tagdef in all]))
-        if type(listtags) != set:
-            listtags = set([listtags])
-
-        if 'name' not in listtags:
+        if 'name' not in self.listtags:
             addName = True
         else:
             addName = False
 
         def dictFile(file):
-            tagvals = [ ( tag, file[tag] ) for tag in listtags ]
+            tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
             if addName:
                  tagvals.append( ( 'name', file.file ) )
             return dict(tagvals)
@@ -769,7 +771,7 @@ class FileTags (Node):
                     jsonWriter = json.dumps
                 else:
                     raise RuntimeError('Could not configure JSON library.')
-                return jsonWriter( [ dictFile(file) for file in files ]) + '\n'
+                return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
             elif acceptType == 'text/html':
                 break
         # render HTML result

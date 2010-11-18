@@ -112,6 +112,14 @@ def p_tags_all(p):
             | slash string slash TAGS slash"""
     p[0] = url_ast.FileTags(appname=p[2])
 
+def p_tags_all_opts(p):
+    """tags : slash string slash TAGS queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[5])
+
+def p_tags_all_slash_opts(p):
+    """tags : slash string slash TAGS slash queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
+
 def p_tags(p):
     """tags : slash string slash TAGS slash string 
             | slash string slash TAGS slash string slash"""
