@@ -11,6 +11,8 @@ from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden,
 from rest_fileio import FileIO, LogFileIO
 import json
 
+jsonMungeTypes = set([ 'date', 'timestamptz' ])
+
 def listmax(list):
     if list:
         return max([mystr(val) for val in list])
@@ -740,11 +742,16 @@ class FileTags (Node):
         else:
             addName = False
 
+        jsonMungeTags = set( [ tagdef.tagname for tagdef in all if tagdef.typestr in jsonMungeTypes ] )
+
         def dictFile(file):
             tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
             if addName:
-                 tagvals.append( ( 'name', file.file ) )
-            return dict(tagvals)
+                tagvals.append( ( 'name', file.file ) )
+            tagvals = dict(tagvals)
+            for tagname in jsonMungeTags:
+                tagvals[tagname] = str(tagvals[tagname])
+            return tagvals
 
         self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
@@ -1143,7 +1150,6 @@ class Query (Node):
 
         def body():
             listtags = self.queryopts.get('list', None)
-            web.debug(listtags)
             if listtags:
                 if type(listtags) != set:
                     listtags = [ listtags ]
@@ -1174,11 +1180,17 @@ class Query (Node):
             else:
                 raise RuntimeError('Could not configure JSON library.')
             
+            jsonMungeTags = set( [ tagname for tagname in listtags
+                                   if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
+
             def jsonFile(file):
                 tagvals = [ ( tag, file[tag] ) for tag in listtags ]
                 if addName:
                     tagvals.append( ( 'name', file.file ) )
-                return jsonWriter(dict(tagvals))
+                tagvals = dict(tagvals)
+                for tagname in jsonMungeTags:
+                    tagvals[tagname] = str(tagvals[tagname])
+                return jsonWriter(tagvals)
 
             self.globals['queryTarget'] = self.qtarget()
             
