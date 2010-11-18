@@ -450,6 +450,33 @@ class Application:
                         self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
                         self.globals['roleinfo'] = self.buildroleinfo()
                         self.globals['typeinfo'] = self.get_type()
+                        self.globals['typesdict'] = dict([ (type['_type_name'], type) for type in self.globals['typeinfo'] ])
+
+                        def tagOptions(tagname, values=[]):
+                            tagdef = self.globals['tagdefsdict'][tagname]
+                            tagnames = self.globals['tagdefsdict'].keys()
+                            type = self.globals['typesdict'][tagdef.typestr]
+                            typevals = type['_type_values']
+                            roleinfo = self.globals['roleinfo']
+                            web.debug(tagdef, type)
+                            if tagdef.typestr in ['role', 'rolepat', 'tagname'] or typevals:
+                                if typevals:
+                                    options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
+                                elif tagdef.typestr in [ 'role', 'rolepat' ]:
+                                    if roleinfo != None:
+                                        if tagdef.typestr == 'rolepat':
+                                            options = [ (role, role) for role in set(roleinfo).union(set(['*'])).difference(set(values)) ]
+                                        else:
+                                            options = [ (role, role) for role in set(roleinfo).difference(set(values)) ]
+                                    else:
+                                        options = None
+                                elif tagdef.typestr == 'tagname' and tagnames:
+                                    options = [ (tag, tag) for tag in set(tagnames).difference(set(values)) ]
+                            else:
+                                options = None
+                            return options
+
+                        self.globals['tagOptions'] = tagOptions
 
                         # and set defaults if they weren't overridden by caller
                         self.globals['view'] = self.globals.get('view', None)
@@ -746,7 +773,7 @@ class Application:
                     dbtype = res['_type_dbtype']
                     key = self.downcast_value(dbtype, key)
                     vals.append( (key, desc) )
-                res['_type_values'] = vals
+                res['_type_values'] = dict(vals)
             return res
         predlist = [ dict(tag='_type_dbtype', op=None, vals=[]) ]
         if typename != None:

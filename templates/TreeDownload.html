@@ -93,7 +93,9 @@ $def with (transmissionnum)
 	<td>
 	<div id="Required Tags">
 	<table class="table-wrapper" rules="all" id="Dataset Tags">
-	$for tagdef in tagdefsdict.itervalues():
+	$ tagdefs = tagdefsdict.itervalues()
+	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
+	$for tagdef in tagdefs:
 		<tr>
 		<td class="tag-name">${tagdef.tagname}</td>
 		<td><input name="${tagdef.tagname}" id="${tagdef.tagname}_val" width="20" value="" readonly /></td>

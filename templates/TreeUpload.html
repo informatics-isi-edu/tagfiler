@@ -84,35 +84,36 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 	<td>
 	<div id="custom-tags">
 	<table class="table-wrapper" id="Required Tags">
-	$for tagdef in tagdefsdict.itervalues():
+	$ tagdefs = tagdefsdict.values()
+	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
+	$for tagdef in tagdefs:
 		$ type = typesdict[tagdef.typestr]
 		$ typedesc = type['_type_description']
 		$ typevals = type['_type_values']		
 		<tr>
 		<td class="tag-name">${tagdef.tagname} (${typedesc})</td>
 		<td>
-		$ options = []
-		$if typevals:
-			$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
+		$ options = tagOptions(tagdef.tagname)
+		$if options:
+			<select name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}"
+		$else:
+			<input type="text" name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}" 
+		$if tagdef.tagname in appletTagnamesRequire:
+			required="required"
+		$if options:
+			>
+		$else:
+			/>
 		$if options:
 			$ options.sort(key=lambda x: x[0])
 			$if typedesc.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
 				$ article = 'an'
 			$else:
 				$ article = 'a'
-			<select name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}"
-			$if tagdef.tagname in appletTagnamesRequire:
-				required="required"
-			>
 			<option value="" selected="selected">Choose ${article} ${typedesc}</option>
 			$for option in options:
 				<option value="${option[0]}">${option[1]}</option>
 			</select>
-		$else:
-			<input type="text" name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}" 
-			$if tagdef.tagname in appletTagnamesRequire:
-				 required="required"
-			/>
 		</td>
 		</tr>
 	</table>

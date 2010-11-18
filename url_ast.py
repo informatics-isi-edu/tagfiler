@@ -690,6 +690,7 @@ class FileTags (Node):
             all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags ]
         else:
             self.listtags = [ tagdef.tagname for tagdef in all ]
+        all.sort(key=lambda tagdef: tagdef.tagname)
         system = [ tagdef for tagdef in all if tagdef.owner == None ]
         userdefined = [ tagdef for tagdef in all if tagdef.owner != None ]
 

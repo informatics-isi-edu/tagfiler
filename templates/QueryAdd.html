@@ -5,7 +5,9 @@ $def with (ops)
 <form enctype="application/x-www-form-urlencoded" action="${queryTarget}" method="get">
   <table class="query-add"><tr>
   <td><select name="tag">
-	$for tagname in tagdefsdict.keys():
+  	$ tagnames = tagdefsdict.keys()
+	$ tagnames.sort()
+	$for tagname in tagnames:
 		<option value="${tagname}">${tagname}</option>
   </select></td>
   <td><select name="op">
