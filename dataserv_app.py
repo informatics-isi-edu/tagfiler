@@ -458,7 +458,6 @@ class Application:
                             type = self.globals['typesdict'][tagdef.typestr]
                             typevals = type['_type_values']
                             roleinfo = self.globals['roleinfo']
-                            web.debug(tagdef, type)
                             if tagdef.typestr in ['role', 'rolepat', 'tagname'] or typevals:
                                 if typevals:
                                     options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
