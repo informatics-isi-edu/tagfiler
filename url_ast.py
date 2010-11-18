@@ -769,7 +769,7 @@ class FileTags (Node):
                     jsonWriter = json.dumps
                 else:
                     raise RuntimeError('Could not configure JSON library.')
-                return jsonWriter( [ dictFile(file) for file in files ])
+                return jsonWriter( [ dictFile(file) for file in files ]) + '\n'
             elif acceptType == 'text/html':
                 break
         # render HTML result
@@ -1200,11 +1200,11 @@ class Query (Node):
                     elif acceptType == 'application/json':
                         yield '['
                         if files:
-                            yield jsonFile(files[0])
+                            yield jsonFile(files[0]) + '\n'
                         if len(files) > 1:
                             for file in files[1:]:
-                                yield ',' + jsonFile(file)
-                        yield ']'
+                                yield ',' + jsonFile(file) + '\n'
+                        yield ']\n'
                         return
                     elif acceptType == 'text/html':
                         break
