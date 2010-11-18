@@ -15,10 +15,18 @@ jsonMungeTypes = set([ 'date', 'timestamptz' ])
 
 def listmax(list):
     if list:
-        return max([mystr(val) for val in list])
+        return max([len(mystr(val)) for val in list])
     else:
         return 0
-        
+
+def listOrStringMax(val, curmax=0):
+    if type(val) == list:
+        return max(listmax(val), curmax)
+    elif val:
+        return max(len(mystr(val)), curmax)
+    else:
+        return curmax
+
 def mystr(val):
     if type(val) == type(1.0):
         return re.sub("0*e", "0e", "%.48e" % val)
@@ -651,12 +659,9 @@ class FileTags (Node):
     def buildtaginfo(self, ownerwhere):
         owner = self.owner()
         where1 = ''
-        where2 = ''
         if ownerwhere:
             where1 = 'owner %s' % ownerwhere
-            where2 = 'tagdefs.owner %s' % ownerwhere
         filtered_tagdefs = self.select_tagdef(where=where1, order='tagname')
-        filtered_filetags = self.select_filetags(where=where2)
         
         tagdefs = [ tagdef for tagdef in filtered_tagdefs if (len(self.listtags)==0 or tagdef.tagname in self.listtags) ]
         for tagdef in tagdefs:
@@ -669,9 +674,10 @@ class FileTags (Node):
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-        results = self.select_file()
-        if len(results) == 0:
-            raise NotFound(data='data set "%s"' % self.data_id)
+        predlist = []
+        if self.data_id:
+            predlist.append( dict(tag='name', op='=', vals=[self.data_id]) )
+            
         self.txlog('GET ALL TAGS', dataset=self.data_id)
 
         custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
@@ -679,40 +685,19 @@ class FileTags (Node):
         if type(self.listtags) != set:
             self.listtags = set([self.listtags])
 
-        system = self.buildtaginfo('is null')
-        userdefined = self.buildtaginfo('is not null')
-        all = self.buildtaginfo('')
-
-        self.listtags = set([tagdef.tagname for tagdef in all])
-
-        if self.data_id:
-            predlist = [ dict(tag='name', op='=', vals=[self.data_id]) ]
+        all = self.globals['tagdefsdict'].values()
+        if len(self.listtags) > 0:
+            all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags ]
         else:
-            predlist = []
-        files = [ file for file in self.select_files_by_predlist(predlist, listtags=['owner']) ]
+            self.listtags = [ tagdef.tagname for tagdef in all ]
+        system = [ tagdef for tagdef in all if tagdef.owner == None ]
+        userdefined = [ tagdef for tagdef in all if tagdef.owner != None ]
+
+        files = [ file for file in self.select_files_by_predlist(predlist, listtags=self.listtags) ]
         length = 0
         for file in files:
-            tagsdict = dict([ (res.tagname, True) for res in self.select_filetags(data_id=file.file) ])
-            for tagdef in all:
-                if tagsdict.get(tagdef.tagname, False):
-                    if tagdef.typestr == '':
-                        file[tagdef.tagname] = True
-                    else:
-                        results = self.select_file_tag(tagdef.tagname, data_id=file.file, tagdef=tagdef, owner=file.owner)
-                        if tagdef.multivalue:
-                            file[tagdef.tagname] = [ res.value for res in results ]
-                            length = max(length, listmax(file[tagdef.tagname]))
-                        else:
-                            file[tagdef.tagname] = results[0].value
-                            if file[tagdef.tagname]:
-                                length = max(length, mystr(file[tagdef.tagname]))
-                else:
-                    if tagdef.typestr == '':
-                        file[tagdef.tagname] = False
-                    elif tagdef.multivalue:
-                        file[tagdef.tagname] = []
-                    else:
-                        file[tagdef.tagname] = None
+            for tagname in self.listtags:
+                length = listOrStringMax(file[tagname], length)
 
         return (files, system, userdefined, all, length)
 
