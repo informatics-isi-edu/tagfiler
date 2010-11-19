@@ -73,6 +73,7 @@ class NotFound (WebException):
     def __init__(self, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -81,6 +82,7 @@ class Forbidden (WebException):
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -89,6 +91,7 @@ class Unauthorized (WebException):
     def __init__(self, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -97,6 +100,7 @@ class BadRequest (WebException):
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -105,6 +109,7 @@ class Conflict (WebException):
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -113,6 +118,7 @@ class IntegrityError (WebException):
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -121,6 +127,7 @@ class RuntimeError (WebException):
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
+        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
