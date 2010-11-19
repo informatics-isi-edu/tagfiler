@@ -1,11 +1,4 @@
-$def with (tvars)
-$ transmissionnum = tvars.get('transmissionnum')
-$ tags = tvars.get('tags')
-$ files = tvars.get('files')
-$ direction = tvars.get('direction')
-$ success = tvars.get('success')
-$ error = tvars.get('error')
-$ idquote = tvars.get('idquote')
+$def with (transmissionnum, direction, success, error, files)
 $ odd = True
 $if success:
 	<h2>Completed</h2>
@@ -26,8 +19,7 @@ $if transmissionnum:
 		Please write this transmission number on the visit inventory form.
 </p><p>
 <table class="file-tag-list">
-$for tag in tags:
-	$ tagname, vals = tag
+$for tagname, vals in appletTagvals:
 	$if odd:
 		<tr class="file-tag odd">
 	$else:

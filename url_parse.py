@@ -112,6 +112,14 @@ def p_tags_all(p):
             | slash string slash TAGS slash"""
     p[0] = url_ast.FileTags(appname=p[2])
 
+def p_tags_all_opts(p):
+    """tags : slash string slash TAGS queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[5])
+
+def p_tags_all_slash_opts(p):
+    """tags : slash string slash TAGS slash queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
+
 def p_tags(p):
     """tags : slash string slash TAGS slash string 
             | slash string slash TAGS slash string slash"""
@@ -233,8 +241,21 @@ def p_compare_ineq(p):
                | ':' SIMTO ':'"""
     p[0] = ineqmap[ p[2].lower() ]
 
+def p_stringset(p):
+    """stringset : string ',' string"""
+    p[0] = set([p[1], p[3]])
+
+def p_stringset_grow(p):
+    """stringset : stringset ',' string"""
+    p[0] = p[1]
+    p[1].add(p[3])
+
 def p_queryopts(p):
     """queryopts : '?' string '=' string"""
+    p[0] = { p[2] : p[4] }
+
+def p_queryopts_set(p):
+    """queryopts : '?' string '=' stringset"""
     p[0] = { p[2] : p[4] }
 
 def p_queryopts_short(p):
@@ -246,7 +267,26 @@ def p_queryopts_grow(p):
     """queryopts : queryopts '&' string '=' string
                  | queryopts ';' string '=' string"""
     p[0] = p[1]
-    p[0][p[3]] = p[5]
+    if p[0].has_key(p[3]):
+        v = p[0][p[3]]
+        if type(v) != set:
+            v = set([ v ])
+            p[0][p[3]] = v
+        v.add(p[5])
+    else:
+        p[0][p[3]] = p[5]
+
+def p_queryopts_grow_set(p):
+    """queryopts : queryopts '&' string '=' stringset
+                 | queryopts ';' string '=' stringset"""
+    p[0] = p[1]
+    if p[0].has_key(p[3]):
+        v = p[0][p[3]]
+        if type(v) != set:
+            p[0][p[3]] = v
+        v.update(p[5])
+    else:
+        p[0][p[3]] = p[5]
 
 def p_queryopts_grow_short(p):
     """queryopts : queryopts '&' string
@@ -254,7 +294,14 @@ def p_queryopts_grow_short(p):
                  | queryopts '&' string '='
                  | queryopts ';' string '='"""
     p[0] = p[1]
-    p[0][p[3]] = None
+    if p[0].has_key(p[3]):
+        v = p[0][p[3]]
+        if type(v) != list:
+            v = set([ v ])
+            p[0][p[3]] = v
+        v.add(None)
+    else:
+        p[0][p[3]] = None
 
 def p_transmit_number(p):
     """transmitnumber : slash string slash TRANSMITNUMBER """

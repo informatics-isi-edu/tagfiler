@@ -1,16 +1,4 @@
-$def with (tvars)
-$ target = tvars.get('target')
-$ testfile = tvars.get('testfile')
-$ appletlog = tvars.get('appletlog')
-$ tags = tvars.get('tags')
-$ tagdefs = tvars.get('tagdefs')
-$ types = tvars.get('types')
-$ requiredtags = tvars.get('requiredtags')
-$ customproperties = tvars.get('customproperties')
-$ connections = tvars.get('connections')
-$ allowchunks = tvars.get('uploadchunks')
-$ socketbuffersize = tvars.get('socketbuffersize')
-$ chunkbytes = tvars.get('appletchunkbytes')
+$def with ()
 $for type in types:
 	$ values = type['_type_values']
 	$if values:
@@ -25,25 +13,25 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 		<tr>
 			<td class="applet">
 				<APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
-				 ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar"
+				 ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar,json-org.jar"
 				  width=25 height=25 MAYSCRIPT >
-				<PARAM name="tagfiler.server.url" value="${target}"/>
+				<PARAM name="tagfiler.server.url" value="${home}"/>
 				<PARAM name="classloader_cache" value="false" />
 				<PARAM name="separate_jvm" value="true" />
-				$if testfile:
-					<PARAM name="tagfiler.applet.test" value="${testfile}"/>
-				$if appletlog:
-					<PARAM name="tagfiler.applet.log" value="${appletlog}"/>
-				$if customproperties:
-					<PARAM name="custom.properties" value="${customproperties}"/>
-				$if connections:
-					<PARAM name="tagfiler.connections" value="${connections}"/>
-				$if allowchunks:
-					<PARAM name="tagfiler.allow.chunks" value="${allowchunks}"/>
-				$if socketbuffersize:
-					<PARAM name="tagfiler.socket.buffer.size" value="${socketbuffersize}"/>
-				$if chunkbytes:
-					<PARAM name="tagfiler.chunkbytes" value="${chunkbytes}"/>
+				$if appletTestProperties:
+					<PARAM name="tagfiler.applet.test" value="${appletTestProperties}"/>
+				$if appletLogfile:
+					<PARAM name="tagfiler.applet.log" value="${appletLogfile}"/>
+				$if appletCustomProperties:
+					<PARAM name="custom.properties" value="${appletCustomProperties}"/>
+				$if clientConnections:
+					<PARAM name="tagfiler.connections" value="${clientConnections}"/>
+				$if clientUploadChunks:
+					<PARAM name="tagfiler.allow.chunks" value="${clientUploadChunks}"/>
+				$if clientSocketBufferSize:
+					<PARAM name="tagfiler.socket.buffer.size" value="${clientSocketBufferSize}"/>
+				$if clientChunkbytes:
+					<PARAM name="tagfiler.chunkbytes" value="${clientChunkbytes}"/>
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
 				  Download JRE 1.5 for your system from the following link:</b><br/>
 				<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
@@ -96,36 +84,36 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 	<td>
 	<div id="custom-tags">
 	<table class="table-wrapper" id="Required Tags">
-	$for tag in tags:
-		$ tagname, typestr = tag
-		$ type = typesdict[typestr]
+	$ tagdefs = tagdefsdict.values()
+	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
+	$for tagdef in tagdefs:
+		$ type = typesdict[tagdef.typestr]
 		$ typedesc = type['_type_description']
 		$ typevals = type['_type_values']		
 		<tr>
-		<td class="tag-name">${tagname} (${typedesc})</td>
+		<td class="tag-name">${tagdef.tagname} (${typedesc})</td>
 		<td>
-		$ options = []
-		$if typevals:
-			$ options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.iteritems() ]
+		$ options = tagOptions(tagdef.tagname)
+		$if options:
+			<select name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}"
+		$else:
+			<input type="text" name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}" 
+		$if tagdef.tagname in appletTagnamesRequire:
+			required="required"
+		$if options:
+			>
+		$else:
+			/>
 		$if options:
 			$ options.sort(key=lambda x: x[0])
 			$if typedesc.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
 				$ article = 'an'
 			$else:
 				$ article = 'a'
-			<select name="${tagname}" id="${tagname}_id" typestr="${typestr}"
-			$if tagname in requiredtags:
-				required="required"
-			>
 			<option value="" selected="selected">Choose ${article} ${typedesc}</option>
 			$for option in options:
 				<option value="${option[0]}">${option[1]}</option>
 			</select>
-		$else:
-			<input type="text" name="${tagname}" id="${tagname}_id" typestr="${typestr}" 
-			$if tagname in requiredtags:
-				 required="required"
-			/>
 		</td>
 		</tr>
 	</table>

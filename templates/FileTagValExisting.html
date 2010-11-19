@@ -1,37 +1,31 @@
-$def with (tvars)
-$ title = tvars.get('title')
-$ apptarget = tvars.get('apptarget')
-$ tagspace = tvars.get('tagspace')
-$ data_id = tvars.get('data_id')
-$ taginfo = tvars.get('taginfo')
-$ urlquote = tvars.get('urlquote')
+$def with (title, files, tagdefs)
 $if title:
 	<h2>${title}</h2>
-$ excludes, tagdefs, tagdefsdict, tags, filetagvals, length = taginfo
 $if title == 'System' and data_id:
-	<a href="${apptarget + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
-$if len(filetagvals) > 0:
-	$ odd = True
-	<table class="file-list">
-	$if tagspace == 'tags':
-		<tr class="file-heading"><th class="file-name">File</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
-	$else:
-		<tr class="file-heading"><th class="file-name">Tag</th><th class="file-tag">ACL</th><th class="file-tag">Member(s)</th></tr>
-	$for data_id, tag, vals in filetagvals:
-		$ tagname, typestr, writeok = tagdefsdict[tag]
-		$if odd:
-			<tr class="file odd"><td class="file-name">${data_id}</td><td>${tag}</td>
-		$else:
-			<tr class="file even"><td class="file-name">${data_id}</td><td>${tag}</td>
-		$ odd = not odd
-			$if typestr:
-				<td class="file-tag"><table>
-				$for val in vals:
-					<tr><td class="file-tag multivalue">${val}</td></tr>
-				</table></td>
-		</tr>
-	</table>
-$elif data_id:
-	<p>There are no existing tags on "${data_id}".</p>
+	<a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
+$ odd = True
+<table class="file-list">
+$if tagspace == 'tagdefacl':
+	<tr class="file-heading"><th class="file-name">Tag</th><th class="file-tag">ACL</th><th class="file-tag">Member(s)</th></tr>
 $else:
-	<p>There are no existing tags in the catalog.</p>
+	<tr class="file-heading"><th class="file-name">File</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
+$for file in files:
+	$for tagdef in tagdefs:
+		$if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
+			<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
+		$else:
+			$if odd:
+				<tr class="file odd"><td class="file-name">${file.file}</td><td>${tagdef.tagname}</td>
+			$else:
+				<tr class="file even"><td class="file-name">${file.file}</td><td>${tagdef.tagname}</td>
+			$ odd = not odd
+			$if tagdef.typestr != '':
+				<td class="file-tag"><table>
+				$if tagdef.multivalue:
+					$for val in file[tagdef.tagname]:
+						<tr><td class="file-tag multivalue">${val}</td></tr>
+				$else:
+					<tr><td class="file-tag multivalue">${file[tagdef.tagname]}</td></tr>
+				</table></td>
+			</tr>
+</table>

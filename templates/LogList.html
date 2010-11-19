@@ -1,26 +1,23 @@
-$def with (tvars)
-$ target = tvars.get('target')
-$ files = tvars.get('files')
-$ urlquote = tvars.get('urlquote')
+$def with (lognames)
 <h3>Current active log file</h3>
 $if 'messages' in files:
-	<ul><li><a href="${target}/log/messages?action=view">messages</a>
-	[<a href="${target}/log/messages">Download</a>]</li>
+	<ul><li><a href="${home}/log/messages?action=view">messages</a>
+	[<a href="${home}/log/messages">Download</a>]</li>
 	</ul>
 $else:
 	<p>There is no active log file.</p>
 <h3>Archived log files</h3>
-$if len(set(files).difference(set(['messages']))) > 0:
+$if len(set(lognames).difference(set(['messages']))) > 0:
 	<ol>
 	<li>There will be at most one log file per day.</li>
 	<li>When service activity is low, several days may be combined in one log file, thus avoiding many small log files.</li>
 	<li>When too many log files accumulate, the oldest files will be purged.</li>
 	</ol>
 	<ul>
-	$for name in files:
+	$for name in lognames:
 		$if name != 'messages':
-			<li><a href="${target}/log/${urlquote(name)}?action=view">${name}</a>
-			[<a href="${target}/log/${urlquote(name)}">Download</a>]</li>
+			<li><a href="${home}/log/${urlquote(name)}?action=view">${name}</a>
+			[<a href="${home}/log/${urlquote(name)}">Download</a>]</li>
 	</ul>
 $else:
 	<p>There are no archived logs to list.</p>

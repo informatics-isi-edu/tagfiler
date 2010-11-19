@@ -1,26 +1,21 @@
-$def with (tvars)
-$ target = tvars.get('target')
-$ type = tvars.get('type')
-$ name = tvars.get('name')
-$ referer = tvars.get('referer')
-$ urlquote = tvars.get('urlquote')
+$def with (type)
 $ typeLong = dict(file="file", url="saved URL", tagdef="tag definition", imgset="image set").get(type, '')
 $ typeUri = dict(file='file', url='file', tagdef='tagdef', imgset='file').get(type, type)
 $ suffix = dict(imgset=' and all associated image files').get(type, '')
-		<fieldset>
-		  <legend>Do you want to delete ${typeLong} "${name}"${suffix}?</legend>
-		  <table>
-		    <tr>
-		      <td>
-		  		<form enctype="application/x-www-form-urlencoded" action="${target}/${typeUri}/${urlquote(name)}" method="post">
-				  <input type="hidden" name="action" value="ConfirmDelete" />
-				  <input type="hidden" name="referer" value="${referer}" />
-				  <input type="submit" value="Yes" />
-			    </form>
-		  		<form enctype="application/x-www-form-urlencoded" action="${referer}" method="get">
-				  <input type="submit" value="No" />
-		  		</form>
-		      </td>
-		    </tr>
-		  </table>
-		</fieldset>
+<fieldset>
+<legend>Do you want to delete ${typeLong} "${data_id}"${suffix}?</legend>
+<table>
+<tr>
+<td>
+<form enctype="application/x-www-form-urlencoded" action="${home}/${typeUri}/${urlquote(data_id)}" method="post">
+  <input type="hidden" name="action" value="ConfirmDelete" />
+  <input type="hidden" name="referer" value="${referer}" />
+  <input type="submit" value="Yes" />
+</form>
+<form enctype="application/x-www-form-urlencoded" action="${referer}" method="get">
+  <input type="submit" value="No" />
+</form>
+</td>
+</tr>
+</table>
+</fieldset>

@@ -23,9 +23,10 @@ WEBSTATICFILES=logo.png \
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
 	FileList.html FileUriList.txt ConfirmForm.html \
-	TagdefExisting.html TagdefNew.html \
+	FileTagValBlock.html \
+	TagdefExisting.html TagdefPolicy.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
-	FileTagNew.html TagdefNewShortcut.html \
+	TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
 	TreeUpload.html TreeDownload.html TreeStatus.html \
 	Error.html AppletError.html \

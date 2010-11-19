@@ -1,5 +1,5 @@
-$def with (target)
-<form enctype="multipart/form-data" action="${target}" method="post">
+$def with (suffix)
+<form enctype="multipart/form-data" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post">
 <input name="myfile" type="file" />
 <input type="submit" value="Upload" />
 </form>
