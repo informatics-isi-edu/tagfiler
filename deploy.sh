@@ -381,8 +381,8 @@ tagacl "Downloaded" read downloader
 tagacl "Downloaded" write downloader
 
 storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" admin "*"
-storedquery "OCT tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/OCT%20tags" admin "*"
-storedquery "OCT brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/OCT%20brief%20tags" admin "*"
+storedquery "fundus tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" admin "*"
+storedquery "fundus brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" admin "*"
 
 modtagdef()
 {
@@ -396,10 +396,10 @@ modtagdef()
    tagacl "\$tagname" write grader
 }
 
-typedef Modality            text 'Modality' 'OCT OCT' 'eyecare eyecare' 'Icam Icam'
+typedef Modality            text 'Modality' 'OCT OCT' 'fundus fundus' 'eyecam eyecam'
 typedef 'Study Name'        text 'Study Name' 'CHES CHES' 'MEPED MEPED' 'LALES LALES'
 
-# OCT
+# fundus
 typedef '# 0-9'             int8 'Count (0-9)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9'
 typedef '# 0-16'            int8 'Count (0-16)' '0 0' '1 1' '2 2' '3 3' '4 4' '5 5' '6 6' '7 7' '8 8' '9 9' '10 10' '11 11' '12 12' '13 13' '14 14' '15 15' '16 16'
 typedef 'no/yes'            int8 'Grade (no/yes)' '0 No' '2 Yes'
@@ -418,10 +418,10 @@ typedef 'Diabetic Retinopathy Level' int8 'Grade (Diabetic Retinopathy Level)' '
 
 #        TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 tagdef   Modality                     text   admin   tag         tag        false      Modality
-tag "OCT tags" "_cfg_file list tags" tagname "Modality"
+tag "fundus tags" "_cfg_file list tags" tagname "Modality"
 
 tagdef   'Study Name'                 text   admin   tag         tag        false      'Study Name'
-tagdef   'Study Participant'          int8   admin   tag         tag        false
+tagdef   'Study Participant'          text   admin   tag         tag        false
 tagdef   'Study Date'                 date   admin   tag         tag        false
 
 for tag in 'Modality' 'Study Name' 'Study Participant' 'Study Date'
@@ -441,63 +441,63 @@ done
 
 
 #         MOD    TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-modtagdef OCT    'Max DRU Size'               int8   admin   tag         tag        false      'Max DRU Size'
-modtagdef OCT    '# DRU Size Subfields'       int8   admin   tag         tag        false      '# 0-9'
-modtagdef OCT    'DRU Area'                   int8   admin   tag         tag        false      'DRU Area'
-modtagdef OCT    'Max DRU Type'               int8   admin   tag         tag        false      'Max DRU Type'
-modtagdef OCT    '# DRU Type Subfields'       int8   admin   tag         tag        false      '# 0-9'
-modtagdef OCT    'DRU Grid Type'              int8   admin   tag         tag        false      'DRU Grid Type'
-modtagdef OCT    'Inc Pignment'               int8   admin   tag         tag        false      'Inc Pigment'
-modtagdef OCT    'RPE Depigment'              int8   admin   tag         tag        false      'RPE Depigment'
-modtagdef OCT    '# RPE Depigment Subfields'  int8   admin   tag         tag        false      '# 0-9'
+modtagdef fundus    'Max DRU Size'               int8   admin   tag         tag        false      'Max DRU Size'
+modtagdef fundus    '# DRU Size Subfields'       int8   admin   tag         tag        false      '# 0-9'
+modtagdef fundus    'DRU Area'                   int8   admin   tag         tag        false      'DRU Area'
+modtagdef fundus    'Max DRU Type'               int8   admin   tag         tag        false      'Max DRU Type'
+modtagdef fundus    '# DRU Type Subfields'       int8   admin   tag         tag        false      '# 0-9'
+modtagdef fundus    'DRU Grid Type'              int8   admin   tag         tag        false      'DRU Grid Type'
+modtagdef fundus    'Inc Pignment'               int8   admin   tag         tag        false      'Inc Pigment'
+modtagdef fundus    'RPE Depigment'              int8   admin   tag         tag        false      'RPE Depigment'
+modtagdef fundus    '# RPE Depigment Subfields'  int8   admin   tag         tag        false      '# 0-9'
 
-modtagdef OCT    'Inc Pigment CC/CPT'         int8   admin   tag         tag        false      'Inc/RPE Lesions'
-modtagdef OCT    'RPE Depigment CC/CPT'       int8   admin   tag         tag        false      'Inc/RPE Lesions'
+modtagdef fundus    'Inc Pigment CC/CPT'         int8   admin   tag         tag        false      'Inc/RPE Lesions'
+modtagdef fundus    'RPE Depigment CC/CPT'       int8   admin   tag         tag        false      'Inc/RPE Lesions'
 
-modtagdef OCT    'Geographic Atrophy'         int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef OCT    'PED/RD'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef OCT    'SubRet Hem'                 int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef OCT    'SubRet Scar'                int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef OCT    'ARM RX'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef OCT    'Lesions Summary'            int8   admin   tag         tag        false      'no/yes/CG'
+modtagdef fundus    'Geographic Atrophy'         int8   admin   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'PED/RD'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'SubRet Hem'                 int8   admin   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'SubRet Scar'                int8   admin   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'ARM RX'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'Lesions Summary'            int8   admin   tag         tag        false      'no/yes/CG'
 
-modtagdef OCT    'GA # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
-modtagdef OCT    'Ex # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
+modtagdef fundus    'GA # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
+modtagdef fundus    'Ex # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
 
-modtagdef OCT    'Calcified Drusen'           int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Peripheral Drusen'          int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Peripap Atrophy'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Art Sheathing'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Cen Art Occlus'             int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Br Art Occlus'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Cen Vein Occlus'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Br Vein Occlus'             int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Hollen Plaque'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Ast Hyalosis'               int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Nevus'                      int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Chorioret Scar'             int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef OCT    'SWR Tension'                int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef OCT    'SWR Cello Reflex'           int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Mac Hole'                   int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef OCT    'Histoplasmosis'             int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef OCT    'Ret Detach'                 int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef OCT    'Large C/D'                  int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Thick Vit/Glial'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef OCT    'Other (comments)'           int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Calcified Drusen'           int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Peripheral Drusen'          int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Peripap Atrophy'            int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Art Sheathing'              int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Cen Art Occlus'             int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Br Art Occlus'              int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Cen Vein Occlus'            int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Br Vein Occlus'             int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Hollen Plaque'              int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Ast Hyalosis'               int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Nevus'                      int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Chorioret Scar'             int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'SWR Tension'                int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'SWR Cello Reflex'           int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Mac Hole'                   int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Histoplasmosis'             int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Ret Detach'                 int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Large C/D'                  int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Thick Vit/Glial'            int8   admin   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Other (comments)'           int8   admin   tag         tag        false      'Other Lesions +PT'
 
-modtagdef OCT    'Other Lesions Summary'      int8   admin   tag         tag        false      'no/yes'
+modtagdef fundus    'Other Lesions Summary'      int8   admin   tag         tag        false      'no/yes'
 
-modtagdef OCT    'Diabetic Retinopathy Level' int8   admin   tag         tag        false      'Diabetic Retinopathy Level'
+modtagdef fundus    'Diabetic Retinopathy Level' int8   admin   tag         tag        false      'Diabetic Retinopathy Level'
 
-tag "OCT brief tags" "_cfg_file list tags" tagname "Modality"
-tag "OCT brief tags" "_cfg_file list tags" tagname "Lesions Summary"
-tag "OCT brief tags" "_cfg_file list tags" tagname "Other Lesions Summary"
-tag "OCT brief tags" "_cfg_file list tags" tagname "Diabetic Retinopathy Level"
+tag "fundus brief tags" "_cfg_file list tags" tagname "Modality"
+tag "fundus brief tags" "_cfg_file list tags" tagname "Lesions Summary"
+tag "fundus brief tags" "_cfg_file list tags" tagname "Other Lesions Summary"
+tag "fundus brief tags" "_cfg_file list tags" tagname "Diabetic Retinopathy Level"
 
-tag "OCT brief tags" "_cfg_tag list tags" tagname "Modality"
-tag "OCT brief tags" "_cfg_tag list tags" tagname "Lesions Summary"
-tag "OCT brief tags" "_cfg_tag list tags" tagname "Other Lesions Summary"
-tag "OCT brief tags" "_cfg_tag list tags" tagname "Diabetic Retinopathy Level"
+tag "fundus brief tags" "_cfg_tag list tags" tagname "Modality"
+tag "fundus brief tags" "_cfg_tag list tags" tagname "Lesions Summary"
+tag "fundus brief tags" "_cfg_tag list tags" tagname "Other Lesions Summary"
+tag "fundus brief tags" "_cfg_tag list tags" tagname "Diabetic Retinopathy Level"
 
 EOF
 
