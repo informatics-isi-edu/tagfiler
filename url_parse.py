@@ -2,7 +2,7 @@ import ply.yacc as yacc
 import threading
 import web
 
-from url_lex import make_lexer, tokens
+from url_lex import make_lexer, tokens, keywords
 
 # use ast module to build abstract syntax tree
 import url_ast
@@ -348,22 +348,15 @@ def p_spacestringlist(p):
 
 # grammatically, keywords can also be valid string values...
 def p_stringany(p):
-    """string : FILE
-              | TAGS
-              | TAGDEF
-              | QUERY
-              | STUDY
-              | STRING
-              | LT
-              | LEQ
-              | GT
-              | GEQ
-              | LIKE
-              | SIMTO
-              | REGEXP
-              | CIREGEXP
-              | spacestring"""
+    """stub"""
+    # weird bit:
+    # this doc string is a grammar rule allowing all keywords to be used as string content
+    # in contexts where strings are expected.  to avoid this list being inconsistent with
+    # changes to the token set, we generate it automatically.
+    # this will fail if __doc__ cannot be mutated before yacc reads it
     p[0] = p[1]
+
+p_stringany.__doc__ =  "string : " + " \n| ".join(keywords.values()) + ' \n| STRING \n| spacestring'
 
 def p_stringplus_concat(p):
     """string : string string"""
