@@ -51,6 +51,8 @@ logger.setLevel(logging.INFO)
 
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
+    if type(url) != type('text'):
+        url = str(url)
     return urllib.quote(url, safe="")
 
 def make_filter(allowed):
