@@ -387,19 +387,21 @@ function getDatasetInfo() {
 function validateCustomTags() {
     var tagnames = getRequiredTagsName();
     for (i=0; i<tagnames.length; i++) {
-	log("validating tag " + tagnames[i]);
+		log("validating tag " + tagnames[i]);
     	var node = document.getElementById(tagnames[i]+'_id');
-    	attr = node.attributes;
-    	if (attr['required']) {
-    		var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
-    		if (value.length == 0) {
-    			alert('Tag "' + tagnames[i] + '" is required.');
-    			return false;
-    		}
-    	}
-    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(node.value)) {
-    		alert('Bad value for tag "' + tagnames[i] + '".');
-    		return false;
+    	var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
+    	var attr = node.attributes;
+    	if (value.length > 0) {
+	    	if (attr['typestr'].value == 'date' && !document.TagFileUploader.validateDate(value) || 
+	    		attr['typestr'].value == 'int8' && (isNaN(parseInt(value)) || value.length != ("" + parseInt(value)).length) ||
+	    		attr['typestr'].value == 'float8' && isNaN(parseFloat(value)))
+	    	{
+	    		alert('Bad value for tag "' + tagnames[i] + '".');
+	    		return false;
+	    	}
+    	} else if (attr['required']) {
+			alert('Tag "' + tagnames[i] + '" is required.');
+			return false;
     	}
     }
     return true;

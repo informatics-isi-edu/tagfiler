@@ -1048,7 +1048,8 @@ class Application:
             self.validateTagname(value, tagname, data_id)
 
         try:
-            value = self.downcast_value(dbtype, value)
+            if value:
+                value = self.downcast_value(dbtype, value)
         except:
             raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
