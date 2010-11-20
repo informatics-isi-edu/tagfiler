@@ -14,6 +14,7 @@ import distutils.sysconfig
 import sys
 import string
 from logging.handlers import SysLogHandler
+import json
 try:
     import webauthn
 except:
@@ -48,6 +49,13 @@ sysloghandler.setFormatter(syslogformatter)
 logger.addHandler(sysloghandler)
 
 logger.setLevel(logging.INFO)
+
+if hasattr(json, 'write'):
+    jsonWriter = json.write
+elif hasattr(json, 'dumps'):
+    jsonWriter = json.dumps
+else:
+    raise RuntimeError('Could not configure JSON library.')
 
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -224,6 +232,7 @@ class Application:
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote
+        self.globals['jsonWriter'] = jsonWriter
 
         self.globals['home'] = self.home + web.ctx.homepath
         self.globals['homepath'] = web.ctx.homepath

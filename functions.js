@@ -493,3 +493,72 @@ if(ajax_request) {
 
 var redirectToLogin = false;
 
+function renderTagdefs(table) {
+    var columns = [];
+    var columnmap = {};
+    var typedescs = null;
+    var cardinality = { false : "0 or one", true : "1 or more" };
+
+    var rows = table.getElementsByTagName("tr");
+    var headrow = rows[0];
+
+    var headers = headrow.children;
+    for (i=0; i<headers.length; i++) {
+	columns[i] = headers[i].getAttribute("name");
+	columnmap[columns[i]] = i;
+	var name = headers[i].getAttribute("name");
+	if ( name == "typestr") {
+	    typedescs = JSON.parse(unescape(headers[i].innerHTML));
+	    headers[i].innerHTML = "Tag type";
+	}
+	else {
+	    labels = { "Tag name" : "Tag name",
+		       "Owner" : "Owner",
+		       "multivalue" : "#&nbsp;Values",
+		       "readpolicy" : "Tag readers",
+		       "writepolicy" : "Tag writers" };
+	    headers[i].innerHTML = labels[headers[i].innerHTML];
+	}
+    }
+
+    for (i=1; i<rows.length; i++) {
+	if (rows[i].getAttribute("class") == "tagdef") {
+	    if ( i % 2 == 1 ) {
+		rows[i].className = "tagdef odd";
+	    }
+	    else {
+		rows[i].className = "tagdef even";
+	    }
+	    var cells = rows[i].children;
+	    var namecell = cells[columnmap["tagname"]];
+	    var tagname = namecell.innerHTML;
+	    var typecell = cells[columnmap["typestr"]];
+	    typecell.innerHTML = typedescs[typecell.innerHTML];
+	    var cardcell = cells[columnmap["multivalue"]];
+	    cardcell.innerHTML = cardinality[cardcell.innerHTML];
+	    var ownercell = cells[columnmap["owner"]];
+	    var owner = ownercell.innerHTML;
+	    var ownerand = "";
+	    if (owner != "") {
+		ownerand = "\"" + owner + "\" and "
+	    }
+	    var policy = { "anonymous" : "anyone", 
+			   "users" : "authenticated users", 
+			   "file" : "users who can access the file", 
+			   "fowner" : "user who owns the file",
+			   "tag" : (ownerand + "users in ACL") };
+	    var readpolcell = cells[columnmap["readpolicy"]];
+	    readpolcell.innerHTML = policy[readpolcell.innerHTML];
+	    var writepolcell = cells[columnmap["writepolicy"]];
+	    writepolcell.innerHTML = policy[writepolcell.innerHTML];
+
+	    namecell.innerHTML = "<form "
+		+ "encoding=\"application/x-www-url-encoded\" "
+		+ "action=\"/tagfiler/tagdef\" method=\"post\">"
+		+ "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
+		+ "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
+		+ "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
+		+ tagname + "</form>";
+	}
+    }
+}

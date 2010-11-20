@@ -24,7 +24,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
 	FileList.html FileUriList.txt ConfirmForm.html \
 	FileTagValBlock.html \
-	TagdefExisting.html TagdefPolicy.html \
+	TagdefExisting.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
 	TagdefNewShortcut.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \

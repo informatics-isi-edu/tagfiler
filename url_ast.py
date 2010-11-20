@@ -7,7 +7,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, idquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, idquote, jsonWriter
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -588,12 +588,9 @@ class Tagdef (Node):
 
         def postCommit(results):
             if self.action == 'delete':
+                self.globals['data_id'] = self.tag_id
                 return self.renderlist("Delete Confirmation",
-                                       [self.render.ConfirmForm(dict(target=self.home + web.ctx.homepath,
-                                                                     type='tagdef',
-                                                                     name=self.tag_id,
-                                                                     referer=self.uri2referer(uri),
-                                                                     urlquote=urlquote))])
+                                       [self.render.ConfirmForm('tagdef')])
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
@@ -758,12 +755,6 @@ class FileTags (Node):
                                 body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 return '&'.join(body)
             elif acceptType == 'application/json':
-                if hasattr(json, 'write'):
-                    jsonWriter = json.write
-                elif hasattr(json, 'dumps'):
-                    jsonWriter = json.dumps
-                else:
-                    raise RuntimeError('Could not configure JSON library.')
                 return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
             elif acceptType == 'text/html':
                 break
@@ -1159,13 +1150,6 @@ class Query (Node):
             else:
                 addName = False
 
-            if hasattr(json, 'write'):
-                jsonWriter = json.write
-            elif hasattr(json, 'dumps'):
-                jsonWriter = json.dumps
-            else:
-                raise RuntimeError('Could not configure JSON library.')
-            
             jsonMungeTags = set( [ tagname for tagname in listtags
                                    if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
 
