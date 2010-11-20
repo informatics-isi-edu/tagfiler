@@ -344,11 +344,11 @@ cfgtag "webauthn require" text 'True'
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
 #cfgtag "chunk bytes" text '1048576'
 
-cfgtag "connections" text '4'
-cfgtag "upload chunks" text 'True'
-cfgtag "download chunks" text 'True'
-cfgtag "socket buffer size" text '8192'
-cfgtag "applet chunk bytes" text '4194304'
+cfgtag "client connections" text '4'
+cfgtag "client upload chunks" text 'True'
+cfgtag "client download chunks" text 'True'
+cfgtag "client socket buffer size" text '8192'
+cfgtag "client chunk bytes" text '4194304'
 
 cfgtag "file list tags" text bytes owner 'read users' 'write users'
 #cfgtag "file list tags write" text 'read users' 'write users'
@@ -624,11 +624,10 @@ cp tagfiler.properties \
    /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/util
 
 chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
+chmod -R a+r ${deploydir}
 
 EOF
 fi
-
-chmod -R a+r ${deploydir}
 
 if [[ -d /etc/logrotate.d/ ]]
 then
