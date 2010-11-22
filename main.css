@@ -12,13 +12,13 @@ div.error {
   font-weight: bold;
   color: #ff0000;
 }
-table.file-list, table.tagdefs {
+table.file-list, table.tagdefs, table.role-list {
   border-collapse: collapse;
 }
 table.file-tag-list {
   border-collapse: collapse;
 }
-.file-list, .file-heading, .file, .file-tag, .file-name, .file-update, .file-tags, .file-tag, .file-delete, .file-tag-list, .heading, table.tagdefs, tr.tagdef, tr.tagdef td, tr.heading th {
+.file-list, .file-heading, .file, .file-tag, .file-name, .file-update, .file-tags, .file-tag, .file-delete, .file-tag-list, .heading, table.tagdefs, tr.tagdef, tr.tagdef td, tr.heading th, tr.role td {
   border: 1px solid black;
 }
 .file-tag.multivalue {
