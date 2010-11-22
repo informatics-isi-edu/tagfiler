@@ -53,8 +53,7 @@ def p_filelist_opts2(p):
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 
 def p_file(p):
-    """file : slash string slash FILE slash string
-            | slash string slash FILE slash string slash"""
+    """file : slash string slash FILE slash string"""
     p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
 
 def p_log(p):
