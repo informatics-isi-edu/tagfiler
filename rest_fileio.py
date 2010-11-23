@@ -941,23 +941,8 @@ class LogFileIO (FileIO):
                 web.header('Content-Length', length)
             else:
                 pollmins = 1
-                tvars = dict()
-                tvars['authn'] = self.authn
-                tvars['title'] = "Log %s" % self.data_id
-                tvars['subtitle'] = self.subtitle
-                tvars['logo'] = self.logo
-
-                tvars['home'] = self.home + web.ctx.homepath
-                tvars['webauthnhome'] = self.webauthnhome
-
-                tvars['user'] = self.authn.role
-                tvars['roles'] = self.authn.roles
-                tvars['loginsince'] = self.authn.since
-                tvars['loginuntil'] = self.authn.until
-
-
-                top = unicode(self.render.Top(tvars)) + "<pre>"
-                bottom = "</pre>" + unicode(self.render.Bottom(tvars))
+                top = unicode(self.render.Top()) + "<pre>"
+                bottom = "</pre>" + unicode(self.render.Bottom())
                 web.header('Content-type', "text/html")
                 web.header('Content-Length', len(top) + length + len(bottom))
                     

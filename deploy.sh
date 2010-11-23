@@ -371,7 +371,7 @@ cfgtag "subtitle" text 'Tagfiler (trunk) on ${HOME_HOST}'
 cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/${SVCPREFIX}/static/logo.png" width="245" height="167" />'
 cfgtag "contact" text '<p>Your HTML here</p>'
 cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
-cfgtag "bugs" text 'https://jira.misd.isi.edu:8444/browse/DEIIMGUP'
+cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
 
 
 ## Types and Tags for NEI MISD/DEI demo...

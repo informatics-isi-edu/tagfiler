@@ -369,7 +369,6 @@ class Application:
         self.globals['authn'] = authn
 
     def renderlist(self, title, renderlist, refresh=True):
-        tvars = dict()
         if refresh:
             self.globals['pollmins'] = 1
         else:
