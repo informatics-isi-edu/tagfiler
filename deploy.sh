@@ -158,6 +158,9 @@ tagdef url            text        ""      anonymous   system     false
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
+tagdef contains       text        ""      file        file       true       url
+tagdef version        text        ""      file        file       true       url
+
 tagdef "Transmission Number" \
                       int8        ""    file        file       false
 
