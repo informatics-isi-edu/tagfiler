@@ -54,7 +54,7 @@ div.progress-text {
   text-align: center;
   position: relative;
 }
-table.topmargin, table.file-tag-list {
+table.topmargin {
   width: 100%;
 }
 table.topmargin td.logo {

@@ -280,6 +280,7 @@ typedef text         text          'Text'
 typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
+typedef url          text          'URL'
 
 storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" admin "*"
 

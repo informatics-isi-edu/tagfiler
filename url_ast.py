@@ -607,6 +607,7 @@ class FileTags (Node):
         self.data_id = data_id
         self.tag_id = tag_id
         self.value = value
+        self.typestr = None
         self.view_type = None
         self.referer = None
         if tagvals:
@@ -618,16 +619,45 @@ class FileTags (Node):
         self.globals['data_id'] = self.data_id
 
     def get_tag_body(self):
+        owner = self.owner()
         results = self.select_tagdef(self.tag_id)
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.tag_id)
         tagdef = results[0]
+        tagdef.writeok = self.test_tag_authz('write', tagdef.tagname, fowner=owner)
+        self.tagdef = tagdef
+        self.typestr = tagdef.typestr
+        self.contentType = None
+        self.urlFallback = False
+        
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType in set([ 'application/x-www-form-urlencoded',
+                                   'text/plain' ]):
+                self.contentType = acceptType
+                break
+            if acceptType == 'text/uri-list':
+                if self.typestr == 'url':
+                    # only prefer uri-list for URLs
+                    self.contentType = acceptType
+                else:
+                    # but use it as last resort for other types
+                    self.urlFallback = True
+                break
+            if acceptType == 'text/html':
+                break
+
+        if self.contentType == None and self.urlFallback:
+            self.contentType = 'text/uri-list'
+
+        if self.contentType == None:
+            self.contentType = 'text/html'
+        
         results = self.select_file()
         if len(results) == 0:
             raise NotFound(data='data set "%s"' % self.data_id)
         owner = self.owner()
         results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
-        if len(results) == 0:
+        if len(results) == 0 and self.contentType not in ['text/uri-list', 'text/html']:
             if self.value == None:
                 raise NotFound(data='tag "%s" on dataset "%s"' % (self.tag_id, self.data_id))
             elif self.value == '':
@@ -647,11 +677,27 @@ class FileTags (Node):
         return values
 
     def get_tag_postCommit(self, values):
-        web.header('Content-Type', 'application/x-www-form-urlencoded')
-        if len(values) > 0:
-            return "&".join([(urlquote(self.tag_id) + '=' + urlquote(mystr(val))) for val in values])
+        web.header('Content-Type', self.contentType)
+        if self.contentType == 'application/x-www-form-urlencoded':
+            if len(values) > 0:
+                return "&".join([(urlquote(self.tag_id) + '=' + urlquote(mystr(val))) for val in values])
+            else:
+                return urlquote(self.tag_id)
+        elif self.contentType == 'text/uri-list':
+            if self.typestr == 'url':
+                return '\n'.join(values + [''])
+            else:
+                raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s"' % self.typestr)
+        elif self.contentType == 'text/plain':
+            return '\n'.join(values) + '\n'
         else:
-            return urlquote(self.tag_id)
+            # 'text/html'
+            file = web.storage(file=self.data_id)
+            file[self.tag_id] = values
+            return self.renderlist('Dataset "%s" Tag "%s" Values' % (self.data_id, self.tag_id),
+                                   [self.render.FileTagValBlock(file,
+                                                                self.tagdef,
+                                                                [self.tag_id])])
 
     def buildtaginfo(self, ownerwhere):
         owner = self.owner()
