@@ -20,7 +20,7 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		<td class="file-name">
-		<a href="${homepath}/file/${urlquote(file.file)}${querystr}">${file.file}</a>
+		<a href="${homepath}/file/${urlquote(file.file)}">${file.file}</a>
 		$if file['Image Set']:
 			<a href="${homepath}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
 		$if file.writeok:
