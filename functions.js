@@ -345,14 +345,6 @@ function setFiles(files) {
 }
 
 /**
- * Add a file to be downloaded
- * Files are separated by HTML newline
- */
-function addFile(file) {
-    document.getElementById("Files").innerHTML += '<br/>'+file;
-}
-
-/**
  * Set the status during the upload/download
  */
 function setStatus(status) {
