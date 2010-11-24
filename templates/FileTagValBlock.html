@@ -26,6 +26,8 @@ $elif tagdef.typestr:
 			${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
 		$elif tagdef.typestr == 'url':
 			<a href="${val}">${val}</a>
+		$elif tagdef.typestr == 'file':
+			<a href="${home}/file/${urlquote_name(val)}">${val}</a>
 		$else:
 			${val}
 		</td>

@@ -154,12 +154,14 @@ tagdef "modified by"  text        ""      anonymous   system     false      role
 tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
-tagdef url            text        ""      anonymous   system     false
+tagdef url            text        ""      file        file       false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
 tagdef contains       text        ""      file        file       true       url
-tagdef version        text        ""      file        file       true       url
+tagdef version        text        ""      file        file       true       file
+tagdef "version number" int8      ""      file        system     false
+tagdef "Version Set"  ""          ""      file        system     false
 
 tagdef "Transmission Number" \
                       int8        ""    file        file       false
@@ -256,7 +258,7 @@ do
    tag "\$x" "list on homepage"
 done
 
-storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin "*"
+storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" admin "*"
 
 typedef()
 {
@@ -284,6 +286,7 @@ typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
 typedef url          text          'URL'
+typedef file         text          'Dataset'
 
 storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" admin "*"
 
@@ -303,7 +306,7 @@ cfgtagdef 'file list tags' text     ""      file        file       true       ta
 # tag list tags MUST BE DEFINED NEXT...
 cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
 # THEN, need to do this manually to break dependency loop
-tag "configuration tags" "_cfg_tag list tags" tagname "\$tagname"
+tag "configuration tags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
 cfgtagdef 'file list tags write' text ""    file        file       true       tagname
 cfgtagdef home          text        ""      file        file       false
@@ -315,6 +318,7 @@ cfgtagdef 'template path' text      ""      file        file       false
 cfgtagdef 'chunk bytes' text        ""      file        file       false
 cfgtagdef 'local files immutable' text ""   file        file       false
 cfgtagdef 'remote files immutable' text ""  file        file       false
+cfgtagdef 'use versions' 'text'     ""      file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
 cfgtagdef subtitle      text        ""      file        file       false
 cfgtagdef logo          text        ""      file        file       false

@@ -85,21 +85,20 @@ class FileIO (Application):
         self.filetype = 'file'
         self.bytes = None
         self.referer = None
+        self.versionname = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
 
         def body():
-            fresults = self.select_file()
-            if len(fresults) == 0:
-                raise NotFound(data='dataset %s' % (self.data_id))
+            file, version = self.select_file_version()
+            if version:
+                # use the version as the file if it is a versioned file
+                file = version
+                self.data_id = file.file
+                
             self.enforce_file_authz('read')
-            tresults = self.select_file_tag('content-type')
-            if len(tresults) > 0:
-                content_type = tresults[0].value
-            else:
-                content_type = None
-            return (fresults[0], content_type)
+            return (file, file['content-type'])
 
         def postCommit(result):
             # if the dataset is a remote URL, just redirect client
@@ -329,11 +328,13 @@ class FileIO (Application):
     def DELETE(self, uri):
 
         def body():
-            results = self.select_file()
-            if len(results) == 0:
-                raise NotFound(data='dataset %s' % (self.data_id))
-            result = results[0]
-            self.enforce_file_authz('write', local=result.local)
+            file, version = self.select_file_version()
+
+            if version:
+                file = version
+                self.data_id = file.file
+
+            self.enforce_file_authz('write', local=file.local)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
             return result
@@ -375,72 +376,17 @@ class FileIO (Application):
 
     def insertForStore(self):
         remote = False
-        results = [ res for res in self.select_file() ]
-
-        if len(results) > 0:
-            # check permissions and update existing file
-            remote = not results[0].local
-            self.enforce_file_authz('write', local=not remote)
-            if (results[0].location != self.location):
-                self.update_file()
-            else:
-                results = []
-            self.txlog('UPDATE', dataset=self.data_id)
-        else:
-            # anybody is free to insert new uniquely named file
-            self.insert_file()
-            self.txlog('CREATE', dataset=self.data_id)
-            t = self.db.transaction()
-
-            web.debug('setting owner "%s"' % self.authn.role)
-            self.set_file_tag('owner', self.authn.role)
-            t.commit()
-    
-            t = self.db.transaction()
-            try:
-                self.set_file_tag('created', 'now')
-                t.commit()
-            except:
-                t.rollback()
-
-            t = self.db.transaction()
-            try:
-                self.set_file_tag('name', self.data_id)
-                t.commit()
-            except:
-                t.rollback()
-    
-        t = self.db.transaction()
+        content_type = None
+        results = []
         try:
-            self.set_file_tag('modified by', self.authn.role)
-            t.commit()
-        except:
-            t.rollback()
+            file, latest = self.select_file_version()
+        except NotFound:
+            file = None
+            latest = None
 
-        t = self.db.transaction()
-        try:
-            self.set_file_tag('modified', 'now')
-            t.commit()
-        except:
-            t.rollback()
+        created = False
 
         if self.bytes != None:
-            t = self.db.transaction()
-            try:
-                self.set_file_tag('bytes', self.bytes)
-                t.commit()
-            except:
-                t.rollback()
-                
-            t = self.db.transaction()
-            try:
-                self.delete_file_tag('url')
-                t.commit()
-                if remote:
-                    self.txlog('DELETE', self.data_id)
-            except:
-                t.rollback()
-                
             content_types = self.select_file_tag('content-type')
             if len(content_types) > 0:
                 tagged_content_type = content_types[0].value
@@ -459,41 +405,82 @@ class FileIO (Application):
                                                guessed_content_type,
                                                tagged_content_type)
 
-            if content_type:
-                t = self.db.transaction()
-                try:
-                    self.set_file_tag('content-type', content_type)
-                    t.commit()
-                except:
-                    t.rollback()
-
+        if file:
+            # check permissions and update existing file
+            remote = not file.local
+            self.enforce_file_authz('write', local=file.local)
+            if (file.location != self.location):
+                if file['Version Set']:
+                    # register as a new version of the existing file
+                    if latest:
+                        versionnum = latest['version number'] + 1
+                    else:
+                        # TODO: save latest version number on parent file to force monotonicity even with deletes?
+                        versionnum = 1
+                    self.versionname = self.data_id + '@%d' % versionnum
+                    self.insert_file(self.versionname, self.local, self.location)
+                    self.updateFileTags(self.versionname, True, content_type, remote, self.bytes)
+                    self.set_file_tag('version number', versionnum, data_id=self.versionname)
+                    self.set_file_tag('version', self.versionname, data_id=self.data_id)
+                    self.updateFileTags(self.data_id, created, content_type, remote, None)
+                    created = True
+                else:
+                    # update the existing non-versioned file
+                    self.update_file()
+                    self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+                    results = [file]
+            self.txlog('UPDATE', dataset=self.data_id)
         else:
-            t = self.db.transaction()
-            try:
-                self.delete_file_tag('bytes')
-                t.commit()
-            except:
-                t.rollback()
+            # anybody is free to insert new uniquely named file
+            created = True
+            self.txlog('CREATE', dataset=self.data_id)
+            if self.trackVersions:
+                # create version set file
+                self.insert_file(self.data_id, local=True, location=None)
+                self.set_file_tag('Version Set')
+                # need to set normal system tags too
+                self.updateFileTags(self.data_id, created, content_type, remote, None)
 
-            t = self.db.transaction()
-            try:
-                self.delete_file_tag('content-type')
-                t.commit()
-            except:
-                t.rollback()
+                # create first version w/ client provided content
+                versionnum = 1
+                self.versionname = self.data_id + '@%d' % versionnum
+                self.insert_file(self.versionname, local=True, location=self.location)
+                self.set_file_tag('version number', versionnum, data_id=self.versionname)
 
-            t = self.db.transaction()
-            try:
-                self.set_file_tag('url', self.location)
-                t.commit()
-                if remote:
-                    self.txlog('DELETE', self.data_id)
-            except:
-                t.rollback()
+                # register first version
+                self.set_file_tag('version', self.versionname, data_id=self.data_id)
+                self.updateFileTags(self.versionname, created, content_type, remote, self.bytes)
+            else:
+                # create non-versioned file
+                self.insert_file(self.data_id, self.local, self.location)
+                self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+
+        return results
+
+    def updateFileTags(self, data_id, created, content_type, remote, bytes):
+        if created:
+            self.set_file_tag('owner', self.authn.role, data_id=data_id)
+            self.set_file_tag('created', 'now', data_id=data_id)
+            self.set_file_tag('name', data_id, data_id=data_id)
+    
+        self.set_file_tag('modified by', self.authn.role, data_id=data_id)
+        self.set_file_tag('modified', 'now', data_id=data_id)
+
+        if self.bytes != None:
+            if bytes != None:
+                self.set_file_tag('bytes', bytes, data_id=data_id)
+            self.delete_file_tag('url', data_id=data_id)
+                
+            if content_type:
+                self.set_file_tag('content-type', content_type, data_id=data_id)
+        else:
+            self.delete_file_tag('bytes', data_id=data_id)
+            self.delete_file_tag('content-type', data_id=data_id)
+            self.set_file_tag('url', self.location, data_id=data_id)
 
         # custom demo hack, proxy tag ops on Image Set to all member files
         if self.queryopts.has_key('Image Set'):
-            predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+            predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [data_id] } ]
             subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
         else:
             subfiles = []
@@ -502,8 +489,8 @@ class FileIO (Application):
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
             self.enforce_tag_authz('write', tagname)
-            self.set_file_tag(tagname, self.queryopts[tagname])
-            self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
+            self.set_file_tag(tagname, self.queryopts[tagname], data_id=data_id)
+            self.txlog('SET', dataset=data_id, tag=tagname, value=self.queryopts[tagname])
             # custom demo hack, proxy tag ops on Image Set to all member files
             if tagname != 'Image Set':
                 for subfile in subfiles:
@@ -516,13 +503,13 @@ class FileIO (Application):
                 srcrole = srcroles.pop()
                 dstrole, readusers, writeusers = self.remap[srcrole]
                 for readuser in readusers:
-                    self.set_file_tag('read users', readuser)
-                    self.txlog('REMAP', dataset=self.data_id, tag='read users', value=readuser)
+                    self.set_file_tag('read users', readuser, data_id=data_id)
+                    self.txlog('REMAP', dataset=data_id, tag='read users', value=readuser)
                 for writeuser in writeusers:
-                    self.set_file_tag('write users', writeuser)
-                    self.txlog('REMAP', dataset=self.data_id, tag='write users', value=writeuser)
-                self.set_file_tag('owner', dstrole)
-                self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
+                    self.set_file_tag('write users', writeuser, data_id=data_id)
+                    self.txlog('REMAP', dataset=data_id, tag='write users', value=writeuser)
+                self.set_file_tag('owner', dstrole, data_id=data_id)
+                self.txlog('REMAP', dataset=data_id, tag='owner', value=dstrole)
                 t.commit()
             except:
                 #et, ev, tb = sys.exc_info()
@@ -531,8 +518,6 @@ class FileIO (Application):
                 t.rollback()
         elif len(srcroles) > 1:
             raise Conflict("Ambiguous remap rules encountered")
-            
-        return results
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
@@ -615,10 +600,10 @@ class FileIO (Application):
                 pass
             
     def deletePrevious(self, files):
-        for result in files:
-            if result.local:
+        for file in files:
+            if file.local:
                 # previous result had local file, so free it
-                self.deleteFile(self.store_path + '/' + result.location)
+                self.deleteFile(self.store_path + '/' + file.location)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -662,17 +647,19 @@ class FileIO (Application):
         # clast  -- last byte position of content body in file
 
         def preWriteBody():
-            results = self.select_file()
-            if len(results) == 0:
-                return None
-            else:
-                result = results[0]
-                self.enforce_file_authz('write', local=result.local)
+            try:
+                file, version = self.select_file_version()
+            except NotFound:
+                file = None
+                version = None
+
+            if file:
+                self.enforce_file_authz('write', local=file.local)
                 if self.update:
-                    if result.local:
-                        self.location = result.location
+                    if file.local:
+                        self.location = file.location
                         filename = self.store_path + '/' + self.location
-                        self.local = result.local
+                        self.local = file.local
                         f = open(filename, 'r+b')
                         #web.debug('reopen', self.location, self.local, filename, f)
                         return f
@@ -726,9 +713,9 @@ class FileIO (Application):
 
             return self.insertForStore()
 
-        def postWritePostCommit(results):
-            if not content_range and len(results) > 0:
-                self.deletePrevious(results)
+        def postWritePostCommit(files):
+            if not content_range and files:
+                self.deletePrevious(files)
             uri = self.home + self.store_path + '/' + urlquote(self.data_id)
             web.header('Location', uri)
             if filename:
@@ -766,9 +753,9 @@ class FileIO (Application):
         def putBody():
             return self.insertForStore()
 
-        def putPostCommit(results):
-            if len(results) > 0:
-                self.deletePrevious(results)
+        def putPostCommit(files):
+            if files:
+                self.deletePrevious(files)
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():

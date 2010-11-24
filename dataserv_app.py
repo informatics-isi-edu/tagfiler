@@ -63,6 +63,20 @@ def urlquote(url):
         url = str(url)
     return urllib.quote(url, safe="")
 
+def urlquote_name(filename):
+    # BUG: this is not really safe as it misdetects user names ending in @[0-9]+
+    # really need to store urlquoted name in DB to be safe
+    m = re.match('^(?P<base>.*)([@](?P<version>[0-9]+))?$', filename)
+    if not m:
+        raise RuntimeError('Failure parsing file name "%s"' % filename)
+    base = urlquote(m.group('base'))
+    version = m.group('version')
+    if version != None:
+        version = '@' + urlquote(version)
+    else:
+        version = ''
+    return base + version
+
 def make_filter(allowed):
     allchars = string.maketrans('', '')
     delchars = ''.join([c for c in allchars if c not in allowed])
@@ -224,6 +238,7 @@ class Application:
         self.remap = buildPolicyRules(self.getParamsDb('policy remappings'))
         self.localFilesImmutable = parseBoolString(self.getParamDb('local files immutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(self.getParamDb('remote files immutable', 'False'))
+        self.trackVersions = parseBoolString(self.getParamDb('use versions', 'False'))
 
         self.render = web.template.render(self.template_path, globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
@@ -231,6 +246,7 @@ class Application:
         # 'globals' are local to this Application instance and also used by its templates
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
+        self.globals['urlquote_name'] = urlquote_name
         self.globals['idquote'] = idquote
         self.globals['jsonWriter'] = jsonWriter
 
@@ -806,9 +822,45 @@ class Application:
             results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
         return results
 
-    def insert_file(self):
+    def select_file_version(self, data_id=None, versionnum=None):
+        if data_id == None:
+            data_id = self.data_id
+        if data_id == None:
+            raise Conflict("Cannot find versions without a dataset name.")
+        
+        fresults = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[data_id])],
+                                                     listtags=['Version Set', 'version', 'content-type'])
+        if len(fresults) == 0:
+            raise NotFound(data='dataset "%s"' % (data_id))
+        file = fresults[0]
+        version = None
+
+        if file['Version Set']:
+            versions = []
+            for vfile in file['version']:
+                vfresults = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[vfile])],
+                                                          listtags=['content-type', 'version number'])
+                if len(vfresults) > 0:
+                    vfresult = vfresults[0]
+                    versions.append((vfresult['version number'], vfresult))
+            if versionnum != None:
+                versions = dict(versions)
+                try:
+                    version = versions[versionnum]
+                except:
+                    raise NotFound(data='version %d of dataset "%s"' % (versionnum, data_id))
+            else:
+                versions.sort(key=lambda pair: pair[0], reverse=True)
+                try:
+                    version = versions[0][1]
+                except:
+                    raise NotFound(data='any version of dataset %s' % (self.data_id))
+
+        return (file, version)
+
+    def insert_file(self, data_id, local, location):
         self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
-                      vars=dict(name=self.data_id, local=self.local, location=self.location))
+                      vars=dict(name=data_id, local=local, location=location))
 
     def update_file(self):
         self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
@@ -1096,7 +1148,7 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def select_files_by_predlist(self, predlist=None, listtags=None):
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[]):
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1154,9 +1206,11 @@ class Application:
                        '"_read users" ON (files.name = "_read users".file)']
         selects = ['files.name AS file',
                    'files.local AS local',
+                   'files.location AS location',
                    '_owner.value AS owner']
         groupbys = ['files.name',
                     'files.local',
+                    'files.location',
                     '_owner.value']
         wheres = []
         values = dict()
@@ -1233,7 +1287,7 @@ class Application:
 
         query = 'SELECT %s FROM %s %s GROUP BY %s' % (selects, tables, wheres, groupbys)
 
-        query += " ORDER BY files.name"
+        query += " ORDER BY " + ", ".join(['"%s"' % self.wraptag(tag) for tag in ordertags] + ['file'])
         
         #web.debug(query)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):

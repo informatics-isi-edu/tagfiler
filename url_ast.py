@@ -7,7 +7,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, idquote, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlquote_name, idquote, jsonWriter
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -686,6 +686,9 @@ class FileTags (Node):
         elif self.contentType == 'text/uri-list':
             if self.typestr == 'url':
                 return '\n'.join(values + [''])
+            if self.typestr == 'file':
+                return '\n'.join(['%s/%s/file/%s' % (self.home, web.ctx.homepath, urlquote_name(val)) for val in values]
+                                 + [''])
             else:
                 raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s"' % self.typestr)
         elif self.contentType == 'text/plain':
