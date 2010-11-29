@@ -376,7 +376,7 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
-        remote = False
+        remote = not self.local
         content_type = None
         results = []
         try:
@@ -441,7 +441,7 @@ class FileIO (Application):
             self.txlog('CREATE', dataset=self.data_id)
             if self.trackVersions:
                 # create version set file
-                self.insert_file(self.data_id, local=True, location=None)
+                self.insert_file(self.data_id, self.local, location=None)
                 self.set_file_tag('Version Set')
                 # need to set normal system tags too
                 self.updateFileTags(self.data_id, created, content_type, remote, None)
@@ -449,7 +449,7 @@ class FileIO (Application):
                 # create first version w/ client provided content
                 versionnum = 1
                 self.versionname = self.data_id + '@%d' % versionnum
-                self.insert_file(self.versionname, local=True, location=self.location)
+                self.insert_file(self.versionname, self.local, location=self.location)
                 self.set_file_tag('version number', versionnum, data_id=self.versionname)
 
                 # register first version
@@ -819,6 +819,7 @@ class FileIO (Application):
                                    [self.render.ConfirmForm(ftype)])
         
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
+        web.debug(contentType)
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
 
