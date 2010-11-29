@@ -408,7 +408,6 @@ class FileIO (Application):
 
         if file:
             # check permissions and update existing file
-            remote = not file.local
             self.enforce_file_authz('write', local=file.local)
             if (file.location != self.location):
                 if file['Version Set']:
@@ -420,19 +419,19 @@ class FileIO (Application):
                         versionnum = 1
                     self.versionname = self.data_id + '@%d' % versionnum
                     self.insert_file(self.versionname, self.local, self.location)
-                    self.updateFileTags(self.versionname, True, content_type, remote, self.bytes)
+                    self.updateFileTags(self.versionname, True, content_type)
                     self.set_file_tag('version number', versionnum, data_id=self.versionname)
                     self.set_file_tag('version', self.versionname, data_id=self.data_id)
-                    self.updateFileTags(self.data_id, created, content_type, remote, None)
+                    self.updateFileTags(self.data_id, created, content_type, versionSet=True)
                     created = True
                 else:
                     # replace the existing non-versioned file
                     self.update_file()
-                    self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+                    self.updateFileTags(self.data_id, created, content_type)
                     results = [file]
             else:
                 # we're updating an existing file in place
-                self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+                self.updateFileTags(self.data_id, created, content_type)
                         
             self.txlog('UPDATE', dataset=self.data_id)
         else:
@@ -444,25 +443,25 @@ class FileIO (Application):
                 self.insert_file(self.data_id, self.local, location=None)
                 self.set_file_tag('Version Set')
                 # need to set normal system tags too
-                self.updateFileTags(self.data_id, created, content_type, remote, None)
+                self.updateFileTags(self.data_id, created, content_type, versionSet=True)
 
                 # create first version w/ client provided content
                 versionnum = 1
                 self.versionname = self.data_id + '@%d' % versionnum
                 self.insert_file(self.versionname, self.local, location=self.location)
                 self.set_file_tag('version number', versionnum, data_id=self.versionname)
+                self.updateFileTags(self.versionname, created, content_type)
 
                 # register first version
                 self.set_file_tag('version', self.versionname, data_id=self.data_id)
-                self.updateFileTags(self.versionname, created, content_type, remote, self.bytes)
             else:
                 # create non-versioned file
                 self.insert_file(self.data_id, self.local, self.location)
-                self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+                self.updateFileTags(self.data_id, created, content_type)
 
         return results
 
-    def updateFileTags(self, data_id, created, content_type, remote, bytes):
+    def updateFileTags(self, data_id, created, content_type, versionSet=False):
         if created:
             self.set_file_tag('owner', self.authn.role, data_id=data_id)
             self.set_file_tag('created', 'now', data_id=data_id)
@@ -471,17 +470,17 @@ class FileIO (Application):
         self.set_file_tag('modified by', self.authn.role, data_id=data_id)
         self.set_file_tag('modified', 'now', data_id=data_id)
 
-        if self.bytes != None:
-            if bytes != None:
-                self.set_file_tag('bytes', bytes, data_id=data_id)
-            self.delete_file_tag('url', data_id=data_id)
+        if not versionSet:
+            if self.local:
+                self.set_file_tag('bytes', self.bytes, data_id=data_id)
+                self.delete_file_tag('url', data_id=data_id)
                 
-            if content_type:
-                self.set_file_tag('content-type', content_type, data_id=data_id)
-        else:
-            self.delete_file_tag('bytes', data_id=data_id)
-            self.delete_file_tag('content-type', data_id=data_id)
-            self.set_file_tag('url', self.location, data_id=data_id)
+                if content_type:
+                    self.set_file_tag('content-type', content_type, data_id=data_id)
+            else:
+                self.delete_file_tag('bytes', data_id=data_id)
+                self.delete_file_tag('content-type', data_id=data_id)
+                self.set_file_tag('url', self.location, data_id=data_id)
 
         # custom demo hack, proxy tag ops on Image Set to all member files
         # BUG: the contains tag is empty at this point in applet workflow
