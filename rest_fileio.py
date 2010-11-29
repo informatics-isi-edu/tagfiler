@@ -10,7 +10,7 @@ import re
 import traceback
 import sys
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote
 
 # build a map of mime type --> primary suffix
 mime_types_suffixes = dict()
@@ -86,6 +86,7 @@ class FileIO (Application):
         self.bytes = None
         self.referer = None
         self.versionname = None
+        self.update = False
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -606,6 +607,28 @@ class FileIO (Application):
                 # previous result had local file, so free it
                 self.deleteFile(self.store_path + '/' + file.location)
 
+    def putPreWriteBody(self):
+        try:
+            file, version = self.select_file_version()
+        except NotFound:
+            file = None
+            version = None
+
+        if file:
+            self.enforce_file_authz('write', local=file.local)
+            if self.update:
+                if file.local:
+                    self.location = file.location
+                    filename = self.store_path + '/' + self.location
+                    self.local = file.local
+                    f = open(filename, 'r+b')
+                    #web.debug('reopen', self.location, self.local, filename, f)
+                    return f
+                else:
+                    raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
+            else:
+                return None
+
     def PUT(self, uri):
         """store file content from client"""
 
@@ -648,26 +671,7 @@ class FileIO (Application):
         # clast  -- last byte position of content body in file
 
         def preWriteBody():
-            try:
-                file, version = self.select_file_version()
-            except NotFound:
-                file = None
-                version = None
-
-            if file:
-                self.enforce_file_authz('write', local=file.local)
-                if self.update:
-                    if file.local:
-                        self.location = file.location
-                        filename = self.store_path + '/' + self.location
-                        self.local = file.local
-                        f = open(filename, 'r+b')
-                        #web.debug('reopen', self.location, self.local, filename, f)
-                        return f
-                    else:
-                        raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
-                else:
-                    return None
+            return self.putPreWriteBody()
 
         def preWritePostCommit(f):
             return f
@@ -742,13 +746,11 @@ class FileIO (Application):
         # return same result page as for GET app/tags/data_id for convenience
 
         def preWriteBody():
-            results = self.select_file()
-            if len(results) == 0:
-                return True
-            self.enforce_file_authz('write', local=results[0].local)
-            return True
+            return self.putPreWriteBody()
 
-        def preWritePostCommit(result):
+        def preWritePostCommit(f):
+            if f != None:
+                raise Conflict(data='Cannot perform range-based access via POST.')
             return None
         
         def putBody():
