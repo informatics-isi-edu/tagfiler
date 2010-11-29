@@ -424,11 +424,12 @@ class FileIO (Application):
                     self.set_file_tag('version', self.versionname, data_id=self.data_id)
                     self.updateFileTags(self.data_id, created, content_type, remote, None)
                     created = True
-                else:
-                    # update the existing non-versioned file
-                    self.update_file()
-                    self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
-                    results = [file]
+            else:
+                # update the existing non-versioned file
+                self.update_file()
+                self.updateFileTags(self.data_id, created, content_type, remote, self.bytes)
+                results = [file]
+                        
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
