@@ -77,6 +77,12 @@ def urlquote_name(filename):
         version = ''
     return base + version
 
+def parseBoolString(theString):
+    if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
+        return True
+    else:
+        return False
+              
 def make_filter(allowed):
     allchars = string.maketrans('', '')
     delchars = ''.join([c for c in allchars if c not in allowed])
@@ -190,12 +196,6 @@ class Application:
         def getParamEnv(suffix, default=None):
             return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
-        def parseBoolString(theString):
-            if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
-                return True
-            else:
-                return False
-              
         def buildPolicyRules(rules):
             remap = dict()
             for rule in rules:

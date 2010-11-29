@@ -10,7 +10,7 @@ import re
 import traceback
 import sys
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote, parseBoolString
 
 # build a map of mime type --> primary suffix
 mime_types_suffixes = dict()
@@ -87,6 +87,7 @@ class FileIO (Application):
         self.referer = None
         self.versionname = None
         self.update = False
+        self.useVersions = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -438,7 +439,7 @@ class FileIO (Application):
             # anybody is free to insert new uniquely named file
             created = True
             self.txlog('CREATE', dataset=self.data_id)
-            if self.trackVersions:
+            if self.trackVersions and self.useVersions != False:
                 # create version set file
                 self.insert_file(self.data_id, self.local, location=None)
                 self.set_file_tag('Version Set')
@@ -818,7 +819,6 @@ class FileIO (Application):
                                    [self.render.ConfirmForm(ftype)])
         
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
-        web.debug(contentType)
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
 
@@ -890,6 +890,10 @@ class FileIO (Application):
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.location = storage.url + '?title=%s' % urlquote(self.data_id)
+                try:
+                    self.useVersions = parseBoolString(storage.versioned)
+                except:
+                    pass
                 self.local = False
                 return self.dbtransact(putBody, putPostCommit)
 
