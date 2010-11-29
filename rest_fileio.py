@@ -484,9 +484,9 @@ class FileIO (Application):
             self.set_file_tag('url', self.location, data_id=data_id)
 
         # custom demo hack, proxy tag ops on Image Set to all member files
-        if self.queryopts.has_key('Image Set'):
-            predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [data_id] } ]
-            subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
+        # BUG: the contains tag is empty at this point in applet workflow
+        if self.queryopts.has_key('contains'):
+            subfiles = self.gettagvals('contains', data_id=data_id)
         else:
             subfiles = []
                 
