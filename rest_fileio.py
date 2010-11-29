@@ -928,8 +928,8 @@ class LogFileIO (FileIO):
                 web.header('Content-Length', length)
             else:
                 pollmins = 1
-                top = unicode(self.render.Top()) + "<pre>"
-                bottom = "</pre>" + unicode(self.render.Bottom())
+                top = "<pre>"
+                bottom = "</pre>"
                 web.header('Content-type', "text/html")
                 web.header('Content-Length', len(top) + length + len(bottom))
                     
