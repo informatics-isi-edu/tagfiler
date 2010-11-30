@@ -86,6 +86,7 @@ class FileIO (Application):
         self.bytes = None
         self.referer = None
         self.versionname = None
+        self.versionnum = None
         self.update = False
         self.useVersions = None
 
@@ -381,20 +382,20 @@ class FileIO (Application):
         content_type = None
         results = []
         try:
-            file, latest = self.select_file_version()
+            file, latest = self.select_file_version(versionnum=self.versionnum)
         except NotFound:
             file = None
             latest = None
 
         created = False
 
-        if self.bytes != None:
+        if self.bytes != None and not self.update:
             content_types = self.select_file_tag('content-type')
             if len(content_types) > 0:
                 tagged_content_type = content_types[0].value
             else:
                 tagged_content_type = None
-                
+
             try:
                 filename = self.store_path + '/' + self.location
                 p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
@@ -410,7 +411,7 @@ class FileIO (Application):
         if file:
             # check permissions and update existing file
             self.enforce_file_authz('write', local=file.local)
-            if (file.location != self.location):
+            if not self.update:
                 if file['Version Set']:
                     # register as a new version of the existing file
                     if latest:
@@ -432,7 +433,13 @@ class FileIO (Application):
                     results = [file]
             else:
                 # we're updating an existing file in place
-                self.updateFileTags(self.data_id, created, content_type)
+                if file['Version Set']:
+                    self.versionname = latest['file']
+                    self.updateFileTags(self.versionname, created, content_type)
+                    self.updateFileTags(self.data_id, created, content_type, versionSet=True)
+                else:
+                    # replace the existing non-versioned file
+                    self.updateFileTags(self.data_id, created, content_type)
                         
             self.txlog('UPDATE', dataset=self.data_id)
         else:
@@ -617,25 +624,31 @@ class FileIO (Application):
             file = None
             version = None
 
+        vnum = None
+
         if file:
             self.enforce_file_authz('write', local=file.local)
             if self.update:
-                if version:
-                    file = version
                 if file.local:
+                    if version:
+                        if version.location == None:
+                            raise RuntimeError('Existing file version has no known backing file.')
+                        vnum = version['version number']
+                        file = version
                     if file.location == None:
-                        # act like this is a regular PUT if there is no location (no current version)
-                        return None
+                        return (None, None)
                     self.location = file.location
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
                     f = open(filename, 'r+b')
                     #web.debug('reopen', self.location, self.local, filename, f)
-                    return f
+                    return (f, vnum)
                 else:
                     raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
             else:
-                return None
+                return (None, None)
+        else:
+            return (None, None)
 
     def PUT(self, uri):
         """store file content from client"""
@@ -681,8 +694,8 @@ class FileIO (Application):
         def preWriteBody():
             return self.putPreWriteBody()
 
-        def preWritePostCommit(f):
-            return f
+        def preWritePostCommit(results):
+            return results
         
         if cfirst != None and clast:
             # try update-in-place if user is doing Range: partial PUT
@@ -695,7 +708,7 @@ class FileIO (Application):
             self.update = False
 
         # this retries if a file was found but could not be opened due to races
-        f = self.dbtransact(preWriteBody, preWritePostCommit)
+        f, self.versionnum = self.dbtransact(preWriteBody, preWritePostCommit)
 
         try:
             self.db._db_cursor().connection.close()
@@ -764,7 +777,8 @@ class FileIO (Application):
         def preWriteBody():
             return self.putPreWriteBody()
 
-        def preWritePostCommit(f):
+        def preWritePostCommit(results):
+            f, self.versionnum = results
             if f != None:
                 raise Conflict(data='Cannot perform range-based access via POST.')
             return None

@@ -827,14 +827,14 @@ class Application:
             results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
         return results
 
-    def select_file_version(self, data_id=None, versionnum=None):
+    def select_file_version_orig(self, data_id=None, versionnum=None):
         if data_id == None:
             data_id = self.data_id
         if data_id == None:
             raise Conflict("Cannot find versions without a dataset name.")
         
-        fresults = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[data_id])],
-                                                     listtags=['Version Set', 'version', 'content-type'])
+        fresults = self.select_files_by_predlist(data_id=data_id, predlist=[],
+                                                 listtags=['Version Set', 'version', 'content-type'])
         if len(fresults) == 0:
             raise NotFound(data='dataset "%s"' % (data_id))
         file = fresults[0]
@@ -843,7 +843,7 @@ class Application:
         if file['Version Set']:
             versions = []
             for vfile in file['version']:
-                vfresults = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[vfile])],
+                vfresults = self.select_files_by_predlist(data_id=vfile, predlist=[],
                                                           listtags=['content-type', 'version number'])
                 if len(vfresults) > 0:
                     vfresult = vfresults[0]
@@ -860,6 +860,53 @@ class Application:
                     version = versions[0][1]
                 except:
                     raise NotFound(data='any version of dataset %s' % (self.data_id))
+
+        return (file, version)
+
+    def select_file_version(self, data_id=None, versionnum=None):
+        if data_id == None:
+            data_id = self.data_id
+        if data_id == None:
+            raise Conflict("Cannot find versions without a dataset name.")
+        
+        fresults = self.select_file(data_id=data_id)
+        if len(fresults) == 0:
+            raise NotFound(data='dataset "%s"' % (data_id))
+        file = fresults[0]
+        file['Version Set'] = False
+        file['version'] = []
+        file.file = file.name
+        try:
+            file['content-type'] = self.gettagvals('content-type', data_id=data_id)[0]
+        except:
+            file['content-type'] = None
+        version = None
+
+        try:
+            version_set = self.select_file_tag('Version Set', data_id=data_id)[0]
+            file['Version Set'] = True
+            maxvnum = 0
+            file['version'] = self.gettagvals('version', data_id=data_id)
+            for vname in file['version']:
+                vnum = self.gettagvals('version number', data_id=vname)[0]
+                if (versionnum != None and vnum == versionnum) or (vnum > maxvnum):
+                    version = self.select_file(data_id=vname)[0]
+                    version['version number'] = vnum
+                    try:
+                        version['content-type'] = self.gettagvals('content-type', data_id=vname)[0]
+                    except:
+                        version['content-type'] = None
+                    maxvnum = vnum
+                    version.file = version.name
+
+            if versionnum and version == None:
+                raise NotFound(data='version %d of dataset "%s"' % (versionnum, data_id))
+
+            if version == None:
+                raise NotFound(data='any version of dataset %s' % (self.data_id))
+
+        except IndexError:
+            pass
 
         return (file, version)
 
@@ -1155,7 +1202,7 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[]):
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None):
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1221,6 +1268,10 @@ class Application:
                     '_owner.value']
         wheres = []
         values = dict()
+
+        if data_id:
+            wheres.append("files.name = $dataid")
+            values['dataid'] = data_id
 
         roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
         for r in range(0, len(roles)):
