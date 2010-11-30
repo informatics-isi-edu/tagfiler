@@ -555,7 +555,6 @@ class FileIO (Application):
                     eof = True
                 elif buflen == 0:
                     f.close()
-                    self.deleteFile(filename)
                     raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
             elif buflen == 0:
                 eof = True
