@@ -342,7 +342,7 @@ class FileIO (Application):
             return result
 
         def postCommit(result):
-            if result.local:
+            if result.local and result.location != None:
                 """delete the file"""
                 filename = self.store_path + '/' + result.location
                 dir = os.path.dirname(filename)
@@ -606,7 +606,7 @@ class FileIO (Application):
             
     def deletePrevious(self, files):
         for file in files:
-            if file.local:
+            if file.local and file.location != None:
                 # previous result had local file, so free it
                 self.deleteFile(self.store_path + '/' + file.location)
 
@@ -744,6 +744,14 @@ class FileIO (Application):
                 self.deleteFile(filename)
             raise
 
+    def testAndExpandFiles(self, filesdict, data_id, trigger, set):
+        results = self.select_file_tag(trigger, data_id=data_id)
+        if len(results) > 0:
+            for fname in self.gettagvals(set, data_id=data_id):
+                for file in self.select_file(fname):
+                    if not filesdict.has_key(file.name):
+                        filesdict[file.name] = file
+
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
@@ -765,28 +773,23 @@ class FileIO (Application):
             raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
 
         def deleteBody():
-            files = []
+            filesdict = dict()
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
             self.enforce_file_authz('write', local=result.local)
-            files.append(result)
-            if not result.local:
-                # custom DEI EIU hack, to proxy delete to all member files
-                try:
-                    results = self.select_file_tag('Image Set')
-                except:
-                    results = []
-                if len(results) > 0:
-                    self.predlist = [ dict(tag='Transmission Number', op='=', vals=[self.data_id]) ]
-                    for res in self.select_files_by_predlist():
-                        for f in self.select_file(data_id=res.file):
-                            files.append(f)
-            for res in files:
+            filesdict[result.name] = result
+
+            self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
+            self.testAndExpandFiles(filesdict, self.data_id, 'Version Set', 'version')
+            for file in filesdict.values():
+                self.testAndExpandFiles(filesdict, file.name, 'Version Set', 'version')
+            
+            for res in filesdict.itervalues():
                 self.delete_file(res.name)
                 self.txlog('DELETE', dataset=res.name)
-            return files
+            return filesdict.values()
         
         def deletePostCommit(files):
             self.deletePrevious(files)
