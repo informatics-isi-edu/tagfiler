@@ -158,7 +158,7 @@ tagdef url            text        ""      file        file       false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
-tagdef contains       text        ""      file        file       true       url
+tagdef contains       text        ""      file        file       true       file
 tagdef version        text        ""      file        file       true       file
 tagdef "version number" int8      ""      file        system     false
 tagdef "Version Set"  ""          ""      file        system     false
@@ -404,7 +404,7 @@ modtagdef()
    tagacl "\$tagname" write grader
 }
 
-typedef Modality            text 'Modality' 'OCT OCT' 'fundus fundus' 'eyecam eyecam'
+typedef Modality            text 'Modality' 'fundus fundus'
 typedef 'Study Name'        text 'Study Name' 'CHES CHES' 'MEPED MEPED' 'LALES LALES'
 
 # fundus
