@@ -620,7 +620,12 @@ class FileIO (Application):
         if file:
             self.enforce_file_authz('write', local=file.local)
             if self.update:
+                if version:
+                    file = version
                 if file.local:
+                    if file.location == None:
+                        # act like this is a regular PUT if there is no location (no current version)
+                        return None
                     self.location = file.location
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
