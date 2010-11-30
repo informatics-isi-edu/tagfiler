@@ -934,6 +934,8 @@ class Application:
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
+            if self.typestr == 'file':
+                tabledef += " REFERENCES files (name) ON DELETE CASCADE"
         if not self.multivalue:
             if dbtype != '':
                 tabledef += ", UNIQUE(file, value)"

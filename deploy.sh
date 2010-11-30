@@ -132,7 +132,13 @@ tagdef()
       else
          default=""
       fi
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 \${default}, UNIQUE(file, value) )"
+      if [[ "\$7" = "file" ]]
+      then
+         fk="REFERENCES files (name) ON DELETE CASCADE"
+      else
+         fk=""
+      fi
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 \${default} \${fk}, UNIQUE(file, value) )"
       psql -q -t -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
    else
       psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
