@@ -63,6 +63,11 @@ def urlquote(url):
         url = str(url)
     return urllib.quote(url, safe="")
 
+def urlunquote(url):
+    if type(url) != type('text'):
+        url = str(url)
+    return urllib.unquote_plus(url)
+
 def urlquote_name(filename):
     # BUG: this is not really safe as it misdetects user names ending in @[0-9]+
     # really need to store urlquoted name in DB to be safe
@@ -339,7 +344,7 @@ class Application:
     def validateEnumeration(self, enum, tagname=None, data_id=None):
         try:
             key, desc = enum.split(" ", 1)
-            key = urllib.unquote(key)
+            key = urlunquote(key)
         except:
             raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
 
@@ -801,7 +806,7 @@ class Application:
                 vals = []
                 for val in res['_type_values']:
                     key, desc = val.split(" ", 1)
-                    key = urllib.unquote(key)
+                    key = urlunquote(key)
                     dbtype = res['_type_dbtype']
                     key = self.downcast_value(dbtype, key)
                     vals.append( (key, desc) )

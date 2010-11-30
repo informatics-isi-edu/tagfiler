@@ -47,7 +47,7 @@ tokens = [ 'STRING' ] + list(keywords.values())
 # (consuming code must unescape after parsing)
 def t_STRING(t):
     r'[-*%_.~A-Za-z0-9]+'
-    t.value = urllib.unquote(t.value)
+    t.value = urllib.unquote_plus(t.value)
     t.type = keywords.get(t.value, 'STRING')
     return t
 

@@ -7,7 +7,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlquote_name, idquote, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, urlquote_name, idquote, jsonWriter
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -875,8 +875,8 @@ class FileTags (Node):
             #  tag=val&tag=val...
             for tagval in content.strip().split('&'):
                 tag, val = tagval.split('=')
-                tag = urllib.unquote(tag)
-                val = urllib.unquote(val)
+                tag = urlunquote(tag)
+                val = urlunquote(val)
 
                 if tag == '':
                     raise BadRequest(data="A non-empty tag name is required.")
@@ -951,7 +951,7 @@ class FileTags (Node):
                         value = storage['val-%s' % (tag_id)]
                     except:
                         value = None
-                    self.tagvals[urllib.unquote(tag_id)] = [ value ]
+                    self.tagvals[urlunquote(tag_id)] = [ value ]
             try:
                 # look for single tag/value for backwards compatibility
                 self.tag_id = storage.tag
