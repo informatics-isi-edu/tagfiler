@@ -1181,8 +1181,10 @@ class Application:
         if not multivalue:
             results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
             if len(results) > 0:
-                # drop existing value so we can reinsert one standard way
-                self.delete_file_tag(tagname, data_id=data_id)
+                if results[0].value == value:
+                    return
+                else:
+                    self.delete_file_tag(tagname, data_id=data_id)
         else:
             results = self.select_file_tag(tagname, value, data_id=data_id, owner=owner)
             if len(results) > 0:
