@@ -12,6 +12,9 @@ import pytz
 import traceback
 import distutils.sysconfig
 import sys
+import random
+import time
+import math
 import string
 from logging.handlers import SysLogHandler
 import json
@@ -568,6 +571,13 @@ class Application:
                 except psycopg2.InterfaceError:
                     # try reopening the database connection
                     self.db = web.database(db=self.dbstr, dbn=self.dbnstr)
+
+                # exponential backoff...
+                # count=1 is roughly 1 microsecond
+                # count=9 is roughly 100 seconds
+                # randomly jittered from 75-125% of exponential delay
+                delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.0000001
+                time.sleep(delay)
 
         finally:
             pass
