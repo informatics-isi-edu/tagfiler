@@ -166,6 +166,9 @@ class RuntimeError (WebException):
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
+# BUG: use locking to avoid assumption that global interpreter lock protects us?
+configDataCache = dict()
+
 class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
@@ -182,9 +185,17 @@ class Application:
     def getParamsDb(self, suffix, data_id=None):
         if data_id == None:
             data_id = 'tagfiler configuration'
+
+        if configDataCache.has_key(data_id):
+            l1 = configDataCache[data_id]
+            if l1.has_key(suffix):
+                return l1[suffix]
+        
         try:
             results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
-            #web.debug(data_id, suffix, results)
+            if not configDataCache.has_key(data_id):
+                configDataCache[data_id] = dict()
+            configDataCache[data_id][suffix] = results
             return results
         except:
             return []

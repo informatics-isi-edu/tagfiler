@@ -390,9 +390,10 @@ class FileIO (Application):
         created = False
 
         if self.bytes != None and not self.update:
-            content_types = self.select_file_tag('content-type')
-            if len(content_types) > 0:
-                tagged_content_type = content_types[0].value
+            if latest:
+                tagged_content_type = latest['content-type']
+            elif file:
+                tagged_content_type = file['content-type']
             else:
                 tagged_content_type = None
 
@@ -508,28 +509,30 @@ class FileIO (Application):
                 for subfile in subfiles:
                     self.set_file_tag(tagname, self.queryopts[tagname], data_id=subfile)
 
-        srcroles = set(self.remap.keys()).intersection(self.authn.roles)
-        if len(srcroles) == 1:
-            try:
-                t = self.db.transaction()
-                srcrole = srcroles.pop()
-                dstrole, readusers, writeusers = self.remap[srcrole]
-                for readuser in readusers:
-                    self.set_file_tag('read users', readuser, data_id=data_id)
-                    self.txlog('REMAP', dataset=data_id, tag='read users', value=readuser)
-                for writeuser in writeusers:
-                    self.set_file_tag('write users', writeuser, data_id=data_id)
-                    self.txlog('REMAP', dataset=data_id, tag='write users', value=writeuser)
-                self.set_file_tag('owner', dstrole, data_id=data_id)
-                self.txlog('REMAP', dataset=data_id, tag='owner', value=dstrole)
-                t.commit()
-            except:
-                #et, ev, tb = sys.exc_info()
-                #web.debug('got exception during owner remap attempt',
-                #          traceback.format_exception(et, ev, tb))
-                t.rollback()
-        elif len(srcroles) > 1:
-            raise Conflict("Ambiguous remap rules encountered")
+        if created:
+            # only remap on newly created files
+            srcroles = set(self.remap.keys()).intersection(self.authn.roles)
+            if len(srcroles) == 1:
+                try:
+                    t = self.db.transaction()
+                    srcrole = srcroles.pop()
+                    dstrole, readusers, writeusers = self.remap[srcrole]
+                    for readuser in readusers:
+                        self.set_file_tag('read users', readuser, data_id=data_id)
+                        self.txlog('REMAP', dataset=data_id, tag='read users', value=readuser)
+                    for writeuser in writeusers:
+                        self.set_file_tag('write users', writeuser, data_id=data_id)
+                        self.txlog('REMAP', dataset=data_id, tag='write users', value=writeuser)
+                    self.set_file_tag('owner', dstrole, data_id=data_id)
+                    self.txlog('REMAP', dataset=data_id, tag='owner', value=dstrole)
+                    t.commit()
+                except:
+                    #et, ev, tb = sys.exc_info()
+                    #web.debug('got exception during owner remap attempt',
+                    #          traceback.format_exception(et, ev, tb))
+                    t.rollback()
+            elif len(srcroles) > 1:
+                raise Conflict("Ambiguous remap rules encountered")
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
@@ -710,7 +713,8 @@ class FileIO (Application):
         f, self.versionnum = self.dbtransact(preWriteBody, preWritePostCommit)
 
         try:
-            self.db._db_cursor().connection.close()
+            pass
+#            self.db._db_cursor().connection.close()
         except:
             pass
 
