@@ -573,10 +573,11 @@ class Application:
                     self.db = web.database(db=self.dbstr, dbn=self.dbnstr)
 
                 # exponential backoff...
-                # count=1 is roughly 1 microsecond
-                # count=9 is roughly 100 seconds
+                # count=1 is roughly 0.1 microsecond
+                # count=9 is roughly 10 seconds
                 # randomly jittered from 75-125% of exponential delay
-                delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.0000001
+                delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.00000001
+                web.debug('transaction retry: delaying %f' % delay)
                 time.sleep(delay)
 
         finally:
@@ -1225,7 +1226,7 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, qd=0):
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1293,8 +1294,8 @@ class Application:
         values = dict()
 
         if data_id:
-            wheres.append("files.name = $dataid")
-            values['dataid'] = data_id
+            wheres.append("files.name = $dataid_%d" % qd)
+            values['dataid_%d' % qd] = data_id
 
         roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
         for r in range(0, len(roles)):
@@ -1328,8 +1329,8 @@ class Application:
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
-                        valpreds.append("t%s.value %s $val%s_%s" % (p, self.opsDB[op], p, v))
-                        values["val%s_%s" % (p, v)] = vals[v]
+                        valpreds.append("t%s.value %s $val%s_%s_%d" % (p, self.opsDB[op], p, v, qd))
+                        values["val%s_%s_%d" % (p, v, qd)] = vals[v]
                     wheres.append(" OR ".join(valpreds))
                 if tagdef.readpolicy == 'fowner':
                     # this tag rule is more restrictive than file or static checks already done
@@ -1370,8 +1371,52 @@ class Application:
 
         query += " ORDER BY " + ", ".join(['"%s"' % self.wraptag(tag) for tag in ordertags] + ['file'])
         
-        #web.debug(query)
+        return (query, values)
+
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None):
+        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id)
+        #web.debug(query, values)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
+    def select_files_by_predlist_path(self, path=None):
+        if path == None:
+            path = [ (None, None, None) ]
+
+        queries = []
+        values = dict()
+
+        context = ''
+
+        for e in range(0, len(path)):
+            predlist, listtags, ordertags = path[e]
+            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags)
+            values.update(v)
+
+            if e < len(path) - 1:
+                if len(listtags) != 1:
+                    raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
+                projection = listtags[0]
+                if e == 0:
+                    context = '(SELECT DISTINCT unnest("%s") FROM (%s) AS q_%d)' % (projection, q, e)
+                else:
+                    context = '(SELECT DISTINCT unnest("%s") FROM (%s) AS q_%d WHERE q_%d.file IN (%s))' % (projection, q, e, e, context)
+            else:
+                if context:
+                    query = '(%s) AS q_%d WHERE q_%d.file IN (%s)' % (q, e, e, context)
+                else:
+                    query = '(%s) AS q_%d' % (q, e)
+            
+        if listtags == None:
+            listtags = self.listtags
+        listtags.extend(['file', 'local', 'location', 'owner'])
+        listtags = set(listtags)
+        
+        selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag) for listtag in listtags ]
+        selects = ', '.join(selects)
+
+        query = 'SELECT ' + selects + ' FROM ' + query
+        return self.db.query(query, values)
+
+    

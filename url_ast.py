@@ -1173,6 +1173,8 @@ class Query (Node):
 
         def body():
             listtags = self.queryopts.get('list', None)
+            path = self.queryopts.get('path', None)
+            
             if listtags:
                 if type(listtags) != set:
                     listtags = [ listtags ]
@@ -1249,3 +1251,5 @@ class Query (Node):
 
         for res in self.dbtransact(body, postCommit):
             yield res
+
+
