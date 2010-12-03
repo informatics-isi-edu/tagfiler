@@ -1,6 +1,7 @@
 import ply.yacc as yacc
 import threading
 import web
+import urllib
 
 from url_lex import make_lexer, tokens, keywords
 
@@ -348,14 +349,9 @@ def p_filename_version(p):
         raise ParseError(p[3], 'Filename part of URL has invalid version number:')
     p[0] = p[1] + '@' + p[3]
 
-# treat any sequence of '+'+ as a space string
 def p_spacestring(p):
     """spacestring : '+'"""
     p[0] = ' '
-
-def p_spacestringlist(p):
-    """spacestring : spacestring '+'"""
-    p[0] = p[1] + ' '
 
 # grammatically, keywords can also be valid string values...
 def p_stringany(p):
@@ -369,7 +365,7 @@ def p_stringany(p):
 
 p_stringany.__doc__ =  "string : " + " \n| ".join(keywords.values()) + ' \n| STRING \n| spacestring'
 
-def p_stringplus_concat(p):
+def p_string_concat(p):
     """string : string string"""
     p[0] = p[1] + p[2]
 
