@@ -71,20 +71,6 @@ def urlunquote(url):
         url = str(url)
     return urllib.unquote_plus(url)
 
-def urlquote_name(filename):
-    # BUG: this is not really safe as it misdetects user names ending in @[0-9]+
-    # really need to store urlquoted name in DB to be safe
-    m = re.match('^(?P<base>.*)([@](?P<version>[0-9]+))?$', filename)
-    if not m:
-        raise RuntimeError('Failure parsing file name "%s"' % filename)
-    base = urlquote(m.group('base'))
-    version = m.group('version')
-    if version != None:
-        version = '@' + urlquote(version)
-    else:
-        version = ''
-    return base + version
-
 def parseBoolString(theString):
     if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
         return True
@@ -195,12 +181,12 @@ class Application:
                 return l1[suffix]
         
         try:
-            results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id)
+            results = self.gettagvals('_cfg_%s' % suffix, data_id=data_id, version=False)
             if not configDataCache.has_key(data_id):
                 configDataCache[data_id] = dict()
             configDataCache[data_id][suffix] = results
             return results
-        except:
+        except NotFound:
             return []
 
     def __init__(self):
@@ -208,6 +194,8 @@ class Application:
         global render
 
         self.data_id = None
+        self.version = None
+        self.predlist = []
         self.globals = dict()
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
@@ -257,7 +245,6 @@ class Application:
         self.remap = buildPolicyRules(self.getParamsDb('policy remappings'))
         self.localFilesImmutable = parseBoolString(self.getParamDb('local files immutable', 'False'))
         self.remoteFilesImmutable = parseBoolString(self.getParamDb('remote files immutable', 'False'))
-        self.trackVersions = parseBoolString(self.getParamDb('use versions', 'False'))
 
         self.render = web.template.render(self.template_path, globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
@@ -265,7 +252,6 @@ class Application:
         # 'globals' are local to this Application instance and also used by its templates
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
-        self.globals['urlquote_name'] = urlquote_name
         self.globals['idquote'] = idquote
         self.globals['jsonWriter'] = jsonWriter
 
@@ -325,14 +311,22 @@ class Application:
                             (':ciregexp:', '~*'),
                             (':!ciregexp:', '!~*') ])
 
-        self.validators = { 'owner' : self.validateRole,
-                            'read users' : self.validateRolePattern,
-                            'write users' : self.validateRolePattern,
-                            'modified by' : self.validateRole,
-                            '_type_values' : self.validateEnumeration }
+        self.tagnameValidators = { 'owner' : self.validateRole,
+                                   'read users' : self.validateRolePattern,
+                                   'write users' : self.validateRolePattern,
+                                   'modified by' : self.validateRole,
+                                   '_type_values' : self.validateEnumeration }
+        
+        self.tagtypeValidators = { 'tagname' : self.validateTagname,
+                                   'file' : self.validateFilename }
 
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
+
+    def validateFilename(self, file, tagname='', data_id=None):
+        results = self.select_file(file, None)
+        if len(results) == 0:
+            raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
 
     def validateTagname(self, tag, tagname=None, data_id=None):
         if tag == '':
@@ -612,9 +606,9 @@ class Application:
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
-    def owner(self, data_id=None):
+    def owner(self, data_id=None, version=None):
         try:
-            results = self.select_file_tag('owner', data_id=data_id, owner='_')
+            results = self.select_file_tag('owner', data_id=data_id, version=version, owner='_')
             if len(results) > 0:
                 return results[0].value
             else:
@@ -630,7 +624,7 @@ class Application:
             except NotImplemented:
                 return None
     
-    def test_file_authz(self, mode, data_id=None, owner=None):
+    def test_file_authz(self, mode, data_id=None, version=None, owner=None):
         """Check whether access is allowed to user given mode and owner.
 
            True: access allowed
@@ -638,10 +632,12 @@ class Application:
            None: user needs to authenticate to be sure"""
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
         if owner == None:
-            owner = self.owner(data_id=data_id)
+            owner = self.owner(data_id=data_id, version=version)
         try:
-            authorized = [ res.value for res in self.select_file_acl(mode, data_id) ]
+            authorized = [ res.value for res in self.select_file_acl(mode, data_id, version) ]
         except:
             authorized = []
         if owner:
@@ -662,7 +658,7 @@ class Application:
         else:
             return None
 
-    def test_tag_authz(self, mode, tagname=None, user=None, data_id=None, fowner=None):
+    def test_tag_authz(self, mode, tagname=None, user=None, data_id=None, version=None, fowner=None):
         """Check whether access is allowed to user given policy_tag and owner.
 
            True: access allowed
@@ -670,6 +666,8 @@ class Application:
            None: user needs to authenticate to be sure"""
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
         if tagname == None:
             tagname = self.tag_id
         if user == None:
@@ -680,7 +678,7 @@ class Application:
         try:
             tagdef = self.select_tagdef(tagname)[0]
         except:
-            raise BadRequest(data="The tag %s is not defined on this server." % tagname)
+            raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
 
         # lookup policy model based on access mode we are checking
         column = dict(read='readpolicy', write='writepolicy')
@@ -699,7 +697,7 @@ class Application:
             authorized = [ fowner ]
         elif model == 'file':
             try:
-                authorized = [ res.value for res in self.select_file_acl(mode, data_id=data_id) ]
+                authorized = [ res.value for res in self.select_file_acl(mode, data_id=data_id, version=version) ]
             except:
                 authorized = [ ]
             if fowner:
@@ -742,21 +740,23 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode, data_id=None, local=False, owner=None):
+    def enforce_file_authz(self, mode, data_id=None, version=None, local=False, owner=None):
         """Check whether access is allowed and throw web exception if not."""
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
         if mode == 'write':
             if not local:
                 try:
-                    results = self.select_file_tag('Image Set', data_id=data_id)
+                    results = self.select_file_tag('Image Set', data_id=data_id, version=version)
                     if len(results) > 0:
                         local = True
                 except:
                     pass
             if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
                 raise Forbidden(data="access to immutable dataset %s" % data_id)
-        allow = self.test_file_authz(mode, data_id=data_id, owner=owner)
+        allow = self.test_file_authz(mode, data_id=data_id, version=version, owner=owner)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % data_id)
         elif allow == None:
@@ -773,22 +773,24 @@ class Application:
             web.ctx.status = status
             return False
 
-    def enforce_tag_authz(self, mode, tagname=None, data_id=None):
+    def enforce_tag_authz(self, mode, tagname=None, data_id=None, version=None):
         """Check whether access is allowed and throw web exception if not."""
         if data_id == None:
             data_id = self.data_id
-        fowner = self.owner(data_id=data_id)
+        if version == None:
+            version = self.version
+        fowner = self.owner(data_id=data_id, version=version)
         user = self.authn.role
         if tagname == None:
             tagname = self.tag_id
-        results = self.select_file(data_id=data_id)
+        results = self.select_file(data_id=data_id, version=version)
         if len(results) == 0:
-            raise NotFound(data="dataset %s" % data_id)
-        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id)
+            raise NotFound(data='dataset "%s"@%d' % (data_id, version))
+        allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id, version=version)
         if allow == False:
-            raise Forbidden(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
+            raise Forbidden(data='%s access to tag %s on dataset "%s"@%d' % (mode, tagname, data_id, version))
         elif allow == None:
-            raise Unauthorized(data="%s access to tag %s on dataset %s" % (mode, tagname, data_id))
+            raise Unauthorized(data='%s access to tag %s on dataset "%s"@%d' % (mode, tagname, data_id, version))
         else:
             pass
 
@@ -808,8 +810,8 @@ class Application:
     def wraptag(self, tagname):
         return '_' + tagname.replace('"','""')
 
-    def gettagvals(self, tagname, data_id=None, owner=None, user=None):
-        results = self.select_file_tag(tagname, data_id=data_id, owner=owner, user=user)
+    def gettagvals(self, tagname, data_id=None, version=None, owner=None, user=None):
+        results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner, user=user)
         values = [ ]
         for result in results:
             try:
@@ -840,111 +842,51 @@ class Application:
         listtags = [ '_type_name', '_type_description', '_type_dbtype', '_type_values' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
 
-    def select_file(self, data_id=None):
+    def select_file(self, data_id=None, version=None):
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
+        vars = dict(name=data_id, version=version)
+        query = 'SELECT * FROM files'
+        if not version or not data_id:
+            query += ' JOIN latestfiles USING (name, version)'
+        if data_id:
+            query += ' WHERE name = $name'
+            if version:
+                query += ' AND version = $version'
+        return self.db.query(query, vars)
+
+    def select_file_versions(self, data_id=None):
         if data_id == None:
-            results = self.db.select('files', vars=dict(name=data_id))
+            data_id = self.data_id
+        vars = dict(name=data_id)
+        query = 'SELECT * FROM files'
+        if data_id:
+            query += ' WHERE name = $name'
+        return self.db.query(query, vars)
+
+    def insert_file(self, data_id, version, local, location):
+        vars = dict(name=data_id, version=version, local=local, location=location)
+        self.db.query("INSERT INTO files ( name, version, local, location ) VALUES ( $name, $version, $local, $location )", vars=vars)
+        if version > 1:
+            self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
         else:
-            results = self.db.select('files', where="name = $name", vars=dict(name=data_id))
-        return results
-
-    def select_file_version_orig(self, data_id=None, versionnum=None):
-        if data_id == None:
-            data_id = self.data_id
-        if data_id == None:
-            raise Conflict("Cannot find versions without a dataset name.")
-        
-        fresults = self.select_files_by_predlist(data_id=data_id, predlist=[],
-                                                 listtags=['Version Set', 'version', 'content-type'])
-        if len(fresults) == 0:
-            raise NotFound(data='dataset "%s"' % (data_id))
-        file = fresults[0]
-        version = None
-
-        if file['Version Set']:
-            versions = []
-            for vfile in file['version']:
-                vfresults = self.select_files_by_predlist(data_id=vfile, predlist=[],
-                                                          listtags=['content-type', 'version number'])
-                if len(vfresults) > 0:
-                    vfresult = vfresults[0]
-                    versions.append((vfresult['version number'], vfresult))
-            if versionnum != None:
-                versions = dict(versions)
-                try:
-                    version = versions[versionnum]
-                except:
-                    raise NotFound(data='version %d of dataset "%s"' % (versionnum, data_id))
-            else:
-                versions.sort(key=lambda pair: pair[0], reverse=True)
-                try:
-                    version = versions[0][1]
-                except:
-                    raise NotFound(data='any version of dataset %s' % (self.data_id))
-
-        return (file, version)
-
-    def select_file_version(self, data_id=None, versionnum=None):
-        if data_id == None:
-            data_id = self.data_id
-        if data_id == None:
-            raise Conflict("Cannot find versions without a dataset name.")
-        
-        fresults = self.select_file(data_id=data_id)
-        if len(fresults) == 0:
-            raise NotFound(data='dataset "%s"' % (data_id))
-        file = fresults[0]
-        file['Version Set'] = False
-        file['version'] = []
-        file.file = file.name
-        try:
-            file['content-type'] = self.gettagvals('content-type', data_id=data_id)[0]
-        except:
-            file['content-type'] = None
-        version = None
-
-        try:
-            version_set = self.select_file_tag('Version Set', data_id=data_id)[0]
-            file['Version Set'] = True
-            maxvnum = 0
-            file['version'] = self.gettagvals('version', data_id=data_id)
-            for vname in file['version']:
-                vnum = self.gettagvals('version number', data_id=vname)[0]
-                if (versionnum != None and vnum == versionnum) or (vnum > maxvnum):
-                    version = self.select_file(data_id=vname)[0]
-                    version['version number'] = vnum
-                    try:
-                        version['content-type'] = self.gettagvals('content-type', data_id=vname)[0]
-                    except:
-                        version['content-type'] = None
-                    maxvnum = vnum
-                    version.file = version.name
-
-            if versionnum and version == None:
-                raise NotFound(data='version %d of dataset "%s"' % (versionnum, data_id))
-
-            if version == None:
-                raise NotFound(data='any version of dataset %s' % (self.data_id))
-
-        except IndexError:
-            pass
-
-        return (file, version)
-
-    def insert_file(self, data_id, local, location):
-        self.db.query("INSERT INTO files ( name, local, location ) VALUES ( $name, $local, $location )",
-                      vars=dict(name=data_id, local=local, location=location))
+            self.db.query("INSERT INTO latestfiles ( name, version ) VALUES ( $name, $version )", vars=vars)
 
     def update_file(self):
-        self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name",
-                      vars=dict(name=self.data_id, location=self.location, local=self.local))
+        vars=dict(name=self.data_id, version=self.version, location=self.location, local=self.local)
+        self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name AND version = $version", vars=vars)
 
-    def delete_file(self, data_id=None):
+    def delete_file(self, data_id=None, version=None):
         if data_id == None:
             data_id = self.data_id
-        self.db.query("DELETE FROM files where name = $name",
-                      vars=dict(name=data_id))
+        if version == None:
+            version = self.version
+        query = "DELETE FROM files where name = $name"
+        if version:
+            query += ' AND version = $version'
+        self.db.query(query, vars=dict(name=data_id, version=version))
 
     def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
         tables = [ 'tagdefs' ]
@@ -991,7 +933,7 @@ class Application:
                       vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.authn.role))
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
-        tabledef += " ( file text REFERENCES files (name) ON DELETE CASCADE"
+        tabledef += " ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY(file, version) REFERENCES files (name, version) ON DELETE CASCADE"
         indexdef = ''
 
         results = self.get_type(typename=self.typestr)
@@ -1004,15 +946,15 @@ class Application:
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             if self.typestr == 'file':
-                tabledef += " REFERENCES files (name) ON DELETE CASCADE"
+                tabledef += " REFERENCES latestfiles (name) ON DELETE CASCADE"
         if not self.multivalue:
             if dbtype != '':
-                tabledef += ", UNIQUE(file, value)"
+                tabledef += ", UNIQUE(file, version, value)"
                 indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
                 indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
                 indexdef += ' (value)'
             else:
-                tabledef += ", UNIQUE(file)"
+                tabledef += ", UNIQUE(file, version)"
         tabledef += " )"
         self.db.query(tabledef)
         if indexdef:
@@ -1024,17 +966,18 @@ class Application:
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
 
-    def select_file_tag(self, tagname, value=None, data_id=None, tagdef=None, user=None, owner=None):
+    def select_file_tag(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
         if user == None:
             user = self.authn.role
         if tagdef == None:
             tagdef = self.select_tagdef(tagname)[0]
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            # None means unspecified
+            # False means we want latest (to allow passing through multiple callers)
+            version = self.version
             
-        joins = ''
-        wheres = ''
-
         if tagdef.readpolicy == 'anonymous':
             pass
         elif tagdef.readpolicy == 'users':
@@ -1054,23 +997,28 @@ class Application:
                 if  not self.test_file_authz('read', data_id=data_id, owner=owner):
                     return []
 
-        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) 
-        query += " WHERE file = $file" 
-        if value == '':
-            query += " AND value IS NULL ORDER BY VALUE"
-        elif value:
-            query += " AND value = $value ORDER BY VALUE"
+        query = 'SELECT tag.* FROM "%s" AS tag' % self.wraptag(tagname)
+        if not version:
+            query += ' JOIN latestfiles ON (tag.file = latestfiles.name AND tag.version = latestfiles.version)'
+        query += ' WHERE tag.file = $file'
+        if version:
+            query += ' AND tag.version = $version'
+        if value == '' or value:
+            if value == '':
+                query += ' AND tag.value IS NULL'
+            else:
+                query += ' AND tag.value = $value'
+            query += '  ORDER BY value'
         #web.debug(query)
-        return self.db.query(query, vars=dict(file=data_id, value=value))
+        return self.db.query(query, vars=dict(file=data_id, value=value, version=version))
 
-    def select_file_acl(self, mode, data_id=None):
+    def select_file_acl(self, mode, data_id=None, version=None):
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
         tagname = dict(read='read users', write='write users')[mode]
-        query = "SELECT * FROM \"%s\"" % (self.wraptag(tagname)) \
-                + " WHERE file = $file"
-        vars=dict(file=data_id)
-        return self.db.query(query, vars=vars)
+        return self.select_file_tag(tagname, data_id=data_id, version=version)
 
     def select_tag_acl(self, mode, user=None, tag_id=None):
         if tag_id == None:
@@ -1104,14 +1052,20 @@ class Application:
         query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
         return self.db.query(query)
 
-    def select_filetags(self, tagname=None, where=None, data_id=None, user=None):
+    def select_filetags(self, tagname=None, where=None, data_id=None, version=None, user=None):
         wheres = []
         vars = dict()
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
         if data_id:
             wheres.append("file = $file")
             vars['file'] = data_id
+            if version:
+                wheres.append("version = $version")
+                vars['version'] = version
+        
         if where:
             wheres.append(where)
         if tagname:
@@ -1121,25 +1075,30 @@ class Application:
         wheres = ' AND '.join(wheres)
         if wheres:
             wheres = "WHERE " + wheres
-        query = "SELECT file, tagname FROM filetags join tagdefs using (tagname) " + wheres \
-                + " GROUP BY file, tagname ORDER BY file, tagname"
-        #web.debug(query)
+        query = "SELECT file, version, tagname FROM filetags join tagdefs using (tagname) " + wheres \
+                + " GROUP BY file, version, tagname ORDER BY file, tagname"
+        #web.debug(query, vars)
         return [ result for result in self.db.query(query, vars=vars)
                  if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
-    def delete_file_tag(self, tagname, value=None, data_id=None, owner=None):
-        if value or value == '':
-            whereval = " AND value = $value"
-        else:
-            whereval = ""
+    def delete_file_tag(self, tagname, value=None, data_id=None, version=None, owner=None):
         if data_id == None:
             data_id = self.data_id
-        self.db.query("DELETE FROM \"%s\"" % (self.wraptag(tagname))
-                      + " WHERE file = $file" + whereval,
-                      vars=dict(file=data_id, value=value))
-        results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
+        if version == None:
+            version = self.version
+        query = 'DELETE FROM "%s" AS tag' % self.wraptag(tagname)
+        if not version:
+            query += ' USING latestfiles'
+        query += ' WHERE tag.file = $file'
+        if version:
+            query += ' AND tag.version = $version'
+        else:
+            query += ' AND tag.file = latestfiles.name AND tag.version = latestfiles.version'
+        if value or value == '':
+            query += " AND value = $value"
+        self.db.query(query, vars=dict(file=data_id, version=version, value=value))
+        results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner)
         if len(results) == 0:
-            # there may be other values tagged still
             self.db.delete("filetags", where="file = $file AND tagname = $tagname",
                            vars=dict(file=data_id, tagname=tagname))
 
@@ -1151,23 +1110,34 @@ class Application:
         elif dbtype in [ 'date', 'timestamptz' ]:
             if value == 'now':
                 value = datetime.datetime.now(pytz.timezone('UTC'))
-            else:
+            elif type(value) == str:
                 value = dateutil.parser.parse(value)
         else:
             pass
         return value
             
-    def set_file_tag(self, tagname, value=None, data_id=None, owner=None):
+    def set_file_tag(self, tagname, value=None, data_id=None, version=None, owner=None):
         if data_id == None:
             data_id = self.data_id
+        if version == None:
+            version = self.version
 
-        try:
-            results = self.select_tagdef(tagname)
-            result = results[0]
-            tagtype = result.typestr
-            multivalue = result.multivalue
-        except:
+        results = self.select_file(data_id, version)
+        if len(results) == 0:
+            if version == None:
+                raise NotFound(data='dataset "%s"' % data_id)
+            else:
+                raise NotFound(data='dataset "%s"@%d' % (data_id, version))
+
+        file = results[0]
+        version = file.version
+
+        results = self.select_tagdef(tagname)
+        if len(results) == 0:
             raise BadRequest(data="The tag %s is not defined on this server." % tagname)
+        tagdef = results[0]
+        tagtype = tagdef.typestr
+        multivalue = tagdef.multivalue
 
         results = self.get_type(tagtype)
         if len(results) == 0:
@@ -1175,13 +1145,13 @@ class Application:
         type = results[0]
         dbtype = type['_type_dbtype']
         
-        validator = self.validators.get(tagname)
+        validator = self.tagnameValidators.get(tagname)
         if validator:
-            #web.debug("set_file_tag: %s=%s with validator %s" % (tagname, value, validator))
             validator(value, tagname, data_id)
 
-        if tagtype == 'tagname':
-            self.validateTagname(value, tagname, data_id)
+        validator = self.tagtypeValidators.get(tagtype)
+        if validator:
+            validator(value, tagname, data_id)
 
         try:
             if value:
@@ -1190,33 +1160,33 @@ class Application:
             raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
         if not multivalue:
-            results = self.select_file_tag(tagname, data_id=data_id, owner=owner)
+            results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner)
             if len(results) > 0:
                 if results[0].value == value:
                     return
                 else:
-                    self.delete_file_tag(tagname, data_id=data_id)
+                    self.delete_file_tag(tagname, data_id=data_id, version=version)
         else:
-            results = self.select_file_tag(tagname, value, data_id=data_id, owner=owner)
+            results = self.select_file_tag(tagname, value, data_id=data_id, version=version, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
 
         if tagtype != '' and value != None:
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
-                    + " ( file, value ) VALUES ( $file, $value )" 
+                    + " ( file, version, value ) VALUES ( $file, $version, $value )" 
         else:
             # insert untyped or typed w/ default value...
             query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
-                    + " ( file ) VALUES ( $file )"
+                    + " ( file, version ) VALUES ( $file, $version )"
 
         #web.debug(query)
-        self.db.query(query, vars=dict(file=data_id, value=value))
+        vars = dict(file=data_id, version=version, value=value, tagname=tagname)
+        self.db.query(query, vars=vars)
         
-        results = self.select_filetags(tagname, data_id=data_id)
+        results = self.select_filetags(tagname, data_id=data_id, version=version)
         if len(results) == 0:
-            self.db.query("INSERT INTO filetags (file, tagname) VALUES ($file, $tagname)",
-                          vars=dict(file=data_id, tagname=tagname))
+            self.db.query("INSERT INTO filetags (file, version, tagname) VALUES ($file, $version, $tagname)", vars=vars)
         else:
             # may already be reverse-indexed in multivalue case
             pass            
@@ -1226,7 +1196,7 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, qd=0):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest'):
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1279,14 +1249,16 @@ class Application:
                 tagdefs[tagname] = tagdef
 
         innertables = ['files',
-                       '_owner ON (files.name = _owner.file)']
+                       '_owner ON (files.name = _owner.file AND files.version = _owner.version)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
-                       '"_read users" ON (files.name = "_read users".file)']
+                       '"_read users" ON (files.name = "_read users".file AND files.version = "_read users".version)']
         selects = ['files.name AS file',
+                   'files.version AS version',
                    'files.local AS local',
                    'files.location AS location',
                    '_owner.value AS owner']
         groupbys = ['files.name',
+                    'files.version',
                     'files.local',
                     'files.location',
                     '_owner.value']
@@ -1296,6 +1268,12 @@ class Application:
         if data_id:
             wheres.append("files.name = $dataid_%d" % qd)
             values['dataid_%d' % qd] = data_id
+            if version:
+                wheres.append("files.version = $version_%d" % qd)
+                values['version_%d' % qd] = version
+
+        if (not data_id or not version) and versions == 'latest':
+            innertables.append('latestfiles ON (files.name = latestfiles.name AND files.version = latestfiles.version)')
 
         roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
         for r in range(0, len(roles)):
@@ -1315,7 +1293,7 @@ class Application:
 
             if op == ':not:':
                 # not matches if tag column is null or we lack read access to the tag (act as if not there)
-                outertables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))                
+                outertables.append('"%s" AS t%s ON (files.name = t%s.file AND files.version = t%s.version)' % (self.wraptag(tag), p, p, p))                
                 if tagdef.readpolicy == 'fowner':
                     # this tag rule is more restrictive than file or static checks already done
                     wheres.append('t%s.file IS NULL OR (ownrole.role IS NULL)' % p)
@@ -1325,7 +1303,7 @@ class Application:
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
-                innertables.append('"%s" AS t%s ON (files.name = t%s.file)' % (self.wraptag(tag), p, p))                
+                innertables.append('"%s" AS t%s ON (files.name = t%s.file AND files.version = t%s.version)' % (self.wraptag(tag), p, p, p))
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
@@ -1340,7 +1318,7 @@ class Application:
         singlevaltags = [ tagname for tagname in listtags
                           if not tagdefs[tagname].multivalue and tagname != 'owner' ]
         for tagname in singlevaltags:
-            outertables.append('"_%s" ON (files.name = "_%s".file)' % (tagname, tagname))
+            outertables.append('"_%s" ON (files.name = "_%s".file AND files.version = "_%s".version)' % (tagname, tagname, tagname))
             if tagdefs[tagname].typestr == '':
                 selects.append('("_%s".file IS NOT NULL) AS "%s"' % (tagname, tagname))
                 groupbys.append('"%s"' % tagname)
@@ -1353,7 +1331,7 @@ class Application:
                          if tagdefs[tagname].multivalue ]
         for tagname in multivaltags:
             if tagname != 'read users':
-                outertables.append('(SELECT file, array_agg(value) AS value FROM "_%s" GROUP BY file) AS "%s" ON (files.name = "%s".file)' % (tagname, tagname, tagname))
+                outertables.append('(SELECT file, version, array_agg(value) AS value FROM "_%s" GROUP BY file, version) AS "%s" ON (files.name = "%s".file AND files.version = "%s".version)' % (tagname, tagname, tagname, tagname))
                 selects.append('"%s".value AS "%s"' % (tagname, tagname))
                 groupbys.append('"%s".value' % tagname)
             else:
@@ -1361,7 +1339,7 @@ class Application:
 
         groupbys = ", ".join(groupbys)
         selects = ", ".join(selects)
-        tables = " JOIN ".join(innertables) + " LEFT OUTER JOIN ".join(outertables)
+        tables = "(" + " JOIN ".join(innertables) + ")" + " LEFT OUTER JOIN ".join(outertables)
 
         wheres = " AND ".join([ "(%s)" % where for where in wheres])
         if wheres:
@@ -1373,8 +1351,8 @@ class Application:
         
         return (query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None):
-        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id)
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest'):
+        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
         #web.debug(query, values)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)

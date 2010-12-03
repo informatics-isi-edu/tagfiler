@@ -85,22 +85,23 @@ class FileIO (Application):
         self.filetype = 'file'
         self.bytes = None
         self.referer = None
-        self.versionname = None
-        self.versionnum = None
         self.update = False
-        self.useVersions = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
 
         def body():
-            file, version = self.select_file_version()
-            if version:
-                # use the version as the file if it is a versioned file
-                file = version
-                self.data_id = file.file
-                
-            self.enforce_file_authz('read')
+            #web.debug(self.data_id, self.version)
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
+            if len(results) == 0:
+                if self.version == None:
+                    raise NotFound('dataset "%s"' % self.data_id)
+                else:
+                    raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
+            file = results[0]
+            self.enforce_file_authz('read', self.data_id, self.version)
+            self.version = file.version
+            #web.debug(file)
             return (file, file['content-type'])
 
         def postCommit(result):
@@ -171,6 +172,7 @@ class FileIO (Application):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
+        #web.header('Content-Location', self.globals['homepath'] + '/file/%s@%d' % (urlquote(self.data_id), self.version))
         if sendBody:
 
             try:
@@ -331,13 +333,14 @@ class FileIO (Application):
     def DELETE(self, uri):
 
         def body():
-            file, version = self.select_file_version()
-
-            if version:
-                file = version
-                self.data_id = file.file
-
-            self.enforce_file_authz('write', local=file.local)
+            results = self.select_file()
+            if len(results) == 0:
+                if self.version == None:
+                    raise NotFound('dataset "%s"' % self.data_id)
+                else:
+                    raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
+            file = results[0]
+            self.enforce_file_authz('write', file.data_id, file.version, local=file.local)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
             return result
@@ -382,17 +385,25 @@ class FileIO (Application):
         content_type = None
         results = []
         try:
-            file, latest = self.select_file_version(versionnum=self.versionnum)
+            if not self.update:
+                # treat full entity PUT to any version as PUT to the head version
+                self.version = None
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
+            if len(results) == 0:
+                if self.version == None:
+                    raise NotFound('dataset "%s"' % self.data_id)
+                else:
+                    raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
+            file = results[0]
+            self.version = file.version
+            self.enforce_file_authz('write', self.data_id, file.version)
         except NotFound:
             file = None
-            latest = None
 
         created = False
 
         if self.bytes != None and not self.update:
-            if latest:
-                tagged_content_type = latest['content-type']
-            elif file:
+            if file:
                 tagged_content_type = file['content-type']
             else:
                 tagged_content_type = None
@@ -413,103 +424,75 @@ class FileIO (Application):
             # check permissions and update existing file
             self.enforce_file_authz('write', local=file.local)
             if not self.update:
-                if file['Version Set']:
-                    # register as a new version of the existing file
-                    if latest:
-                        versionnum = latest['version number'] + 1
-                    else:
-                        # TODO: save latest version number on parent file to force monotonicity even with deletes?
-                        versionnum = 1
-                    self.versionname = self.data_id + '@%d' % versionnum
-                    self.insert_file(self.versionname, self.local, self.location)
-                    self.updateFileTags(self.versionname, True, content_type)
-                    self.set_file_tag('version number', versionnum, data_id=self.versionname)
-                    self.set_file_tag('version', self.versionname, data_id=self.data_id)
-                    self.updateFileTags(self.data_id, created, content_type, versionSet=True)
-                    created = True
-                else:
-                    # replace the existing non-versioned file
-                    self.update_file()
-                    self.updateFileTags(self.data_id, created, content_type)
-                    results = [file]
+                # register as a new version of the existing file
+                self.version = file.version + 1  # BUG?  PUT to a version other than current head?
+                self.insert_file(self.data_id, self.version, self.local, self.location)
             else:
                 # we're updating an existing file in place
-                if file['Version Set']:
-                    self.versionname = latest['file']
-                    self.updateFileTags(self.versionname, created, content_type)
-                    self.updateFileTags(self.data_id, created, content_type, versionSet=True)
-                else:
-                    # replace the existing non-versioned file
-                    self.updateFileTags(self.data_id, created, content_type)
+                self.version = file.version
                         
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
             created = True
             self.txlog('CREATE', dataset=self.data_id)
-            if self.trackVersions and self.useVersions != False:
-                # create version set file
-                self.insert_file(self.data_id, self.local, location=None)
-                self.set_file_tag('Version Set')
-                # need to set normal system tags too
-                self.updateFileTags(self.data_id, created, content_type, versionSet=True)
+            self.version = 1
+            self.insert_file(self.data_id, self.version, self.local, self.location)
 
-                # create first version w/ client provided content
-                versionnum = 1
-                self.versionname = self.data_id + '@%d' % versionnum
-                self.insert_file(self.versionname, self.local, location=self.location)
-                self.set_file_tag('version number', versionnum, data_id=self.versionname)
-                self.updateFileTags(self.versionname, created, content_type)
-
-                # register first version
-                self.set_file_tag('version', self.versionname, data_id=self.data_id)
-            else:
-                # create non-versioned file
-                self.insert_file(self.data_id, self.local, self.location)
-                self.updateFileTags(self.data_id, created, content_type)
+        self.updateFileTags(self.data_id, self.version, file, content_type, versionSet=True)
 
         return results
 
-    def updateFileTags(self, data_id, created, content_type, versionSet=False):
-        if created:
+    def updateFileTags(self, data_id, version, basefile, content_type, versionSet=False):
+        if not basefile:
+            # set initial tags
             self.set_file_tag('owner', self.authn.role, data_id=data_id)
             self.set_file_tag('created', 'now', data_id=data_id)
             self.set_file_tag('name', data_id, data_id=data_id)
-    
-        self.set_file_tag('modified by', self.authn.role, data_id=data_id)
-        self.set_file_tag('modified', 'now', data_id=data_id)
+        elif version != basefile.version:
+            # copy basefile tagse
+            results = self.select_filetags(data_id=basefile.file, version=basefile.version)
+            for result in results:
+                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'content-type', 'url' ]:
+                    tags = self.select_file_tag(result.tagname, data_id=basefile.file, version=basefile.version)
+                    for tag in tags:
+                        #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)
+                        #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, tag.value))
+                        self.set_file_tag(result.tagname, value=tag.value, data_id=data_id, version=version)
+            
+        self.set_file_tag('modified by', self.authn.role, data_id=data_id, version=version)
+        self.set_file_tag('modified', 'now', data_id=data_id, version=version)
 
-        if not versionSet:
-            if self.local:
-                self.set_file_tag('bytes', self.bytes, data_id=data_id)
-                self.delete_file_tag('url', data_id=data_id)
+        if self.local:
+            self.set_file_tag('bytes', self.bytes, data_id=data_id, version=version)
+            self.delete_file_tag('url', data_id=data_id, version=version)
                 
-                if content_type:
-                    self.set_file_tag('content-type', content_type, data_id=data_id)
-            else:
-                self.delete_file_tag('bytes', data_id=data_id)
-                self.delete_file_tag('content-type', data_id=data_id)
-                self.set_file_tag('url', self.location, data_id=data_id)
+            if content_type:
+                self.set_file_tag('content-type', content_type, data_id=data_id, version=version)
+        else:
+            self.delete_file_tag('bytes', data_id=data_id, version=version)
+            self.delete_file_tag('content-type', data_id=data_id, version=version)
+            self.set_file_tag('url', self.location, data_id=data_id, version=version)
 
         # custom demo hack, proxy tag ops on Image Set to all member files
         # BUG: the contains tag is empty at this point in applet workflow
         if self.queryopts.has_key('contains'):
-            subfiles = self.gettagvals('contains', data_id=data_id)
+            subfiles = self.gettagvals('contains', data_id=data_id, version=version)
         else:
             subfiles = []
                 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
-            self.enforce_tag_authz('write', tagname)
-            self.set_file_tag(tagname, self.queryopts[tagname], data_id=data_id)
+            self.enforce_tag_authz('write', tagname, data_id=data_id, version=version)
+            self.set_file_tag(tagname, self.queryopts[tagname], data_id=data_id, version=version)
             self.txlog('SET', dataset=data_id, tag=tagname, value=self.queryopts[tagname])
             # custom demo hack, proxy tag ops on Image Set to all member files
             if tagname != 'Image Set':
                 for subfile in subfiles:
-                    self.set_file_tag(tagname, self.queryopts[tagname], data_id=subfile)
+                    self.set_file_tag(tagname, self.queryopts[tagname], data_id=subfile, version=None)
 
-        if created:
+        if not basefile or version != basefile.version:
             # only remap on newly created files
             srcroles = set(self.remap.keys()).intersection(self.authn.roles)
             if len(srcroles) == 1:
@@ -518,12 +501,12 @@ class FileIO (Application):
                     srcrole = srcroles.pop()
                     dstrole, readusers, writeusers = self.remap[srcrole]
                     for readuser in readusers:
-                        self.set_file_tag('read users', readuser, data_id=data_id)
+                        self.set_file_tag('read users', readuser, data_id=data_id, version=version)
                         self.txlog('REMAP', dataset=data_id, tag='read users', value=readuser)
                     for writeuser in writeusers:
-                        self.set_file_tag('write users', writeuser, data_id=data_id)
+                        self.set_file_tag('write users', writeuser, data_id=data_id, version=version)
                         self.txlog('REMAP', dataset=data_id, tag='write users', value=writeuser)
-                    self.set_file_tag('owner', dstrole, data_id=data_id)
+                    self.set_file_tag('owner', dstrole, data_id=data_id, version=version)
                     self.txlog('REMAP', dataset=data_id, tag='owner', value=dstrole)
                     t.commit()
                 except:
@@ -621,36 +604,37 @@ class FileIO (Application):
 
     def putPreWriteBody(self):
         try:
-            file, version = self.select_file_version()
+            if not self.update:
+                # treat full entity PUT to any version as PUT to the head version
+                self.version = None
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
+            if len(results) == 0:
+                if self.version == None:
+                    raise NotFound('dataset "%s"' % self.data_id)
+                else:
+                    raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
+            file = results[0]
+            self.version = file.version
+            self.enforce_file_authz('write', self.data_id, file.version)
         except NotFound:
             file = None
-            version = None
-
-        vnum = None
 
         if file:
-            self.enforce_file_authz('write', local=file.local)
             if self.update:
                 if file.local:
-                    if version:
-                        if version.location == None:
-                            raise RuntimeError('Existing file version has no known backing file.')
-                        vnum = version['version number']
-                        file = version
                     if file.location == None:
                         return (None, None)
                     self.location = file.location
+                    self.version = file.version
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
                     f = open(filename, 'r+b')
                     #web.debug('reopen', self.location, self.local, filename, f)
-                    return (f, vnum)
+                    return f
                 else:
                     raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
-            else:
-                return (None, None)
-        else:
-            return (None, None)
+
+        return None
 
     def PUT(self, uri):
         """store file content from client"""
@@ -710,7 +694,7 @@ class FileIO (Application):
             self.update = False
 
         # this retries if a file was found but could not be opened due to races
-        f, self.versionnum = self.dbtransact(preWriteBody, preWritePostCommit)
+        f = self.dbtransact(preWriteBody, preWritePostCommit)
 
         try:
             pass
@@ -781,9 +765,9 @@ class FileIO (Application):
             return self.putPreWriteBody()
 
         def preWritePostCommit(results):
-            f, self.versionnum = results
+            f = results
             if f != None:
-                raise Conflict(data='Cannot perform range-based access via POST.')
+                raise BadRequest(data='Cannot perform range-based access via POST.')
             return None
         
         def putBody():
@@ -804,9 +788,6 @@ class FileIO (Application):
             filesdict[result.name] = result
 
             self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
-            self.testAndExpandFiles(filesdict, self.data_id, 'Version Set', 'version')
-            for file in filesdict.values():
-                self.testAndExpandFiles(filesdict, file.name, 'Version Set', 'version')
             
             for res in filesdict.itervalues():
                 self.delete_file(res.name)
@@ -915,10 +896,6 @@ class FileIO (Application):
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.location = storage.url + '?title=%s' % urlquote(self.data_id)
-                try:
-                    self.useVersions = parseBoolString(storage.versioned)
-                except:
-                    pass
                 self.local = False
                 return self.dbtransact(putBody, putPostCommit)
 

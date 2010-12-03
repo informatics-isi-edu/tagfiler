@@ -339,15 +339,15 @@ def p_slash(p):
 
 def p_filename(p):
     """filename : string"""
-    p[0] = p[1]
+    p[0] = web.storage(data_id=p[1], version=None)
 
 def p_filename_version(p):
     """filename : string '@' string"""
     try:
-        x = int(p[2])
+        x = int(p[3])
     except:
         raise ParseError(p[3], 'Filename part of URL has invalid version number:')
-    p[0] = p[1] + '@' + p[3]
+    p[0] = web.storage(data_id=p[1], version=p[3])
 
 def p_spacestring(p):
     """spacestring : '+'"""

@@ -27,7 +27,7 @@ $elif tagdef.typestr:
 		$elif tagdef.typestr == 'url':
 			<a href="${val}">${val}</a>
 		$elif tagdef.typestr == 'file':
-			<a href="${home}/file/${urlquote_name(val)}">${val}</a>
+			<a href="${home}/file/${urlquote(val)}">${val}</a>
 		$else:
 			${val}
 		</td>

@@ -1,4 +1,4 @@
-$def with (files)
+$def with (files, showversions=False)
 $ odd = True
 $if view:
 	$ querystr = '?view=%s' % urlquote(view)
@@ -20,7 +20,13 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		<td class="file-name">
-		<a href="${homepath}/file/${urlquote(file.file)}">${file.file}</a>
+		$if showversions:
+			$ version = '@%d' % file.version
+			$ vsuffix = '@%d' % file.version
+		$else:
+			$ version = ''
+			$ vsuffix = ''
+		<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}">${file.file}${version}</a>
 		$if file['Image Set']:
 			<a href="${homepath}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
 		$if file.writeok:

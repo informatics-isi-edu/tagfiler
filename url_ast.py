@@ -7,7 +7,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, urlquote_name, idquote, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -362,7 +362,12 @@ class FileId(Node, FileIO):
     def __init__(self, appname, data_id, location=None, local=False, queryopts={}):
         Node.__init__(self, appname)
         FileIO.__init__(self)
-        self.data_id = data_id
+        if type(data_id) == web.utils.Storage:
+            self.data_id = data_id.data_id
+            self.version = data_id.version
+        else:
+            self.data_id = data_id
+            self.version = None
         self.location = location
         self.local = local
         self.queryopts = queryopts
@@ -601,7 +606,12 @@ class FileTags (Node):
 
     def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None, queryopts={}):
         Node.__init__(self, appname)
-        self.data_id = data_id
+        if type(data_id) == web.utils.Storage:
+            self.data_id = data_id.data_id
+            self.version = data_id.version
+        else:
+            self.data_id = data_id
+            self.version = None
         self.tag_id = tag_id
         self.value = value
         self.typestr = None
@@ -613,7 +623,8 @@ class FileTags (Node):
             self.tagvals = dict()
         self.queryopts = queryopts
 
-        self.globals['data_id'] = self.data_id
+        self.globals['data_id'] = self.data_id 
+        self.globals['version'] = self.version
 
     def get_tag_body(self):
         owner = self.owner()
@@ -933,7 +944,7 @@ class FileTags (Node):
         return self.dbtransact(self.delete_body, self.delete_postCommit)
 
     def post_nullBody(self):
-        web.debug('post_nullBody')
+        #web.debug('post_nullBody')
         return None
 
     def post_postCommit(self, results):
@@ -1151,6 +1162,15 @@ class Query (Node):
         except:
             pass
 
+        versions = self.queryopts.get('versions')
+        if versions not in [ 'latest', 'any' ]:
+            versions = 'latest'
+
+        if versions == 'any':
+            self.showversions = True
+        else:
+            self.showversions = False
+                
         if op == '':
             op = None
 
@@ -1182,7 +1202,7 @@ class Query (Node):
             else:
                 self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
-            files = [ res for res in self.select_files_by_predlist(listtags=self.globals['filelisttags'] + ['Image Set']) ]
+            files = [ res for res in self.select_files_by_predlist(listtags=self.globals['filelisttags'] + ['Image Set'], versions=versions) ]
             for res in files:
                 # decorate each result with writeok information
                 res.writeok = self.gui_test_file_authz('write',
@@ -1242,12 +1262,12 @@ class Query (Node):
                         break
                 yield self.renderlist(self.title,
                                        [self.render.QueryViewStatic(self.ops, self.predlist),
-                                        self.render.FileList(files)])
+                                        self.render.FileList(files, showversions=self.showversions)])
             else:
                 yield self.renderlist(self.title,
                                        [self.render.QueryAdd(self.ops),
                                         self.render.QueryView(self.ops, self.predlist),
-                                        self.render.FileList(files)])
+                                        self.render.FileList(files, showversions=self.showversions)])
 
         for res in self.dbtransact(body, postCommit):
             yield res

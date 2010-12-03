@@ -96,11 +96,12 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 
 echo "create core tables..."
 
-psql -q -t -c "CREATE TABLE files ( name text PRIMARY KEY, local boolean default False, location text )"
+psql -q -t -c "CREATE TABLE files ( name text, version int8, local boolean default False, location text, PRIMARY KEY(name, version) )"
+psql -q -t -c "CREATE TABLE latestfiles ( name text PRIMARY KEY, version int8, FOREIGN KEY (name, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 psql -q -t -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, readpolicy text, writepolicy text, owner text )"
 psql -q -t -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
 psql -q -t -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
-psql -q -t -c "CREATE TABLE filetags ( file text REFERENCES files (name) ON DELETE CASCADE, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, tagname) )"
+psql -q -t -c "CREATE TABLE filetags ( file text, version int8, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 
 psql -q -t -c "CREATE SEQUENCE transmitnumber"
 
@@ -134,23 +135,23 @@ tagdef()
       fi
       if [[ "\$7" = "file" ]]
       then
-         fk="REFERENCES files (name) ON DELETE CASCADE"
+         fk="REFERENCES latestfiles (name) ON DELETE CASCADE"
       else
          fk=""
       fi
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text REFERENCES files (name) ON DELETE CASCADE, value \$2 \${default} \${fk}, UNIQUE(file, value) )"
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, value \$2 \${default} \${fk}, UNIQUE(file, version, value), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
       psql -q -t -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
    else
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text PRIMARY KEY REFERENCES files (name) ON DELETE CASCADE )"
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
    fi
 }
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 
-tagdef '_type_name'   text        ""      file        file       false
-tagdef '_type_description' text   ""      file        file       false
-tagdef '_type_dbtype' text        ""      file        file       false
-tagdef '_type_values' text        ""      file        file       true
+tagdef '_type_name'   text        ""      anonymous   file       false
+tagdef '_type_description' text   ""      anonymous   file       false
+tagdef '_type_dbtype' text        ""      anonymous   file       false
+tagdef '_type_values' text        ""      anonymous   file       true
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -165,9 +166,6 @@ tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      file        file       false
 
 tagdef contains       text        ""      file        file       true       file
-tagdef version        text        ""      file        file       true       file
-tagdef "version number" int8      ""      file        system     false
-tagdef "Version Set"  ""          ""      file        system     false
 
 tagdef "Transmission Number" \
                       int8        ""    file        file       false
@@ -207,21 +205,21 @@ tag()
    echo "set /tags/\$file/\$tagname=" "\$@"
    if [[ -z "\$typestr" ]] || [[ \$# -eq 0 ]]
    then
-      psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file ) VALUES ( '\$file' )"
+      psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version ) VALUES ( '\$file', 1 )"
    elif [[ \$# -gt 0 ]]
    then
       while [[ \$# -gt 0 ]]
       do
-         psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, value ) VALUES ( '\$file', '\$1' )"
+         psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version, value ) VALUES ( '\$file', 1, '\$1' )"
          shift
       done
    fi
 
    # add to filetags only if this insert changes status
-   if [[ -z "\$(psql -A -t -c "SELECT * FROM filetags WHERE file = '\$file' AND tagname = '\$tagname'")" ]] \
-     && [[ -n "\$(psql -A -t -c "SELECT * FROM \\"_\$tagname\\" WHERE file = '\$file'")" ]]
+   if [[ -z "\$(psql -A -t -c "SELECT * FROM filetags WHERE file = '\$file' AND version = 1 AND tagname = '\$tagname'")" ]] \
+     && [[ -n "\$(psql -A -t -c "SELECT * FROM \\"_\$tagname\\" WHERE file = '\$file' AND version = 1 ")" ]]
    then
-      psql -q -t -c "INSERT INTO filetags (file, tagname) VALUES ('\$file', '\$tagname')"
+      psql -q -t -c "INSERT INTO filetags (file, version, tagname) VALUES ('\$file', 1, '\$tagname')"
    fi
 }
 
@@ -244,7 +242,8 @@ storedquery()
    esac
 
    echo "create stored query: '\$file' --> '\$url'..."
-   psql -t -q -c "INSERT INTO files (name, local, location) VALUES ( '\$file', False, '\$url' )"
+   psql -t -q -c "INSERT INTO files (name, version, local, location) VALUES ( '\$file', 1, False, '\$url' )"
+   psql -t -q -c "INSERT INTO latestfiles (name, version) VALUES ( '\$file', 1 )"
    tag "\$file" name text "\$file"
    tag "\$file" url text "\$url"
    tag "\$file" owner text "\$owner"
@@ -324,7 +323,6 @@ cfgtagdef 'template path' text      ""      file        file       false
 cfgtagdef 'chunk bytes' text        ""      file        file       false
 cfgtagdef 'local files immutable' text ""   file        file       false
 cfgtagdef 'remote files immutable' text ""  file        file       false
-cfgtagdef 'use versions' 'text'     ""      file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
 cfgtagdef subtitle      text        ""      file        file       false
 cfgtagdef logo          text        ""      file        file       false
