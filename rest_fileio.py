@@ -340,6 +340,7 @@ class FileIO (Application):
                 else:
                     raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
             file = results[0]
+            self.version = file.version
             self.enforce_file_authz('write', file.data_id, file.version, local=file.local)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
@@ -439,18 +440,18 @@ class FileIO (Application):
             self.version = 1
             self.insert_file(self.data_id, self.version, self.local, self.location)
 
-        self.updateFileTags(self.data_id, self.version, file, content_type, versionSet=True)
+        self.updateFileTags(file, content_type, versionSet=True)
 
         return results
 
-    def updateFileTags(self, data_id, version, basefile, content_type, versionSet=False):
+    def updateFileTags(self, basefile, content_type, versionSet=False):
         if not basefile:
             # set initial tags
-            self.set_file_tag('owner', self.authn.role, data_id=data_id)
-            self.set_file_tag('created', 'now', data_id=data_id)
-            self.set_file_tag('name', data_id, data_id=data_id)
-        elif version != basefile.version:
-            # copy basefile tagse
+            self.set_file_tag('owner', self.authn.role)
+            self.set_file_tag('created', 'now')
+            self.set_file_tag('name', self.data_id)
+        elif self.version != basefile.version:
+            # copy basefile tags
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
                 if result.tagname not in [ 'bytes', 'modified', 'modified by', 'content-type', 'url' ]:
@@ -458,41 +459,30 @@ class FileIO (Application):
                     for tag in tags:
                         #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)
                         #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, tag.value))
-                        self.set_file_tag(result.tagname, value=tag.value, data_id=data_id, version=version)
+                        self.set_file_tag(result.tagname, value=tag.value)
             
-        self.set_file_tag('modified by', self.authn.role, data_id=data_id, version=version)
-        self.set_file_tag('modified', 'now', data_id=data_id, version=version)
+        self.set_file_tag('modified by', self.authn.role)
+        self.set_file_tag('modified', 'now')
 
         if self.local:
-            self.set_file_tag('bytes', self.bytes, data_id=data_id, version=version)
-            self.delete_file_tag('url', data_id=data_id, version=version)
+            self.set_file_tag('bytes', self.bytes)
+            self.delete_file_tag('url')
                 
             if content_type:
-                self.set_file_tag('content-type', content_type, data_id=data_id, version=version)
+                self.set_file_tag('content-type', content_type)
         else:
-            self.delete_file_tag('bytes', data_id=data_id, version=version)
-            self.delete_file_tag('content-type', data_id=data_id, version=version)
-            self.set_file_tag('url', self.location, data_id=data_id, version=version)
+            self.delete_file_tag('bytes')
+            self.delete_file_tag('content-type')
+            self.set_file_tag('url', self.location)
 
-        # custom demo hack, proxy tag ops on Image Set to all member files
-        # BUG: the contains tag is empty at this point in applet workflow
-        if self.queryopts.has_key('contains'):
-            subfiles = self.gettagvals('contains', data_id=data_id, version=version)
-        else:
-            subfiles = []
-                
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
         for tagname in self.queryopts.keys():
-            self.enforce_tag_authz('write', tagname, data_id=data_id, version=version)
-            self.set_file_tag(tagname, self.queryopts[tagname], data_id=data_id, version=version)
-            self.txlog('SET', dataset=data_id, tag=tagname, value=self.queryopts[tagname])
-            # custom demo hack, proxy tag ops on Image Set to all member files
-            if tagname != 'Image Set':
-                for subfile in subfiles:
-                    self.set_file_tag(tagname, self.queryopts[tagname], data_id=subfile, version=None)
+            self.enforce_tag_authz('write', tagname)
+            self.set_file_tag(tagname, self.queryopts[tagname])
+            self.txlog('SET', dataset=self.data_id, tag=tagname, value=self.queryopts[tagname])
 
-        if not basefile or version != basefile.version:
+        if not basefile:
             # only remap on newly created files
             srcroles = set(self.remap.keys()).intersection(self.authn.roles)
             if len(srcroles) == 1:
@@ -599,7 +589,6 @@ class FileIO (Application):
     def deletePrevious(self, files):
         for file in files:
             if file.local and file.location != None:
-                # previous result had local file, so free it
                 self.deleteFile(self.store_path + '/' + file.location)
 
     def putPreWriteBody(self):
@@ -729,7 +718,7 @@ class FileIO (Application):
         def postWritePostCommit(files):
             if not content_range and files:
                 self.deletePrevious(files)
-            uri = self.home + self.store_path + '/' + urlquote(self.data_id)
+            uri = self.home + self.store_path + '/' + urlquote(self.data_id) + '@%d' % self.version
             web.header('Location', uri)
             if filename:
                 web.ctx.status = '201 Created'
@@ -785,12 +774,13 @@ class FileIO (Application):
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
             self.enforce_file_authz('write', local=result.local)
+            self.version = result.version
             filesdict[result.name] = result
 
             self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
             
             for res in filesdict.itervalues():
-                self.delete_file(res.name)
+                self.delete_file(res.name, res.version)
                 self.txlog('DELETE', dataset=res.name)
             return filesdict.values()
         

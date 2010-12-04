@@ -883,9 +883,17 @@ class Application:
             data_id = self.data_id
         if version == None:
             version = self.version
-        query = "DELETE FROM files where name = $name"
+        wheres = []
+        query = 'DELETE FROM files'
+        if not version:
+            query += ' USING latestfiles'
+            wheres.extend(['files.name = latestfiles.name', 'files.version = latestfiles.version'])
+        wheres.append('name = $name')
         if version:
-            query += ' AND version = $version'
+            wheres.append('version = $version')
+        wheres = ' AND '.join(wheres)
+        if wheres:
+            query += ' WHERE ' + wheres
         self.db.query(query, vars=dict(name=data_id, version=version))
 
     def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
