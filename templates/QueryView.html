@@ -23,9 +23,9 @@ $for pred in predlist:
 	<fieldset>
 	<legend>${pred['tag']}</legend>
 	$if pred['op'] in [ '', None ]:
-		${ops['']}
+		${opsdict['']}
 	$if pred['op'] == ':not:':
-		${ops[pred['op']]}
+		${opsdict[pred['op']]}
 	$elif pred['op']:
 		${opsdict[pred['op']]}
 		$ count = 0

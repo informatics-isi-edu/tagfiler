@@ -1204,7 +1204,7 @@ class Application:
         result = self.db.query(query)
         return str(result[0].nextval).rjust(9, '0')
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest'):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest', tagdefs=None):
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1212,7 +1212,7 @@ class Application:
             predlist = self.predlist
 
         if listtags == None:
-            listtags = self.globals['filelisttags']
+            listtags = [ x for x in self.globals['filelisttags'] ]
         else:
             listtags = [ x for x in listtags ]
 
@@ -1226,13 +1226,15 @@ class Application:
         if roles:
             roles.append('*')
 
-        tagdefs = dict()
+        if tagdefs == None:
+            tagdefs = dict()
+            
         for pred in predlist:
             # do static checks on each referenced tag at most once
             if not tagdefs.has_key(pred['tag']):
                 results = self.select_tagdef(pred['tag'])
                 if len(results) == 0:
-                    raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+                    raise BadRequest(data='The tag "%s" is not defined on this server.' % pred['tag'])
                 tagdef = results[0]
                 if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
                     user = self.authn.role
@@ -1252,7 +1254,7 @@ class Application:
             if not tagdefs.has_key(tagname):
                 results = self.select_tagdef(tagname)
                 if len(results) == 0:
-                    raise BadRequest(data="The tag %s is not defined on this server." % pred['tag'])
+                    raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
                 tagdef = results[0]
                 tagdefs[tagname] = tagdef
 
@@ -1366,28 +1368,35 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def select_files_by_predlist_path(self, path=None):
+    def select_files_by_predlist_path(self, path=None, versions='latest'):
         if path == None:
-            path = [ (None, None, None) ]
+            path = [ ([], [], []) ]
 
         queries = []
         values = dict()
+        tagdefs = dict()
 
         context = ''
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags)
+            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
                 if len(listtags) != 1:
                     raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
                 projection = listtags[0]
-                if e == 0:
-                    context = '(SELECT DISTINCT unnest("%s") FROM (%s) AS q_%d)' % (projection, q, e)
+                if tagdefs[projection].typestr not in [ 'text', 'file' ]:
+                    raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
+                if tagdefs[projection].multivalue:
+                    projectclause = 'unnest("%s")' % projection
                 else:
-                    context = '(SELECT DISTINCT unnest("%s") FROM (%s) AS q_%d WHERE q_%d.file IN (%s))' % (projection, q, e, e, context)
+                    projectclause = '"%s"' % projection
+                if e == 0:
+                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
+                else:
+                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.file IN (%s))' % (projectclause, q, e, e, context)
             else:
                 if context:
                     query = '(%s) AS q_%d WHERE q_%d.file IN (%s)' % (q, e, e, context)
@@ -1396,10 +1405,10 @@ class Application:
             
         if listtags == None:
             listtags = self.listtags
-        listtags.extend(['file', 'local', 'location', 'owner'])
         listtags = set(listtags)
         
-        selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag) for listtag in listtags ]
+        selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
+                    for listtag in listtags.union(set(['file', 'local', 'location', 'owner', 'version'])) ]
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query

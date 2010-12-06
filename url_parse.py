@@ -163,23 +163,53 @@ def p_tag(p):
 def p_query1(p):
     """query : slash string slash QUERY
              | slash string slash QUERY slash"""
-    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts={})
+    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts={})
 
 def p_query2a(p):
     """query : slash string slash QUERY queryopts"""
-    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts=p[5])
+    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=p[5])
 
 def p_query2b(p):
     """query : slash string slash QUERY slash queryopts"""
-    p[0] = url_ast.Query(appname=p[2], predlist=[], queryopts=p[6])
+    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=p[6])
 
 def p_query3(p):
-    """query : slash string slash QUERY slash predlist"""
-    p[0] = url_ast.Query(appname=p[2], predlist=p[6], queryopts={})
+    """query : slash string slash QUERY slash querypath"""
+    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts={})
 
 def p_query4(p):
-    """query : slash string slash QUERY slash predlist queryopts"""
-    p[0] = url_ast.Query(appname=p[2], predlist=p[6], queryopts=p[7])
+    """query : slash string slash QUERY slash querypath queryopts"""
+    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=p[7])
+
+def p_querypath_listonly(p):
+    """querypath : listtags"""
+    p[0] = [ ( [], p[1], [] ) ]
+
+def p_querypath(p):
+    """querypath : predlist listtags"""
+    p[0] = [ ( p[1], p[2], [] ) ]
+
+def p_querypath_extend(p):
+    """querypath : querypath slash predlist listtags"""
+    p[0] = p[1]
+    ppreds, plisttags, pordertags = p[0][-1]
+    if len(plisttags) == 0:
+        # the parent path element has no listtags, default to 'contains'
+        p[0][-1] = ( ppreds, [ 'contains' ], pordertags )
+    p[0].append( ( p[3], p[4], [] ) )
+
+def p_listtags_empty(p):
+    """listtags :
+                | '(' ')'"""
+    p[0] = []
+
+def p_listtags(p):
+    """listtags : '(' vallist ')'"""
+    p[0] = p[2]
+
+def p_predlist_empty(p):
+    """predlist : """
+    p[0] = []
 
 def p_predlist(p):
     """predlist : pred"""

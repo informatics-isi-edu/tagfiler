@@ -1112,21 +1112,32 @@ class TagdefACL (FileTags):
 
 class Query (Node):
     __slots__ = [ 'predlist', 'queryopts', 'action' ]
-    def __init__(self, appname, predlist=[], queryopts={}):
+    def __init__(self, appname, queryopts={}, path=[]):
         Node.__init__(self, appname)
-        self.predlist = predlist
+        self.path = path
+        if len(self.path) == 0:
+            self.path = [ ( [], [], [] ) ]
+        self.predlist = self.path[-1][0]
         self.queryopts = queryopts
         self.action = 'query'
         self.globals['view'] = None
 
     def qtarget(self):
-        terms = []
-        for pred in self.predlist:
-            if pred['op']:
-                terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
+        qpath = []
+        for elem in self.path:
+            predlist, listtags, ordertags = elem
+            terms = []
+            for pred in predlist:
+                if pred['op']:
+                    terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
+                else:
+                    terms.append(urlquote(pred['tag']))
+            if not listtags or len(listtags) == 1 and listtags[0] == 'contains':
+                listpart = ''
             else:
-                terms.append(urlquote(pred['tag']))
-        return self.home + web.ctx.homepath + '/query/' + ';'.join(terms)
+                listpart = '(' + ','.join([ urlquote(tag) for tag in listtags ]) + ')'
+            qpath.append( ';'.join(terms) + listpart )
+        return self.home + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
         # this interface has both REST and form-based functions
@@ -1191,18 +1202,26 @@ class Query (Node):
         else:
             raise BadRequest(data="Form field action=%s not understood." % self.action)
 
-        def body():
-            listtags = self.queryopts.get('list', None)
-            path = self.queryopts.get('path', None)
+        if self.action in [ 'add', 'delete' ]:
+            # apply predlist changes to last path element
+            predlist, listtags, ordertags = self.path[-1]
+            self.path[-1] = (self.predlist, listtags, ordertags)
+
+        self.globals['queryTarget'] = self.qtarget()
             
-            if listtags:
-                if type(listtags) != set:
-                    listtags = [ listtags ]
-                self.globals['filelisttags'] = [ tag for tag in listtags if tag ]
-            else:
-                self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
+        def body():
+            listtags = self.queryopts.get('list', self.path[-1][1])
+            if len(listtags) == 0:
+                listtags = self.getParamsDb('file list tags', data_id=self.globals['view'])
+            listtags = [ t for t in listtags ]
+            self.globals['filelisttags'] = listtags
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
-            files = [ res for res in self.select_files_by_predlist(listtags=self.globals['filelisttags'] + ['Image Set'], versions=versions) ]
+            predlist, listtags, ordertags = self.path[-1]
+            self.path[-1] = predlist, list(self.globals['filelisttags']), ordertags
+            self.path[-1][1].append('Image Set') # we always need this
+
+            files = [ res for res in self.select_files_by_predlist_path(path=self.path, versions=versions) ]
+
             for res in files:
                 # decorate each result with writeok information
                 res.writeok = self.gui_test_file_authz('write',
@@ -1230,12 +1249,10 @@ class Query (Node):
                     tagvals[tagname] = str(tagvals[tagname])
                 return jsonWriter(tagvals)
 
-            self.globals['queryTarget'] = self.qtarget()
-            
             self.setNoCache()
 
             if self.action in set(['add', 'delete']):
-                raise web.seeother(self.qtarget() + '?action=edit')
+                raise web.seeother(self.globals['queryTarget'] + '?action=edit')
 
             if self.title == None:
                 if self.action == 'query':
