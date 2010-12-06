@@ -1261,7 +1261,7 @@ class Application:
         innertables = ['files',
                        '_owner ON (files.name = _owner.file AND files.version = _owner.version)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
-                       '"_read users" ON (files.name = "_read users".file AND files.version = "_read users".version)']
+                       '(SELECT file, version, array_agg(value) AS value FROM "_read users" GROUP BY file, version) AS "read users" ON (files.name = "read users".file AND files.version = "read users".version)']
         selects = ['files.name AS file',
                    'files.version AS version',
                    'files.local AS local',
@@ -1291,8 +1291,8 @@ class Application:
         roletable = ", ".join(roletable)
 
         outertables.append( '(VALUES %s) AS ownrole (role) ON ("_owner".value = ownrole.role)' % roletable)
-        outertables.append( '(VALUES %s) AS readrole (role) ON ("_read users".value = readrole.role)' % roletable)
-        wheres.append('ownrole.role IS NOT NULL OR readrole IS NOT NULL')
+        outertables.append( '(VALUES %s) AS readrole (role) ON (readrole.role = ANY ("read users".value)) ' % roletable)
+        wheres.append('ownrole.role IS NOT NULL OR readrole.role IS NOT NULL')
         
         for p in range(0, len(predlist)):
             pred = predlist[p]
@@ -1342,10 +1342,8 @@ class Application:
         for tagname in multivaltags:
             if tagname != 'read users':
                 outertables.append('(SELECT file, version, array_agg(value) AS value FROM "_%s" GROUP BY file, version) AS "%s" ON (files.name = "%s".file AND files.version = "%s".version)' % (tagname, tagname, tagname, tagname))
-                selects.append('"%s".value AS "%s"' % (tagname, tagname))
-                groupbys.append('"%s".value' % tagname)
-            else:
-                selects.append('(array_agg("_%s".value)) AS "%s"' % (tagname, tagname))
+            selects.append('"%s".value AS "%s"' % (tagname, tagname))
+            groupbys.append('"%s".value' % tagname)
 
         groupbys = ", ".join(groupbys)
         selects = ", ".join(selects)
@@ -1412,6 +1410,7 @@ class Application:
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query
+        #web.debug(query, values)
         return self.db.query(query, values)
 
     
