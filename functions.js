@@ -489,7 +489,9 @@ function renderTagdefs(table) {
     var columns = [];
     var columnmap = {};
     var typedescs = null;
-    var cardinality = { false : "0 or one", true : "1 or more" };
+    var cardinality = [];
+    cardinality[false] = "0 or one";
+    cardinality[true] = "1 or more";
 
     var rows = table.getElementsByTagName("tr");
     var headrow = rows[0];

@@ -46,7 +46,7 @@ $if title == 'User':
 $ tagdefs = tagdefsdict.values()
 $ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 $for tagdef in tagdefs:
-	<tr class="tagdef"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</d></tr>
+	<tr class="tagdef"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
 </table>
 <script type="text/javascript">
 renderTagdefs(document.getElementById("${idquote(title) + '_tagdefs'}"));
