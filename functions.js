@@ -437,6 +437,13 @@ function downloadBrowse() {
 }
 
 /**
+ * Get the checksum switch
+ */
+function getChecksum() {
+	return "" + document.getElementById('cksum').checked;
+}
+
+/**
  * Method "contains" for the Array object
  * returns true if an element is in the array, and false otherwise
  */
