@@ -86,6 +86,7 @@ class FileIO (Application):
         self.bytes = None
         self.referer = None
         self.update = False
+        self.needed_db_globals = []  # turn off expensive db queries we ignore
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -176,7 +177,8 @@ class FileIO (Application):
         if sendBody:
 
             try:
-                self.db._db_cursor().connection.close()
+                pass
+                #self.db._db_cursor().connection.close()
             except:
                 pass
 

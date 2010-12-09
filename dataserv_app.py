@@ -198,6 +198,9 @@ class Application:
         self.predlist = []
         self.globals = dict()
 
+        # this ordered list can be pruned to optimize transactions
+        self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
+
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
         def getParamEnv(suffix, default=None):
@@ -493,10 +496,13 @@ class Application:
                         count = count + 1
 
                         # build up globals useful to almost all classes, to avoid redundant coding
-                        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
-                        self.globals['roleinfo'] = self.buildroleinfo()
-                        self.globals['typeinfo'] = self.get_type()
-                        self.globals['typesdict'] = dict([ (type['_type_name'], type) for type in self.globals['typeinfo'] ])
+                        # this is fragile to make things fast and simple
+                        db_globals_dict = dict(tagdefsdict=lambda : dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ]),
+                                               roleinfo=lambda : self.buildroleinfo(),
+                                               typeinfo=lambda : self.get_type(),
+                                               typesdict=lambda : dict([ (type['_type_name'], type) for type in self.globals['typeinfo'] ]))
+                        for key in self.needed_db_globals:
+                            self.globals[key] = db_globals_dict[key]()
 
                         def tagOptions(tagname, values=[]):
                             tagdef = self.globals['tagdefsdict'][tagname]
