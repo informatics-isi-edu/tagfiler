@@ -391,7 +391,7 @@ class FileIO (Application):
         try:
             # treat full entity PUT to any version as PUT to the head version
             self.version = None
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified by'])
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
@@ -457,19 +457,24 @@ class FileIO (Application):
                         #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)
                         #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, tag.value))
                         self.set_file_tag(result.tagname, value=tag.value)
-            
-        self.set_file_tag('modified by', self.authn.role)
+
+        if not basefile or self.authn.role != basefile['modified by']:
+            self.set_file_tag('modified by', self.authn.role)
         self.set_file_tag('modified', 'now')
 
         if self.local:
-            self.set_file_tag('bytes', self.bytes)
-            self.delete_file_tag('url')
+            if not basefile or self.bytes != basefile.bytes:
+                self.set_file_tag('bytes', self.bytes)
+            if not basefile or basefile.url:
+                self.delete_file_tag('url')
                 
             if content_type:
                 self.set_file_tag('content-type', content_type)
         else:
-            self.delete_file_tag('bytes')
-            self.delete_file_tag('content-type')
+            if basefile and basefile.bytes != None:
+                self.delete_file_tag('bytes')
+            if basefile and basefile['content-type'] != None:
+                self.delete_file_tag('content-type')
             self.set_file_tag('url', self.location)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
@@ -593,7 +598,7 @@ class FileIO (Application):
             if not self.update:
                 # treat full entity PUT to any version as PUT to the head version
                 self.version = None
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified by'])
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
