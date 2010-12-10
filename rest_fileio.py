@@ -384,13 +384,13 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
+        """Only call this after writing a full file body!"""
         remote = not self.local
         content_type = None
         results = []
         try:
-            if not self.update:
-                # treat full entity PUT to any version as PUT to the head version
-                self.version = None
+            # treat full entity PUT to any version as PUT to the head version
+            self.version = None
             results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
             if len(results) == 0:
                 if self.version == None:
@@ -405,7 +405,7 @@ class FileIO (Application):
 
         created = False
 
-        if self.bytes != None and not self.update:
+        if self.bytes != None:
             if file:
                 tagged_content_type = file['content-type']
             else:
@@ -426,14 +426,9 @@ class FileIO (Application):
         if file:
             # check permissions and update existing file
             self.enforce_file_authz('write', local=file.local)
-            if not self.update:
-                # register as a new version of the existing file
-                self.version = file.version + 1  # BUG?  PUT to a version other than current head?
-                self.insert_file(self.data_id, self.version, self.local, self.location)
-            else:
-                # we're updating an existing file in place
-                self.version = file.version
-                        
+            # register as a new version of the existing file
+            self.version = file.version + 1  # BUG?  PUT to a version other than current head?
+            self.insert_file(self.data_id, self.version, self.local, self.location)
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
@@ -620,6 +615,7 @@ class FileIO (Application):
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
                     f = open(filename, 'r+b')
+                    self.updateFileTags(file, None)
                     #web.debug('reopen', self.location, self.local, filename, f)
                     return f
                 else:
@@ -731,7 +727,10 @@ class FileIO (Application):
             return res
 
         try:
-            result = self.dbtransact(postWriteBody, postWritePostCommit)
+            if not self.update:
+                result = self.dbtransact(postWriteBody, postWritePostCommit)
+            else:
+                result = postWritePostCommit([])
             return result
         except web.SeeOther:
             raise
