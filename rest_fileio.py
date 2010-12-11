@@ -9,6 +9,9 @@ import random
 import re
 import traceback
 import sys
+import time
+import datetime
+import pytz
 
 from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote, parseBoolString
 
@@ -391,7 +394,7 @@ class FileIO (Application):
         try:
             # treat full entity PUT to any version as PUT to the head version
             self.version = None
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified by'])
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
@@ -460,7 +463,10 @@ class FileIO (Application):
 
         if not basefile or self.authn.role != basefile['modified by']:
             self.set_file_tag('modified by', self.authn.role)
-        self.set_file_tag('modified', 'now')
+
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5:
+            self.set_file_tag('modified', 'now')
 
         if self.local:
             if not basefile or self.bytes != basefile.bytes:
@@ -598,7 +604,7 @@ class FileIO (Application):
             if not self.update:
                 # treat full entity PUT to any version as PUT to the head version
                 self.version = None
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified by'])
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
