@@ -700,11 +700,14 @@ class FileIO (Application):
         except:
             pass
 
+        mustInsert = False
+
         # we get here if write is not disallowed
         if f == None:
             f, filename = self.getTemporary('wb')
             self.location = filename[len(self.store_path)+1:]
             self.local = True
+            mustInsert = True
         else:
             filename = None
 
@@ -738,7 +741,7 @@ class FileIO (Application):
             return res
 
         try:
-            if not self.update:
+            if mustInsert == True:
                 result = self.dbtransact(postWriteBody, postWritePostCommit)
             else:
                 result = postWritePostCommit([])
