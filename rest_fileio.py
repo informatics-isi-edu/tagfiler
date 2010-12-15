@@ -433,11 +433,11 @@ class FileIO (Application):
             self.version = 1
             self.insert_file(self.data_id, self.version, self.local, self.location)
 
-        self.updateFileTags(file, content_type, versionSet=True)
+        self.updateFileTags(file, content_type)
 
         return results
 
-    def updateFileTags(self, basefile, content_type, versionSet=False):
+    def updateFileTags(self, basefile, content_type):
         if not basefile:
             # set initial tags
             self.set_file_tag('owner', self.authn.role)
@@ -713,12 +713,21 @@ class FileIO (Application):
 
         def postWriteBody():
             # this may repeat in case of database races
-            try:
-                self.client_content_type = web.ctx.env['CONTENT_TYPE'].lower()
-            except:
-                self.client_content_type = None
-
-            return self.insertForStore()
+            if mustInsert:
+                try:
+                    self.client_content_type = web.ctx.env['CONTENT_TYPE'].lower()
+                except:
+                    self.client_content_type = None
+                return self.insertForStore()
+            else:
+                # simplified path for chunk updates
+                results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
+                if len(results) > 0:
+                    basefile = results[0]
+                else:
+                    basefile = None
+                self.updateFileTags(basefile, basefile['content-type'])
+                return []
 
         def postWritePostCommit(files):
             if not content_range and files:
@@ -734,11 +743,7 @@ class FileIO (Application):
             return res
 
         try:
-            if mustInsert == True:
-                result = self.dbtransact(postWriteBody, postWritePostCommit)
-            else:
-                result = postWritePostCommit([])
-            return result
+            return self.dbtransact(postWriteBody, postWritePostCommit)
         except web.SeeOther:
             raise
         except:
