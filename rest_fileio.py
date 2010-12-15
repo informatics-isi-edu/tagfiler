@@ -387,26 +387,20 @@ class FileIO (Application):
         return (boundary1, boundaryN)
 
     def insertForStore(self):
-        """Only call this after writing a full file body!"""
+        """Only call this after creating a new file on disk!"""
         remote = not self.local
         content_type = None
         results = []
-        try:
-            # treat full entity PUT to any version as PUT to the head version
-            self.version = None
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
-            if len(results) == 0:
-                if self.version == None:
-                    raise NotFound('dataset "%s"' % self.data_id)
-                else:
-                    raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
+
+        # treat full entity PUT to any version as PUT to the head version
+        self.version = None
+        results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
+        if len(results) == 0:
+            file = None
+        else:
             file = results[0]
             self.version = file.version
             self.enforce_file_authz('write', self.data_id, file.version)
-        except NotFound:
-            file = None
-
-        created = False
 
         if self.bytes != None:
             if file:
@@ -435,7 +429,6 @@ class FileIO (Application):
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
-            created = True
             self.txlog('CREATE', dataset=self.data_id)
             self.version = 1
             self.insert_file(self.data_id, self.version, self.local, self.location)
