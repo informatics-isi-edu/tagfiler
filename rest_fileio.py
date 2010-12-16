@@ -35,12 +35,16 @@ def yieldBytes(f, first, last, chunkbytes):
     while byte <= last:
         readbytes = min(chunkbytes, last - byte + 1)
         buf = f.read(readbytes)
-
-        byte += len(buf)
+        rlen = len(buf)
+        byte += rlen
         yield buf
-
-        if len(buf) < readbytes:
-            break
+        if rlen < readbytes:
+            # undersized read means file got shorter (possible w/ concurrent truncates)
+            web.debug('tagfiler.rest_fileio.yieldBytes: short read to %d instead of %d bytes!' % (byte, last))
+            # compensate as if the file has a hole, since it is too late to signal an error now
+            byte = rlen
+            yield bytearray(readbytes - rlen)
+            
 
 def choose_content_type(clientval, guessedval, taggedval):
     """Hueristic choice between client-supplied and guessed Content-Type.
