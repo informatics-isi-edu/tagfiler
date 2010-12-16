@@ -132,7 +132,7 @@ class FileIO (Application):
                 self.location = result.location
                 filename = self.store_path + '/' + self.location
                 try:
-                    f = open(filename, "rb")
+                    f = open(filename, "rb", 0)
                     if content_type == None:
                         p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                         line = p.stdout.readline()
@@ -577,7 +577,7 @@ class FileIO (Application):
         
                 fileHandle, filename = tempfile.mkstemp(prefix=prefix, dir=dir)
                 os.close(fileHandle)
-                f = open(filename, mode)
+                f = open(filename, mode, 0)
                 break
             except:
                 if count > limit:
@@ -626,7 +626,7 @@ class FileIO (Application):
                     self.version = file.version
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
-                    f = open(filename, 'r+b')
+                    f = open(filename, 'r+b', 0)
                     self.updateFileTags(file, None)
                     #web.debug('reopen', self.location, self.local, filename, f)
                     return f
