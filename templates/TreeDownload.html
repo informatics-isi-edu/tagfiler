@@ -19,8 +19,8 @@ $def with (transmissionnum)
 					<PARAM name="custom.properties" value="${appletCustomProperties}"/>
 				$if clientConnections:
 					<PARAM name="tagfiler.connections" value="${clientConnections}"/>
-				$if clientUploadChunks:
-					<PARAM name="tagfiler.allow.chunks" value="${clientUploadChunks}"/>
+				$if clientDownloadChunks:
+					<PARAM name="tagfiler.allow.chunks" value="${clientDownloadChunks}"/>
 				$if clientSocketBufferSize:
 					<PARAM name="tagfiler.socket.buffer.size" value="${clientSocketBufferSize}"/>
 				$if clientChunkbytes:
