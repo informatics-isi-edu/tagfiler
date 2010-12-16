@@ -88,6 +88,7 @@ class FileIO (Application):
 
     def __init__(self):
         Application.__init__(self)
+        self.skip_predispatch = True
         self.action = None
         self.filetype = 'file'
         self.bytes = None
@@ -99,6 +100,7 @@ class FileIO (Application):
         global mime_types_suffixes
 
         def body():
+            self.preDispatchCore(uri)
             #web.debug(self.data_id, self.version)
             results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type'])
             if len(results) == 0:
@@ -319,6 +321,7 @@ class FileIO (Application):
         if self.action == 'define':
 
             def body():
+                self.preDispatchCore(uri)
                 results = self.select_file()
                 if len(results) == 0:
                     return None
@@ -342,6 +345,7 @@ class FileIO (Application):
     def DELETE(self, uri):
 
         def body():
+            self.preDispatchCore(uri)
             results = self.select_file()
             if len(results) == 0:
                 if self.version == None:
@@ -673,6 +677,7 @@ class FileIO (Application):
         # clast  -- last byte position of content body in file
 
         def preWriteBody():
+            self.preDispatchCore(uri)
             return self.putPreWriteBody()
 
         def preWritePostCommit(results):
@@ -768,6 +773,7 @@ class FileIO (Application):
         # return same result page as for GET app/tags/data_id for convenience
 
         def preWriteBody():
+            self.preDispatchCore(uri)
             return self.putPreWriteBody()
 
         def preWritePostCommit(results):
@@ -806,6 +812,7 @@ class FileIO (Application):
             raise web.seeother(self.referer)
 
         def preDeleteBody():
+            self.preDispatchCore(uri)
             results = self.select_file()
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
@@ -917,6 +924,7 @@ class LogFileIO (FileIO):
 
     def __init__(self):
         FileIO.__init__(self)
+        self.skip_preDispatch = False
 
 
     def GET(self, uri, sendBody=True):

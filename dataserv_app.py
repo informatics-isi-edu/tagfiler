@@ -417,30 +417,34 @@ class Application:
         self.db = app.db
         self.set_authn(app.authn)
 
+    def preDispatchCore(self, uri):
+        if self.globals['webauthnhome']:
+            if not self.db:
+                self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+            self.set_authn(webauthn.session.test_and_update_session(self.db,
+                                                                    referer=self.home + uri,
+                                                                    setcookie=True))
+            self.middispatchtime = datetime.datetime.now()
+            if not self.authn.role and self.globals['webauthnrequire']:
+                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % self.home + uri)
+        else:
+            try:
+                user = web.ctx.env['REMOTE_USER']
+                roles = set([ user ])
+            except:
+                user = None
+                roles = set()
+            self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
+
     def preDispatch(self, uri):
         def body():
-            if self.globals['webauthnhome']:
-                if not self.db:
-                    self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-                self.set_authn(webauthn.session.test_and_update_session(self.db,
-                                                                        referer=self.home + uri,
-                                                                        setcookie=True))
-                self.middispatchtime = datetime.datetime.now()
-                if not self.authn.role and self.globals['webauthnrequire']:
-                    raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % self.home + uri)
-            else:
-                try:
-                    user = web.ctx.env['REMOTE_USER']
-                    roles = set([ user ])
-                except:
-                    user = None
-                    roles = set()
-                self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
+            self.preDispatchCore(uri)
 
         def postCommit(results):
             pass
 
-        self.dbtransact(body, postCommit)
+        if not self.skip_preDispatch:
+            self.dbtransact(body, postCommit)
 
     def postDispatch(self, uri=None):
         def body():
