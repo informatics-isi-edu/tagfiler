@@ -240,7 +240,7 @@ class Application:
 
         # these properties are used by Python code but not templates
         self.store_path = self.getParamDb('store path', '/var/www/%s-data' % self.daemonuser)
-        self.chunkbytes = int(self.getParamDb('chunk bytes', 1048576))
+        self.chunkbytes = int(self.getParamDb('chunk bytes', 64 * 1024))
         self.log_path = self.getParamDb('log path', '/var/www/%s-logs' % self.daemonuser)
         self.template_path = self.getParamDb('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
         self.home = self.getParamDb('home', 'https://%s' % self.hostname)
