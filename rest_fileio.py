@@ -499,19 +499,20 @@ class FileIO (Application):
                     t = self.db.transaction()
                     srcrole = srcroles.pop()
                     dstrole, readusers, writeusers = self.remap[srcrole]
+                    #web.debug('remap:', self.remap[srcrole])
                     for readuser in readusers:
-                        self.set_file_tag('read users', readuser, data_id=data_id, version=version)
-                        self.txlog('REMAP', dataset=data_id, tag='read users', value=readuser)
+                        self.set_file_tag('read users', readuser, data_id=self.data_id, version=self.version)
+                        self.txlog('REMAP', dataset=self.data_id, tag='read users', value=readuser)
                     for writeuser in writeusers:
-                        self.set_file_tag('write users', writeuser, data_id=data_id, version=version)
-                        self.txlog('REMAP', dataset=data_id, tag='write users', value=writeuser)
-                    self.set_file_tag('owner', dstrole, data_id=data_id, version=version)
-                    self.txlog('REMAP', dataset=data_id, tag='owner', value=dstrole)
+                        self.set_file_tag('write users', writeuser, data_id=self.data_id, version=self.version)
+                        self.txlog('REMAP', dataset=self.data_id, tag='write users', value=writeuser)
+                    self.set_file_tag('owner', dstrole, data_id=self.data_id, version=self.version)
+                    self.txlog('REMAP', dataset=self.data_id, tag='owner', value=dstrole)
                     t.commit()
                 except:
-                    #et, ev, tb = sys.exc_info()
-                    #web.debug('got exception during owner remap attempt',
-                    #          traceback.format_exception(et, ev, tb))
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception during owner remap attempt',
+                              traceback.format_exception(et, ev, tb))
                     t.rollback()
             elif len(srcroles) > 1:
                 raise Conflict("Ambiguous remap rules encountered")
