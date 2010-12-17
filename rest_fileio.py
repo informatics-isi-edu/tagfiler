@@ -687,9 +687,9 @@ class FileIO (Application):
             # try update-in-place if user is doing Range: partial PUT
             self.update = True
             self.local = True
-            # if checksum is not set, then allow chunk updates
-            if len(self.gettagvals('sha256sum')) == 0:
-                self.localFilesImmutable = False
+            # if checksum is not set, then allow chunk updates # BUG: this is improper outside transaction body
+            #if len(self.gettagvals('sha256sum')) == 0:
+            #    self.localFilesImmutable = False
         else:
             self.update = False
 
