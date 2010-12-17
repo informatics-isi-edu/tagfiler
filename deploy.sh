@@ -139,10 +139,16 @@ tagdef()
       else
          fk=""
       fi
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, value \$2 \${default} \${fk}, UNIQUE(file, version, value), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
+      if [[ "\$6" = "true" ]]
+      then
+         uniqueval='UNIQUE(file, version, value)'
+      else
+         uniqueval='UNIQUE(file, version),'
+      fi
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, value \$2 \${default} NOT NULL \${fk}, \${uniqueval} , FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
       psql -q -t -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
    else
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, UNIQUE (file, version), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
    fi
 }
 

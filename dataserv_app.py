@@ -965,16 +965,20 @@ class Application:
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
+            tabledef += ' NOT NULL'
             if self.typestr == 'file':
                 tabledef += " REFERENCES latestfiles (name) ON DELETE CASCADE"
         if not self.multivalue:
+            tabledef += ", UNIQUE(file, version)"
             if dbtype != '':
-                tabledef += ", UNIQUE(file, version, value)"
                 indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
                 indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
                 indexdef += ' (value)'
+        else:
+            if dbtype != '':
+                tabledef += ', UNIQUE(file, version, value)'
             else:
-                tabledef += ", UNIQUE(file, version)"
+                tabledef += ', UNIQUE(file, version)'
         tabledef += " )"
         self.db.query(tabledef)
         if indexdef:
