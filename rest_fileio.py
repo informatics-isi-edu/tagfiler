@@ -475,7 +475,7 @@ class FileIO (Application):
             if not basefile or basefile.url:
                 self.delete_file_tag('url')
                 
-            if content_type and basefile['content-type'] != content_type:
+            if content_type and (not basefile or basefile['content-type'] != content_type):
                 self.set_file_tag('content-type', content_type)
         else:
             if basefile and basefile.bytes != None:
