@@ -878,6 +878,12 @@ class Application:
             query += ' WHERE name = $name'
         return self.db.query(query, vars)
 
+    def select_dataset_size(self):
+        data_id = self.data_id + '/%'
+        vars = dict(data_id=data_id)
+        query = 'SELECT SUM(value) AS size, COUNT(*) AS count FROM "_bytes" WHERE file like $data_id'
+        return self.db.query(query, vars)
+
     def insert_file(self, data_id, version, local, location):
         vars = dict(name=data_id, version=version, local=local, location=location)
         self.db.query("INSERT INTO files ( name, version, local, location ) VALUES ( $name, $version, $local, $location )", vars=vars)

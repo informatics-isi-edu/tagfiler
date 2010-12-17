@@ -85,59 +85,11 @@ class Study (Node):
         Node.__init__(self, appname)
         self.action = 'get'
         self.study_type = None
+        self.study_size = None
+        self.count = None
         self.data_id = data_id
         self.status = None
         self.direction = 'upload'
-
-    def body(self):
-        files = []
-
-        self.globals['appletTagnames'] = self.getParamsDb('applet tags', data_id=self.study_type)
-        self.globals['types'] = self.get_type()
-        self.globals['appletTagnamesRequire'] = self.getParamsDb('applet tags require', data_id=self.study_type)
-        
-        if self.action == 'get' and self.data_id:
-            files = self.gettagvals('contains', data_id=self.data_id)
-            self.globals['appletTagvals'] = [ (tagname,
-                                               [ res.value for res
-                                                 in self.select_file_tag(tagname=tagname, data_id=self.data_id) ])
-                                              for tagname in self.globals['appletTagnames'] ]
-            if self.status == 'success':
-                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
-            else:
-                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.data_id)
-        elif self.action == 'upload' or self.action == 'download':
-            self.globals['tagdefsdict'] = dict([ item for item in self.globals['tagdefsdict'].iteritems()
-                                                 if item[0] in self.globals['appletTagnames'] ])
-        return files
-
-    def postCommit(self, files):
-        if self.action == 'upload':
-            return self.renderlist("Study Upload",
-                                   [self.render.TreeUpload()])
-        elif self.action == 'download':
-            return self.renderlist("Study Download",
-                                   [self.render.TreeDownload(self.data_id)])
-        elif self.action == 'get':
-            success = None
-            error = None
-            if self.status == 'success':
-                success = 'All files were successfully %sed.' % self.direction
-            elif self.status == 'error':
-                error = 'An unknown error prevented a complete %s.' % self.direction
-            else:
-                error = self.status
-
-            if self.data_id:
-                return self.renderlist(None,
-                                       [self.render.TreeStatus(self.data_id, self.direction, success, error, files)])
-            else:
-                url = '/appleterror'
-                if self.status:
-                    url += '?status=%s' % urlquote(self.status)
-                raise web.seeother(url)
-        else:
-            raise BadRequest('Unrecognized action form field.')
 
     def GET(self, uri):
         storage = web.input()
@@ -161,7 +113,94 @@ class Study (Node):
         except:
             pass
 
-        return self.dbtransact(self.body, self.postCommit)
+        def body():
+            files = []
+    
+            self.globals['appletTagnames'] = self.getParamsDb('applet tags', data_id=self.study_type)
+            self.globals['types'] = self.get_type()
+            self.globals['appletTagnamesRequire'] = self.getParamsDb('applet tags require', data_id=self.study_type)
+            
+            if self.action == 'get' and self.data_id:
+                files = self.gettagvals('contains', data_id=self.data_id)
+                self.globals['appletTagvals'] = [ (tagname,
+                                                   [ res.value for res
+                                                     in self.select_file_tag(tagname=tagname, data_id=self.data_id) ])
+                                                  for tagname in self.globals['appletTagnames'] ]
+            elif self.action == 'upload' or self.action == 'download':
+                self.globals['tagdefsdict'] = dict([ item for item in self.globals['tagdefsdict'].iteritems()
+                                                     if item[0] in self.globals['appletTagnames'] ])
+            return files
+    
+        def postCommit(files):
+            if self.action == 'upload':
+                return self.renderlist("Study Upload",
+                                       [self.render.TreeUpload()])
+            elif self.action == 'download':
+                return self.renderlist("Study Download",
+                                       [self.render.TreeDownload(self.data_id)])
+            elif self.action == 'get':
+                success = None
+                error = None
+                if self.status == 'success':
+                    success = 'All files were successfully %sed.' % self.direction
+                elif self.status == 'error':
+                    error = 'An unknown error prevented a complete %s.' % self.direction
+                else:
+                    error = self.status
+    
+                if self.data_id:
+                    return self.renderlist(None,
+                                           [self.render.TreeStatus(self.data_id, self.direction, success, error, files)])
+                else:
+                    url = '/appleterror'
+                    if self.status:
+                        url += '?status=%s' % urlquote(self.status)
+                    raise web.seeother(url)
+            else:
+                raise BadRequest('Unrecognized action form field.')
+
+        return self.dbtransact(body, postCommit)
+
+    def PUT(self, uri):
+        storage = web.input()
+        try:
+            self.study_size = int(storage.study_size)
+        except:
+            pass
+
+        try:
+            self.count = int(storage.count)
+        except:
+            pass
+
+        try:
+            self.status = storage.status
+        except:
+            pass
+
+        try:
+            self.direction = storage.direction
+        except:
+            pass
+
+        def body():
+            result = True
+            if self.direction == 'upload' and self.status == 'success':
+                results = self.select_dataset_size()[0]
+                if results.size != self.study_size or results.count != self.count:
+                    self.status = 'conflict'
+                    result = None
+            if self.status == 'success':
+                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.data_id)
+            else:
+                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.data_id)
+            return result
+
+        def postCommit(result):
+            if not result:
+                raise Conflict('The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.data_id))
+
+        return self.dbtransact(body, postCommit)
 
 class AppletError (Node):
     """Represents an appleterror URI
