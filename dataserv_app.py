@@ -193,6 +193,8 @@ class Application:
         "store common configuration data for all service classes"
         global render
 
+        self.skip_preDispatch = False
+
         self.data_id = None
         self.version = None
         self.predlist = []
