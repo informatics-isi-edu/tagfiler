@@ -475,7 +475,7 @@ class FileIO (Application):
             if not basefile or basefile.url:
                 self.delete_file_tag('url')
                 
-            if content_type:
+            if content_type and basefile['content-type'] != content_type:
                 self.set_file_tag('content-type', content_type)
         else:
             if basefile and basefile.bytes != None:
@@ -617,6 +617,8 @@ class FileIO (Application):
         except NotFound:
             file = None
 
+        self.fileMatch = file
+
         if file:
             if self.update:
                 if file.local:
@@ -627,8 +629,6 @@ class FileIO (Application):
                     filename = self.store_path + '/' + self.location
                     self.local = file.local
                     f = open(filename, 'r+b', 0)
-                    self.updateFileTags(file, None)
-                    #web.debug('reopen', self.location, self.local, filename, f)
                     return f
                 else:
                     raise Conflict(data="The resource %s is a remote URL dataset and so does not support partial byte access." % self.data_id)
@@ -730,12 +730,8 @@ class FileIO (Application):
                 return self.insertForStore()
             else:
                 # simplified path for chunk updates
-                results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
-                if len(results) > 0:
-                    basefile = results[0]
-                else:
-                    basefile = None
-                self.updateFileTags(basefile, basefile['content-type'])
+                basefile = self.fileMatch
+                self.updateFileTags(basefile, None)
                 return []
 
         def postWritePostCommit(files):
