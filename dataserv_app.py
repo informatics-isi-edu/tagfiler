@@ -342,7 +342,7 @@ class Application:
         if self.authn:
             try:
                 valid = self.authn.roleProvider.testRole(self.db, role)
-            except NotImplemented:
+            except NotImplemented, AttributeError:
                 valid = True
             if not valid:
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
@@ -630,7 +630,7 @@ class Application:
             try:
                 roleinfo = [ role for role in self.authn.roleProvider.listRoles(self.db) ]
                 return roleinfo
-            except NotImplemented:
+            except NotImplemented, AttributeError:
                 return None
     
     def test_file_authz(self, mode, data_id=None, version=None, owner=None):
