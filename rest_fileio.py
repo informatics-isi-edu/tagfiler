@@ -157,7 +157,7 @@ class FileIO (Application):
                 cached = file_cache.get((self.authn.role, self.data_id), None)
             if cached:
                 ctime, fileresult = cached
-                if (now - ctime).seconds < 30:
+                if (now - ctime).seconds < 5:
                     f, content_type = postCommit((fileresult, fileresult['content-type']))
                     if not f:
                         file_cache.pop((self.authn.role, self.data_id), None)
@@ -737,7 +737,7 @@ class FileIO (Application):
                 cached = file_cache.get((self.authn.role, self.data_id), None)
             if cached:
                 ctime, fileresult = cached
-                if (now - ctime).seconds < 30:
+                if (now - ctime).seconds < 5:
                     self.location = fileresult.location
                     self.version = fileresult.version
                     filename = self.store_path + '/' + self.location
@@ -813,19 +813,30 @@ class FileIO (Application):
                 res = ''
             return res
 
-        try:
-            result = self.dbtransact(postWriteBody, postWritePostCommit)
-            if not self.fileMatchCache:
-                file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
-                file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
-            return result
-                
-        except web.SeeOther:
-            raise
-        except:
-            if filename:
-                self.deleteFile(filename)
-            raise
+        if not mustInsert \
+                and self.local \
+                and self.fileMatch \
+                and self.version == self.fileMatch.version \
+                and self.authn.role == self.fileMatch['modified by'] \
+                and self.fileMatch['modified'] and (now - self.fileMatch['modified']).seconds < 5 \
+                and self.fileMatch['bytes'] == self.bytes \
+                and not self.fileMatch['url'] \
+                and len(self.queryopts.keys()) == 0:
+            # skip tag update transaction if and only if it is a noop
+            return postWritePostCommit([])
+        else:
+            try:
+                result = self.dbtransact(postWriteBody, postWritePostCommit)
+                if not self.fileMatchCache:
+                    file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
+                    file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
+                return result
+            except web.SeeOther:
+                raise
+            except:
+                if filename:
+                    self.deleteFile(filename)
+                raise
 
     def testAndExpandFiles(self, filesdict, data_id, trigger, set):
         results = self.select_file_tag(trigger, data_id=data_id)
