@@ -105,7 +105,7 @@ class FileIO (Application):
         def body():
             self.preDispatchCore(uri)
             #web.debug(self.data_id, self.version)
-            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by']])
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version, listtags=['content-type', 'bytes', 'url', 'modified', 'modified by'])
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
