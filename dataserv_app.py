@@ -465,8 +465,7 @@ class Application:
     def midDispatch(self):
         now = datetime.datetime.now()
         if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
-            self.postDispatch()
-            self.middispatchtime = now
+            self.preDispatchCore()
 
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))

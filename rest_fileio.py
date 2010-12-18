@@ -91,7 +91,7 @@ class FileIO (Application):
 
     def __init__(self):
         Application.__init__(self)
-        self.skip_predispatch = True
+        self.skip_preDispatch = True
         self.action = None
         self.filetype = 'file'
         self.bytes = None
