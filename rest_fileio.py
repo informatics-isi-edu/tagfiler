@@ -738,10 +738,10 @@ class FileIO (Application):
             if cached:
                 ctime, fileresult = cached
                 if (now - ctime).seconds < 30:
-                    self.location = file.location
-                    self.version = file.version
+                    self.location = fileresult.location
+                    self.version = fileresult.version
                     filename = self.store_path + '/' + self.location
-                    self.local = file.local
+                    self.local = fileresult.local
                     f = open(filename, 'r+b', 0)
                     if not f:
                         file_cache.pop((self.authn.role, self.data_id), None)

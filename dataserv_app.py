@@ -419,13 +419,13 @@ class Application:
         self.db = app.db
         self.set_authn(app.authn)
 
-    def preDispatchCore(self, uri):
+    def preDispatchCore(self, uri, setcookie=True):
         if self.globals['webauthnhome']:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
             self.set_authn(webauthn.session.test_and_update_session(self.db,
                                                                     referer=self.home + uri,
-                                                                    setcookie=True))
+                                                                    setcookie=setcookie))
             self.middispatchtime = datetime.datetime.now()
             if not self.authn.role and self.globals['webauthnrequire']:
                 raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % self.home + uri)
@@ -465,7 +465,7 @@ class Application:
     def midDispatch(self):
         now = datetime.datetime.now()
         if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
-            self.preDispatchCore()
+            self.preDispatchCore(web.ctx.homepath, setcookie=False)
 
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))
