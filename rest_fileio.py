@@ -813,6 +813,9 @@ class FileIO (Application):
                 res = ''
             return res
 
+        if self.fileMatchCache:
+            file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
+            file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
         if not mustInsert \
                 and self.local \
                 and self.fileMatch \
@@ -827,9 +830,6 @@ class FileIO (Application):
         else:
             try:
                 result = self.dbtransact(postWriteBody, postWritePostCommit)
-                if not self.fileMatchCache:
-                    file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
-                    file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
                 return result
             except web.SeeOther:
                 raise
