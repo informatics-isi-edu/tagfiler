@@ -76,6 +76,9 @@ def choose_content_type(clientval, guessedval, taggedval):
             return clientval
     return guessedval
 
+file_cache = dict()  # cache[(user, data_id)] = (ctime, fileresult)
+file_version_cache = dict() # cache[(user, data_id, version)] = (ctime, fileresult)
+
 class FileIO (Application):
     """Basic bulk file I/O
 
@@ -109,6 +112,7 @@ class FileIO (Application):
                 else:
                     raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
             file = results[0]
+            self.fileMatch = file
             self.enforce_file_authz('read', self.data_id, self.version)
             self.version = file.version
             #web.debug(file)
@@ -143,6 +147,30 @@ class FileIO (Application):
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
 
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        def preRead():
+            f = None
+            content_type = None
+            if self.version != None:
+                cached = file_version_cache.get((self.authn.role, self.data_id, self.version), None)
+            else:
+                cached = file_cache.get((self.authn.role, self.data_id), None)
+            if cached:
+                ctime, fileresult = cached
+                if (now - ctime).seconds < 30:
+                    f, content_type = postCommit((fileresult, fileresult['content-type']))
+                    if not f:
+                        file_cache.pop((self.authn.role, self.data_id), None)
+                        file_version_cache.pop((self.authn.role, self.data_id, fileresult.version), None)
+                else:
+                    file_cache.pop((self.authn.role, self.data_id), None)
+                    file_version_cache.pop((self.authn.role, self.data_id, fileresult.version), None)
+            if not f:
+                return self.dbtransact(body, postCommit)
+            else:
+                self.fileMatch = None
+                return (f, content_type)
+
         count = 0
         limit = 10
         f = None
@@ -154,7 +182,11 @@ class FileIO (Application):
                 raise web.internallerror('Could not access local copy of ' + self.data_id)
 
             # we do this in a loop to compensate for race conditions noted above
-            f, content_type = self.dbtransact(body, postCommit)
+            f, content_type = preRead()
+
+        if self.fileMatch:
+            file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
+            file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
 
         # we only get here if we were able to both:
         #   a. open the file for reading its content
@@ -624,7 +656,7 @@ class FileIO (Application):
             if self.update:
                 if file.local:
                     if file.location == None:
-                        return (None, None)
+                        return None
                     self.location = file.location
                     self.version = file.version
                     filename = self.store_path + '/' + self.location
@@ -694,8 +726,41 @@ class FileIO (Application):
         else:
             self.update = False
 
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+
+        self.fileMatchCache = True
+        def preWriteCached():
+            f = None
+            if self.version != None:
+                cached = file_version_cache.get((self.authn.role, self.data_id, self.version), None)
+            else:
+                cached = file_cache.get((self.authn.role, self.data_id), None)
+            if cached:
+                ctime, fileresult = cached
+                if (now - ctime).seconds < 30:
+                    self.location = file.location
+                    self.version = file.version
+                    filename = self.store_path + '/' + self.location
+                    self.local = file.local
+                    f = open(filename, 'r+b', 0)
+                    if not f:
+                        file_cache.pop((self.authn.role, self.data_id), None)
+                        file_version_cache.pop((self.authn.role, self.data_id, fileresult.version), None)
+                else:
+                    file_cache.pop((self.authn.role, self.data_id), None)
+                    file_version_cache.pop((self.authn.role, self.data_id, fileresult.version), None)
+            if not f:
+                return self.dbtransact(preWriteBody, preWritePostCommit)
+            else:
+                self.fileMatch = fileresult
+                self.fileMatchCache = False
+                return f
+
         # this retries if a file was found but could not be opened due to races
-        f = self.dbtransact(preWriteBody, preWritePostCommit)
+        if self.update:
+            f = preWriteCached()
+        else:
+            f = self.dbtransact(preWriteBody, preWritePostCommit)
 
         try:
             pass
@@ -749,7 +814,12 @@ class FileIO (Application):
             return res
 
         try:
-            return self.dbtransact(postWriteBody, postWritePostCommit)
+            result = self.dbtransact(postWriteBody, postWritePostCommit)
+            if not self.fileMatchCache:
+                file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
+                file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
+            return result
+                
         except web.SeeOther:
             raise
         except:
