@@ -237,7 +237,6 @@ class Application:
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
 
-        t = self.db.transaction()
         # BEGIN: get runtime parameters from database
 
         # these properties are used by Python code but not templates
@@ -284,7 +283,6 @@ class Application:
         self.globals['clientSocketBufferSize'] = int(self.getParamDb('client socket buffer size', 8192))
         
         # END: get runtime parameters from database
-        t.commit()
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
