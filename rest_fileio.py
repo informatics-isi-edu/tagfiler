@@ -813,7 +813,7 @@ class FileIO (Application):
                 res = ''
             return res
 
-        if self.fileMatchCache:
+        if self.fileMatchCache and self.fileMatch:
             file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
             file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
         if not mustInsert \
