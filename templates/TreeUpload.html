@@ -60,6 +60,21 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 	</table>
 </div>
 <div>
+	<h3>Dataset Name</h3>
+	<table>
+		<tr>
+			<td>
+				<input id="TransmissionNumber" name="TransmissionNumber" type="text" value="" disabled="disabled" />
+			</td>
+			<td>
+				<input name="DatasetName" id="DatasetName Automatically" type="radio" value="automatically" checked="checked"  onclick="resetDatasetName()" />Generate Automatically
+				<br/>
+				<input name="DatasetName" id="DatasetName Set" type="radio" value="set" onclick="setDatasetName()" />Set
+			</td>
+		</tr>
+	</table>
+</div>
+<div>
 	<h3>Source Directory for Upload</h3>
 	<table>
 		<tr>

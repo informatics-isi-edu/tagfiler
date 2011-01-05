@@ -891,7 +891,7 @@ class FileTags (Node):
             # custom DEI EIU hack, proxy tag ops on Image Set to all member files
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                predlist = [ { 'tag' : 'Dataset Name', 'op' : '=', 'vals' : [self.data_id] } ]
                 subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
             else:
                 subfiles = []
@@ -947,7 +947,7 @@ class FileTags (Node):
             # custom DEI EIU hack
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                predlist = [ { 'tag' : 'Transmission Number', 'op' : '=', 'vals' : [self.data_id] } ]
+                predlist = [ { 'tag' : 'Dataset Name', 'op' : '=', 'vals' : [self.data_id] } ]
                 subfiles = [ res.file for res in  self.select_files_by_predlist(predlist=predlist) ]
             else:
                 subfiles = []

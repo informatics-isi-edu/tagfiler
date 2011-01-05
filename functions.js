@@ -301,7 +301,7 @@ function setTags(tags) {
 }
 
 /**
- * Set the transmission number
+ * Set the Dataset Name
  */
 function setTransmissionNumber(value) {
 	document.getElementById("TransmissionNumber").value = value;
@@ -369,14 +369,15 @@ function getDatasetInfo() {
 		var tags = getTagsName();
 		document.TagFileDownloader.getDatasetInfo(value, tags);
 	} else {
-		alert('Transmission number can not be empty.');
+		alert('Dataset Name can not be empty.');
 	}
 }
 
 /**
  * Check if all required tags are present and have proper values
+ * Check if the dataset name needs to be provided
  */
-function validateCustomTags() {
+function validateUpload() {
     var tagnames = getRequiredTagsName();
     for (i=0; i<tagnames.length; i++) {
 		log("validating tag " + tagnames[i]);
@@ -396,6 +397,11 @@ function validateCustomTags() {
 			return false;
     	}
     }
+    if (document.getElementById('DatasetName Set').checked && 
+    	document.getElementById('TransmissionNumber').value.replace(/^\s*/, "").replace(/\s*$/, "").length == 0) {
+			alert('You need to provide a dataset name.');
+			return false;
+    }
     return true;
 }
 
@@ -403,7 +409,7 @@ function validateCustomTags() {
  * Upload the files
  */
 function uploadAll() {
-	if (validateCustomTags()) {
+	if (validateUpload()) {
     	document.TagFileUploader.uploadAll();
 	}
 }
@@ -441,6 +447,29 @@ function downloadBrowse() {
  */
 function getChecksum() {
 	return "" + document.getElementById('cksum').checked;
+}
+
+/**
+ * Get the dataset name
+ */
+function getDatasetName() {
+	return document.getElementById('TransmissionNumber').value;
+}
+
+/**
+ * Enable setting a dataset name
+ */
+function setDatasetName() {
+	document.getElementById('TransmissionNumber').disabled = false;
+}
+
+/**
+ * Disable setting a dataset name
+ */
+function resetDatasetName() {
+	var elem = document.getElementById('TransmissionNumber');
+	elem.disabled = true;
+	elem.value = "";
 }
 
 /**
