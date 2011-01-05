@@ -10,7 +10,7 @@ WEBSTATICDIR=$(WEBROOTDIR)/html/$(INSTALLSVC)/static
 
 WSGIFILE=tagfiler.wsgi
 
-SCRIPTFILES=functions.js main.css
+SCRIPTFILES=functions.js main.css calendar.gif
 
 FILES=dataserv_app.py rest_fileio.py \
 	url_ast.py url_lex.py url_parse.py \
@@ -18,7 +18,8 @@ FILES=dataserv_app.py rest_fileio.py \
 
 WEBSTATICFILES=logo.png \
 	functions.js \
-	main.css
+	main.css \
+	calendar.gif
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \

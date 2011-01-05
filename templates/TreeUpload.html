@@ -108,6 +108,8 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 			>
 		$else:
 			/>
+			$if tagdef.typestr == "date":
+				<a href="javascript:generateCalendar('${tagdef.tagname}_id')"><img src="${home}/static/calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>
 		$if options:
 			$ options.sort(key=lambda x: x[0])
 			$if typedesc.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:

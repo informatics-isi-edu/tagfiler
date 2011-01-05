@@ -563,3 +563,215 @@ function renderTagdefs(table) {
 	}
     }
 }
+
+var calWindow;
+var today;
+var cal;
+var calDoc;
+var MonthName=["January", "February", "March", "April", "May", "June","July", "August", "September", "October", "November", "December"];
+var WeekDayName=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];	
+var DaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+var WeekHeadColor="pink";
+var WeekendColor="cyan";
+var WeekDayColor="white";
+var FontColor="blue";
+var TodayColor="yellow";
+var DateColor="white";
+var YearColor="blue";
+
+function generateCalendar(id)
+{
+	today = new Date();	
+	cal = new Calendar(today);
+	cal.id = id;
+	calWindow = window.open("", "", "toolbar=0, status=0, menubar=0, fullscreen=no, width=205, height=215, resizable=0, top=200, left=500");
+	calDoc = calWindow.document;
+	renderCalendar();
+}
+
+function renderCalendar()
+{
+	var calHeader;
+	var calData;
+	var i;
+	var j;
+	var selectedMonth;
+	var dayCount = 0;
+	var firstDay;
+
+	calDoc.open();
+	calDoc.writeln("<html><head><title>Date Picker</title>");
+	calDoc.writeln("<script>var winMain=window.opener;</script>");
+	calDoc.writeln("</head><body link=" + FontColor + " vlink=" + FontColor + "><form name='Calendar'>");
+
+	calHeader = "<table border=1 cellpadding=1 cellspacing=1 width='100%' align=\"center\" valign=\"top\">\n";
+	calHeader += "<tr>\n<td colspan='7'><table border=0 width='100%' cellpadding=0 cellspacing=0><tr><td align='left'>\n";
+	calHeader += "<select name=\"MonthSelector\" onChange=\"javascript:winMain.cal.switchMonth(selectedIndex);winMain.renderCalendar();\">\n";
+	
+	for (i=0; i<12; i++)
+	{
+		if (i == cal.Month)
+			selectedMonth = "Selected";
+		else
+			selectedMonth = "";	
+		calHeader += "<option " + selectedMonth + " value >" + MonthName[i] + "\n";
+	}
+
+	calHeader += "</select></td>";
+	calHeader += "\n<td align='right'><a href=\"javascript:winMain.cal.previousYear();winMain.renderCalendar()\"><b><font color=\"" + YearColor +
+		     "\"><</font></b></a><font color=\"" + YearColor + "\" size=2><b> " + cal.Year + 
+		     " </b></font><a href=\"javascript:winMain.cal.nextYear();winMain.renderCalendar()\"><b><font color=\"" + YearColor + "\">></font></b></a></td></tr></table></td>\n";	
+	calHeader += "</tr>";
+	calHeader += "<tr bgcolor=" + WeekHeadColor + ">";
+	
+	for (i=0; i<7; i++)
+	{
+		calHeader += "<td align='center'><font size='2'>" + WeekDayName[i].substr(0,2) + "</font></td>";
+	}
+
+	calHeader += "</tr>";	
+	calDoc.write(calHeader);
+	
+	calDate = new Date(cal.Year, cal.Month);
+	calDate.setDate(1);
+	firstDay = calDate.getDay();
+	calData = "<tr>";
+
+	for (i=0; i<firstDay; i++)
+	{
+		calData += generateCell();
+		dayCount++;
+	}
+
+	for (j=1; j<=cal.monthDays(); j++)
+	{
+		var cellData;
+		dayCount++;
+		if ((j == today.getDate()) && (cal.Month == today.getMonth()) && (cal.Year == today.getFullYear()))
+			cellData = generateCell(j, true, TodayColor);
+		else
+		{
+			if (j == cal.Date)
+			{
+				cellData = generateCell(j, true, DateColor);
+			}
+			else
+			{	 
+				if (dayCount%7 == 0 || (dayCount + 6) % 7 == 0)
+					cellData = generateCell(j, false, WeekendColor);
+				else
+					cellData = generateCell(j, null, WeekDayColor);
+			}		
+		}						
+		calData += cellData;
+
+		if((dayCount % 7 == 0) && (j < cal.monthDays()))
+		{
+			calData += "</tr>\n<tr>";
+		}
+	}
+
+	calDoc.writeln(calData);	
+	calDoc.writeln("\n</table>");
+	calDoc.writeln("</form></body></html>");
+	calDoc.close();
+}
+
+function generateCell(cellValue, cellHighLight, cellColor)
+{
+	var value;
+	var cellStr;
+	var color;
+	var highLight1;
+	var highLight2;
+	
+	if (cellValue == null)
+		value = "";
+	else
+		value = cellValue;
+	
+	if (cellColor != null)
+		color = "bgcolor=\"" + cellColor + "\"";
+	else
+		color = "";	
+	if ((cellHighLight != null) && cellHighLight)
+	{
+		highLight1 = "color='red'><b>";
+		highLight2 = "</b>";
+	}
+	else
+	{
+		highLight1 = ">"; 
+		highLight2 = "";
+	}
+	
+	cellStr = "<td " + color + " width=20 align='center'><font size='2'" + highLight1 + "<a href=\"javascript:winMain.document.getElementById('" + cal.id + "').value='" +
+		   cal.dateFormat(value) + "';window.close();\">" + value + "</a>" + highLight2 + "</font></td>";
+
+	return cellStr;
+}
+
+
+function Calendar()
+{
+	this.Date = today.getDate();
+	this.Month = today.getMonth();
+	this.Year = today.getFullYear();
+}
+
+function nextYear()
+{
+	cal.Year++;
+}
+Calendar.prototype.nextYear = nextYear;
+
+function previousYear()
+{	
+	cal.Year--;
+}
+Calendar.prototype.previousYear = previousYear;
+	
+function switchMonth(month)
+{
+	cal.Month = month;
+}
+Calendar.prototype.switchMonth = switchMonth;
+
+function monthDays()
+{
+	if (cal.isLeapYear())
+	{
+		DaysInMonth[1] = 29;
+	}
+	
+	return DaysInMonth[cal.Month];	
+}
+Calendar.prototype.monthDays = monthDays;
+
+function isLeapYear()
+{
+	if (cal.Year % 4 == 0)
+	{
+		if ((cal.Year % 100 == 0) && cal.Year % 400 != 0)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+	else
+	{
+		return false;
+	}
+}
+Calendar.prototype.isLeapYear = isLeapYear;
+
+function dateFormat(date)
+{
+		return (cal.Year + "-" + (cal.Month+1) + "-" + date);
+}
+Calendar.prototype.dateFormat = dateFormat;	
+
