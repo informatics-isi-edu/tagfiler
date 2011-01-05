@@ -284,6 +284,18 @@ class Application:
         
         # END: get runtime parameters from database
 
+        try:
+            def parsekv(kv):
+                if len(kv) == 2:
+                    return kv
+                else:
+                    return [ kv[0], None ]
+                
+            uri = web.ctx.env['REQUEST_URI']
+            self.storage = web.storage([ parsekv(kv.split('=', 1)) for kv in uri.split('?', 1)[1].replace(';', '&').split('&') ])
+        except:
+            self.storage = web.storage([]) 
+
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
         self.ops = [ ('', 'Tagged'),

@@ -92,24 +92,23 @@ class Study (Node):
         self.direction = 'upload'
 
     def GET(self, uri):
-        storage = web.input()
         try:
-            self.action = storage.action
+            self.action = self.storage.action
         except:
             pass
 
         try:
-            self.study_type = storage.type
+            self.study_type = self.storage.type
         except:
             pass
 
         try:
-            self.direction = storage.direction
+            self.direction = self.storage.direction
         except:
             pass
 
         try:
-            self.status = storage.status
+            self.status = self.storage.status
         except:
             pass
 
@@ -162,24 +161,23 @@ class Study (Node):
         return self.dbtransact(body, postCommit)
 
     def PUT(self, uri):
-        storage = web.input()
         try:
-            self.study_size = int(storage.study_size)
+            self.study_size = int(self.storage.study_size)
         except:
             pass
 
         try:
-            self.count = int(storage.count)
+            self.count = int(self.storage.count)
         except:
             pass
 
         try:
-            self.status = storage.status
+            self.status = self.storage.status
         except:
             pass
 
         try:
-            self.direction = storage.direction
+            self.direction = self.storage.direction
         except:
             pass
 
@@ -216,9 +214,8 @@ class AppletError (Node):
         self.status = None
 
     def GET(self, uri):
-        storage = web.input()
         try:
-            self.status = storage.status
+            self.status = self.storage.status
         except:
             pass
 
@@ -284,19 +281,18 @@ class FileList (Node):
                                    [self.render.Commands(),
                                     self.render.FileList(files)])
 
-        storage = web.input()
         action = None
         name = None
         filetype = None
         readers = None
         writers = None
         try:
-            action = storage.action
+            action = self.storage.action
             try:
-                name = storage.name
-                filetype = storage.type
-                readers = storage['read users']
-                writers = storage['write users']
+                name = self.storage.name
+                filetype = self.storage.type
+                readers = self.storage['read users']
+                writers = self.storage['write users']
             except:
                 pass
         except:
@@ -324,7 +320,7 @@ class FileList (Node):
                                        [self.render.NameForm()])
         else:
             try:
-                self.globals['view'] = storage.view
+                self.globals['view'] = self.storage.view
             except:
                 pass
             return self.dbtransact(body, postCommit)
@@ -866,9 +862,8 @@ class FileTags (Node):
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
         self.globals['referer'] = self.home + uri
-        storage = web.input()
         try:
-            self.view_type = storage.view
+            self.view_type = self.storage.view
         except:
             pass
         

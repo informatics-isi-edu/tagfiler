@@ -325,24 +325,23 @@ class FileIO (Application):
 
     def GET(self, uri):
 
-        storage = web.input()
         suffix = ''
         try:
-            self.action = storage.action
-            self.filetype = storage.type
+            self.action = self.storage.action
+            self.filetype = self.storage.type
         except:
             pass
         
         params = []
         
         try:
-            if storage['read users'] == '*':
+            if self.storage['read users'] == '*':
                 params.append('read users=*')
         except:
             pass
         
         try:
-            if storage['write users'] == '*':
+            if self.storage['write users'] == '*':
                 params.append('write users=*')
         except:
             pass
