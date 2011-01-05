@@ -775,6 +775,8 @@ class FileTags (Node):
 
         custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
         self.listtags = self.queryopts.get('list', set(custom_tags))
+        if not self.listtags:
+            self.listtags = set()
         if type(self.listtags) != set:
             self.listtags = set([self.listtags])
 
