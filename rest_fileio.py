@@ -327,21 +327,21 @@ class FileIO (Application):
 
         suffix = ''
         try:
-            self.action = self.storage.action
-            self.filetype = self.storage.type
+            self.action = urllib.unquote(self.storage.action)
+            self.filetype = urllib.unquote(self.storage.type)
         except:
             pass
         
         params = []
         
         try:
-            if self.storage['read users'] == '*':
+            if urllib.unquote(self.storage['read users']) == '*':
                 params.append('read users=*')
         except:
             pass
         
         try:
-            if self.storage['write users'] == '*':
+            if urllib.unquote(self.storage['write users']) == '*':
                 params.append('write users=*')
         except:
             pass

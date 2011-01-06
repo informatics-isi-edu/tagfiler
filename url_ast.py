@@ -93,22 +93,22 @@ class Study (Node):
 
     def GET(self, uri):
         try:
-            self.action = self.storage.action
+            self.action = urllib.unquote(self.storage.action)
         except:
             pass
 
         try:
-            self.study_type = self.storage.type
+            self.study_type = urllib.unquote(self.storage.type)
         except:
             pass
 
         try:
-            self.direction = self.storage.direction
+            self.direction = urllib.unquote(self.storage.direction)
         except:
             pass
 
         try:
-            self.status = self.storage.status
+            self.status = urllib.unquote(self.storage.status)
         except:
             pass
 
@@ -162,22 +162,22 @@ class Study (Node):
 
     def PUT(self, uri):
         try:
-            self.study_size = int(self.storage.study_size)
+            self.study_size = int(urllib.unquote(self.storage.study_size))
         except:
             pass
 
         try:
-            self.count = int(self.storage.count)
+            self.count = int(urllib.unquote(self.storage.count))
         except:
             pass
 
         try:
-            self.status = self.storage.status
+            self.status = urllib.unquote(urllib.unquote(self.storage.status))
         except:
             pass
 
         try:
-            self.direction = self.storage.direction
+            self.direction = urllib.unquote(self.storage.direction)
         except:
             pass
 
@@ -215,7 +215,7 @@ class AppletError (Node):
 
     def GET(self, uri):
         try:
-            self.status = self.storage.status
+            self.status = urllib.unquote(self.storage.status)
         except:
             pass
 
@@ -287,12 +287,12 @@ class FileList (Node):
         readers = None
         writers = None
         try:
-            action = self.storage.action
+            action = urllib.unquote(self.storage.action)
             try:
-                name = self.storage.name
-                filetype = self.storage.type
-                readers = self.storage['read users']
-                writers = self.storage['write users']
+                name = urllib.unquote(self.storage.name)
+                filetype = urllib.unquote(self.storage.type)
+                readers = urllib.unquote(self.storage['read users'])
+                writers = urllib.unquote(self.storage['write users'])
             except:
                 pass
         except:
@@ -320,7 +320,7 @@ class FileList (Node):
                                        [self.render.NameForm()])
         else:
             try:
-                self.globals['view'] = self.storage.view
+                self.globals['view'] = urllib.unquote(self.storage.view)
             except:
                 pass
             return self.dbtransact(body, postCommit)
@@ -863,7 +863,7 @@ class FileTags (Node):
         # dispatch variants, browsing and REST
         self.globals['referer'] = self.home + uri
         try:
-            self.view_type = self.storage.view
+            self.view_type = urllib.unquote(self.storage.view)
         except:
             pass
         
