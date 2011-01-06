@@ -78,6 +78,7 @@ def choose_content_type(clientval, guessedval, taggedval):
 
 file_cache = dict()  # cache[(user, data_id)] = (ctime, fileresult)
 file_version_cache = dict() # cache[(user, data_id, version)] = (ctime, fileresult)
+file_cache_time = 5 # maximum cache time in seconds
 
 class FileIO (Application):
     """Basic bulk file I/O
@@ -157,7 +158,7 @@ class FileIO (Application):
                 cached = file_cache.get((self.authn.role, self.data_id), None)
             if cached:
                 ctime, fileresult = cached
-                if (now - ctime).seconds < 5:
+                if (now - ctime).seconds < file_cache_time:
                     f, content_type = postCommit((fileresult, fileresult['content-type']))
                     if not f:
                         file_cache.pop((self.authn.role, self.data_id), None)
@@ -733,10 +734,11 @@ class FileIO (Application):
             if self.version != None:
                 cached = file_version_cache.get((self.authn.role, self.data_id, self.version), None)
             else:
-                cached = file_cache.get((self.authn.role, self.data_id), None)
+                # don't trust latest version caching for writes
+                cached = None
             if cached:
                 ctime, fileresult = cached
-                if (now - ctime).seconds < 5:
+                if (now - ctime).seconds < file_cache_time:
                     self.location = fileresult.location
                     self.version = fileresult.version
                     filename = self.store_path + '/' + self.location
@@ -756,9 +758,10 @@ class FileIO (Application):
                 return f
 
         # this retries if a file was found but could not be opened due to races
-        if self.update:
+        if self.update and len(self.queryopts) == 0:
             f = preWriteCached()
         else:
+            # don't trust cache for version updates nor queryopts-based tag writing...
             f = self.dbtransact(preWriteBody, preWritePostCommit)
 
         try:
