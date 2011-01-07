@@ -1232,8 +1232,15 @@ class Application:
 
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"
-        result = self.db.query(query)
-        return str(result[0].nextval).rjust(9, '0')
+        vars = dict()
+        # now, as we can set manually dataset names, make sure the new generated name is unique
+        while True:
+            result = self.db.query(query)
+            name = str(result[0].nextval).rjust(9, '0')
+            vars['name'] = name
+            res = self.db.query("SELECT * FROM files WHERE name = $name", vars)
+            if len(res) == 0:
+                return name
 
     def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest', tagdefs=None):
         def dbquote(s):
