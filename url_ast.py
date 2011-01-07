@@ -172,7 +172,7 @@ class Study (Node):
             pass
 
         try:
-            self.status = urllib.unquote(urllib.unquote_plus(self.storage.status))
+            self.status = urllib.unquote_plus(self.storage.status)
         except:
             pass
 
