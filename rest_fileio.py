@@ -153,6 +153,8 @@ class FileIO (Application):
             f = None
             content_type = None
             if self.version != None:
+                if type(self.version) == str:
+                    self.version = int(self.version)
                 cached = file_version_cache.get((self.authn.role, self.data_id, self.version), None)
             else:
                 cached = file_cache.get((self.authn.role, self.data_id), None)
@@ -187,7 +189,7 @@ class FileIO (Application):
 
         if self.fileMatch:
             file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
-            file_version_cache[(self.authn.role, self.data_id, '%d' % self.fileMatch.version)] = (now, self.fileMatch)
+            file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
 
         # we only get here if we were able to both:
         #   a. open the file for reading its content
@@ -732,6 +734,8 @@ class FileIO (Application):
         def preWriteCached():
             f = None
             if self.version != None:
+                if type(self.version) == str:
+                    self.version = int(self.version)
                 cached = file_version_cache.get((self.authn.role, self.data_id, self.version), None)
             else:
                 # don't trust latest version caching for writes
@@ -817,7 +821,7 @@ class FileIO (Application):
 
         if self.fileMatchCache and self.fileMatch:
             file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
-            file_version_cache[(self.authn.role, self.data_id, '%d' % self.fileMatch.version)] = (now, self.fileMatch)
+            file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
         if not mustInsert \
                 and self.local \
                 and self.fileMatch \
