@@ -12,6 +12,7 @@ import sys
 import time
 import datetime
 import pytz
+import urllib
 
 from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote, parseBoolString
 
@@ -333,6 +334,9 @@ class FileIO (Application):
             self.action = urllib.unquote_plus(self.storage.action)
             self.filetype = urllib.unquote_plus(self.storage.type)
         except:
+            #et, ev, tb = sys.exc_info()
+            #web.debug('got exception during self.storage access',
+            #          traceback.format_exception(et, ev, tb))
             pass
         
         params = []
