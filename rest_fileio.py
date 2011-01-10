@@ -495,7 +495,7 @@ class FileIO (Application):
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
                 if result.tagname not in [ 'bytes', 'created', 'modified', 'modified by', 'sha256sum', 'content-type', 'url' ]:
-                    tags = self.select_file_tag(result.tagname, data_id=basefile.file, version=basefile.version)
+                    tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)
                         #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, tag.value))

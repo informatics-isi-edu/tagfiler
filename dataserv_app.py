@@ -1004,8 +1004,7 @@ class Application:
                       vars=dict(tag_id=self.tag_id))
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
-
-    def select_file_tag(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
+    def select_file_tag_args_prep(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
         if user == None:
             user = self.authn.role
         if tagdef == None:
@@ -1016,6 +1015,31 @@ class Application:
             # None means unspecified
             # False means we want latest (to allow passing through multiple callers)
             version = self.version
+
+        return (data_id, version, tagdef, user)
+
+    def select_file_tag_noauthn(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
+        data_id, version, tagdef, user = \
+                 self.select_file_tag_args_prep(tagname, value, data_id, version, tagdef, user, owner)
+
+        query = 'SELECT tag.* FROM "%s" AS tag' % self.wraptag(tagname)
+        if not version:
+            query += ' JOIN latestfiles ON (tag.file = latestfiles.name AND tag.version = latestfiles.version)'
+        query += ' WHERE tag.file = $file'
+        if version:
+            query += ' AND tag.version = $version'
+        if value == '' or value:
+            if value == '':
+                query += ' AND tag.value IS NULL'
+            else:
+                query += ' AND tag.value = $value'
+            query += '  ORDER BY value'
+        #web.debug(query)
+        return self.db.query(query, vars=dict(file=data_id, value=value, version=version))
+
+    def select_file_tag(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
+        data_id, version, tagdef, user = \
+                 self.select_file_tag_args_prep(tagname, value, data_id, version, tagdef, user, owner)
             
         if tagdef.readpolicy == 'anonymous':
             pass
@@ -1035,21 +1059,8 @@ class Application:
             elif tagdef.readpolicy == 'file':
                 if  not self.test_file_authz('read', data_id=data_id, owner=owner):
                     return []
-
-        query = 'SELECT tag.* FROM "%s" AS tag' % self.wraptag(tagname)
-        if not version:
-            query += ' JOIN latestfiles ON (tag.file = latestfiles.name AND tag.version = latestfiles.version)'
-        query += ' WHERE tag.file = $file'
-        if version:
-            query += ' AND tag.version = $version'
-        if value == '' or value:
-            if value == '':
-                query += ' AND tag.value IS NULL'
-            else:
-                query += ' AND tag.value = $value'
-            query += '  ORDER BY value'
-        #web.debug(query)
-        return self.db.query(query, vars=dict(file=data_id, value=value, version=version))
+                
+        return self.select_file_tag_noauthn(tagname, value, data_id, version, tagdef, user, owner)
 
     def select_file_acl(self, mode, data_id=None, version=None):
         if data_id == None:
@@ -1206,7 +1217,7 @@ class Application:
                 else:
                     self.delete_file_tag(tagname, data_id=data_id, version=version)
         else:
-            results = self.select_file_tag(tagname, value, data_id=data_id, version=version, owner=owner)
+            results = self.select_file_tag_noauthn(tagname, value, data_id=data_id, version=version, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
