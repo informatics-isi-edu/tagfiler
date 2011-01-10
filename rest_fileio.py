@@ -490,10 +490,11 @@ class FileIO (Application):
             self.set_file_tag('created', 'now')
             self.set_file_tag('name', self.data_id)
         elif self.version != basefile.version:
+            self.set_file_tag('created', 'now')
             # copy basefile tags
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
-                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'content-type', 'url' ]:
+                if result.tagname not in [ 'bytes', 'created', 'modified', 'modified by', 'sha256sum', 'content-type', 'url' ]:
                     tags = self.select_file_tag(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)

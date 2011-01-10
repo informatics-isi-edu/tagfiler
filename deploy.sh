@@ -169,11 +169,11 @@ tagdef bytes          int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef url            text        ""      file        file       false      url
 tagdef content-type   text        ""      anonymous   file       false
-tagdef sha256sum      text        ""      file        file       false
+tagdef sha256sum      text        ""      anonymous   file       false
 
 tagdef contains       text        ""      file        file       true       file
 
-tagdef "Dataset Name" text        ""      file        file       false
+tagdef "Dataset Name" text        ""      anonymous   file       false
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "admin"   file        file       false
