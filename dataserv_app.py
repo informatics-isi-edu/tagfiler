@@ -1212,7 +1212,7 @@ class Application:
         if not multivalue:
             results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner)
             if len(results) > 0:
-                if results[0].value == value:
+                if tagtype == '' or results[0].value == value:
                     return
                 else:
                     self.delete_file_tag(tagname, data_id=data_id, version=version)

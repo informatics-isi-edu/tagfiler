@@ -498,9 +498,14 @@ class FileIO (Application):
                 if result.tagname not in [ 'bytes', 'version created', 'modified', 'modified by', 'sha256sum', 'content-type', 'url' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
-                        #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, tag.value)
-                        #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, tag.value))
-                        self.set_file_tag(result.tagname, value=tag.value)
+                        if hasattr(tag, 'value'):
+                            #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, urlquote(tag.value))
+                            #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, urlquote(tag.value)))
+                            self.set_file_tag(result.tagname, value=tag.value)
+                        else:
+                            #web.debug('copying /tags/%s@%d/%s' % (basefile.file, basefile.version, result.tagname)
+                            #          + ' to /tags/%s@%d/%s' % (self.data_id, self.version, result.tagname))
+                            self.set_file_tag(result.tagname)
 
         if not basefile or self.authn.role != basefile['modified by']:
             self.set_file_tag('modified by', self.authn.role)
@@ -912,7 +917,6 @@ class FileIO (Application):
                 ftype = 'file'
             else:
                 try:
-                    # custom DEI EIU hack, to proxy delete to all member files
                     results = self.select_file_tag('Image Set')
                     if len(results) > 0:
                         ftype = 'imgset'
