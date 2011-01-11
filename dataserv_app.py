@@ -1040,7 +1040,7 @@ class Application:
     def select_file_tag(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
         data_id, version, tagdef, user = \
                  self.select_file_tag_args_prep(tagname, value, data_id, version, tagdef, user, owner)
-            
+        #web.debug('select_file_tag: %s@%s/%s' % (data_id, version, tagname))
         if tagdef.readpolicy == 'anonymous':
             pass
         elif tagdef.readpolicy == 'users':

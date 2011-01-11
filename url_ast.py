@@ -763,10 +763,6 @@ class FileTags (Node):
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-        predlist = []
-        if self.data_id:
-            predlist.append( dict(tag='name', op='=', vals=[self.data_id]) )
-            
         self.txlog('GET ALL TAGS', dataset=self.data_id)
 
         custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
@@ -785,7 +781,14 @@ class FileTags (Node):
         system = [ tagdef for tagdef in all if tagdef.owner == None ]
         userdefined = [ tagdef for tagdef in all if tagdef.owner != None ]
 
-        files = [ file for file in self.select_files_by_predlist(predlist, listtags=self.listtags) ]
+        if self.data_id != None:
+            if self.version != None:
+                files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, version=self.version, listtags=self.listtags) ]
+            else:
+                files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, listtags=self.listtags) ]
+        else:
+            files = [ file for file in self.select_files_by_predlist(predlist=[], listtags=self.listtags) ]
+
         length = 0
         for file in files:
             for tagname in self.listtags:
