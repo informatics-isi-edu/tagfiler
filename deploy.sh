@@ -161,11 +161,13 @@ tagdef '_type_values' text        ""      anonymous   file       true
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
+tagdef "version created" timestamptz ""   anonymous   system     false
 tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
 tagdef "write users"  text        ""      anonymous   fowner     true       rolepat
 tagdef "modified by"  text        ""      anonymous   system     false      role
 tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
+tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef url            text        ""      file        file       false      url
 tagdef content-type   text        ""      anonymous   file       false
