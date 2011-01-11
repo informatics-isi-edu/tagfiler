@@ -495,7 +495,7 @@ class FileIO (Application):
             # copy basefile tags
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
-                if result.tagname not in [ 'bytes', 'version created', 'modified', 'modified by', 'sha256sum', 'content-type', 'url' ]:
+                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'content-type', 'url' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
