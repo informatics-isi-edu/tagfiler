@@ -517,15 +517,15 @@ class FileIO (Application):
         if self.local:
             if not basefile or self.bytes != basefile.bytes or basefile.version != self.version:
                 self.set_file_tag('bytes', self.bytes)
-            if not basefile or basefile.url:
+            if not basefile or basefile.url and basefile.version == self.version:
                 self.delete_file_tag('url')
                 
-            if content_type and (not basefile or basefile['content-type'] != content_type) or basefile.version != self.version:
+            if content_type and (not basefile or basefile['content-type'] != content_type or basefile.version != self.version):
                 self.set_file_tag('content-type', content_type)
         else:
-            if basefile and basefile.bytes != None:
+            if basefile and basefile.bytes != None and basefile.version == self.version:
                 self.delete_file_tag('bytes')
-            if basefile and basefile['content-type'] != None:
+            if basefile and basefile['content-type'] != None and basefile.version == self.version:
                 self.delete_file_tag('content-type')
             self.set_file_tag('url', self.location)
 
