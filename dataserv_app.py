@@ -389,6 +389,8 @@ class Application:
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
         if dataset:
+            if self.version:
+                dataset += '@%s' % self.version
             parts.append('dataset "%s"' % dataset)
         if tag:
             parts.append('tag "%s"' % tag)
