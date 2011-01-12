@@ -166,6 +166,7 @@ class Study (Node):
         return self.dbtransact(body, postCommit)
 
     def PUT(self, uri):
+        self.storage = web.input()
         try:
             self.study_size = int(urllib.unquote_plus(self.storage.study_size))
         except:
