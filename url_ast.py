@@ -87,9 +87,14 @@ class Study (Node):
         self.study_type = None
         self.study_size = None
         self.count = None
-        self.data_id = data_id
         self.status = None
         self.direction = 'upload'
+        if type(data_id) == web.utils.Storage:
+            self.data_id = data_id.data_id
+            self.version = data_id.version
+        else:
+            self.data_id = data_id
+            self.version = None
 
     def GET(self, uri):
         try:
@@ -136,7 +141,7 @@ class Study (Node):
                                        [self.render.TreeUpload()])
             elif self.action == 'download':
                 return self.renderlist("Study Download",
-                                       [self.render.TreeDownload(self.data_id)])
+                                       [self.render.TreeDownload(self.data_id, self.version)])
             elif self.action == 'get':
                 success = None
                 error = None
@@ -797,7 +802,10 @@ class FileTags (Node):
         return (files, system, userdefined, all, length)
 
     def get_title_one(self):
-        return 'Tags for dataset "%s"' % self.data_id
+        suffix = ''
+        if self.version:
+            suffix = '@%s' % self.version
+        return 'Tags for dataset "%s%s"' % (self.data_id, suffix)
 
     def get_title_all(self):
         return 'Tags for all datasets'

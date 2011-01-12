@@ -28,9 +28,9 @@ $if len(files) > 0:
 			$ vsuffix = ''
 		<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}">${file.file}${version}</a>
 		$if file['Image Set']:
-			<a href="${homepath}/study/${urlquote(file.file)}?action=download">all&nbsp;parts</a>
+			<a href="${homepath}/study/${urlquote(file.file)}${vsuffix}?action=download">all&nbsp;parts</a>
 		$if file.writeok:
-			<form enctype="application/x-www-form-urlencoded" action="${homepath}/file/${urlquote(file.file)}" method="post">
+			<form enctype="application/x-www-form-urlencoded" action="${homepath}/file/${urlquote(file.file)}${vsuffix}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />
@@ -39,14 +39,14 @@ $if len(files) > 0:
 			</form>
 		</td>
 		<td class="file-tags">
-			<a href="${homepath}/tags/${urlquote(file.file)}">All Tags</a>
+			<a href="${homepath}/tags/${urlquote(file.file)}${vsuffix}">All Tags</a>
 			$if 'Modality' in filelisttags and file['Modality'] == 'fundus' and not file['Image Set']:
-				<br /><a href="${homepath}/tags/${urlquote(file.file)}?view=fundus+tags">Fundus Grade</a>
+				<br /><a href="${homepath}/tags/${urlquote(file.file)}${vsuffix}?view=fundus+tags">Fundus Grade</a>
 		</td>
 		<td class="file-update">
 		$if file.writeok:
-			<a href="${homepath}/file/${urlquote(file.file)}?action=define&amp;type=file">Replace&nbsp;with&nbsp;file</a><br />
-			<a href="${homepath}/file/${urlquote(file.file)}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a>
+			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=file">Replace&nbsp;with&nbsp;file</a><br />
+			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a>
 		</td>
 		$for tag in filelisttags:
 			$if tagdefsdict.has_key(tag):

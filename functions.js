@@ -366,8 +366,15 @@ function getDatasetInfo() {
 	// Trim the value
 	var value = node.value.replace(/^\s*/, "").replace(/\s*$/, "");
 	if (value.length > 0) {
+		var version = document.getElementById("Version").value.replace(/^\s*/, "").replace(/\s*$/, "");
+		if (version.length > 0) {
+			if (isNaN(parseInt(version)) || version.length != ("" + parseInt(version)).length) {
+				alert('Invalid value for the version.');
+				return;
+			}
+		}
 		var tags = getTagsName();
-		document.TagFileDownloader.getDatasetInfo(value, tags);
+		document.TagFileDownloader.getDatasetInfo(value, version, tags);
 	} else {
 		alert('Dataset Name can not be empty.');
 	}

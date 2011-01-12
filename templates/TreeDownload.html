@@ -1,4 +1,8 @@
-$def with (transmissionnum)
+$def with (transmissionnum, version)
+$if not transmissionnum:
+	$ transmissionnum = ''
+$if not version:
+	$ version = ''
 <div>
 	<h3>Status</h3>
 	<table>
@@ -9,6 +13,7 @@ $def with (transmissionnum)
 				  width=25 height=25 MAYSCRIPT >
 				<PARAM name="tagfiler.server.url" value="${home}"/>
 				<PARAM name="tagfiler.server.transmissionnum" value="${transmissionnum}"/>
+				<PARAM name="tagfiler.server.version" value="${version}"/>
 				<PARAM name="classloader_cache" value="false" />
 				<PARAM name="separate_jvm" value="true" />
 				$if appletTestProperties:
@@ -53,14 +58,20 @@ $def with (transmissionnum)
 	</table>
 </div>
 <div>
-	<h3>Dataset Name</h3>
+	<h3>Dataset</h3>
 	<table>
 		<tr>
 			<td>
-				$if transmissionnum:
-					<input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/>
-				$else:
-					<input id="TransmissionNumber" value="" disabled="disabled" type="text" />
+				<table class="table-wrapper" rules="all" >
+					<tr>
+						<td class="tag-name">Name</td>
+						<td><input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/></td>
+					</tr>
+					<tr>
+						<td class="tag-name">Version</td>
+						<td><input id="Version" type="text" disabled="disabled" value="${version}"/></td>
+					</tr>
+				</table>	
 			</td>
 			<td>
 				<button id="UpdateButton" type="button" name="Update" disabled="disabled" onclick="getDatasetInfo()" >Update</button>

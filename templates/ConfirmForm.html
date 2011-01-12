@@ -1,13 +1,16 @@
-$def with (type)
+$def with (type, version=None)
 $ typeLong = dict(file="file", url="saved URL", tagdef="tag definition", imgset="image set").get(type, '')
 $ typeUri = dict(file='file', url='file', tagdef='tagdef', imgset='file').get(type, type)
 $ suffix = dict(imgset=' and all associated image files', versset=' and all associated versions').get(type, '')
+$ vsuffix = ''
+$if version:
+	$ vsuffix = '@%s' % version
 <fieldset>
-<legend>Do you want to delete ${typeLong} "${data_id}"${suffix}?</legend>
+<legend>Do you want to delete ${typeLong} "${data_id}${vsuffix}"${suffix}?</legend>
 <table>
 <tr>
 <td>
-<form enctype="application/x-www-form-urlencoded" action="${home}/${typeUri}/${urlquote(data_id)}" method="post">
+<form enctype="application/x-www-form-urlencoded" action="${home}/${typeUri}/${urlquote(data_id)}${vsuffix}" method="post">
   <input type="hidden" name="action" value="ConfirmDelete" />
   <input type="hidden" name="referer" value="${referer}" />
   <input type="submit" value="Yes" />
