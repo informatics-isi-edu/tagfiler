@@ -84,6 +84,39 @@ def make_filter(allowed):
 
 idquote = make_filter(string.letters + string.digits + '_-:.' )
 
+def buildPolicyRules(rules, fatal=False):
+    remap = dict()
+    for rule in rules:
+        srcrole, dstrole, readers, writers = rule.split(';', 4)
+        srcrole = urllib.unquote(srcrole.strip())
+        dstrole = urllib.unquote(dstrole.strip())
+        readers = readers.strip()
+        writers = writers.strip()
+        if remap.has_key(srcrole):
+            web.debug('Policy rule "%s" duplicates already-mapped source role.' % rule)
+            if fatal:
+                raise KeyError()
+            else:
+                continue
+        if dstrole == '':
+            web.debug('Policy rule "%s" has illegal empty destination role.' % rule)
+            if fatal:
+                raise ValueError()
+            else:
+                continue
+        if readers != '':
+            readers = [ urllib.unquote(reader.strip()) for reader in readers.split(',') ]
+            readers = [ reader for reader in readers if reader != '' ]
+        else:
+            readers = []
+        if writers != '':
+            writers = [ urllib.unquote(writer.strip()) for writer in writers.split(',') ]
+            writers = [ writer for writer in writers if writer != '' ]
+        else:
+            writers = []
+        remap[srcrole] = (dstrole, readers, writers)
+    return remap
+
 class WebException (web.HTTPError):
     def __init__(self, status, data='', headers={}):
         m = re.match('.*MSIE.*',
@@ -208,16 +241,6 @@ class Application:
         def getParamEnv(suffix, default=None):
             return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
 
-        def buildPolicyRules(rules):
-            remap = dict()
-            for rule in rules:
-                rule = rule.split(';')
-                srcrole, dstrole, readers, writers = rule
-                readers = [ reader.strip() for reader in readers.split(',') ]
-                writers = [ writer.strip() for writer in writers.split(',') ]
-                remap[srcrole.strip()] = (dstrole.strip(), readers, writers)
-            return remap
-        
         try:
             p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)
             line = p.stdout.readline()
@@ -330,7 +353,8 @@ class Application:
                                    'read users' : self.validateRolePattern,
                                    'write users' : self.validateRolePattern,
                                    'modified by' : self.validateRole,
-                                   '_type_values' : self.validateEnumeration }
+                                   '_type_values' : self.validateEnumeration,
+                                   '_cfg_policy remappings' : self.validatePolicyRule }
         
         self.tagtypeValidators = { 'tagname' : self.validateTagname,
                                    'file' : self.validateFilename }
@@ -357,6 +381,7 @@ class Application:
             except NotImplemented, AttributeError:
                 valid = True
             if not valid:
+                web.debug('Supplied tag value "%s" is not a valid role.' % role)
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
                 
     def validateRolePattern(self, role, tagname=None, data_id=None):
@@ -385,6 +410,15 @@ class Application:
                 key = self.downcast_value(dbtype, key)
             except:
                 raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['_type_description'], dbtype))
+
+    def validatePolicyRule(self, rule, tagname=None, data_id=None):
+        try:
+            remap = buildPolicyRules([rule], fatal=True)
+        except (ValueError, KeyError):
+            raise BadRequest('Supplied rule "%s" is invalid for tag "%s"' % (rule, tagname))
+        srcrole, mapping = remap.items()[0]
+        if self.remap.has_key(srcrole):
+            raise BadRequest('Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []

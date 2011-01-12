@@ -1,15 +1,15 @@
 $def with ()
 <ol>
-  $if 'admin' in authn.roles:
+  $if authn.hasRoles(['admin']):
   	<li><a href="${webauthnhome}/role/">Manage roles</a></li>
-  $if 'uploader' in authn.roles:
+  $if authn.hasRoles(['curator', 'uploader']):
 	<li><a href="${homepath}/study?action=upload">Upload study</a></li>
-  $if 'downloader' in authn.roles:
+  $if authn.hasRoles(['curator', 'downloader']):
 	<li><a href="${homepath}/study?action=download">Download study</a></li>
 	<li><a href="${homepath}/query?action=edit">Query by tags latest file versions</a>, <a href="${homepath}/query?action=edit&versions=any">Query by tags on all file versions</a></li>
   <li><a href="${help}">Help and documentation</a></li>
   <li><a href="${bugs}">View or submit bug reports/issues</a></li>
-  $if 'admin' in authn.roles:
+  $if authn.hasRoles(['admin']):
 	<li><a href="${homepath}/tagdef">Manage available tag definitions (expert mode)</a></li>
 	<li><a href="${homepath}/file?action=define">Create custom dataset (expert mode)</a></li>
 </ol>

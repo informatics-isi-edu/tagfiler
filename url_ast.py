@@ -358,7 +358,7 @@ class LogList (Node):
         Node.__init__(self, appname)
 
     def GET(self, uri):
-        if 'admin' not in self.authn.roles:
+        if not self.authn.hasRoles(['admin']):
             raise Forbidden('listing of log files')
         
         if self.log_path:

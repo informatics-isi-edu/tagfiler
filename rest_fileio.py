@@ -556,9 +556,10 @@ class FileIO (Application):
                     t.commit()
                 except:
                     et, ev, tb = sys.exc_info()
-                    web.debug('got exception during owner remap attempt',
+                    web.debug('got exception "%s" during owner remap attempt' % str(ev),
                               traceback.format_exception(et, ev, tb))
                     t.rollback()
+                    raise
             elif len(srcroles) > 1:
                 raise Conflict("Ambiguous remap rules encountered")
 
@@ -1023,7 +1024,7 @@ class LogFileIO (FileIO):
 
     def GET(self, uri, sendBody=True):
 
-        if 'admin' not in self.authn.roles:
+        if not self.authn.hasRoles(['admin']):
             raise Forbidden('read access to log file "%s"' % self.data_id)
 
         if not self.log_path:

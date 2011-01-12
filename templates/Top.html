@@ -65,28 +65,29 @@ $else:
     <td>
       <a href="${home}/">Home</a>
     </td>
-    $if 'admin' in authn.roles:
+    $ roleurl = authn.getRoleMgmtUrl()
+    $if roleurl and authn.hasRoles(['admin']):
     	<td>
-			<a href="${webauthnhome}/role/">Manage roles</a>
-		</td>
-    $if 'uploader' in authn.roles:
-	<td>
-		<a href="${home}/study?action=upload">Upload study</a>
+	<a href="${roleurl}">Manage roles</a>
 	</td>
-    $if 'downloader' in authn.roles:
+    $if authn.hasRoles(['curator', 'uploader']):
 	<td>
-		<a href="${home}/study?action=download">Download study</a>
+	<a href="${home}/study?action=upload">Upload study</a>
+	</td>
+    $if authn.hasRoles(['curator', 'downloader']):
+	<td>
+	<a href="${home}/study?action=download">Download study</a>
 	</td>
 	<td>
-		<a href="${home}/query?action=edit">Query by tags</a>
+	<a href="${home}/query?action=edit">Query by tags</a>
 	</td>
     <td>
-		<a href="${help}">Help</a>
+    <a href="${help}">Help</a>
     </td>
     <td>
-		<a href="${bugs}">Bugs</a>
-	</td>
-    $if 'admin' in authn.roles:
+    <a href="${bugs}">Bugs</a>
+    </td>
+    $if authn.hasRoles(['admin']):
 	<td>
 	<a href="${home}/log">Logs</a>
 	</td>

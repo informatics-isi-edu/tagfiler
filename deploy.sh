@@ -5,6 +5,22 @@
 # which invokes this with SVCPREFIX...
 ######
 
+# role mapping used in default data and ACLs
+
+# default for trial-data demo
+admin=${admin:-admin}
+uploader=${uploader:-uploader}
+downloader=${downloader:-downloader}
+curator=${curator:-coordinator}
+grader=${grader:-grader}
+
+# alternates
+#admin=MISD
+#uploader=PSOC
+#downloader=PSOC
+#curator=PSOC
+#grader=PSOC
+
 TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()'`/tagfiler
 
 # this is the URL base path of the service
@@ -176,7 +192,7 @@ tagdef sha256sum      text        ""      anonymous   file       false
 tagdef contains       text        ""      file        file       true       file
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
-tagdef "Image Set"    ""          "admin"   file        file       false
+tagdef "Image Set"    ""          "${admin}"   file        file       false
 
 tagacl()
 {
@@ -192,7 +208,7 @@ tagacl()
 }
 
 tagacl "list on homepage" read "*"
-tagacl "list on homepage" write "admin"
+tagacl "list on homepage" write "${admin}"
 
 tag()
 {
@@ -259,16 +275,16 @@ storedquery()
    done
 }
 
-storedquery "New image studies" 'Image%20Set;Downloaded:not:?view=study%20tags' admin downloader
-storedquery "Previous image studies" 'Image%20Set;Downloaded?view=study%20tags' admin downloader
-storedquery "All image studies" 'Image%20Set?view=study%20tags' admin downloader
+storedquery "New image studies" 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
+storedquery "Previous image studies" 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
+storedquery "All image studies" 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
 
 for x in "New image studies" "Previous image studies" "All image studies"
 do
    tag "\$x" "list on homepage"
 done
 
-storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" admin "*"
+storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
 
 typedef()
 {
@@ -276,7 +292,7 @@ typedef()
    dbtype="\$2"
    desc="\$3"
    shift 3
-   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" admin "*"
+   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" "${admin}" "*"
    tag "_type_def_\${typename}" "_type_name" text "\${typename}"
    tag "_type_def_\${typename}" "_type_dbtype" text "\${dbtype}"
    tag "_type_def_\${typename}" "_type_description" text "\${desc}"
@@ -298,7 +314,7 @@ typedef tagname      text          'Tag name'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
 
-storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" admin "*"
+storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
 
 cfgtagdef()
 {
@@ -379,7 +395,33 @@ cfgtag "file list tags" text bytes owner 'read users' 'write users'
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...
 # semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
-cfgtag "policy remappings" text 'uploader;coordinator;uploader,downloader;uploader'
+
+# these are actual (not logical) role names just like other ACLs and metadata
+# only the python code itself uses logical roles for built-in policies
+
+if [[ "${uploader}" = "${curator}" ]]
+then
+   writers=
+else
+   # allow uploader to retain access
+   writers="${uploader}"
+   readers="${uploader}"
+fi
+
+if [[ "${downloader}" = "${curator}" ]]
+then
+   readers=
+else
+   # also give read access to downloaders
+   if [[ -n "\${readers}" ]]
+   then
+      readers="\${readers},${downloader}"
+   else
+      readers="${downloader}"
+   fi
+fi
+
+cfgtag "policy remappings" text "${uploader};${curator};\${readers};\${writers}"
 
 #cfgtag "applet test properties" text '/home/userid/appletTest.properties'
 #cfgtag "applet test log" text '/home/userid/applet.log'
@@ -394,12 +436,12 @@ cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
 ## Types and Tags for NEI MISD/DEI demo...
 
 tagdef "Downloaded"   ""          ""      tag         tag        false
-tagacl "Downloaded" read downloader
-tagacl "Downloaded" write downloader
+tagacl "Downloaded" read "${downloader}"
+tagacl "Downloaded" write "${downloader}"
 
-storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" admin "*"
-storedquery "fundus tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" admin "*"
-storedquery "fundus brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" admin "*"
+storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" "${admin}" "*"
+storedquery "fundus tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" "${admin}" "*"
+storedquery "fundus brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" "${admin}" "*"
 
 modtagdef()
 {
@@ -409,8 +451,8 @@ modtagdef()
    tagdef "\$tagname" "\$@"
    tag "\$modality tags" "_cfg_file list tags" tagname "\$tagname"
    tag "\$modality tags" "_cfg_tag list tags" tagname "\$tagname"
-   tagacl "\$tagname" read downloader
-   tagacl "\$tagname" write grader
+   tagacl "\$tagname" read "${downloader}"
+   tagacl "\$tagname" write "${grader}"
 }
 
 typedef Modality            text 'Modality' 'fundus fundus'
@@ -434,17 +476,17 @@ typedef 'Other Lesions +PT' int8 'Grade (Other w/ PT)' '0 N' '1 Q' '2 Y' '3 PT' 
 typedef 'Diabetic Retinopathy Level' int8 'Grade (Diabetic Retinopathy Level)' '10 DR Abset' '12 Non-Diabetic' '13 Questionable' '14 HE, SE, IRMA w/o MAs' '15 Hem Only w/o MAs' '20 Microaneurysms Only' '31 Mild NPDR' '37 Mild/Moderate NPDR' '43 Moderate NPDR' '47 Moderate/Severe NPDR' '53 Severe NPDR' '60 FP Only' '61 No Ret w/ RX' '62 MAs Only w/ RX' '63 Early NPDR w/ RX' '64 Moderate/Severe NPDR w/ RX' '65 Moderate PDR' '71 DRS HRC' '75 Severe DRS HRC' '81 Advanced PDR' '85 End-Stage PDR' '90 Cannot Grade'
 
 #        TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-tagdef   Modality                     text   admin   tag         tag        false      Modality
+tagdef   Modality                     text   "${admin}"   tag         tag        false      Modality
 tag "fundus tags" "_cfg_file list tags" tagname "Modality"
 
-tagdef   'Study Name'                 text   admin   tag         tag        false      'Study Name'
-tagdef   'Study Participant'          text   admin   tag         tag        false
-tagdef   'Study Date'                 date   admin   tag         tag        false
+tagdef   'Study Name'                 text   "${admin}"   tag         tag        false      'Study Name'
+tagdef   'Study Participant'          text   "${admin}"   tag         tag        false
+tagdef   'Study Date'                 date   "${admin}"   tag         tag        false
 
 for tag in 'Modality' 'Study Name' 'Study Participant' 'Study Date'
 do
-   tagacl "\$tag" read PI downloader
-   tagacl "\$tag" write tagger coordinator
+   tagacl "\$tag" read PI "${downloader}"
+   tagacl "\$tag" write tagger "${coordinator}"
 done
 
 # set default applet tags and configure named views too...
@@ -458,53 +500,53 @@ done
 
 
 #         MOD    TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-modtagdef fundus    'Max DRU Size'               int8   admin   tag         tag        false      'Max DRU Size'
-modtagdef fundus    '# DRU Size Subfields'       int8   admin   tag         tag        false      '# 0-9'
-modtagdef fundus    'DRU Area'                   int8   admin   tag         tag        false      'DRU Area'
-modtagdef fundus    'Max DRU Type'               int8   admin   tag         tag        false      'Max DRU Type'
-modtagdef fundus    '# DRU Type Subfields'       int8   admin   tag         tag        false      '# 0-9'
-modtagdef fundus    'DRU Grid Type'              int8   admin   tag         tag        false      'DRU Grid Type'
-modtagdef fundus    'Inc Pignment'               int8   admin   tag         tag        false      'Inc Pigment'
-modtagdef fundus    'RPE Depigment'              int8   admin   tag         tag        false      'RPE Depigment'
-modtagdef fundus    '# RPE Depigment Subfields'  int8   admin   tag         tag        false      '# 0-9'
+modtagdef fundus    'Max DRU Size'               int8   "${admin}"   tag         tag        false      'Max DRU Size'
+modtagdef fundus    '# DRU Size Subfields'       int8   "${admin}"   tag         tag        false      '# 0-9'
+modtagdef fundus    'DRU Area'                   int8   "${admin}"   tag         tag        false      'DRU Area'
+modtagdef fundus    'Max DRU Type'               int8   "${admin}"   tag         tag        false      'Max DRU Type'
+modtagdef fundus    '# DRU Type Subfields'       int8   "${admin}"   tag         tag        false      '# 0-9'
+modtagdef fundus    'DRU Grid Type'              int8   "${admin}"   tag         tag        false      'DRU Grid Type'
+modtagdef fundus    'Inc Pignment'               int8   "${admin}"   tag         tag        false      'Inc Pigment'
+modtagdef fundus    'RPE Depigment'              int8   "${admin}"   tag         tag        false      'RPE Depigment'
+modtagdef fundus    '# RPE Depigment Subfields'  int8   "${admin}"   tag         tag        false      '# 0-9'
 
-modtagdef fundus    'Inc Pigment CC/CPT'         int8   admin   tag         tag        false      'Inc/RPE Lesions'
-modtagdef fundus    'RPE Depigment CC/CPT'       int8   admin   tag         tag        false      'Inc/RPE Lesions'
+modtagdef fundus    'Inc Pigment CC/CPT'         int8   "${admin}"   tag         tag        false      'Inc/RPE Lesions'
+modtagdef fundus    'RPE Depigment CC/CPT'       int8   "${admin}"   tag         tag        false      'Inc/RPE Lesions'
 
-modtagdef fundus    'Geographic Atrophy'         int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef fundus    'PED/RD'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef fundus    'SubRet Hem'                 int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef fundus    'SubRet Scar'                int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef fundus    'ARM RX'                     int8   admin   tag         tag        false      'GA/Ex DA Lesions'
-modtagdef fundus    'Lesions Summary'            int8   admin   tag         tag        false      'no/yes/CG'
+modtagdef fundus    'Geographic Atrophy'         int8   "${admin}"   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'PED/RD'                     int8   "${admin}"   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'SubRet Hem'                 int8   "${admin}"   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'SubRet Scar'                int8   "${admin}"   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'ARM RX'                     int8   "${admin}"   tag         tag        false      'GA/Ex DA Lesions'
+modtagdef fundus    'Lesions Summary'            int8   "${admin}"   tag         tag        false      'no/yes/CG'
 
-modtagdef fundus    'GA # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
-modtagdef fundus    'Ex # DAs in Grid'           int8   admin   tag         tag        false      '# 0-16'
+modtagdef fundus    'GA # DAs in Grid'           int8   "${admin}"   tag         tag        false      '# 0-16'
+modtagdef fundus    'Ex # DAs in Grid'           int8   "${admin}"   tag         tag        false      '# 0-16'
 
-modtagdef fundus    'Calcified Drusen'           int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Peripheral Drusen'          int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Peripap Atrophy'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Art Sheathing'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Cen Art Occlus'             int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Br Art Occlus'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Cen Vein Occlus'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Br Vein Occlus'             int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Hollen Plaque'              int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Ast Hyalosis'               int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Nevus'                      int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Chorioret Scar'             int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef fundus    'SWR Tension'                int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef fundus    'SWR Cello Reflex'           int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Mac Hole'                   int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef fundus    'Histoplasmosis'             int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef fundus    'Ret Detach'                 int8   admin   tag         tag        false      'Other Lesions +PT'
-modtagdef fundus    'Large C/D'                  int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Thick Vit/Glial'            int8   admin   tag         tag        false      'Other Lesions'
-modtagdef fundus    'Other (comments)'           int8   admin   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Calcified Drusen'           int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Peripheral Drusen'          int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Peripap Atrophy'            int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Art Sheathing'              int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Cen Art Occlus'             int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Br Art Occlus'              int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Cen Vein Occlus'            int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Br Vein Occlus'             int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Hollen Plaque'              int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Ast Hyalosis'               int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Nevus'                      int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Chorioret Scar'             int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'SWR Tension'                int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'SWR Cello Reflex'           int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Mac Hole'                   int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Histoplasmosis'             int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Ret Detach'                 int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
+modtagdef fundus    'Large C/D'                  int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Thick Vit/Glial'            int8   "${admin}"   tag         tag        false      'Other Lesions'
+modtagdef fundus    'Other (comments)'           int8   "${admin}"   tag         tag        false      'Other Lesions +PT'
 
-modtagdef fundus    'Other Lesions Summary'      int8   admin   tag         tag        false      'no/yes'
+modtagdef fundus    'Other Lesions Summary'      int8   "${admin}"   tag         tag        false      'no/yes'
 
-modtagdef fundus    'Diabetic Retinopathy Level' int8   admin   tag         tag        false      'Diabetic Retinopathy Level'
+modtagdef fundus    'Diabetic Retinopathy Level' int8   "${admin}"   tag         tag        false      'Diabetic Retinopathy Level'
 
 tag "fundus brief tags" "_cfg_file list tags" tagname "Modality"
 tag "fundus brief tags" "_cfg_file list tags" tagname "Lesions Summary"
