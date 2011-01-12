@@ -892,7 +892,12 @@ class Application:
     def select_dataset_size(self):
         data_id = self.data_id + '/%'
         vars = dict(data_id=data_id)
-        query = 'SELECT SUM(value) AS size, COUNT(*) AS count FROM "_bytes" WHERE file like $data_id'
+        what = 'SUM(value) AS size, COUNT(*) AS count'
+        versionquery = 'SELECT MAX(version) AS version FROM "_bytes" WHERE file LIKE $data_id'
+        datasetquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
+        joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(version)' % (datasetquery, versionquery)
+        query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
+        #web.debug('select_dataset_size', self.version, query, vars)
         return self.db.query(query, vars)
 
     def insert_file(self, data_id, version, local, location):
