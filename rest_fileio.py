@@ -507,20 +507,20 @@ class FileIO (Application):
                             #          + ' to /tags/%s@%d/%s' % (self.data_id, self.version, result.tagname))
                             self.set_file_tag(result.tagname)
 
-        if not basefile or self.authn.role != basefile['modified by']:
+        if not basefile or self.authn.role != basefile['modified by'] or basefile.version != self.version:
             self.set_file_tag('modified by', self.authn.role)
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
-        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5:
+        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5 or basefile.version != self.version:
             self.set_file_tag('modified', 'now')
 
         if self.local:
-            if not basefile or self.bytes != basefile.bytes:
+            if not basefile or self.bytes != basefile.bytes or basefile.version != self.version:
                 self.set_file_tag('bytes', self.bytes)
             if not basefile or basefile.url:
                 self.delete_file_tag('url')
                 
-            if content_type and (not basefile or basefile['content-type'] != content_type):
+            if content_type and (not basefile or basefile['content-type'] != content_type) or basefile.version != self.version:
                 self.set_file_tag('content-type', content_type)
         else:
             if basefile and basefile.bytes != None:
