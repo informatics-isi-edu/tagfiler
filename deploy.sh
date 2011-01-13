@@ -120,6 +120,7 @@ psql -q -t -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELE
 psql -q -t -c "CREATE TABLE filetags ( file text, version int8, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 
 psql -q -t -c "CREATE SEQUENCE transmitnumber"
+psql -q -t -c "CREATE SEQUENCE keygenerator"
 
 tagdef()
 {
@@ -190,6 +191,7 @@ tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
 tagdef contains       text        ""      file        file       true       file
+tagdef key            text        ""      anonymous   file       false
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "${admin}"   file        file       false

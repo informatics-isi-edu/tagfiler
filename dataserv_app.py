@@ -923,13 +923,13 @@ class Application:
             query += ' WHERE name = $name'
         return self.db.query(query, vars)
 
-    def select_dataset_size(self):
+    def select_dataset_size(self, key):
         data_id = self.data_id + '/%'
-        vars = dict(data_id=data_id)
+        vars = dict(data_id=data_id, key=key)
         what = 'SUM(value) AS size, COUNT(*) AS count'
-        versionquery = 'SELECT MAX(version) AS version FROM "_bytes" WHERE file LIKE $data_id'
-        datasetquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
-        joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(version)' % (datasetquery, versionquery)
+        filesquery = 'SELECT file, version FROM "_key" WHERE value = $key'
+        bytesquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
+        joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (filesquery, bytesquery)
         query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
         #web.debug('select_dataset_size', self.version, query, vars)
         return self.db.query(query, vars)
@@ -1293,6 +1293,18 @@ class Application:
             res = self.db.query("SELECT * FROM files WHERE name = $name", vars)
             if len(res) == 0:
                 return name
+
+    def select_next_key_number(self):
+        query = "SELECT NEXTVAL ('keygenerator')"
+        vars = dict()
+        # now, as we can set manually dataset names, make sure the new generated name is unique
+        while True:
+            result = self.db.query(query)
+            value = str(result[0].nextval).rjust(9, '0')
+            vars['value'] = value
+            res = self.db.query('SELECT * FROM "_key" WHERE value = $value', vars)
+            if len(res) == 0:
+                return value
 
     def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest', tagdefs=None):
         def dbquote(s):

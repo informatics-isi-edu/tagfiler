@@ -63,7 +63,13 @@ class TransmitNumber (Node):
     def POST(self, uri):
 
         def body():
-            result  = self.select_next_transmit_number()
+            if self.table == 'transmitnumber':
+                result  = self.select_next_transmit_number()
+            elif self.table == 'keygenerator':
+                result  = self.select_next_key_number()
+            else:
+                result = ''
+                
             return result
 
         def postCommit(results):
@@ -71,6 +77,13 @@ class TransmitNumber (Node):
             web.header('Location', results)
             return results
 
+        self.storage = web.input()
+        
+        try:
+            self.table = urllib.unquote_plus(self.storage.table)
+        except:
+            pass
+        
         return self.dbtransact(body, postCommit)
 
 class Study (Node):
@@ -187,10 +200,15 @@ class Study (Node):
         except:
             pass
 
+        try:
+            self.key = urllib.unquote_plus(self.storage.key)
+        except:
+            pass
+
         def body():
             result = True
             if self.direction == 'upload' and self.status == 'success':
-                results = self.select_dataset_size()[0]
+                results = self.select_dataset_size(self.key)[0]
                 if results.size != self.study_size or results.count != self.count:
                     self.status = 'conflict'
                     result = None
