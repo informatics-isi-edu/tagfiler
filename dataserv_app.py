@@ -1548,7 +1548,7 @@ class Application:
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query
-        web.debug(query, values)
+        #web.debug(query, values)
         return self.db.query(query, values)
 
     
