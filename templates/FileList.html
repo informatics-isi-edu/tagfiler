@@ -51,7 +51,7 @@ $if len(files) > 0:
 		$for tag in filelisttags:
 			$if tagdefsdict.has_key(tag):
 				<td class="file-tag ${idquote(tag)}">
-				$:{render.FileTagValBlock(file, tagdefsdict[tag], filelisttagswrite)}
+				$:{render.FileTagValBlock(file, tagdefsdict[tag], filelisttagswrite, version)}
 				</td>
 		</tr>
 	</table>

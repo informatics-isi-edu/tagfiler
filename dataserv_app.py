@@ -845,9 +845,9 @@ class Application:
             raise NotFound(data='dataset "%s"@%d' % (data_id, version))
         allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id, version=version)
         if allow == False:
-            raise Forbidden(data='%s access to tag %s on dataset "%s"@%d' % (mode, tagname, data_id, version))
+            raise Forbidden(data='%s access to tag %s on dataset "%s"@%s' % (mode, tagname, data_id, version))
         elif allow == None:
-            raise Unauthorized(data='%s access to tag %s on dataset "%s"@%d' % (mode, tagname, data_id, version))
+            raise Unauthorized(data='%s access to tag %s on dataset "%s"@%s' % (mode, tagname, data_id, version))
         else:
             pass
 

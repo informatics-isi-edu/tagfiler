@@ -1,4 +1,4 @@
-$def with (file, tagdef, writetags)
+$def with (file, tagdef, writetags, version)
 $ writetags = [ tag for tag in writetags ]
 $ tagnames = tagdefsdict.iterkeys()
 $ typesdict = dict( [ (type['_type_name'], type) for type in typeinfo ] )
@@ -7,6 +7,9 @@ $ typename = type['_type_description']
 $ typevals = type['_type_values']
 $ writeok = tagdef.get('writeok', True)
 $ vals = file[tagdef.tagname]
+$ vsuffix = ''
+$if version:
+	$ vsuffix = '@%s' % version
 $if vals == None:
 	$ itervals = []
 $else:
@@ -33,7 +36,7 @@ $elif tagdef.typestr:
 		</td>
 		<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
 		$if tagdef.tagname in writetags and writeok:
-			<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+			<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}${vsuffix}" method="post">
 			<input type="hidden" name="tag" value="${tagdef.tagname}" />
 			<input type="hidden" name="value" value="${val}" />
 			<input type="hidden" name="action" value="delete" />
@@ -44,7 +47,7 @@ $elif tagdef.typestr:
 		</tr>
 	$if tagdef.tagname in writetags and writeok:
 		<tr>
-		<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+		<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}${vsuffix}" method="post">
 		<input type="hidden" name="set-${urlquote(tagdef.tagname)}" value="true" />
 		<td class="file-tag ${idquote(tagdef.tagname)} multivalue input">
 		$ options = tagOptions(tagdef.tagname, itervals)
@@ -73,7 +76,7 @@ $elif tagdef.typestr:
 $else:
 	<table class="file-tag-list">
 	<tr>
-	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}" method="post">
+	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file.file)}${vsuffix}" method="post">
 	<input type="hidden" name="tag" value="${tagdef.tagname}" />
 	$if writeok:
 		$if vals:

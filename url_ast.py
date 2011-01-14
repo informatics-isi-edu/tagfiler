@@ -767,7 +767,8 @@ class FileTags (Node):
             return self.renderlist('Dataset "%s" Tag "%s" Values' % (self.data_id, self.tag_id),
                                    [self.render.FileTagValBlock(file,
                                                                 self.tagdef,
-                                                                [self.tag_id])])
+                                                                [self.tag_id],
+                                                                self.version)])
 
     def buildtaginfo(self, ownerwhere):
         owner = self.owner()
@@ -834,8 +835,8 @@ class FileTags (Node):
         #web.debug(system, userdefined, all)
         if self.data_id:
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('User', files[0], userdefined),
-                                    self.render.FileTagExisting('System', files[0], system),
+                                   [self.render.FileTagExisting('User', files[0], userdefined, self.version),
+                                    self.render.FileTagExisting('System', files[0], system, self.version),
                                     self.render.TagdefNewShortcut('Define more tags')])
         else:
             return self.renderlist(self.get_title_all(),
