@@ -914,6 +914,18 @@ class Application:
                 query += ' AND version = $version'
         return self.db.query(query, vars)
 
+    def select_file_members(self, data_id=None, version=None):
+        if data_id == None:
+            data_id = self.data_id
+        if version == None:
+            version = self.version
+        vars = dict(data_id=data_id, version=version)
+        keyquery = 'SELECT value FROM "_key" WHERE file = $data_id AND version = $version'
+        memberquery = 'SELECT file AS name, version FROM "_member of" JOIN (%s) AS a USING (value)' % keyquery
+        query = 'SELECT * FROM files JOIN (%s) AS b USING (name, version)' % memberquery
+        #web.debug(query, vars)
+        return self.db.query(query, vars)
+
     def select_file_versions(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
@@ -931,7 +943,7 @@ class Application:
         bytesquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
         joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (filesquery, bytesquery)
         query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
-        #web.debug('select_dataset_size', self.version, query, vars)
+        #web.debug(query, vars)
         return self.db.query(query, vars)
 
     def insert_file(self, data_id, version, local, location):

@@ -495,7 +495,7 @@ class FileIO (Application):
             # copy basefile tags
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
-                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'content-type', 'url' ]:
+                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'content-type', 'url', 'member of' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
@@ -864,6 +864,12 @@ class FileIO (Application):
                     if not filesdict.has_key(file.name):
                         filesdict[file.name] = file
 
+    def testAndExpandWithMembers(self, filesdict, data_id, version):
+        files = self.select_file_members(data_id=data_id, version=version)
+        if len(files) > 0:
+            for file in files:
+                filesdict[file.name] = file
+
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
@@ -896,7 +902,8 @@ class FileIO (Application):
             self.version = result.version
             filesdict[result.name] = result
 
-            self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
+            #self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
+            self.testAndExpandWithMembers(filesdict, self.data_id, self.version)
             
             for res in filesdict.itervalues():
                 self.delete_file(res.name, res.version)
