@@ -192,6 +192,7 @@ tagdef sha256sum      text        ""      anonymous   file       false
 
 tagdef contains       text        ""      file        file       true       file
 tagdef key            text        ""      anonymous   file       false
+tagdef "member of"    text        ""      anonymous   file       true
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "${admin}"   file        file       false

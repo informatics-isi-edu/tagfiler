@@ -927,7 +927,7 @@ class Application:
         data_id = self.data_id + '/%'
         vars = dict(data_id=data_id, key=key)
         what = 'SUM(value) AS size, COUNT(*) AS count'
-        filesquery = 'SELECT file, version FROM "_key" WHERE value = $key'
+        filesquery = 'SELECT file, version FROM "_member of" WHERE value = $key'
         bytesquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
         joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (filesquery, bytesquery)
         query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
