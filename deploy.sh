@@ -153,6 +153,12 @@ tagdef()
       if [[ "\$7" = "file" ]]
       then
          fk="REFERENCES latestfiles (name) ON DELETE CASCADE"
+      elif [[ "\$7" = "vfile" ]]
+      then
+         fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
+      elif [[ "\$1" = "vname" ]]
+      then
+         fk="UNIQUE"
       else
          fk=""
       fi
@@ -186,11 +192,13 @@ tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
 tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
+tagdef vname          text        ""      anonymous   system     false
 tagdef url            text        ""      file        file       false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
 tagdef contains       text        ""      file        file       true       file
+tagdef vcontains      text        ""      file        file       true       vfile
 tagdef key            text        ""      anonymous   file       false
 tagdef "member of"    text        ""      anonymous   file       true
 
@@ -269,6 +277,8 @@ storedquery()
    psql -t -q -c "INSERT INTO files (name, version, local, location) VALUES ( '\$file', 1, False, '\$url' )"
    psql -t -q -c "INSERT INTO latestfiles (name, version) VALUES ( '\$file', 1 )"
    tag "\$file" name text "\$file"
+   tag "\$file" vname text "\$file@1"
+   tag "\$file" version int8 1
    tag "\$file" url text "\$url"
    tag "\$file" owner text "\$owner"
    while [[ \$# -gt 0 ]]
@@ -316,6 +326,7 @@ typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
+typedef vfile        text          'Dataset with version number'
 
 storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
 

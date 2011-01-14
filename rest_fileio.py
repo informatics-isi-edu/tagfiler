@@ -488,14 +488,18 @@ class FileIO (Application):
             # set initial tags
             self.set_file_tag('owner', self.authn.role)
             self.set_file_tag('created', 'now')
+            self.set_file_tag('version created', 'now')
+            self.set_file_tag('version', self.version)
             self.set_file_tag('name', self.data_id)
+            self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
         elif self.version != basefile.version:
             self.set_file_tag('version created', 'now')
             self.set_file_tag('version', self.version)
+            self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
             # copy basefile tags
             results = self.select_filetags(data_id=basefile.file, version=basefile.version)
             for result in results:
-                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'content-type', 'url', 'member of' ]:
+                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'vname', 'content-type', 'url', 'member of' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):

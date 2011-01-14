@@ -357,7 +357,8 @@ class Application:
                                    '_cfg_policy remappings' : self.validatePolicyRule }
         
         self.tagtypeValidators = { 'tagname' : self.validateTagname,
-                                   'file' : self.validateFilename }
+                                   'file' : self.validateFilename,
+                                   'vfile' : self.validateVersionedFilename }
 
         self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
         self.ownerTags = ['read users', 'write users']
@@ -366,6 +367,22 @@ class Application:
         results = self.select_file(file, None)
         if len(results) == 0:
             raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
+
+    def validateVersionedFilename(self, vfile, tagname='', data_id=None):
+        m = re.match('^(?P<data_id>.*)@(?P<version>[0-9]+)', vfile)
+        if m:
+            g = m.groupdict()
+            try:
+                version = int(g['version'])
+            except ValueError:
+                raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
+            if g['data_id'] == '':
+                raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
+            results = self.select_file(g['data_id'], g['version'])
+            if len(results) == 0:
+                raise Conflict('Supplied versioned file name "%s" for tag "%s" is not found.' % (vfile, tagname))
+        else:
+            raise BadRequest('Supplied versioned file name "%s" for tag "%s" has invalid syntax.' % (vfile, tagname))
 
     def validateTagname(self, tag, tagname=None, data_id=None):
         if tag == '':
@@ -1036,6 +1053,8 @@ class Application:
             tabledef += ' NOT NULL'
             if self.typestr == 'file':
                 tabledef += " REFERENCES latestfiles (name) ON DELETE CASCADE"
+            elif self.typestr == 'vfile':
+                tabledef += " REFERENCES \"_vname\" (value) ON DELETE CASCADE"
         if not self.multivalue:
             tabledef += ", UNIQUE(file, version)"
             if dbtype != '':
@@ -1342,7 +1361,7 @@ class Application:
 
         if tagdefs == None:
             tagdefs = dict()
-            
+
         for pred in predlist:
             # do static checks on each referenced tag at most once
             if not tagdefs.has_key(pred['tag']):
@@ -1373,19 +1392,22 @@ class Application:
                 tagdefs[tagname] = tagdef
 
         innertables = ['files',
-                       '_owner ON (files.name = _owner.file AND files.version = _owner.version)']
+                       '_owner ON (files.name = _owner.file AND files.version = _owner.version)',
+                       '_vname ON (files.name = _vname.file AND files.version = _vname.version)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
                        '(SELECT file, version, array_agg(value) AS value FROM "_read users" GROUP BY file, version) AS "read users" ON (files.name = "read users".file AND files.version = "read users".version)']
         selects = ['files.name AS file',
                    'files.version AS version',
                    'files.local AS local',
                    'files.location AS location',
-                   '_owner.value AS owner']
+                   '_owner.value AS owner',
+                   '_vname.value AS vname']
         groupbys = ['files.name',
                     'files.version',
                     'files.local',
                     'files.location',
-                    '_owner.value']
+                    '_owner.value',
+                    '_vname.value']
         wheres = []
         values = dict()
 
@@ -1440,7 +1462,7 @@ class Application:
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
-                          if not tagdefs[tagname].multivalue and tagname != 'owner' ]
+                          if not tagdefs[tagname].multivalue and tagname not in ['owner', 'vname'] ]
         for tagname in singlevaltags:
             outertables.append('"_%s" ON (files.name = "_%s".file AND files.version = "_%s".version)' % (tagname, tagname, tagname))
             if tagdefs[tagname].typestr == '':
@@ -1489,6 +1511,7 @@ class Application:
         tagdefs = dict()
 
         context = ''
+        context_attr = None
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
@@ -1499,7 +1522,7 @@ class Application:
                 if len(listtags) != 1:
                     raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
                 projection = listtags[0]
-                if tagdefs[projection].typestr not in [ 'text', 'file' ]:
+                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 if tagdefs[projection].multivalue:
                     projectclause = 'unnest("%s")' % projection
@@ -1508,10 +1531,11 @@ class Application:
                 if e == 0:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
                 else:
-                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.file IN (%s))' % (projectclause, q, e, e, context)
+                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.%s IN (%s))' % (projectclause, q, e, e, context_attr, context)
+                context_attr = dict(text='file', file='file', vfile='vname')[tagdefs[projection].typestr]
             else:
                 if context:
-                    query = '(%s) AS q_%d WHERE q_%d.file IN (%s)' % (q, e, e, context)
+                    query = '(%s) AS q_%d WHERE q_%d.%s IN (%s)' % (q, e, e, context_attr, context)
                 else:
                     query = '(%s) AS q_%d' % (q, e)
             
@@ -1524,7 +1548,7 @@ class Application:
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query
-        #web.debug(query, values)
+        web.debug(query, values)
         return self.db.query(query, values)
 
     
