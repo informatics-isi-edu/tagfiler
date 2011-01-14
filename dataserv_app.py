@@ -474,7 +474,7 @@ class Application:
                                                                     setcookie=setcookie))
             self.middispatchtime = datetime.datetime.now()
             if not self.authn.role and self.globals['webauthnrequire']:
-                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % self.home + uri)
+                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.home + uri))
         else:
             try:
                 user = web.ctx.env['REMOTE_USER']

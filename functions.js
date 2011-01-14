@@ -163,7 +163,7 @@ function redirectNow() {
 	alert("About to redirect at end of session");
     }
     if (redirectToLogin) {
-	window.location='/webauthn/login?referer=' + window.location;
+	window.location='/webauthn/login?referer=' + encodeURIComponent(window.location);
     }
     else {
 	window.location = window.location;
