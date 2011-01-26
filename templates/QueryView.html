@@ -40,6 +40,7 @@ $for pred in predlist:
 	<input type="hidden" name="vals" value="${pred['vals']}" />
 	<input type="hidden" name="tag" value="${pred['tag']}" />
 	<input type="hidden" name="action" value="delete" />
+	<input type="hidden" name="versions" value="${ {True: 'any', False: 'latest'}[showVersions] }" />
 	<input type="submit" value="Remove from query" />
 	</fieldset>
 	</form>

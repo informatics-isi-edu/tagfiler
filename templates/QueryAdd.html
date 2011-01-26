@@ -20,6 +20,12 @@ $def with (ops)
 	  	<tr><td>OR</td><td><input type="text" name="val${i}" /></td></tr>
   </table></td>
   <td><input type="submit" value="Add to query" />
+  <td><select name="versions">
+  	$ optionkeys = { True: 'any', False: 'latest' }
+	$ optiondesc = { True: 'Show any version which matches', False: 'Show latest version if matches' }
+	<option value="${optionkeys[showVersions]}">${optiondesc[showVersions]}</option>
+	<option value="${optionkeys[not showVersions]}">${optiondesc[not showVersions]}</option>
+  </select></td>
   </tr></table>
   <input type="hidden" name="action" value="add" />
 </form>

@@ -1278,6 +1278,7 @@ class Query (Node):
             self.path[-1] = (self.predlist, listtags, ordertags)
 
         self.globals['queryTarget'] = self.qtarget()
+        self.globals['showVersions'] = self.showversions
             
         def body():
             listtags = self.queryopts.get('list', self.path[-1][1])
@@ -1322,7 +1323,7 @@ class Query (Node):
             self.setNoCache()
 
             if self.action in set(['add', 'delete']):
-                raise web.seeother(self.globals['queryTarget'] + '?action=edit')
+                raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % versions )
 
             if self.title == None:
                 if self.action == 'query':
