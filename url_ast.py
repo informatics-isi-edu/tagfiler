@@ -269,6 +269,7 @@ class FileList (Node):
         
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
         self.globals['referer'] = self.home + uri
+        self.storage = web.input()
 
         def body():
             tagdefs = [ (tagdef.tagname, tagdef)
