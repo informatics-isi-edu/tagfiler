@@ -31,6 +31,11 @@ $elif tagdef.typestr:
 			<a href="${val}">${val}</a>
 		$elif tagdef.typestr == 'file':
 			<a href="${home}/file/${urlquote(val)}">${val}</a>
+		$elif tagdef.typestr == 'vfile':
+			$ parts = val.split('@')
+			$ version = parts[-1]
+			$ base = '@'.join(parts[0:-1])
+			<a href="${home}/file/${urlquote(base)+'@'+version}">${base+'@'+version}</a>
 		$else:
 			${val}
 		</td>
