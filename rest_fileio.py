@@ -894,7 +894,7 @@ class FileIO (Application):
         def putPostCommit(files):
             if files:
                 self.deletePrevious(files)
-            raise web.seeother('/tags/%s' % (urlquote(self.data_id)))
+            raise web.seeother('/tags/%s@%d' % (urlquote(self.data_id), self.version))
 
         def deleteBody():
             filesdict = dict()
