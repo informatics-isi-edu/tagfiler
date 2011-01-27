@@ -918,7 +918,7 @@ class FileTags (Node):
             # custom DEI EIU hack, proxy tag ops on Image Set to all member files
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['contains'], [] ),
+                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
                          ( [], [], [] ) ]
                 subfiles = [ res.file for res in self.select_files_by_predlist_path(path=path) ]
             else:
@@ -933,7 +933,7 @@ class FileTags (Node):
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
                 self.txlog('SET', dataset=self.data_id, tag=tag_id, value=value)
-                if tag_id not in ['Image Set', 'contains' ]:
+                if tag_id not in ['Image Set', 'contains', 'vcontains' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', tag_id, data_id=subfile)
                         self.txlog('SET', dataset=subfile, tag=tag_id, value=value)
@@ -975,7 +975,7 @@ class FileTags (Node):
             # custom DEI EIU hack
             results = self.select_file_tag('Image Set')
             if len(results) > 0:
-                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['contains'], [] ),
+                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
                          ( [], [], [] ) ]
                 subfiles = [ res.file for res in self.select_files_by_predlist_path(path=path) ]
             else:
@@ -1202,7 +1202,7 @@ class Query (Node):
                     terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
                 else:
                     terms.append(urlquote(pred['tag']))
-            if not listtags or len(listtags) == 1 and listtags[0] == 'contains':
+            if not listtags or len(listtags) == 1 and listtags[0] in [ 'contains', 'vcontains' ]:
                 listpart = ''
             else:
                 listpart = '(' + ','.join([ urlquote(tag) for tag in listtags ]) + ')'

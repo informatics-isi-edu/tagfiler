@@ -194,8 +194,8 @@ def p_querypath_extend(p):
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
     if len(plisttags) == 0:
-        # the parent path element has no listtags, default to 'contains'
-        p[0][-1] = ( ppreds, [ 'contains' ], pordertags )
+        # the parent path element has no listtags, default to 'vcontains'
+        p[0][-1] = ( ppreds, [ 'vcontains' ], pordertags )
     p[0].append( ( p[3], p[4], [] ) )
 
 def p_listtags_empty(p):
