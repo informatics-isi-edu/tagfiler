@@ -138,7 +138,7 @@ class Study (Node):
             self.globals['appletTagnamesRequire'] = self.getParamsDb('applet tags require', data_id=self.study_type)
             
             if self.action == 'get' and self.data_id:
-                files = self.gettagvals('contains', data_id=self.data_id)
+                files = self.gettagvals('vcontains', data_id=self.data_id)
                 self.globals['appletTagvals'] = [ (tagname,
                                                    [ res.value for res
                                                      in self.select_file_tag(tagname=tagname, data_id=self.data_id) ])

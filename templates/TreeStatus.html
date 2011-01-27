@@ -38,5 +38,5 @@ $if direction == 'upload':
 <h2>Study Files</h2>
 <ul>
 $for file in files:
-	<li>${file}</li>
+	<li>${file[:file.rindex('@')]}</li>
 </ul>
