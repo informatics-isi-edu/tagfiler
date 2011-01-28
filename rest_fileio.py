@@ -504,11 +504,11 @@ class FileIO (Application):
                         if hasattr(tag, 'value'):
                             #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, urlquote(tag.value))
                             #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, urlquote(tag.value)))
-                            #self.set_file_tag(result.tagname, value=tag.value)
+                            self.set_file_tag(result.tagname, value=tag.value)
                         else:
                             #web.debug('copying /tags/%s@%d/%s' % (basefile.file, basefile.version, result.tagname)
                             #          + ' to /tags/%s@%d/%s' % (self.data_id, self.version, result.tagname))
-                            #self.set_file_tag(result.tagname)
+                            self.set_file_tag(result.tagname)
 
         if not basefile or self.authn.role != basefile['modified by'] or basefile.version != self.version:
             self.set_file_tag('modified by', self.authn.role)
