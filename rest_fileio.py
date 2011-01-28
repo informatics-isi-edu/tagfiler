@@ -497,19 +497,18 @@ class FileIO (Application):
             self.set_file_tag('version', self.version)
             self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
             # copy basefile tags
-            results = self.select_filetags(data_id=basefile.file, version=basefile.version)
-            for result in results:
+            for result in self.select_filetags_noauthn(data_id=basefile.file, version=basefile.version):
                 if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'vname', 'content-type', 'url', 'member of' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
                             #web.debug('copying /tags/%s@%d/%s=%s' % (basefile.file, basefile.version, result.tagname, urlquote(tag.value))
                             #          + ' to /tags/%s@%d/%s=%s' % (self.data_id, self.version, result.tagname, urlquote(tag.value)))
-                            self.set_file_tag(result.tagname, value=tag.value)
+                            #self.set_file_tag(result.tagname, value=tag.value)
                         else:
                             #web.debug('copying /tags/%s@%d/%s' % (basefile.file, basefile.version, result.tagname)
                             #          + ' to /tags/%s@%d/%s' % (self.data_id, self.version, result.tagname))
-                            self.set_file_tag(result.tagname)
+                            #self.set_file_tag(result.tagname)
 
         if not basefile or self.authn.role != basefile['modified by'] or basefile.version != self.version:
             self.set_file_tag('modified by', self.authn.role)

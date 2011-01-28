@@ -364,7 +364,7 @@ class Application:
         self.ownerTags = ['read users', 'write users']
 
     def validateFilename(self, file, tagname='', data_id=None):
-        results = self.select_file(file, None)
+        results = self.select_file(file, False)
         if len(results) == 0:
             raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
 
@@ -1174,7 +1174,7 @@ class Application:
         query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
         return self.db.query(query)
 
-    def select_filetags(self, tagname=None, where=None, data_id=None, version=None, user=None):
+    def select_filetags_noauthn(self, tagname=None, where=None, data_id=None, version=None, user=None):
         wheres = []
         vars = dict()
         if data_id == None:
@@ -1200,7 +1200,10 @@ class Application:
         query = "SELECT file, version, tagname FROM filetags join tagdefs using (tagname) " + wheres \
                 + " GROUP BY file, version, tagname ORDER BY file, tagname"
         #web.debug(query, vars)
-        return [ result for result in self.db.query(query, vars=vars)
+        return self.db.query(query, vars=vars)
+
+    def select_filetags(self, tagname=None, where=None, data_id=None, version=None, user=None):
+        return [ result for result in self.select_filetags_noauthn(tagname, where, data_id, version, user)
                  if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
     def delete_file_tag(self, tagname, value=None, data_id=None, version=None, owner=None):
