@@ -1518,7 +1518,7 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, versions=versions, tagdefs=tagdefs)
+            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
