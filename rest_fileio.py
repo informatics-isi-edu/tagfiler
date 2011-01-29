@@ -905,8 +905,9 @@ class FileIO (Application):
             self.version = result.version
             filesdict[result.name] = result
 
+            #For now, don't delete the members of a dataset. It is unsafe, as a file might belong to multiple datasets
             #self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
-            self.testAndExpandWithMembers(filesdict, self.data_id, self.version)
+            #self.testAndExpandWithMembers(filesdict, self.data_id, self.version)
             
             for res in filesdict.itervalues():
                 self.delete_file(res.name, res.version)
