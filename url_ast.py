@@ -167,7 +167,7 @@ class Study (Node):
     
                 if self.data_id:
                     return self.renderlist(None,
-                                           [self.render.TreeStatus(self.data_id, self.direction, success, error, files)])
+                                           [self.render.TreeStatus(self.data_id, self.direction, success, error, files, self.version)])
                 else:
                     url = '/appleterror'
                     if self.status:

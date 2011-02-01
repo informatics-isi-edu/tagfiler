@@ -1,4 +1,4 @@
-$def with (transmissionnum, direction, success, error, files)
+$def with (transmissionnum, direction, success, error, files, version)
 $ odd = True
 $if success:
 	<h2>Completed</h2>
@@ -15,6 +15,8 @@ See below for a summary of the study.
 <h2>Study Information</h2>
 $if transmissionnum:
 	<p><div class="transmissionnum">Dataset Name: ${transmissionnum}</div>
+	$if version:
+		<p><div class="transmissionnum">Dataset Version: ${version}</div>
 	$if direction == 'upload':
 		Please write this Dataset Name on the visit inventory form.
 </p><p>
