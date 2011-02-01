@@ -889,9 +889,16 @@ class FileIO (Application):
         
         def putBody():
             old_version = self.version
+            if not old_version:
+                results = self.select_files_by_predlist(data_id=self.data_id)
+                if len(results) > 0:
+                    old_version = results[0].version
             result = self.insertForStore()
             if old_version and self.version:
-                self.update_dataset_member(old_version)
+                if self.local :
+                    self.update_dataset_member(old_version)
+                else:
+                    self.delete_dataset_member('%s@%s' % (self.data_id, old_version))
             return result
 
         def putPostCommit(files):
