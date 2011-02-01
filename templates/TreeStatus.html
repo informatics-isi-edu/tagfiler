@@ -14,12 +14,12 @@ See below for a summary of the study.
 </p>
 <h2>Study Information</h2>
 $if transmissionnum:
-	<p><div class="transmissionnum">Dataset Name: ${transmissionnum}</div>
+	<p><div class="transmissionnum">Dataset Name: ${transmissionnum}</div></p>
 	$if version:
-		<p><div class="transmissionnum">Dataset Version: ${version}</div>
+		<p><div class="transmissionnum">Dataset Version: ${version}</div></p>
 	$if direction == 'upload':
-		Please write this Dataset Name on the visit inventory form.
-</p><p>
+		<p>Please write this Dataset Name on the visit inventory form.</p>
+<p>
 <table class="file-tag-list">
 $for tagname, vals in appletTagvals:
 	$if odd:
