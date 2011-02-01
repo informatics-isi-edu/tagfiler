@@ -1,14 +1,14 @@
 $def with (ops, predlist)
 $ opsdict = dict(ops)
 <p>
-<form enctype="application/x-www-form-urlencoded" action="${home}/file" method="post">
+<form enctype="application/x-www-form-urlencoded" action="${home}/file" method="post" onsubmit="return checkInput('SavedQueryName', 'query name')" >
 <fieldset>
 <legend>Save named query</legend>
 Enter a descriptively unique name: <br />
-<input name="name" id="SavedQueryName" onkeyup="checkQueryName()" type="text" />
+<input name="name" id="SavedQueryName" type="text" />
 <input type="hidden" name="url" value="${queryTarget}" />
 <input type="hidden" name="action" value="putsq" />
-<input type="submit" id="SavedQueryButton" disabled="disabled" value="Create Saved Query" />
+<input type="submit" value="Create Saved Query" />
 </fieldset>
 </form>
 </p>

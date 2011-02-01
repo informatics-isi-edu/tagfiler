@@ -491,13 +491,16 @@ Array.prototype.contains = function ( elem ) {
 }
 
 /**
- * Enables/Disables the "Create Saved Query" button based on the query name value
+ * Check that the input box is not empty
+ * Return True if the text box is not empty and False otherwise
+ * Display an alert message if the input text box is empty
  */
-function checkQueryName() {
-	if (document.getElementById('SavedQueryName').value.replace(/^\s*/, "").replace(/\s*$/, "").length > 0) {
-    	document.getElementById('SavedQueryButton').disabled = false;
+function checkInput(id, message) {
+	if (document.getElementById(id).value.replace(/^\s*/, "").replace(/\s*$/, "").length == 0) {
+    	alert('Please enter the ' + message + '.');
+    	return false;
 	} else {
-    	document.getElementById('SavedQueryButton').disabled = true;
+    	return true;
 	}
 }
 

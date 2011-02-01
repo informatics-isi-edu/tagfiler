@@ -1,7 +1,7 @@
 $def with (suffix)
-<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post">
+<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post" onsubmit="return checkInput('url', 'URL of the remote dataset')" >
 Enter the URL of the remote dataset: 
-<input name="url" type="text" /> <br />
+<input name="url" type="text" id="url" /> <br />
 <input type="hidden" name="action" value="put" />
 <input type="submit" value="Register URL" />
 </form>
