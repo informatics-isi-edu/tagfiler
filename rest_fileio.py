@@ -915,6 +915,8 @@ class FileIO (Application):
             
             for res in filesdict.itervalues():
                 self.delete_file(res.name, res.version)
+                #update vcontains
+                self.delete_dataset_member(res.name)
                 self.txlog('DELETE', dataset=res.name)
             return filesdict.values()
         
