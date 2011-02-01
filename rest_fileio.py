@@ -888,7 +888,11 @@ class FileIO (Application):
             return None
         
         def putBody():
-            return self.insertForStore()
+            old_version = self.version
+            result = self.insertForStore()
+            if old_version and self.version:
+                self.update_dataset_member(old_version)
+            return result
 
         def putPostCommit(files):
             if files:
