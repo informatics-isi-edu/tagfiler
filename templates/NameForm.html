@@ -1,7 +1,7 @@
 $def with ()
 <h3>Choose Name and Type of Data</h3>
-<form enctype="application/x-www-form-urlencoded" action="${home + "/file"}" method="get">
-Enter a name for the dataset: <input name="name" type="text" /><br />
+<form enctype="application/x-www-form-urlencoded" action="${home + "/file"}" method="get" onsubmit="return checkInput('datasetName', 'name of the dataset')" >
+Enter a name for the dataset: <input name="name" type="text" id="datasetName" /><br />
 Select a type of dataset definition: 
 <input type="hidden" name="action" value="define" />
 <select name="type">
