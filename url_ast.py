@@ -153,8 +153,9 @@ class Study (Node):
                 return self.renderlist("Study Upload",
                                        [self.render.TreeUpload()])
             elif self.action == 'download':
+                self.globals['version'] = self.version
                 return self.renderlist("Study Download",
-                                       [self.render.TreeDownload(self.data_id, self.version)])
+                                       [self.render.TreeDownload(self.data_id)])
             elif self.action == 'get':
                 success = None
                 error = None
@@ -166,8 +167,9 @@ class Study (Node):
                     error = self.status
     
                 if self.data_id:
+                    self.globals['version'] = self.version
                     return self.renderlist(None,
-                                           [self.render.TreeStatus(self.data_id, self.direction, success, error, files, self.version)])
+                                           [self.render.TreeStatus(self.data_id, self.direction, success, error, files)])
                 else:
                     url = '/appleterror'
                     if self.status:
@@ -651,6 +653,7 @@ class Tagdef (Node):
         def postCommit(results):
             if self.action == 'delete':
                 self.globals['data_id'] = self.tag_id
+                self.globals['version'] = None
                 return self.renderlist("Delete Confirmation",
                                        [self.render.ConfirmForm('tagdef')])
             else:
@@ -835,9 +838,10 @@ class FileTags (Node):
         files, system, userdefined, all, length = results
         #web.debug(system, userdefined, all)
         if self.data_id:
+            self.globals['version'] = self.version
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('User', files[0], userdefined, self.version),
-                                    self.render.FileTagExisting('System', files[0], system, self.version),
+                                   [self.render.FileTagExisting('User', files[0], userdefined),
+                                    self.render.FileTagExisting('System', files[0], system),
                                     self.render.TagdefNewShortcut('Define more tags')])
         else:
             return self.renderlist(self.get_title_all(),
@@ -1138,6 +1142,7 @@ class TagdefACL (FileTags):
         tagdefs, system, userdefined, all, length = results
         self.globals['tagdefsdict'] = dict([ (x.tagname, x) for x in all ])
         if self.data_id:
+            self.globals['version'] = None
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('', tagdefs[0], all)])
         else:

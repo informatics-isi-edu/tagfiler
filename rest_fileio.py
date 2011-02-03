@@ -966,8 +966,9 @@ class FileIO (Application):
         def preDeletePostCommit(result):
             target = self.home + web.ctx.homepath
             ftype = result
+            self.globals['version'] = self.version
             return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(ftype, self.version)])
+                                   [self.render.ConfirmForm(ftype)])
         
         contentType = web.ctx.env['CONTENT_TYPE'].lower()
         if contentType[0:19] == 'multipart/form-data':
