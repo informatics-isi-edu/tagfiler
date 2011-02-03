@@ -31,7 +31,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	QueryAdd.html QueryView.html QueryViewStatic.html \
 	TreeUpload.html TreeDownload.html TreeStatus.html \
 	Error.html AppletError.html \
-	LogList.html LogUriList.html Contact.html
+	LogList.html LogUriList.html Contact.html ContainsForm.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)

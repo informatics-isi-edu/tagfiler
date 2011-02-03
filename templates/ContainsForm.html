@@ -1,0 +1,10 @@
+$def with (suffix)
+<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post" >
+Select a type of dataset: 
+<select name="type">
+  <option value="contains">contains</option>
+  <option value="vcontains">vcontains</option>
+</select><br />
+<input type="submit" value="Register" />
+<input type="hidden" name="action" value="putdq" />
+</form>

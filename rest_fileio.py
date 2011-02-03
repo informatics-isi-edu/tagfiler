@@ -100,6 +100,7 @@ class FileIO (Application):
         self.referer = None
         self.update = False
         self.needed_db_globals = []  # turn off expensive db queries we ignore
+        self.key = None
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -373,6 +374,9 @@ class FileIO (Application):
                 elif self.filetype == 'url':
                     return self.renderlist("Register a remote URL",
                                            [self.render.UrlForm(suffix)])
+                elif self.filetype == 'dataset':
+                    return self.renderlist("Register a dataset",
+                                           [self.render.ContainsForm(suffix)])
                 else:
                     raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
 
@@ -484,6 +488,8 @@ class FileIO (Application):
         return results
 
     def updateFileTags(self, basefile, content_type):
+        if self.key:
+            self.set_file_tag('key', self.key)
         if not basefile:
             # set initial tags
             self.set_file_tag('owner', self.authn.role)
@@ -498,7 +504,7 @@ class FileIO (Application):
             self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
             # copy basefile tags
             for result in self.select_filetags_noauthn(data_id=basefile.file, version=basefile.version):
-                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'vname', 'content-type', 'url', 'member of' ]:
+                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'vname', 'content-type', 'url', 'member of', 'key' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
@@ -877,6 +883,12 @@ class FileIO (Application):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
 
+        def keyBody():
+            return self.select_next_key_number()
+
+        def keyPostCommit(results):
+            return results
+
         def preWriteBody():
 #            self.preDispatchCore(uri)
             return self.putPreWriteBody()
@@ -1022,13 +1034,16 @@ class FileIO (Application):
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' ]:
+            elif self.action in [ 'put', 'putsq' , 'putdq' ]:
                 # we only support URL PUT simulation this way
                 if self.action == 'put':
                     self.location = storage.url
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.location = storage.url + '?title=%s' % urlquote(self.data_id)
+                elif self.action == 'putdq':
+                    self.key = self.dbtransact(keyBody, keyPostCommit)
+                    self.location = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
                 self.local = False
                 return self.dbtransact(putBody, putPostCommit)
 
