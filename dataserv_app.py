@@ -963,16 +963,6 @@ class Application:
         #web.debug(query, vars)
         return self.db.query(query, vars)
 
-    def update_dataset_member(self, old_version):
-        old_member = '%s@%d' % (self.data_id, old_version)
-        new_member = '%s@%d' % (self.data_id, self.version)
-        vars=dict(old_member=old_member, new_member=new_member)
-        self.db.query('UPDATE "_vcontains" SET value = $new_member WHERE value = $old_member', vars=vars)
-
-    def delete_dataset_member(self, name):
-        vars=dict(name=name)
-        self.db.query('DELETE FROM "_vcontains" WHERE value = $name', vars=vars)
-
     def insert_file(self, data_id, version, local, location):
         vars = dict(name=data_id, version=version, local=local, location=location)
         self.db.query("INSERT INTO files ( name, version, local, location ) VALUES ( $name, $version, $local, $location )", vars=vars)
