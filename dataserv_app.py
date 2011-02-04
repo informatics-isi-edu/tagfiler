@@ -985,8 +985,8 @@ class Application:
         vars=dict(name=self.data_id, version=self.version, location=self.location, local=self.local)
         self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name AND version = $version", vars=vars)
 
-    def update_latestfile_version(self, next_latest):
-        vars=dict(name=self.data_id, version=next_latest)
+    def update_latestfile_version(self, data_id, next_latest):
+        vars=dict(name=data_id, version=next_latest)
         self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
 
     def delete_file(self, data_id=None, version=None):
