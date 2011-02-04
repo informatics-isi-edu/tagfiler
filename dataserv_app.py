@@ -1579,7 +1579,7 @@ class Application:
         listtags = set(listtags)
         
         selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
-                    for listtag in listtags.union(set(['file', 'local', 'location', 'owner', 'version'])) ]
+                    for listtag in listtags.union(set(['file', 'dtype', 'storagename', 'url', 'owner', 'version'])) ]
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query
