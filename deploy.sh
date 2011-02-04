@@ -297,7 +297,7 @@ dataset()
    local owner="\$1"
    shift
 
-   echo "create \$type dataset: '\$file'
+   echo "create \$type dataset: '\$file'"
 
    psql -t -q -c "INSERT INTO files (name, version) VALUES ( '\$file', 1 )"
    psql -t -q -c "INSERT INTO latestfiles (name, version) VALUES ( '\$file', 1 )"
