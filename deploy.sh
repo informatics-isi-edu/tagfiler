@@ -257,50 +257,79 @@ tag()
    fi
 }
 
-# pre-established stored queries for use case
-storedquery()
+# pre-established stored data
+dataset()
 {
-   # args: name terms owner [readuser]...
-   local file="\$1"
-   local url="\$2"
-   local owner="\$3"
-   shift 3
+   # args: <name> url <url> <owner> [<readuser>]...
+   # args: <name> blank <owner> [<readuser>]...
+   # args: <name> typedef <owner> [<readuser>]...
 
-   case "\$url" in
-      http*:*|/*)
-          url="\$url"
-          ;;
+   local file="\$1"
+   local type="\$2"
+   local url
+   local owner
+
+   shift 2
+
+   case "\$type" in
+      url)
+         url="\$1"
+         shift         
+
+         case "\$url" in
+            http*:*|/*)
+               url="\$url"
+               ;;
+            *)
+               url="https://${HOME_HOST}/${SVCPREFIX}/query/\$url"
+              ;;
+         esac
+         ;;
+      blank|typedef)
+         :
+         ;;
       *)
-          url="https://${HOME_HOST}/${SVCPREFIX}/query/\$url"
-          ;;
+         echo "Unsupported dataset format: $*"
+         exit 1
+         ;;
    esac
 
-   echo "create stored query: '\$file' --> '\$url'..."
+   local owner="\$1"
+   shift
+
+   echo "create \$type dataset: '\$file'
+
    psql -t -q -c "INSERT INTO files (name, version) VALUES ( '\$file', 1 )"
    psql -t -q -c "INSERT INTO latestfiles (name, version) VALUES ( '\$file', 1 )"
    tag "\$file" name text "\$file"
    tag "\$file" vname text "\$file@1"
    tag "\$file" version int8 1
    tag "\$file" dtype text "url"
-   tag "\$file" url text "\$url"
    tag "\$file" owner text "\$owner"
+
    while [[ \$# -gt 0 ]]
    do
       tag "\$file" "read users" text "\$1"
       shift
    done
+
+   case "\$type" in
+      url)
+         tag "\$file" url text "\$url"
+         ;;
+   esac
 }
 
-storedquery "New image studies" 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
-storedquery "Previous image studies" 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
-storedquery "All image studies" 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
+dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
+dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
+dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
 
 for x in "New image studies" "Previous image studies" "All image studies"
 do
    tag "\$x" "list on homepage"
 done
 
-storedquery "tagfiler configuration" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
+dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
 
 typedef()
 {
@@ -308,7 +337,7 @@ typedef()
    dbtype="\$2"
    desc="\$3"
    shift 3
-   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/_type_def_\${typename}" "${admin}" "*"
+   dataset "_type_def_\${typename}" typedef "${admin}" "*"
    tag "_type_def_\${typename}" "_type_name" text "\${typename}"
    tag "_type_def_\${typename}" "_type_dbtype" text "\${dbtype}"
    tag "_type_def_\${typename}" "_type_description" text "\${desc}"
@@ -327,12 +356,12 @@ typedef text         text          'Text'
 typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
-typedef dtype       text          'Dataset type' 'url' 'blank' 'file' 'contains' 'vcontains'
+typedef dtype       text          'Dataset type' 'url' 'blank' 'typedef' 'file' 'contains' 'vcontains'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
 typedef vfile        text          'Dataset with version number'
 
-storedquery "configuration tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
+dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
 
 cfgtagdef()
 {
@@ -457,9 +486,9 @@ tagdef "Downloaded"   ""          ""      tag         tag        false
 tagacl "Downloaded" read "${downloader}"
 tagacl "Downloaded" write "${downloader}"
 
-storedquery "study tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" "${admin}" "*"
-storedquery "fundus tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" "${admin}" "*"
-storedquery "fundus brief tags" "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" "${admin}" "*"
+dataset "study tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" "${admin}" "*"
+dataset "fundus tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" "${admin}" "*"
+dataset "fundus brief tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" "${admin}" "*"
 
 modtagdef()
 {

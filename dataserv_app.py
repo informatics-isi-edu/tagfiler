@@ -1005,6 +1005,14 @@ class Application:
             # we're deleting latest version if one wasn't specified already by caller
             version = versions[0].version
 
+        dtype = self.select_file_tag_noauthn('dtype', data_id=data_id, version=version)
+        if dtype == 'typedef':
+            # check for in-use dependencies before allowing delete
+            used_types = set([ res.typestr for res in self.select_tagdef() if res.typestr != '' ])
+            typestr = self.select_file_tag_noauthn('_type_name', data_id=data_id, version=version)
+            if typestr in used_types:
+                raise Conflict('The type ("%s") defined by "%s@%s" is in use and cannot be deleted.' % (typestr, data_id, version) )
+
         if version == versions[0].version and len(versions) > 1:
             # we're deleting the latest version and there are previous versions
             self.update_latestfile_version(data_id, versions[1].version)
