@@ -14,7 +14,7 @@ import datetime
 import pytz
 import urllib
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, urlquote, parseBoolString
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString
 
 # build a map of mime type --> primary suffix
 mime_types_suffixes = dict()
@@ -365,6 +365,10 @@ class FileIO (Application):
                 if len(results) == 0:
                     return None
                 self.enforce_file_authz('write', local=results[0].local)
+                if self.version:
+                    result = self.select_file_max_version()
+                    if result[0].version != int(self.version):
+                        raise Forbidden(data="replace of dataset %s@%s" % (self.data_id, self.version))
                 return None
 
             def postCommit(results):

@@ -952,6 +952,15 @@ class Application:
             query += ' WHERE name = $name'
         return self.db.query(query, vars)
 
+    def select_file_max_version(self, data_id=None):
+        if data_id == None:
+            data_id = self.data_id
+        vars = dict(name=data_id)
+        query = 'SELECT MAX(version) AS version FROM files'
+        if data_id:
+            query += ' WHERE name = $name'
+        return self.db.query(query, vars)
+
     def select_dataset_size(self, key):
         data_id = self.data_id + '/%'
         vars = dict(data_id=data_id, key=key)
