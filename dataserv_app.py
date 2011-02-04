@@ -985,22 +985,32 @@ class Application:
         vars=dict(name=self.data_id, version=self.version, location=self.location, local=self.local)
         self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name AND version = $version", vars=vars)
 
+    def update_latestfile_version(self, next_latest):
+        vars=dict(name=self.data_id, version=next_latest)
+        self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
+
     def delete_file(self, data_id=None, version=None):
         if data_id == None:
             data_id = self.data_id
         if version == None:
             version = self.version
         wheres = []
-        query = 'DELETE FROM files'
+
+        if not data_id:
+            raise BadRequest("Dataset deletion requires a dataset name.")
+        
+        versions = [ file for file in self.select_file_versions(data_id) ]
+        versions.sort(key=lambda res: res.version, reverse=True)
+        
         if not version:
-            query += ' USING latestfiles'
-            wheres.extend(['files.name = latestfiles.name', 'files.version = latestfiles.version'])
-        wheres.append('name = $name')
-        if version:
-            wheres.append('version = $version')
-        wheres = ' AND '.join(wheres)
-        if wheres:
-            query += ' WHERE ' + wheres
+            # we're deleting latest version if one wasn't specified already by caller
+            version = versions[0].version
+
+        if version == versions[0].version and len(versions) > 1:
+            # we're deleting the latest version and there are previous versions
+            self.update_latestfile_version(data_id, versions[1].version)
+                
+        query = 'DELETE FROM files WHERE name = $name AND version = $version'
         self.db.query(query, vars=dict(name=data_id, version=version))
 
     def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
