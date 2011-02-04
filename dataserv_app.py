@@ -1440,7 +1440,7 @@ class Application:
                     'files.version',
                     '_owner.value',
                     '_vname.value',
-                    '_dbtype.value',
+                    '_dtype.value',
                     '_storagename.value',
                     '_url.value']
         wheres = []
