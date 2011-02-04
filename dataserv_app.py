@@ -1415,21 +1415,26 @@ class Application:
 
         innertables = ['files',
                        '_owner ON (files.name = _owner.file AND files.version = _owner.version)',
-                       '_vname ON (files.name = _vname.file AND files.version = _vname.version)']
+                       '_vname ON (files.name = _vname.file AND files.version = _vname.version)',
+                       '_dtype ON (files.name = _dtype.file AND files.version = _dtype.version)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
+                       '_storagename ON (files.name = _storagename.file AND files.version = _storagename.version)',
+                       '_url ON (files.name = _url.file AND files.version = _url.version)',
                        '(SELECT file, version, array_agg(value) AS value FROM "_read users" GROUP BY file, version) AS "read users" ON (files.name = "read users".file AND files.version = "read users".version)']
         selects = ['files.name AS file',
                    'files.version AS version',
-                   'files.local AS local',
-                   'files.location AS location',
                    '_owner.value AS owner',
-                   '_vname.value AS vname']
+                   '_vname.value AS vname',
+                   '_dtype.value AS dtype',
+                   '_storagename.value AS storagename',
+                   '_url.value AS url']
         groupbys = ['files.name',
                     'files.version',
-                    'files.local',
-                    'files.location',
                     '_owner.value',
-                    '_vname.value']
+                    '_vname.value',
+                    '_dbtype.value',
+                    '_storagename.value',
+                    '_url.value']
         wheres = []
         values = dict()
 
@@ -1484,7 +1489,7 @@ class Application:
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
-                          if not tagdefs[tagname].multivalue and tagname not in ['owner', 'vname', 'version' ] ]
+                          if not tagdefs[tagname].multivalue and tagname not in ['dbtype', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
         for tagname in singlevaltags:
             outertables.append('"_%s" ON (files.name = "_%s".file AND files.version = "_%s".version)' % (tagname, tagname, tagname))
             if tagdefs[tagname].typestr == '':
@@ -1496,7 +1501,7 @@ class Application:
 
         # add custom per-file multi-val tags to results
         multivaltags = [ tagname for tagname in listtags
-                         if tagdefs[tagname].multivalue ]
+                         if tagdefs[tagname].multivalue and tagname not in [] ]
         for tagname in multivaltags:
             if tagname != 'read users':
                 outertables.append('(SELECT file, version, array_agg(value) AS value FROM "_%s" GROUP BY file, version) AS "%s" ON (files.name = "%s".file AND files.version = "%s".version)' % (tagname, tagname, tagname, tagname))

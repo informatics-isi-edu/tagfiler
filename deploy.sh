@@ -112,7 +112,7 @@ cat > /home/${SVCUSER}/dbsetup.sh <<EOF
 
 echo "create core tables..."
 
-psql -q -t -c "CREATE TABLE files ( name text, version int8, local boolean default False, location text, PRIMARY KEY(name, version) )"
+psql -q -t -c "CREATE TABLE files ( name text, version int8, PRIMARY KEY(name, version) )"
 psql -q -t -c "CREATE TABLE latestfiles ( name text PRIMARY KEY, version int8, FOREIGN KEY (name, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 psql -q -t -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, readpolicy text, writepolicy text, owner text )"
 psql -q -t -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
@@ -193,7 +193,9 @@ tagdef bytes          int8        ""      anonymous   system     false
 tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef vname          text        ""      anonymous   system     false
-tagdef url            text        ""      file        file       false      url
+tagdef dtype          text        ""      anonymous   system     false      dtype
+tagdef storagename    text        ""      system      system     false
+tagdef url            text        ""      file        system     false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
@@ -274,11 +276,12 @@ storedquery()
    esac
 
    echo "create stored query: '\$file' --> '\$url'..."
-   psql -t -q -c "INSERT INTO files (name, version, local, location) VALUES ( '\$file', 1, False, '\$url' )"
+   psql -t -q -c "INSERT INTO files (name, version) VALUES ( '\$file', 1 )"
    psql -t -q -c "INSERT INTO latestfiles (name, version) VALUES ( '\$file', 1 )"
    tag "\$file" name text "\$file"
    tag "\$file" vname text "\$file@1"
    tag "\$file" version int8 1
+   tag "\$file" dtype text "url"
    tag "\$file" url text "\$url"
    tag "\$file" owner text "\$owner"
    while [[ \$# -gt 0 ]]
@@ -305,7 +308,7 @@ typedef()
    dbtype="\$2"
    desc="\$3"
    shift 3
-   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration" "${admin}" "*"
+   storedquery "_type_def_\${typename}" "https://${HOME_HOST}/${SVCPREFIX}/tags/_type_def_\${typename}" "${admin}" "*"
    tag "_type_def_\${typename}" "_type_name" text "\${typename}"
    tag "_type_def_\${typename}" "_type_dbtype" text "\${dbtype}"
    tag "_type_def_\${typename}" "_type_description" text "\${desc}"
@@ -324,6 +327,7 @@ typedef text         text          'Text'
 typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
+typedef dbtype       text          'Dataset type' 'url' 'blank' 'file' 'contains' 'vcontains'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
 typedef vfile        text          'Dataset with version number'
