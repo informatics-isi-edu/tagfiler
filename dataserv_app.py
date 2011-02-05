@@ -1497,7 +1497,7 @@ class Application:
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
-                          if not tagdefs[tagname].multivalue and tagname not in ['dbtype', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
+                          if not tagdefs[tagname].multivalue and tagname not in ['dtype', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
         for tagname in singlevaltags:
             outertables.append('"_%s" ON (files.name = "_%s".file AND files.version = "_%s".version)' % (tagname, tagname, tagname))
             if tagdefs[tagname].typestr == '':
