@@ -124,20 +124,20 @@ class FileIO (Application):
         def postCommit(result):
             # if the dataset is a remote URL, just redirect client
             result, content_type = result
-            if not result.local:
+            if result.dtype == 'url':
                 opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
                 if len(opts) > 0:
                     querystr = '&'.join(opts)
-                    if len(result.location.split("?")) > 1:
+                    if len(result.storagename.split("?")) > 1:
                         querystr = '&' + querystr
                     else:
                         querystr = '?' + querystr
                 else:
                     querystr = ''
-                raise web.seeother(result.location + querystr)
-            else:
-                self.location = result.location
-                filename = self.store_path + '/' + self.location
+                raise web.seeother(result.url + querystr)
+            elif result.dtype == 'file':
+                self.storagename = result.storagename
+                filename = self.store_path + '/' + self.storagename
                 try:
                     f = open(filename, "rb", 0)
                     if content_type == None:
@@ -361,10 +361,10 @@ class FileIO (Application):
 
             def body():
 #                self.preDispatchCore(uri)
-                results = self.select_file()
+                results = self.select_file_tag('dtype')
                 if len(results) == 0:
                     return None
-                self.enforce_file_authz('write', local=results[0].local)
+                self.enforce_file_authz('write', dtype=results[0].value)
                 if self.version:
                     result = self.select_file_max_version()
                     if result[0].version != int(self.version):
@@ -400,15 +400,24 @@ class FileIO (Application):
                     raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
             file = results[0]
             self.version = file.version
-            self.enforce_file_authz('write', file.data_id, file.version, local=file.local)
+            dtype = None
+            results = self.select_file_tag('dtype')
+            if len(results) > 0:
+                dtype = results[0].value
+            storagename = None
+            results = self.select_file_tag('storagename')
+            if len(results) > 0:
+                storagename = results[0].value
+            self.enforce_file_authz('write', file.data_id, file.version, dtype=dtype)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
-            return result
+            return (dtype, storagename)
 
         def postCommit(result):
-            if result.local and result.location != None:
+            dtype, storagename = result
+            if dtype == 'file' and storagename != None:
                 """delete the file"""
-                filename = self.store_path + '/' + result.location
+                filename = self.store_path + '/' + storagename
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
                 web.ctx.status = '204 No Content'
@@ -442,7 +451,6 @@ class FileIO (Application):
 
     def insertForStore(self):
         """Only call this after creating a new file on disk!"""
-        remote = not self.local
         content_type = None
         results = []
 
@@ -463,7 +471,7 @@ class FileIO (Application):
                 tagged_content_type = None
 
             try:
-                filename = self.store_path + '/' + self.location
+                filename = self.store_path + '/' + self.storagename
                 p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                 line = p.stdout.readline()
                 guessed_content_type = line.strip()
@@ -476,16 +484,16 @@ class FileIO (Application):
 
         if file:
             # check permissions and update existing file
-            self.enforce_file_authz('write', local=file.local)
+            self.enforce_file_authz('write', dtype=file.dtype)
             # register as a new version of the existing file
             self.version = file.version + 1  # BUG?  PUT to a version other than current head?
-            self.insert_file(self.data_id, self.version, self.local, self.location)
+            self.insert_file(self.data_id, self.version, self.dtype, self.storagename)
             self.txlog('UPDATE', dataset=self.data_id)
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=self.data_id)
             self.version = 1
-            self.insert_file(self.data_id, self.version, self.local, self.location)
+            self.insert_file(self.data_id, self.version, self.dtype, self.storagename)
 
         self.updateFileTags(file, content_type)
 
@@ -527,7 +535,7 @@ class FileIO (Application):
         if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5 or basefile.version != self.version:
             self.set_file_tag('modified', 'now')
 
-        if self.local:
+        if self.dtype == 'file':
             if not basefile or self.bytes != basefile.bytes or basefile.version != self.version:
                 self.set_file_tag('bytes', self.bytes)
             if not basefile or basefile.url and basefile.version == self.version:
@@ -535,12 +543,12 @@ class FileIO (Application):
                 
             if content_type and (not basefile or basefile['content-type'] != content_type or basefile.version != self.version):
                 self.set_file_tag('content-type', content_type)
-        else:
+        elif self.dtype == 'url':
             if basefile and basefile.bytes != None and basefile.version == self.version:
                 self.delete_file_tag('bytes')
             if basefile and basefile['content-type'] != None and basefile.version == self.version:
                 self.delete_file_tag('content-type')
-            self.set_file_tag('url', self.location)
+            self.set_file_tag('url', self.storagename)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
@@ -657,8 +665,8 @@ class FileIO (Application):
             
     def deletePrevious(self, files):
         for file in files:
-            if file.local and file.location != None:
-                self.deleteFile(self.store_path + '/' + file.location)
+            if file.dtype == 'file' and file.storagename != None:
+                self.deleteFile(self.store_path + '/' + file.storagename)
 
     def putPreWriteBody(self):
         try:
@@ -681,13 +689,13 @@ class FileIO (Application):
 
         if file:
             if self.update:
-                if file.local:
-                    if file.location == None:
+                if file.dtype == 'file':
+                    if file.storagename == None:
                         return None
-                    self.location = file.location
+                    self.storagename = file.storagename
                     self.version = file.version
-                    filename = self.store_path + '/' + self.location
-                    self.local = file.local
+                    filename = self.store_path + '/' + self.storagename
+                    self.dtype = file.dtype
                     f = open(filename, 'r+b', 0)
                     return f
                 else:
@@ -746,7 +754,7 @@ class FileIO (Application):
         if cfirst != None and clast:
             # try update-in-place if user is doing Range: partial PUT
             self.update = True
-            self.local = True
+            self.dtype = 'file'
             # if checksum is not set, then allow chunk updates # BUG: this is improper outside transaction body
             #if len(self.gettagvals('sha256sum')) == 0:
             #    self.localFilesImmutable = False
@@ -768,10 +776,10 @@ class FileIO (Application):
             if cached:
                 ctime, fileresult = cached
                 if (now - ctime).seconds < file_cache_time:
-                    self.location = fileresult.location
+                    self.storagename = fileresult.storagename
                     self.version = fileresult.version
-                    filename = self.store_path + '/' + self.location
-                    self.local = fileresult.local
+                    filename = self.store_path + '/' + self.storagename
+                    self.dtype = fileresult.dtype
                     f = open(filename, 'r+b', 0)
                     if not f:
                         file_cache.pop((self.authn.role, self.data_id), None)
@@ -804,8 +812,8 @@ class FileIO (Application):
         # we get here if write is not disallowed
         if f == None:
             f, filename = self.getTemporary('wb')
-            self.location = filename[len(self.store_path)+1:]
-            self.local = True
+            self.storagename = filename[len(self.store_path)+1:]
+            self.dtype = 'file'
             mustInsert = True
         else:
             filename = None
@@ -848,7 +856,7 @@ class FileIO (Application):
             file_cache[(self.authn.role, self.data_id)] = (now, self.fileMatch)
             file_version_cache[(self.authn.role, self.data_id, self.fileMatch.version)] = (now, self.fileMatch)
         if not mustInsert \
-                and self.local \
+                and self.dtype == 'file' \
                 and self.fileMatch \
                 and self.version == self.fileMatch.version \
                 and self.authn.role == self.fileMatch['modified by'] \
@@ -917,9 +925,17 @@ class FileIO (Application):
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
-            self.enforce_file_authz('write', local=result.local)
+            results = self.select_file_tag('dtype')
+            if len(results) == 0:
+                raise NotFound(data='dtype for dataset %s' % (self.data_id))
+            dtype = results[0].value
+            results = self.select_file_tag('storagename')
+            if len(results) == 0:
+                raise NotFound(data='storagename for dataset %s' % (self.data_id))
+            storagename = results[0].value
+            self.enforce_file_authz('write', dtype=dtype)
             self.version = result.version
-            filesdict[result.name] = result
+            filesdict[result.name] = web.storage(name=result.name, version=result.version, dtype=dtype, storagename=storagename)
 
             #For now, don't delete the members of a dataset. It is unsafe, as a file might belong to multiple datasets
             #self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
@@ -940,10 +956,14 @@ class FileIO (Application):
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
-            self.enforce_file_authz('write', local=result.local)
-            if result.local:
+            results = self.select_file_tag('dtype')
+            if len(results) == 0:
+                raise NotFound(data='dtype for dataset %s' % (self.data_id))
+            dtype = results[0].value
+            self.enforce_file_authz('write', dtype=dtype)
+            if dtype == 'file':
                 ftype = 'file'
-            else:
+            elif dtype == 'url':
                 try:
                     results = self.select_file_tag('Image Set')
                     if len(results) > 0:
@@ -997,8 +1017,8 @@ class FileIO (Application):
                 if buf != boundaryN:
                     # we did not get an entire multipart body apparently
                     raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
-                self.location = tempFileName[len(self.store_path)+1:len(tempFileName)]
-                self.local = True
+                self.storagename = tempFileName[len(self.store_path)+1:len(tempFileName)]
+                self.dtype = 'file'
                 self.bytes = bytes
 
                 result = self.dbtransact(putBody, putPostCommit)
@@ -1029,14 +1049,14 @@ class FileIO (Application):
             elif self.action in [ 'put', 'putsq' , 'putdq' ]:
                 # we only support URL PUT simulation this way
                 if self.action == 'put':
-                    self.location = storage.url
+                    self.storagename = storage.url
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
-                    self.location = storage.url + '?title=%s' % urlquote(self.data_id)
+                    self.storagename = storage.url + '?title=%s' % urlquote(self.data_id)
                 elif self.action == 'putdq':
                     self.key = self.dbtransact(keyBody, keyPostCommit)
-                    self.location = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
-                self.local = False
+                    self.storagename = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
+                self.dtype = 'url'
                 return self.dbtransact(putBody, putPostCommit)
 
             else:

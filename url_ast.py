@@ -297,7 +297,7 @@ class FileList (Node):
                 res.writeok = self.gui_test_file_authz('write',
                                                        owner=res.owner,
                                                        data_id=res.file,
-                                                       local=res.local)
+                                                       dtype=res.dtype)
 
             return files
 
@@ -364,8 +364,8 @@ class FileList (Node):
             raise BadRequest('Expected action, name, and url form fields.')
         ast = FileId(appname=self.appname,
                      data_id=name,
-                     location=url,
-                     local=False)
+                     storagename=url,
+                     dtype='url')
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 
@@ -420,8 +420,8 @@ class FileId(Node, FileIO):
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'data_id', 'location', 'local', 'queryopts' ]
-    def __init__(self, appname, data_id, location=None, local=False, queryopts={}):
+    __slots__ = [ 'data_id', 'storagename', 'dtype', 'queryopts' ]
+    def __init__(self, appname, data_id, storagename=None, dtype='url', queryopts={}):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         if type(data_id) == web.utils.Storage:
@@ -430,8 +430,8 @@ class FileId(Node, FileIO):
         else:
             self.data_id = data_id
             self.version = None
-        self.location = location
-        self.local = local
+        self.storagename = storagename
+        self.dtype = dtype
         self.queryopts = queryopts
 
 class LogId(Node, LogFileIO):
@@ -1303,7 +1303,7 @@ class Query (Node):
                 res.writeok = self.gui_test_file_authz('write',
                                                        owner=res.owner,
                                                        data_id=res.file,
-                                                       local=res.local)
+                                                       dtype=res.dtype)
             return files
 
         def postCommit(files):

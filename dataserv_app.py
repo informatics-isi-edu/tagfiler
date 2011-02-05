@@ -814,21 +814,21 @@ class Application:
         else:
             return True
 
-    def enforce_file_authz(self, mode, data_id=None, version=None, local=False, owner=None):
+    def enforce_file_authz(self, mode, data_id=None, version=None, dtype='url', owner=None):
         """Check whether access is allowed and throw web exception if not."""
         if data_id == None:
             data_id = self.data_id
         if version == None:
             version = self.version
         if mode == 'write':
-            if not local:
+            if dtype == 'url':
                 try:
                     results = self.select_file_tag('Image Set', data_id=data_id, version=version)
                     if len(results) > 0:
-                        local = True
+                        dtype = 'file'
                 except:
                     pass
-            if local and self.localFilesImmutable or not local and self.remoteFilesImmutable:
+            if dtype == 'file' and self.localFilesImmutable or dtype == 'url' and self.remoteFilesImmutable:
                 raise Forbidden(data="access to immutable dataset %s" % data_id)
         allow = self.test_file_authz(mode, data_id=data_id, version=version, owner=owner)
         if allow == False:
@@ -838,10 +838,10 @@ class Application:
         else:
             pass
 
-    def gui_test_file_authz(self, mode, data_id=None, owner=None, local=False):
+    def gui_test_file_authz(self, mode, data_id=None, owner=None, dtype='url'):
         status = web.ctx.status
         try:
-            self.enforce_file_authz(mode, data_id=data_id, local=local, owner=owner)
+            self.enforce_file_authz(mode, data_id=data_id, dtype=dtype, owner=owner)
             return True
         except:
             web.ctx.status = status
@@ -972,17 +972,26 @@ class Application:
         #web.debug(query, vars)
         return self.db.query(query, vars)
 
-    def insert_file(self, data_id, version, local, location):
-        vars = dict(name=data_id, version=version, local=local, location=location)
-        self.db.query("INSERT INTO files ( name, version, local, location ) VALUES ( $name, $version, $local, $location )", vars=vars)
+    def insert_file(self, data_id, version, dtype, storagename):
+        vars = dict(name=data_id, version=version)
+        self.db.query("INSERT INTO files ( name, version ) VALUES ( $name, $version )", vars=vars)
         if version > 1:
             self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
         else:
             self.db.query("INSERT INTO latestfiles ( name, version ) VALUES ( $name, $version )", vars=vars)
+            
+        if dtype:
+            self.set_file_tag('dtype', value=dtype, data_id=data_id, version=version)
+
+        if storagename:
+            self.set_file_tag('storagename', value=storagename, data_id=data_id, version=version)
 
     def update_file(self):
-        vars=dict(name=self.data_id, version=self.version, location=self.location, local=self.local)
-        self.db.query("UPDATE files SET location = $location, local = $local WHERE name = $name AND version = $version", vars=vars)
+        if self.dtype:
+            self.set_file_tag('dtype', value=self.dtype, data_id=self.data_id, version=self.version)
+
+        if self.storagename:
+            self.set_file_tag('storagename', value=self.storagename, data_id=self.data_id, version=self.version)
 
     def update_latestfile_version(self, data_id, next_latest):
         vars=dict(name=data_id, version=next_latest)
