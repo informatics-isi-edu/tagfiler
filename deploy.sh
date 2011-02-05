@@ -304,7 +304,7 @@ dataset()
    tag "\$file" name text "\$file"
    tag "\$file" vname text "\$file@1"
    tag "\$file" version int8 1
-   tag "\$file" dtype text "url"
+   tag "\$file" dtype text "\$type"
    tag "\$file" owner text "\$owner"
 
    while [[ \$# -gt 0 ]]

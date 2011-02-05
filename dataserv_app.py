@@ -982,16 +982,14 @@ class Application:
             
         if dtype:
             self.set_file_tag('dtype', value=dtype, data_id=data_id, version=version)
-
-        if storagename:
-            self.set_file_tag('storagename', value=storagename, data_id=data_id, version=version)
+            if storagename and dtype == 'file':
+                self.set_file_tag('storagename', value=storagename, data_id=data_id, version=version)
 
     def update_file(self):
         if self.dtype:
             self.set_file_tag('dtype', value=self.dtype, data_id=self.data_id, version=self.version)
-
-        if self.storagename:
-            self.set_file_tag('storagename', value=self.storagename, data_id=self.data_id, version=self.version)
+            if self.storagename and self.dtype == 'file':
+                self.set_file_tag('storagename', value=self.storagename, data_id=self.data_id, version=self.version)
 
     def update_latestfile_version(self, data_id, next_latest):
         vars=dict(name=data_id, version=next_latest)

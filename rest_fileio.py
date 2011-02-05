@@ -128,7 +128,7 @@ class FileIO (Application):
                 opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
                 if len(opts) > 0:
                     querystr = '&'.join(opts)
-                    if len(result.storagename.split("?")) > 1:
+                    if len(result.url.split("?")) > 1:
                         querystr = '&' + querystr
                     else:
                         querystr = '?' + querystr
@@ -548,7 +548,7 @@ class FileIO (Application):
                 self.delete_file_tag('bytes')
             if basefile and basefile['content-type'] != None and basefile.version == self.version:
                 self.delete_file_tag('content-type')
-            self.set_file_tag('url', self.storagename)
+            self.set_file_tag('url', self.url)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
@@ -929,10 +929,10 @@ class FileIO (Application):
             if len(results) == 0:
                 raise NotFound(data='dtype for dataset %s' % (self.data_id))
             dtype = results[0].value
+            storagename = None
             results = self.select_file_tag('storagename')
-            if len(results) == 0:
-                raise NotFound(data='storagename for dataset %s' % (self.data_id))
-            storagename = results[0].value
+            if len(results) > 0:
+                storagename = results[0].value
             self.enforce_file_authz('write', dtype=dtype)
             self.version = result.version
             filesdict[result.name] = web.storage(name=result.name, version=result.version, dtype=dtype, storagename=storagename)
@@ -972,6 +972,9 @@ class FileIO (Application):
                         ftype = 'url'
                 except:
                     ftype = 'url'
+            else:
+                ftype = 'url'
+                
             return ftype
 
         def preDeletePostCommit(result):
@@ -1049,13 +1052,13 @@ class FileIO (Application):
             elif self.action in [ 'put', 'putsq' , 'putdq' ]:
                 # we only support URL PUT simulation this way
                 if self.action == 'put':
-                    self.storagename = storage.url
+                    self.url = storage.url
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
-                    self.storagename = storage.url + '?title=%s' % urlquote(self.data_id)
+                    self.url = storage.url + '?title=%s' % urlquote(self.data_id)
                 elif self.action == 'putdq':
                     self.key = self.dbtransact(keyBody, keyPostCommit)
-                    self.storagename = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
+                    self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
                 self.dtype = 'url'
                 return self.dbtransact(putBody, putPostCommit)
 

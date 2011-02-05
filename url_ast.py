@@ -432,6 +432,7 @@ class FileId(Node, FileIO):
             self.version = None
         self.storagename = storagename
         self.dtype = dtype
+        self.url = None
         self.queryopts = queryopts
 
 class LogId(Node, LogFileIO):
