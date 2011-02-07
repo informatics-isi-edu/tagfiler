@@ -392,7 +392,7 @@ class FileIO (Application):
 
         def body():
 #            self.preDispatchCore(uri)
-            results = self.select_file()
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version)
             if len(results) == 0:
                 if self.version == None:
                     raise NotFound('dataset "%s"' % self.data_id)
@@ -400,24 +400,15 @@ class FileIO (Application):
                     raise NotFound('dataset "%s"@%d' % (self.data_id, self.version))
             file = results[0]
             self.version = file.version
-            dtype = None
-            results = self.select_file_tag('dtype')
-            if len(results) > 0:
-                dtype = results[0].value
-            storagename = None
-            results = self.select_file_tag('storagename')
-            if len(results) > 0:
-                storagename = results[0].value
-            self.enforce_file_authz('write', file.data_id, file.version, dtype=dtype)
+            self.enforce_file_authz('write', file.data_id, file.version, dtype=file.dtype)
             self.delete_file()
             self.txlog('DELETE', dataset=self.data_id)
-            return (dtype, storagename)
+            return (file)
 
         def postCommit(result):
-            dtype, storagename = result
-            if dtype == 'file' and storagename != None:
+            if result.dtype == 'file' and result.storagename != None:
                 """delete the file"""
-                filename = self.store_path + '/' + storagename
+                filename = self.store_path + '/' + result.storagename
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
                 web.ctx.status = '204 No Content'
@@ -921,21 +912,13 @@ class FileIO (Application):
 
         def deleteBody():
             filesdict = dict()
-            results = self.select_file()
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version)
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
-            results = self.select_file_tag('dtype')
-            if len(results) == 0:
-                raise NotFound(data='dtype for dataset %s' % (self.data_id))
-            dtype = results[0].value
-            storagename = None
-            results = self.select_file_tag('storagename')
-            if len(results) > 0:
-                storagename = results[0].value
-            self.enforce_file_authz('write', dtype=dtype)
+            self.enforce_file_authz('write', dtype=result.dtype)
             self.version = result.version
-            filesdict[result.name] = web.storage(name=result.name, version=result.version, dtype=dtype, storagename=storagename)
+            filesdict[result.file] = web.storage(name=result.file, version=result.version, dtype=result.dtype, storagename=result.storagename)
 
             #For now, don't delete the members of a dataset. It is unsafe, as a file might belong to multiple datasets
             #self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
@@ -952,18 +935,14 @@ class FileIO (Application):
 
         def preDeleteBody():
 #            self.preDispatchCore(uri)
-            results = self.select_file()
+            results = self.select_files_by_predlist(data_id=self.data_id, version=self.version)
             if len(results) == 0:
                 raise NotFound(data='dataset %s' % (self.data_id))
             result = results[0]
-            results = self.select_file_tag('dtype')
-            if len(results) == 0:
-                raise NotFound(data='dtype for dataset %s' % (self.data_id))
-            dtype = results[0].value
-            self.enforce_file_authz('write', dtype=dtype)
-            if dtype == 'file':
+            self.enforce_file_authz('write', dtype=result.dtype)
+            if result.dtype == 'file':
                 ftype = 'file'
-            elif dtype == 'url':
+            elif result.dtype == 'url':
                 try:
                     results = self.select_file_tag('Image Set')
                     if len(results) > 0:
