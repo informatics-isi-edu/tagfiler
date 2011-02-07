@@ -149,6 +149,8 @@ class FileIO (Application):
                     # this may happen sporadically under race condition:
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
+            elif result.dtype == 'typedef':
+                raise web.seeother('%s/tags/%s' % (self.globals['home'], urlquote(self.data_id)))
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
         def preRead():
