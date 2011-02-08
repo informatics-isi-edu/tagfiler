@@ -1,6 +1,6 @@
 $def with (type)
-$ typeLong = dict(file="file", url="saved URL", tagdef="tag definition", typedef="saved type definition", imgset="image set").get(type, '')
-$ typeUri = dict(file='file', url='file', typedef='file', tagdef='tagdef', imgset='file').get(type, type)
+$ typeLong = dict(file="file", url="saved URL", tagdef="tag definition", typedef="saved type definition", vcontains="saved collection of versioned datasets", blank="saved metadata dataset", contains="saved collection of unversioned datasets", imgset="image set").get(type, '')
+$ typeUri = dict(file='file', url='file', typedef='file', contains='file', vcontains='file', blank='file', tagdef='tagdef', imgset='file').get(type, type)
 $# suffix = dict(imgset=' and all associated image files', versset=' and all associated versions').get(type, '')
 $ suffix = ''
 $ vsuffix = ''

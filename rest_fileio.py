@@ -149,7 +149,7 @@ class FileIO (Application):
                     # this may happen sporadically under race condition:
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
-            elif result.dtype == 'typedef':
+            elif result.dtype in ['blank', 'contains', 'typedef', 'vcontains']:
                 raise web.seeother('%s/tags/%s' % (self.globals['home'], urlquote(self.data_id)))
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
@@ -382,7 +382,7 @@ class FileIO (Application):
                                            [self.render.UrlForm(suffix)])
                 elif self.filetype == 'dataset':
                     return self.renderlist("Register a dataset",
-                                           [self.render.ContainsForm(suffix)])
+                                           [self.render.DatasetForm(suffix)])
                 else:
                     raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
 
@@ -493,8 +493,6 @@ class FileIO (Application):
         return results
 
     def updateFileTags(self, basefile, content_type):
-        if self.key:
-            self.set_file_tag('key', self.key)
         if not basefile:
             # set initial tags
             self.set_file_tag('owner', self.authn.role)
@@ -509,7 +507,7 @@ class FileIO (Application):
             self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
             # copy basefile tags
             for result in self.select_filetags_noauthn(data_id=basefile.file, version=basefile.version):
-                if result.tagname not in [ 'bytes', 'modified', 'modified by', 'sha256sum', 'version created', 'version', 'vname', 'content-type', 'url', 'member of', 'key' ]:
+                if result.tagname not in [ 'bytes', 'content-type', 'dtype', 'key', 'member of', 'modified', 'modified by', 'sha256sum', 'url', 'version created', 'version', 'vname' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
@@ -536,12 +534,15 @@ class FileIO (Application):
                 
             if content_type and (not basefile or basefile['content-type'] != content_type or basefile.version != self.version):
                 self.set_file_tag('content-type', content_type)
-        elif self.dtype == 'url':
+        elif self.dtype in [ 'blank', 'contains', 'typedef', 'url', 'vcontains' ]:
             if basefile and basefile.bytes != None and basefile.version == self.version:
                 self.delete_file_tag('bytes')
             if basefile and basefile['content-type'] != None and basefile.version == self.version:
                 self.delete_file_tag('content-type')
-            self.set_file_tag('url', self.url)
+            if self.url:
+                self.set_file_tag('url', self.url)
+            if self.key:
+                self.set_file_tag('key', self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # they all must work to complete transaction
@@ -953,8 +954,8 @@ class FileIO (Application):
                         ftype = 'url'
                 except:
                     ftype = 'url'
-            elif result.dtype == 'typedef':
-                ftype = 'typedef'
+            else:
+                ftype = result.dtype
                 
             return ftype
 
@@ -1032,15 +1033,17 @@ class FileIO (Application):
                 return self.dbtransact(deleteBody, deletePostCommit)
             elif self.action in [ 'put', 'putsq' , 'putdq' ]:
                 # we only support URL PUT simulation this way
+                self.dtype = 'url'
                 if self.action == 'put':
                     self.url = storage.url
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.url = storage.url + '?title=%s' % urlquote(self.data_id)
                 elif self.action == 'putdq':
-                    self.key = self.dbtransact(keyBody, keyPostCommit)
-                    self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
-                self.dtype = 'url'
+                    self.dtype = storage.type
+                    if storage.type in [ 'contains', 'vcontains' ]:
+                        self.key = self.dbtransact(keyBody, keyPostCommit)
+                        self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
                 return self.dbtransact(putBody, putPostCommit)
 
             else:
