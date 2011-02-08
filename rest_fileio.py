@@ -953,8 +953,8 @@ class FileIO (Application):
                         ftype = 'url'
                 except:
                     ftype = 'url'
-            else:
-                ftype = 'url'
+            elif result.dtype == 'typedef':
+                ftype = 'typedef'
                 
             return ftype
 
