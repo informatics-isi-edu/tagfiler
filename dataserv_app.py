@@ -861,12 +861,13 @@ class Application:
         if len(results) == 0:
             raise NotFound(data='dataset "%s"@%d' % (data_id, version))
         allow = self.test_tag_authz(mode, tagname, user=user, fowner=fowner, data_id=data_id, version=version)
-        if not version:
-            version = 1
+        suffix = ''
+        if version:
+            suffix = '@%s' % version
         if allow == False:
-            raise Forbidden(data='%s access to tag %s on dataset "%s"@%s' % (mode, tagname, data_id, version))
+            raise Forbidden(data='%s access to tag %s on dataset "%s"%s' % (mode, tagname, data_id, suffix))
         elif allow == None:
-            raise Unauthorized(data='%s access to tag %s on dataset "%s"@%s' % (mode, tagname, data_id, version))
+            raise Unauthorized(data='%s access to tag %s on dataset "%s"%s' % (mode, tagname, data_id, suffix))
         else:
             pass
 
