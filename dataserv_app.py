@@ -1015,11 +1015,11 @@ class Application:
         dtype = self.select_file_tag_noauthn('dtype', data_id=data_id, version=version)
         if len(dtype) > 0 and dtype[0].value == 'typedef':
             # check for in-use dependencies before allowing delete
-            used_types = set([ res.typestr for res in self.select_tagdef() if res.typestr != '' ])
+            used_types = set([ res.typestr for res in self.select_tagdef() ])
             typestr = self.select_file_tag_noauthn('_type_name', data_id=data_id, version=version)
             if len(typestr) > 0:
                 typestr = typestr[0].value
-                if typestr in used_types or len(typestr) == 0:
+                if typestr in used_types:
                     raise Conflict('The type ("%s") defined by "%s@%s" is in use and cannot be deleted.' % (typestr, data_id, version) )
 
         if version == versions[0].version and len(versions) > 1:
