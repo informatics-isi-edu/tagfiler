@@ -1019,7 +1019,7 @@ class Application:
             typestr = self.select_file_tag_noauthn('_type_name', data_id=data_id, version=version)
             if len(typestr) > 0:
                 typestr = typestr[0].value
-                if typestr in used_types:
+                if typestr in used_types or len(typestr) == 0:
                     raise Conflict('The type ("%s") defined by "%s@%s" is in use and cannot be deleted.' % (typestr, data_id, version) )
 
         if version == versions[0].version and len(versions) > 1:
