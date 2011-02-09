@@ -46,7 +46,8 @@ $if len(files) > 0:
 		<td class="file-update">
 		$if file.writeok:
 			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=file">Replace&nbsp;with&nbsp;file</a><br />
-			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a>
+			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a><br />
+			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=dataset">Replace&nbsp;with&nbsp;dataset</a>
 		</td>
 		$for tag in filelisttags:
 			$if tagdefsdict.has_key(tag):
