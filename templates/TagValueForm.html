@@ -1,0 +1,17 @@
+$def with (tagname, typestr, typevals, val)
+<td class="file-tag ${idquote(tagname)} multivalue">
+$if typevals:
+	$# this lambda is to simulate ternary operator in Python 2.4
+	${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
+$elif typestr == 'url':
+	<a href="${val}">${val}</a>
+$elif typestr == 'file':
+	<a href="${home}/file/${urlquote(val)}">${val}</a>
+$elif typestr == 'vfile':
+	$ parts = val.split('@')
+	$ version = parts[-1]
+	$ base = '@'.join(parts[0:-1])
+	<a href="${home}/file/${urlquote(base)+'@'+version}">${base+'@'+version}</a>
+$else:
+	${val}
+</td>

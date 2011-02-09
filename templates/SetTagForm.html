@@ -1,0 +1,19 @@
+$def with (file, vsuffix, tagname, vals, writeok)
+<table class="file-tag-list">
+<tr>
+<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
+<input type="hidden" name="tag" value="${tagname}" />
+$if writeok:
+	$if vals:
+		<td class="file-tag ${idquote(tagname)} multivalue">${tagname} is set</td>
+		<input type="hidden" name="referer" value="${referer}" />
+		<input type="hidden" name="action" value="delete" />
+		<td class="file-tag ${idquote(tagname)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
+	$else:
+		<input type="hidden" name="referer" value="${referer}" />
+		<td class="file-tag ${idquote(tagname)} multivalue">not set</td>
+		<input type="hidden" name="action" value="put" />
+		<td class="file-tag ${idquote(tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
+</form>
+</tr>
+</table>
