@@ -1,4 +1,4 @@
-$def with (file, vsuffix, tagname, typename, options)
+$def with (file, vsuffix, tagname, typestr, typename, options)
 <tr>
 <form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
 <input type="hidden" name="set-${urlquote(tagname)}" value="true" />
@@ -15,7 +15,9 @@ $if options:
 		<option value="${option[0]}">${option[1]}</option>
 	</select>
 $else:
-	<input type="text" name="val-${urlquote(tagname)}" />
+	<input type="text" id="${tagname}_id" name="val-${urlquote(tagname)}" />
+$if typestr == 'date':
+	<a href="javascript:generateCalendar('${tagname}_id')"><img src="${home}/static/calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>
 </td>
 <input type="hidden" name="action" value="put" />
 <td class="file-tag ${idquote(tagname)} multivalue set">

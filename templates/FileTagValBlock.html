@@ -31,7 +31,7 @@ $elif tagdef.typestr:
 		</tr>
 	$if tagdef.tagname in writetags and writeok:
 		$ options = tagOptions(tagdef.tagname, itervals)
-		$:{render.SetTagValueForm(file.file, vsuffix, tagdef.tagname, typename, options)}
+		$:{render.SetTagValueForm(file.file, vsuffix, tagdef.tagname, tagdef.typestr, typename, options)}
 	</table>
 $else:
 	$:{render.SetTagForm(file.file, vsuffix, tagdef.tagname, vals, writeok)}
