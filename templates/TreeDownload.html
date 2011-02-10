@@ -67,11 +67,13 @@ $else:
 				<table class="table-wrapper" rules="all" >
 					<tr>
 						<td class="tag-name">Name</td>
-						<td><input id="TransmissionNumber" type="text" disabled="disabled" value="${transmissionnum}"/></td>
+						$ params = dict(type='text', id='TransmissionNumber', disabled='disabled', val=transmissionnum)
+						$:{render.TagValueForm(params)}
 					</tr>
 					<tr>
 						<td class="tag-name">Version</td>
-						<td><input id="Version" type="text" disabled="disabled" value="${vsuffix}"/></td>
+						$ params = dict(type='text', id='Version', disabled='disabled', val=vsuffix)
+						$:{render.TagValueForm(params)}
 					</tr>
 				</table>	
 			</td>
@@ -115,7 +117,8 @@ $else:
 	$for tagdef in tagdefs:
 		<tr>
 		<td class="tag-name">${tagdef.tagname}</td>
-		<td><input name="${tagdef.tagname}" id="${tagdef.tagname}_val" width="20" value="" readonly /></td>
+		$ params = dict(type='text', name=tagdef.tagname , id='%s_val' % tagdef.tagname, readonly='readonly', val='')
+		$:{render.TagValueForm(params)}
 		</tr>
 	</table>
 	</div>

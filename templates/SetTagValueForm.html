@@ -1,11 +1,25 @@
-$def with (file, vsuffix, tagname, typestr, typename, options)
-<tr>
-<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
-<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
-<td class="file-tag ${idquote(tagname)} multivalue input">
+$def with (args)
+$ file = args.get('file')
+$ vsuffix = args.get('vsuffix')
+$ tagname = args.get('tagname')
+$ typestr = args.get('typestr')
+$ typename = args.get('typename')
+$ options = args.get('options')
+$ name = args.get('name')
+$ required = args.get('required')
+$if file:
+	<tr>
+	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
+	<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
+	<td class="file-tag ${idquote(tagname)} multivalue input">
+$else:
+	<td>
 $if options:
 	$ options.sort(key=lambda x: x[0])
-	<select name="val-${urlquote(tagname)}">
+	<select name="${name}" id="${tagname}_id" typestr="${typestr}"
+	$if required:
+		required="${required}"
+	>
 	$if typename.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
 		$ article = 'an'
 	$else:
@@ -15,14 +29,18 @@ $if options:
 		<option value="${option[0]}">${option[1]}</option>
 	</select>
 $else:
-	<input type="text" id="${tagname}_id" name="val-${urlquote(tagname)}" />
+	<input type="text" name="${name}"  id="${tagname}_id" typestr="${typestr}" 
+	$if required:
+		required="${required}"
+	/>
 $if typestr == 'date':
 	<a href="javascript:generateCalendar('${tagname}_id')"><img src="${home}/static/calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>
 </td>
-<input type="hidden" name="action" value="put" />
-<td class="file-tag ${idquote(tagname)} multivalue set">
-<input type="hidden" name="referer" value="${referer}" />
-<input type="submit" value="Set Value" />
-</td>
-</form>
-</tr>
+$if file:
+	<input type="hidden" name="action" value="put" />
+	<td class="file-tag ${idquote(tagname)} multivalue set">
+	<input type="hidden" name="referer" value="${referer}" />
+	<input type="submit" value="Set Value" />
+	</td>
+	</form>
+	</tr>

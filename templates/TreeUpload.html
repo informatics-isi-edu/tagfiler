@@ -111,31 +111,11 @@ $ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
 		$ typevals = type['_type_values']		
 		<tr>
 		<td class="tag-name">${tagdef.tagname} (${typedesc})</td>
-		<td>
 		$ options = tagOptions(tagdef.tagname)
-		$if options:
-			<select name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}"
-		$else:
-			<input type="text" name="${tagdef.tagname}" id="${tagdef.tagname}_id" typestr="${tagdef.typestr}" 
+		$ params = dict(tagname=tagdef.tagname, typestr=tagdef.typestr, typename=typedesc, options=options, name=tagdef.tagname)
 		$if tagdef.tagname in appletTagnamesRequire:
-			required="required"
-		$if options:
-			>
-		$else:
-			/>
-			$if tagdef.typestr == "date":
-				<a href="javascript:generateCalendar('${tagdef.tagname}_id')"><img src="${home}/static/calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>
-		$if options:
-			$ options.sort(key=lambda x: x[0])
-			$if typedesc.lower()[0] in [ 'a', 'e', 'i', 'o', 'u' ]:
-				$ article = 'an'
-			$else:
-				$ article = 'a'
-			<option value="" selected="selected">Choose ${article} ${typedesc}</option>
-			$for option in options:
-				<option value="${option[0]}">${option[1]}</option>
-			</select>
-		</td>
+			$ params['required'] = 'required'
+		$:{render.SetTagValueForm(params)}
 		</tr>
 	</table>
 	</div>
