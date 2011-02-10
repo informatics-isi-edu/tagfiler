@@ -17,23 +17,32 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
+$ options = tagOptions(tagdef.tagname, itervals)
+$ params = dict( file=file.file, 
+$				 tagname=tagdef.tagname, 
+$				 typestr=tagdef.typestr, 
+$				 typename=typename, 
+$				 typevals=typevals, 
+$				 vsuffix=vsuffix, 
+$				 vals=vals, 
+$				 options=options,
+$				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
+$				 writeok=writeok)
 $if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
 	<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
 $elif tagdef.typestr:
 	<table class="file-tag-list">
 	$for val in itervals:
 		<tr>
-		$ params = dict(tagname=tagdef.tagname, typestr=tagdef.typestr, typevals=typevals, val=val)
+		$ params['val'] = val
 		$:{render.TagValueForm(params)}
 		<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
 		$if tagdef.tagname in writetags and writeok:
-			$:{render.RemoveTagValueForm(file.file, vsuffix, tagdef.tagname, val)}
+			$:{render.RemoveTagValueForm(params)}
 		</td>
 		</tr>
 	$if tagdef.tagname in writetags and writeok:
-		$ options = tagOptions(tagdef.tagname, itervals)
-		$ params = dict(file=file.file, vsuffix=vsuffix, tagname=tagdef.tagname, typestr=tagdef.typestr, typename=typename, options=options, name='%s%s' % ('val-', urlquote(tagdef.tagname)))
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:
-	$:{render.SetTagForm(file.file, vsuffix, tagdef.tagname, vals, writeok)}
+	$:{render.SetTagForm(params)}

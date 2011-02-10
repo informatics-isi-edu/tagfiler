@@ -1,4 +1,8 @@
-$def with (file, vsuffix, tagname, val)
+$def with (args)
+$ file = args.get('file')
+$ vsuffix = args.get('vsuffix')
+$ tagname = args.get('tagname')
+$ val = args.get('val')
 <form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
 <input type="hidden" name="tag" value="${tagname}" />
 <input type="hidden" name="value" value="${val}" />

@@ -1,4 +1,9 @@
-$def with (file, vsuffix, tagname, vals, writeok)
+$def with (args)
+$ file = args.get('file')
+$ vsuffix = args.get('vsuffix')
+$ tagname = args.get('tagname')
+$ vals = args.get('vals')
+$ writeok = args.get('writeok')
 <table class="file-tag-list">
 <tr>
 <form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
