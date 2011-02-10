@@ -478,9 +478,9 @@ class Tagdef (Node):
 
         def body():
             predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, None)
-                     for tagdef in self.select_tagdef(where='owner is null', order='tagname') ]
+                     for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagname') ]
             userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
-                     for tagdef in self.select_tagdef(where='owner is not null', order='tagname') ]
+                     for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagname') ]
             types = self.get_type()
             
             return (predefined, userdefined, types)
@@ -774,19 +774,6 @@ class FileTags (Node):
                                                                 self.tagdef,
                                                                 [self.tag_id],
                                                                 self.version)])
-
-    def buildtaginfo(self, ownerwhere):
-        owner = self.owner()
-        where1 = ''
-        if ownerwhere:
-            where1 = 'owner %s' % ownerwhere
-        filtered_tagdefs = self.select_tagdef(where=where1, order='tagname')
-        
-        tagdefs = [ tagdef for tagdef in filtered_tagdefs if (len(self.listtags)==0 or tagdef.tagname in self.listtags) ]
-        for tagdef in tagdefs:
-            tagdef.writeok = self.test_tag_authz('write', tagdef.tagname, fowner=owner)
-
-        return tagdefs
 
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...

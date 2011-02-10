@@ -114,148 +114,10 @@ echo "create core tables..."
 
 psql -q -t -c "CREATE TABLE files ( name text, version int8, PRIMARY KEY(name, version) )"
 psql -q -t -c "CREATE TABLE latestfiles ( name text PRIMARY KEY, version int8, FOREIGN KEY (name, version) REFERENCES files (name, version) ON DELETE CASCADE )"
-psql -q -t -c "CREATE TABLE tagdefs ( tagname text PRIMARY KEY, typestr text, multivalue boolean, readpolicy text, writepolicy text, owner text )"
-psql -q -t -c "CREATE TABLE tagreaders ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
-psql -q -t -c "CREATE TABLE tagwriters ( tagname text REFERENCES tagdefs ON DELETE CASCADE, value text NOT NULL, UNIQUE(tagname, value) )"
 psql -q -t -c "CREATE TABLE filetags ( file text, version int8, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 
 psql -q -t -c "CREATE SEQUENCE transmitnumber"
 psql -q -t -c "CREATE SEQUENCE keygenerator"
-
-tagdef()
-{
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
-
-   # policy is one of:
-   #   anonymous  -- any client can access
-   #   users  -- any authenticated user can access
-   #   file  -- file access rule is observed for tag access
-   #   fowner  -- only file owner can access
-   #   tag -- tag access rule is observed for tag access
-   #   system  -- no client can access
-
-   echo "create tagdef '\$1'..."
-
-   if [[ -n "\$3" ]]
-   then
-      psql -q -t -c "INSERT INTO tagdefs ( tagname, typestr, owner, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-\${2}}', '\$3', '\$4', '\$5', \$6 )"
-   else
-      psql -q -t -c "INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue ) VALUES ( '\$1', '\${7:-\${2}}', '\$4', '\$5', \$6 )"
-   fi
-   if [[ -n "\$2" ]]
-   then
-      if [[ "\$2" = "text" ]]
-      then
-         default="DEFAULT ''"
-      else
-         default=""
-      fi
-      if [[ "\$7" = "file" ]]
-      then
-         fk="REFERENCES latestfiles (name) ON DELETE CASCADE"
-      elif [[ "\$7" = "vfile" ]]
-      then
-         fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
-      elif [[ "\$1" = "vname" ]]
-      then
-         fk="UNIQUE"
-      else
-         fk=""
-      fi
-      if [[ "\$6" = "true" ]]
-      then
-         uniqueval='UNIQUE(file, version, value)'
-      else
-         uniqueval='UNIQUE(file, version)'
-      fi
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, value \$2 \${default} NOT NULL \${fk}, \${uniqueval} , FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
-      psql -q -t -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
-   else
-      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, UNIQUE (file, version), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
-   fi
-}
-
-#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
-
-tagdef 'typedef'   text        ""      anonymous   file       false
-tagdef '_type_description' text   ""      anonymous   file       false
-tagdef '_type_dbtype' text        ""      anonymous   file       false
-tagdef '_type_values' text        ""      anonymous   file       true
-
-tagdef owner          text        ""      anonymous   fowner     false      role
-tagdef created        timestamptz ""      anonymous   system     false
-tagdef "version created" timestamptz ""   anonymous   system     false
-tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
-tagdef "write users"  text        ""      anonymous   fowner     true       rolepat
-tagdef "modified by"  text        ""      anonymous   system     false      role
-tagdef modified       timestamptz ""      anonymous   system     false
-tagdef bytes          int8        ""      anonymous   system     false
-tagdef version        int8        ""      anonymous   system     false
-tagdef name           text        ""      anonymous   system     false
-tagdef vname          text        ""      anonymous   system     false
-tagdef dtype          text        ""      anonymous   system     false      dtype
-tagdef storagename    text        ""      system      system     false
-tagdef url            text        ""      file        system     false      url
-tagdef content-type   text        ""      anonymous   file       false
-tagdef sha256sum      text        ""      anonymous   file       false
-
-tagdef contains       text        ""      file        file       true       file
-tagdef vcontains      text        ""      file        file       true       vfile
-tagdef key            text        ""      anonymous   file       false
-tagdef "member of"    text        ""      anonymous   file       true
-
-tagdef "list on homepage" ""      ""      anonymous   tag        false
-tagdef "Image Set"    ""          "${admin}"   file        file       false
-
-tagacl()
-{
-   # args: tagname {read|write} [value]...
-   local tag=\$1
-   local mode=\${2:0:4}
-   shift 2
-   while [[ \$# -gt 0 ]]
-   do
-      psql -q -t -c "INSERT INTO tag\${mode}ers (tagname, value) VALUES ('\$tag', '\$1')"
-      shift
-   done
-}
-
-tagacl "list on homepage" read "*"
-tagacl "list on homepage" write "${admin}"
-
-tag()
-{
-   # args: file tag typestr [value]...
-   # for non-empty typestr
-   #     does one default value insert for 0 values
-   #     does N value inserts for N>0 values
-
-   local file="\$1"
-   local tagname="\$2"
-   local typestr="\$3"
-
-   shift 3
-
-   echo "set /tags/\$file/\$tagname=" "\$@"
-   if [[ -z "\$typestr" ]] || [[ \$# -eq 0 ]]
-   then
-      psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version ) VALUES ( '\$file', 1 )"
-   elif [[ \$# -gt 0 ]]
-   then
-      while [[ \$# -gt 0 ]]
-      do
-         psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version, value ) VALUES ( '\$file', 1, '\$1' )"
-         shift
-      done
-   fi
-
-   # add to filetags only if this insert changes status
-   if [[ -z "\$(psql -A -t -c "SELECT * FROM filetags WHERE file = '\$file' AND version = 1 AND tagname = '\$tagname'")" ]] \
-     && [[ -n "\$(psql -A -t -c "SELECT * FROM \\"_\$tagname\\" WHERE file = '\$file' AND version = 1 ")" ]]
-   then
-      psql -q -t -c "INSERT INTO filetags (file, version, tagname) VALUES ('\$file', 1, '\$tagname')"
-   fi
-}
 
 # pre-established stored data
 dataset()
@@ -320,16 +182,150 @@ dataset()
    esac
 }
 
-dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
-dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
-dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
+tag()
+{
+   # args: file tag typestr [value]...
+   # for non-empty typestr
+   #     does one default value insert for 0 values
+   #     does N value inserts for N>0 values
 
-for x in "New image studies" "Previous image studies" "All image studies"
-do
-   tag "\$x" "list on homepage"
-done
+   local file="\$1"
+   local tagname="\$2"
+   local typestr="\$3"
 
-dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
+   shift 3
+
+   echo "set /tags/\$file/\$tagname=" "\$@"
+   if [[ -z "\$typestr" ]] || [[ \$# -eq 0 ]]
+   then
+      psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version ) VALUES ( '\$file', 1 )"
+   elif [[ \$# -gt 0 ]]
+   then
+      while [[ \$# -gt 0 ]]
+      do
+         psql -q -t -c "INSERT INTO \\"_\$tagname\\" ( file, version, value ) VALUES ( '\$file', 1, '\$1' )"
+         shift
+      done
+   fi
+
+   # add to filetags only if this insert changes status
+   if [[ -z "\$(psql -A -t -c "SELECT * FROM filetags WHERE file = '\$file' AND version = 1 AND tagname = '\$tagname'")" ]] \
+     && [[ -n "\$(psql -A -t -c "SELECT * FROM \\"_\$tagname\\" WHERE file = '\$file' AND version = 1 ")" ]]
+   then
+      psql -q -t -c "INSERT INTO filetags (file, version, tagname) VALUES ('\$file', 1, '\$tagname')"
+   fi
+}
+
+tagacl()
+{
+   # args: tagname {read|write} [value]...
+   local tag=\$1
+   local mode=\$2
+   shift 2
+   while [[ \$# -gt 0 ]]
+   do
+      tag "_tagdef_\$tag" "tag \$mode users" rolepat "\$1"
+      shift
+   done
+}
+
+tagdef_tags()
+{
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
+
+   # policy is one of:
+   #   anonymous  -- any client can access
+   #   users  -- any authenticated user can access
+   #   file  -- file access rule is observed for tag access
+   #   fowner  -- only file owner can access
+   #   tag -- tag access rule is observed for tag access
+   #   system  -- no client can access
+
+   echo "create tagdef '\$1'..."
+
+   dataset "_tagdef_\$1" blank "\$3" "*"
+
+   tag "_tagdef_\$1" "tagdef readpolicy" "\$4"
+   tag "_tagdef_\$1" "tagdef writepolicy" "\$5"
+
+   if [[ "\$6" == "true" ]]
+   then
+      tag "_tagdef_\$1" "tagdef multivalue"
+   fi
+
+   if [[ -n "\$7" ]]
+   then
+      tag "_tagdef_\$1" "tagdef type" "\$7"
+   else
+      tag "_tagdef_\$1" "tagdef type" "\$2"
+   fi
+}
+
+tagdef_table()
+{
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
+
+   if [[ -n "\$2" ]]
+   then
+      if [[ "\$2" = "text" ]]
+      then
+         default="DEFAULT ''"
+      else
+         default=""
+      fi
+      if [[ "\$7" = "file" ]]
+      then
+         fk="REFERENCES latestfiles (name) ON DELETE CASCADE"
+      elif [[ "\$7" = "vfile" ]]
+      then
+         fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
+      elif [[ "\$1" = "vname" ]]
+      then
+         fk="UNIQUE"
+      else
+         fk=""
+      fi
+      if [[ "\$6" = "true" ]]
+      then
+         uniqueval='UNIQUE(file, version, value)'
+      else
+         uniqueval='UNIQUE(file, version)'
+      fi
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, value \$2 \${default} NOT NULL \${fk}, \${uniqueval} , FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
+      psql -q -t -c "CREATE INDEX \\"_\$1_value_idx\\" ON \\"_\$1\\" (value)"
+   else
+      psql -q -t -c "CREATE TABLE \\"_\$1\\" ( file text NOT NULL, version int8 NOT NULL, UNIQUE (file, version), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
+   fi
+}
+
+tag_names=()
+tag_dbtypes=()
+tag_owners=()
+tag_readpolicies=()
+tag_writepolicies=()
+tag_multivalues=()
+tag_typestrs=()
+
+tagdef()
+{
+   tag_names[${#tag_names[*]}]="\$1"
+   tag_dbtypes[${#tag_dbtypes[*]}]="\$2"
+   tag_owners[${#tag_owners[*]}]="\$3"
+   tag_readpolicies[${#tag_readpolicies[*]}]="\$4"
+   tag_writepolicies[${#tag_writepolicies[*]}]="\$5"
+   tag_multivalues[${#tag_multivalues[*]}]="\$6"
+   tag_typestrs[${#tag_typestrs[*]}]="\$7"
+
+   tagdef_table "\$@"
+}
+
+tagdefs_complete()
+{
+   for i in \${!tag_names[*]}
+   do
+      tagdef_table "\${tag_names[\$i]}" "\${tag_dbtypes[\$i]}" "\${tag_owners[\$i]}" "\${tag_readpolicies[\$i]}" "\${tag_writepolicies[\$i]}" "\${tag_multivalues[\$i]}" "\${tag_typestrs[\$i]}"
+   done
+}
 
 typedef()
 {
@@ -347,6 +343,66 @@ typedef()
    fi
 }
 
+
+#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+
+tagdef 'tagdef'       text        ""      anonymous   system     false
+tagdef 'typedef'      text        ""      anonymous   file       false
+
+tagdef 'tagdef type'         text ""      anonymous   system     false      type
+tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
+tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
+tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
+tagdef 'tag read users'      text ""      anonymous   system     false      rolepat
+tagdef 'tag write users'     text ""      anonymous   system     false      rolepat
+
+tagdef '_type_description' text   ""      anonymous   file       false
+tagdef '_type_dbtype' text        ""      anonymous   file       false
+tagdef '_type_values' text        ""      anonymous   file       true
+
+tagdef 'tagdef type'  text        ""      anonymous   system
+
+tagdef owner          text        ""      anonymous   fowner     false      role
+tagdef created        timestamptz ""      anonymous   system     false
+tagdef "version created" timestamptz ""   anonymous   system     false
+tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
+tagdef "write users"  text        ""      anonymous   fowner     true       rolepat
+tagdef "modified by"  text        ""      anonymous   system     false      role
+tagdef modified       timestamptz ""      anonymous   system     false
+tagdef bytes          int8        ""      anonymous   system     false
+tagdef version        int8        ""      anonymous   system     false
+tagdef name           text        ""      anonymous   system     false
+tagdef vname          text        ""      anonymous   system     false
+tagdef dtype          text        ""      anonymous   system     false      dtype
+tagdef storagename    text        ""      system      system     false
+tagdef url            text        ""      file        system     false      url
+tagdef content-type   text        ""      anonymous   file       false
+tagdef sha256sum      text        ""      anonymous   file       false
+
+tagdef contains       text        ""      file        file       true       file
+tagdef vcontains      text        ""      file        file       true       vfile
+tagdef key            text        ""      anonymous   file       false
+tagdef "member of"    text        ""      anonymous   file       true
+
+tagdef "list on homepage" ""      ""      anonymous   tag        false
+tagdef "Image Set"    ""          "${admin}"   file        file       false
+
+tagdefs_complete
+
+tagacl "list on homepage" read "*"
+tagacl "list on homepage" write "${admin}"
+
+dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
+dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
+dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
+
+for x in "New image studies" "Previous image studies" "All image studies"
+do
+   tag "\$x" "list on homepage"
+done
+
+dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
+
 typedef ''           ''            'No content'
 typedef int8         int8          'Integer'
 typedef float8       float8        'Floating point'
@@ -360,6 +416,9 @@ typedef dtype       text          'Dataset type' 'url URL redirecting dataset' '
 typedef url          text          'URL'
 typedef file         text          'Dataset'
 typedef vfile        text          'Dataset with version number'
+
+typedef type         text          'Scalar value type'
+
 
 dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
 
@@ -609,46 +668,6 @@ EOF
 
 chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
 chmod a+x /home/${SVCUSER}/dbsetup.sh
-
-cat > /home/${SVCUSER}/dbclear.sh <<EOF
-#!/bin/sh
-
-# this script will remove all service tables to clean the database
-
-psql -c "SELECT tagname FROM tagdefs" -t | while read tagname
-do
-   psql -c "DROP TABLE \"_\${tagname//\"/\"\"}\""
-done
-
-psql -c "DROP TABLE filetags"
-psql -c "DROP TABLE tagdefs"
-psql -c "DROP TABLE files"
-
-EOF
-
-chown ${SVCUSER}: /home/${SVCUSER}/dbclear.sh
-chmod a+x /home/${SVCUSER}/dbclear.sh
-
-cat > /home/${SVCUSER}/dbdump.sh <<EOF
-#!/bin/sh
-
-# this script will remove all service tables to clean the database
-
-psql -c "SELECT tagname FROM tagdefs" -t | while read tagname
-do
-    if [[ -n "\$tagname" ]]
-    then
-        echo "DUMPING TAG \"\${tagname}\""
-        psql -c "SELECT * FROM \"_\${tagname//\"/\"\"}\""
-    fi
-done
-
-for table in filetags tagdefs files
-do
-    echo "DUMPING TABLE \"\$table\""
-    psql -c "SELECT * FROM \$table"
-done
-EOF
 
 # setup db tables
 runuser -c "~${SVCUSER}/dbsetup.sh" - ${SVCUSER}

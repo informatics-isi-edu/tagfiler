@@ -1032,49 +1032,54 @@ class Application:
         query = 'DELETE FROM files WHERE name = $name AND version = $version'
         self.db.query(query, vars=dict(name=data_id, version=version))
 
-    def select_tagdef(self, tagname=None, where=None, order=None, staticauthz=None):
-        tables = [ 'tagdefs' ]
-        wheres = []
-        vars = dict()
+    def select_tagdef(self, tagname=None, predlist=[], order=None, staticauthz=None):
         if tagname:
-            wheres.append("tagname = $tagname")
-            vars['tagname'] = tagname
-        if where:
-            wheres.append(where)
-        if order:
-            order = 'ORDER BY ' + order
+            predlist += [ dict(tag='tagdef', op='=', vals=[tagname]) ]
         else:
-            order = ''
-        if staticauthz != None:
-            user = self.authn.role
-            table = dict(read='tagreaders', write='tagwriters')[staticauthz]
-            policy = dict(read='readpolicy', write='writepolicy')[staticauthz]
-            tables.append("%s USING (tagname)" % table)
-            if user != None:
-                parts = [ "%s != 'tag'" % policy ]
-                r = 0
-                for role in self.authn.roles:
-                    parts.append("owner = $role%s" % r)
-                    parts.append("value = $role%s" % r)
-                    vars['role%s' % r] = role
-                    r += 1
-                wheres.append(" OR ".join(parts))
-            else:
-                wheres.append("%s != 'tag'" % policy)
-                wheres.append("%s != 'fowner'" % policy)
-                wheres.append("%s != 'users'" % policy)
-        tables = " LEFT OUTER JOIN ".join(tables)
-        wheres = " AND ".join([ '(%s)' % where for where in wheres ])
-        if wheres:
-            wheres = "WHERE %s" % wheres
+            predlist += [ dict(tag='tagdef', op=None, vals=[]) ]
 
-        query = 'SELECT tagdefs.* FROM %s %s %s' % (tables, wheres, order)
-        #web.debug(query)
-        return self.db.query(query, vars)
-        
+        listtags = [ 'owner' ]
+        listas = { 'tagdef': 'tagname', 
+                   'tagdef type': 'typestr', 
+                   'tagdef multivalue': 'multivalue',
+                   'tagdef readpolicy': 'readpolicy',
+                   'tagdef writepolicy': 'writepolicy',
+                   'tag read users': 'tagreaders',
+                   'tag write users': 'tagwriters' }
+        listtags += listas.keys()
+        if order:
+            ordertags = [ order ]
+        else:
+            ordertags = []
+
+        # TODO: implement or drop staticauthz=read|write param?
+        return select_files_by_predlist(predlist, listtags, ordertags, listas=listas)
+
     def insert_tagdef(self):
-        self.db.query("INSERT INTO tagdefs ( tagname, typestr, readpolicy, writepolicy, multivalue, owner ) VALUES ( $tag_id, $typestr, $readpolicy, $writepolicy, $multivalue, $owner )",
-                      vars=dict(tag_id=self.tag_id, typestr=self.typestr, readpolicy=self.readpolicy, writepolicy=self.writepolicy, multivalue=self.multivalue, owner=self.authn.role))
+        results = self.select_tagdef(self.tag_id)
+        if len(results) > 0:
+            raise Conflict('Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
+
+        data_id = '_tagdef_%s' % self.tag_id
+        version = 1
+        owner = self.authn.role
+        self.insert_file(data_id, version, 'blank', None)
+        tags = [ ('created', 'now'),
+                 ('version created', 'now'),
+                 ('version', version),
+                 ('name', data_id),
+                 ('vname', '%s@%s' % (data_id, version)),
+                 ('tagdef', self.tag_id),
+                 ('tagdef type', self.typestr),
+                 ('tagdef readpolicy', self.readpolicy),
+                 ('tagdef writepolicy', self.writepolicy) ]
+        if self.authn.role:
+            tags.append( ('owner', self.authn.role) )
+        if self.multivalue:
+            tags.append( ('tagdef multivalue', self.multivalue) )
+
+        for tag, value in tags:
+            self.set_file_tag(tag, value, data_id, version, owner)
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
         tabledef += " ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY(file, version) REFERENCES files (name, version) ON DELETE CASCADE"
@@ -1111,8 +1116,11 @@ class Application:
             self.db.query(indexdef)
 
     def delete_tagdef(self):
-        self.db.query("DELETE FROM tagdefs WHERE tagname = $tag_id",
-                      vars=dict(tag_id=self.tag_id))
+        results = self.select_tagdef(self.tag_id)
+        if len(results) == 0:
+            raise NotFound('tagdef "%s"' % self.tag_id)
+        tagdeffile = results[0]
+        self.delete_file( tagdeffile.file, tagdeffile.version )
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
     def select_file_tag_args_prep(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
@@ -1178,42 +1186,31 @@ class Application:
             data_id = self.data_id
         if version == None:
             version = self.version
-        tagname = dict(read='read users', write='write users')[mode]
+        tagname = '%s users' % mode
         return self.select_file_tag(tagname, data_id=data_id, version=version)
 
     def select_tag_acl(self, mode, user=None, tag_id=None):
         if tag_id == None:
             tag_id = self.tag_id
-        table = dict(read='tagreaders', write='tagwriters')[mode]
-        wheres = [ 'tagname = $tag_id' ]
-        vars = dict(tag_id=tag_id)
+
         if user:
-            wheres.append('value = $user')
-            vars['user'] = user
-        wheres = " AND ".join(wheres)
-        query = "SELECT * FROM \"%s\"" % table + " WHERE %s" % wheres
-        #web.debug(query)
-        return self.db.query(query, vars=vars)
+            results = self.select_tagdef(tag_id, predlist=[ dict(tag='tag %s users', op='=', vals=[user]) ])
+        else:
+            results = self.select_tagdef(tag_id)
+
+        return results[0]['tag %s users' % mode]
 
     def set_tag_acl(self, mode, user, tag_id):
-        results = self.select_tag_acl(mode, user, tag_id)
-        if len(results) > 0:
-            return
-        table = dict(read='tagreaders', write='tagwriters')[mode]
-        query = "INSERT INTO %s" % table + " (tagname, value) VALUES ( $tag_id, $user )"
-        self.db.query(query, vars=dict(tag_id=tag_id, user=user))
+        results = self.select_tagdef(tag_id)
+        tagdeffile =  results[0]
+        self.set_file_tag('tag %s users', user, tagdeffile.file, tagdeffile.version, '')
 
     def delete_tag_acl(self, mode, user, tag_id):
-        table = dict(read='tagreaders', write='tagwriters')[mode]
-        query = "DELETE FROM %s" % table + " WHERE tagname = $tag_id AND value = $user"
-        self.db.query(query, vars=dict(tag_id=tag_id, user=user))
+        results = self.select_tagdef(tag_id)
+        tagdeffile =  results[0]
+        self.delete_file_tag('tag %s users', user, tagdeffile.file, tagdeffile.version, '')
 
-    def select_acltags(self, mode):
-        table = dict(read='tagreaders', write='tagwriters')[mode]
-        query = "SELECT tagname FROM %s" % table + " GROUP BY tagname"
-        return self.db.query(query)
-
-    def select_filetags_noauthn(self, tagname=None, where=None, data_id=None, version=None, user=None):
+    def select_filetags_noauthn(self, data_id=None, version=None):
         wheres = []
         vars = dict()
         if data_id == None:
@@ -1227,23 +1224,13 @@ class Application:
                 wheres.append("version = $version")
                 vars['version'] = version
         
-        if where:
-            wheres.append(where)
-        if tagname:
-            wheres.append("tagname = $tagname")
-            vars['tagname'] = tagname
-
         wheres = ' AND '.join(wheres)
         if wheres:
             wheres = "WHERE " + wheres
-        query = "SELECT file, version, tagname FROM filetags join tagdefs using (tagname) " + wheres \
+        query = "SELECT file, version, tagname FROM filetags " + wheres \
                 + " GROUP BY file, version, tagname ORDER BY file, tagname"
         #web.debug(query, vars)
         return self.db.query(query, vars=vars)
-
-    def select_filetags(self, tagname=None, where=None, data_id=None, version=None, user=None):
-        return [ result for result in self.select_filetags_noauthn(tagname, where, data_id, version, user)
-                 if self.test_tag_authz('read', result.tagname, user, result.file) != False ]
 
     def delete_file_tag(self, tagname, value=None, data_id=None, version=None, owner=None):
         if data_id == None:
@@ -1348,7 +1335,7 @@ class Application:
         vars = dict(file=data_id, version=version, value=value, tagname=tagname)
         self.db.query(query, vars=vars)
         
-        results = self.select_filetags(tagname, data_id=data_id, version=version)
+        results = self.select_filetags_noauthn(tagname, data_id=data_id, version=version)
         if len(results) == 0:
             self.db.query("INSERT INTO filetags (file, version, tagname) VALUES ($file, $version, $tagname)", vars=vars)
         else:
@@ -1542,8 +1529,24 @@ class Application:
         
         return (query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest'):
-        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest', listas=None):
+        def select_clause(listtag):
+            if listas.has_key(listtag):
+                return "%s AS %s" % (listtag, listas[listtag])
+            else:
+                return listtag
+
+        if listas != None:
+            if listtags == None:
+                listtags = [ x for x in self.globals['filelisttags'] ]
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], data_id, version, versions=versions)
+            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(["file"])) ]),
+                                                  query)
+            if ordertags:
+                query += " ORDER BY " + ",".join(ordertags)
+        else:
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
+
         #web.debug(query, values)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
