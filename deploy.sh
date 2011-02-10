@@ -177,7 +177,7 @@ tagdef()
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 
-tagdef '_type_name'   text        ""      anonymous   file       false
+tagdef 'typedef'   text        ""      anonymous   file       false
 tagdef '_type_description' text   ""      anonymous   file       false
 tagdef '_type_dbtype' text        ""      anonymous   file       false
 tagdef '_type_values' text        ""      anonymous   file       true
@@ -338,7 +338,7 @@ typedef()
    desc="\$3"
    shift 3
    dataset "_type_def_\${typename}" typedef "${admin}" "*"
-   tag "_type_def_\${typename}" "_type_name" text "\${typename}"
+   tag "_type_def_\${typename}" "typedef" text "\${typename}"
    tag "_type_def_\${typename}" "_type_dbtype" text "\${dbtype}"
    tag "_type_def_\${typename}" "_type_description" text "\${desc}"
    if [[ \$# -gt 0 ]]

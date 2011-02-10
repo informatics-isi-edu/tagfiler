@@ -1,6 +1,6 @@
 $def with (title, test_tagdef_authz)
 $ target = home + '/tagdef'
-$ typenames = [ (type['_type_name'], type['_type_description']) for type in typeinfo ]
+$ typenames = [ (type['typedef'], type['_type_description']) for type in typeinfo ]
 $ typenames.sort(key=lambda x: x[1])
 $ typedict = dict(typenames)
 <h2>${title}</h2>

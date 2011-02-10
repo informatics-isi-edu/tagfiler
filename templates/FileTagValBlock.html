@@ -1,7 +1,7 @@
 $def with (file, tagdef, writetags, version)
 $ writetags = [ tag for tag in writetags ]
 $ tagnames = tagdefsdict.iterkeys()
-$ typesdict = dict( [ (type['_type_name'], type) for type in typeinfo ] )
+$ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
 $ typename = type['_type_description']
 $ typevals = type['_type_values']

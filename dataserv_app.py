@@ -414,9 +414,9 @@ class Application:
             raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
 
         if tagname == '_type_values':
-            results = self.gettagvals('_type_name', data_id=data_id)
+            results = self.gettagvals('typedef', data_id=data_id)
             if len(results) == 0:
-                raise Conflict('Set the "_type_name" tag before trying to set "_type_values".')
+                raise Conflict('Set the "typedef" tag before trying to set "_type_values".')
             typename = results[0]
             results = self.get_type(typename)
             if len(results) == 0:
@@ -568,7 +568,7 @@ class Application:
                         db_globals_dict = dict(tagdefsdict=lambda : dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ]),
                                                roleinfo=lambda : self.buildroleinfo(),
                                                typeinfo=lambda : self.get_type(),
-                                               typesdict=lambda : dict([ (type['_type_name'], type) for type in self.globals['typeinfo'] ]))
+                                               typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]))
                         for key in self.needed_db_globals:
                             self.globals[key] = db_globals_dict[key]()
 
@@ -915,8 +915,8 @@ class Application:
             return res
         predlist = [ dict(tag='_type_dbtype', op=None, vals=[]) ]
         if typename != None:
-            predlist.append( dict(tag='_type_name', op='=', vals=[typename]) )
-        listtags = [ '_type_name', '_type_description', '_type_dbtype', '_type_values' ]
+            predlist.append( dict(tag='typedef', op='=', vals=[typename]) )
+        listtags = [ 'typedef', '_type_description', '_type_dbtype', '_type_values' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
 
     def select_file(self, data_id=None, version=None):
@@ -1019,7 +1019,7 @@ class Application:
         if len(dtype) > 0 and dtype[0].value == 'typedef':
             # check for in-use dependencies before allowing delete
             used_types = set([ res.typestr for res in self.select_tagdef() ])
-            typestr = self.select_file_tag_noauthn('_type_name', data_id=data_id, version=version)
+            typestr = self.select_file_tag_noauthn('typedef', data_id=data_id, version=version)
             if len(typestr) > 0:
                 typestr = typestr[0].value
                 if typestr in used_types:

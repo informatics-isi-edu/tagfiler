@@ -6,7 +6,7 @@ $for type in types:
 	$else:
 		$ values = None
 	$ type['_type_values'] = values
-$ typesdict = dict ( [ (type['_type_name'], type) for type in types ] )
+$ typesdict = dict ( [ (type['typedef'], type) for type in types ] )
 <div>
 	<h3>Status</h3>
 	<table>
