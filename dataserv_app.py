@@ -1131,29 +1131,38 @@ class Application:
         for tag, value in tags:
             self.set_file_tag(tag, value, data_id, version, owner)
 
-        tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(self.tag_id))
+        self.deploy_tagdef()
+
+    def deploy_tagdef(self, tagdef=None):
+        if tagdef == None:
+            try:
+                tagdef = self.select_tagdef(self.tag_id)[0]
+            except:
+                raise Conflict('Tagdef "%s" is not defined and cannot be deployed.' % self.tag_id)
+
+        tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(tagdef.tagname))
         tabledef += " ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY(file, version) REFERENCES files (name, version) ON DELETE CASCADE"
         indexdef = ''
 
-        results = self.get_type(typename=self.typestr)
-        if len(results) == 0:
-            raise BadRequest('Referenced type "%s" is not defined.' % self.typestr)
-        type = results[0]
+        try:
+            type = self.get_type(typename=tagdef.typestr)[0]
+        except:
+            raise BadRequest('Referenced type "%s" is not defined.' % tagdef.typestr)
         dbtype = type['_type_dbtype']
         if dbtype != '':
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             tabledef += ' NOT NULL'
-            if self.typestr == 'file':
+            if tagdef.typestr == 'file':
                 tabledef += " REFERENCES latestfiles (name) ON DELETE CASCADE"
-            elif self.typestr == 'vfile':
+            elif tagdef.typestr == 'vfile':
                 tabledef += " REFERENCES \"_vname\" (value) ON DELETE CASCADE"
-        if not self.multivalue:
+        if not tagdef.multivalue:
             tabledef += ", UNIQUE(file, version)"
             if dbtype != '':
-                indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(self.tag_id))
-                indexdef += ' ON "%s_value_idx"' % (self.wraptag(self.tag_id))
+                indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(tagdef.tagname))
+                indexdef += ' ON "%s_value_idx"' % (self.wraptag(tagdef.tagname))
                 indexdef += ' (value)'
         else:
             if dbtype != '':
@@ -1171,6 +1180,9 @@ class Application:
             raise NotFound('tagdef "%s"' % self.tag_id)
         tagdeffile = results[0]
         self.delete_file( tagdeffile.file, tagdeffile.version )
+        self.undeploy_tagdef()
+
+    def undeploy_tagdef(self):
         self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
 
     def select_file_tag_args_prep(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
