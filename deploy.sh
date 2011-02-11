@@ -515,6 +515,13 @@ cfgtag "file list tags" text dtype bytes owner 'read users' 'write users'
 #cfgtag "local files immutable" text 'True'
 #cfgtag "remote files immutable" text 'True'
 
+dataset "tagdef tags" blank "${admin}" "*"
+for tagname in tagdef "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
+do
+   tag "tagdef tags" "_cfg_file list tags" "tagname" "\$tagname"
+   tag "tagdef tags" "_cfg_tag list tags" "tagname" "\$tagname"
+done
+
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...
 # semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
