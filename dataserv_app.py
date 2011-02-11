@@ -717,6 +717,9 @@ class Application:
             if typestr in used_types:
                 raise Conflict('The type "%s" defined by "%s@%s" is in use and cannot be modified.' % (typestr, data_id, version) )
 
+        if dtype == 'tagdef':
+            raise Conflict('The dataset "%s@%s" is a tagdef and must be modified by the REST /tagdef/ interface.' % (data_id, version) )
+
         if dtype == 'url':
             try:
                 results = self.select_file_tag('Image Set', data_id=data_id, version=version)
@@ -1058,6 +1061,7 @@ class Application:
         listas = { 'tagdef': 'tagname', 
                    'tagdef type': 'typestr', 
                    'tagdef multivalue': 'multivalue',
+                   'tagdef active': 'active',
                    'tagdef readpolicy': 'readpolicy',
                    'tagdef writepolicy': 'writepolicy',
                    'tag read users': 'tagreaders',
@@ -1072,7 +1076,7 @@ class Application:
         def select_clause(listtag):
             if listtag in [ 'tag read users', 'tag write users' ]:
                 listtagexpr = 'array_agg("_%s".value)' % listtag
-            elif listtag in [ 'tagdef multivalue' ]:
+            elif listtag in [ 'tagdef multivalue', 'tagdef active' ]:
                 listtagexpr = '("_%s".file IS NOT NULL)' % listtag
             else:
                 listtagexpr = '"_%s".value' % listtag
@@ -1092,7 +1096,7 @@ class Application:
                                                  + ['"_%s" ON (latestfiles.name = "_%s".file AND latestfiles.version = "_%s".version)' % (listtag, listtag, listtag)
                                                     for listtag in listtags]),
                         wheres,
-                        ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file']
+                        ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file, "_tagdef active".file']
                                  + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue']]) ) )
             vars = dict(tagname=tagname)
             #web.debug(query, vars)
@@ -1120,13 +1124,14 @@ class Application:
                  ('name', data_id),
                  ('vname', '%s@%s' % (data_id, version)),
                  ('tagdef', self.tag_id),
+                 ('tagdef active', None),
                  ('tagdef type', self.typestr),
                  ('tagdef readpolicy', self.readpolicy),
                  ('tagdef writepolicy', self.writepolicy) ]
         if self.authn.role:
             tags.append( ('owner', self.authn.role) )
         if self.multivalue:
-            tags.append( ('tagdef multivalue', self.multivalue) )
+            tags.append( ('tagdef multivalue', None) )
 
         for tag, value in tags:
             self.set_file_tag(tag, value, data_id, version, owner)

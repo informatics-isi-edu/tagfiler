@@ -356,6 +356,7 @@ tagdef 'typedef'      text        ""      anonymous   file       false
 tagdef 'tagdef type'         text ""      anonymous   system     false      type
 
 tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
+tagdef 'tagdef enabled'      ""   ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
 tagdef 'tag read users'      text ""      anonymous   system     true       rolepat
