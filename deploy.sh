@@ -489,6 +489,10 @@ tagacl "Downloaded" write "${downloader}"
 dataset "study tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/study%20tags" "${admin}" "*"
 dataset "fundus tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20tags" "${admin}" "*"
 dataset "fundus brief tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/fundus%20brief%20tags" "${admin}" "*"
+dataset "contains tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/contains%20tags" "${admin}" "*"
+dataset "typedef tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/typedef%20tags" "${admin}" "*"
+dataset "url tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/url%20tags" "${admin}" "*"
+dataset "vcontains tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/vcontains%20tags" "${admin}" "*"
 
 modtagdef()
 {
@@ -544,6 +548,11 @@ for tag in '_cfg_file list tags' '_cfg_file list tags write' '_cfg_applet tags' 
 do 
    tag 'study tags' "\$tag" tagname "Modality" "Study Name" "Study Participant" "Study Date"
 done
+
+tag 'contains tags' "_cfg_tag list tags" tagname "contains"
+tag 'typedef tags' "_cfg_tag list tags" tagname "_type_dbtype" "_type_description" "_type_values" "typedef"
+tag 'url tags' "_cfg_tag list tags" tagname "url"
+tag 'vcontains tags' "_cfg_tag list tags" tagname "vcontains"
 
 
 #         MOD    TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
