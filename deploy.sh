@@ -124,6 +124,7 @@ dataset()
    # args: <name> url <url> <owner> [<readuser>]...
    # args: <name> blank <owner> [<readuser>]...
    # args: <name> typedef <owner> [<readuser>]...
+   # args: <name> tagdef <owner> [<readuser>]...
 
    local file="\$1"
    local type="\$2"
@@ -146,7 +147,7 @@ dataset()
               ;;
          esac
          ;;
-      blank|typedef)
+      blank|typedef|tagdef)
          :
          ;;
       *)
@@ -242,7 +243,7 @@ tagdef_tags()
 
    echo "create tagdef '\$1'..."
 
-   dataset "_tagdef_\$1" blank "\$3" "*"
+   dataset "_tagdef_\$1" tagdef "\$3" "*"
 
    tag "_tagdef_\$1" "tagdef" text "\$1"
 
@@ -425,7 +426,7 @@ typedef text         text          'Text'
 typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
-typedef dtype       text          'Dataset type' 'url URL redirecting dataset' 'blank Metadata-only dataset' 'typedef Type definition' 'file Locally stored file' 'contains Collection of unversioned datasets' 'vcontains Collection of versioned datasets'
+typedef dtype       text          'Dataset type' 'url URL redirecting dataset' 'blank Metadata-only dataset' 'typedef Type definition' 'tagdef Tag definition' 'file Locally stored file' 'contains Collection of unversioned datasets' 'vcontains Collection of versioned datasets'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
 typedef vfile        text          'Dataset with version number'
