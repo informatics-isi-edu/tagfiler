@@ -1061,7 +1061,7 @@ class Application:
         if not predlist:
             # short-circuit query to avoid infinite recursion in select_files_by_predlist...
             if not tagname:
-                wheres = ''
+                wheres = 'WHERE "_tagdef".value IS NOT NULL'
             else:
                 wheres = 'WHERE "_tagdef".value = $tagname'
             
@@ -1568,6 +1568,8 @@ class Application:
             else:
                 return listtag
 
+        #web.debug('select_files_by_predlist', predlist, listtags, ordertags, data_id, version, versions, listas)
+
         if listas != None:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
@@ -1579,7 +1581,12 @@ class Application:
         else:
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
 
-        #web.debug(query, values)
+        #web.debug(len(query), query, values)
+        #web.debug('%s bytes in query:' % len(query))
+        #for string in query.split(','):
+        #    web.debug (string)
+        #web.debug(values)
+        #web.debug('...end query')
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)
