@@ -246,6 +246,7 @@ tagdef_tags()
    dataset "_tagdef_\$1" tagdef "\$3" "*"
 
    tag "_tagdef_\$1" "tagdef" text "\$1"
+   tag "_tagdef_\$1" "tagdef active"
 
    tag "_tagdef_\$1" "tagdef readpolicy" tagpolicy "\$4"
    tag "_tagdef_\$1" "tagdef writepolicy" tagpolicy "\$5"
@@ -356,7 +357,7 @@ tagdef 'typedef'      text        ""      anonymous   file       false
 tagdef 'tagdef type'         text ""      anonymous   system     false      type
 
 tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
-tagdef 'tagdef enabled'      ""   ""      anonymous   system     false
+tagdef 'tagdef active'      ""   ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
 tagdef 'tag read users'      text ""      anonymous   system     true       rolepat

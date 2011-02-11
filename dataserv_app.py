@@ -130,7 +130,6 @@ class NotFound (WebException):
     def __init__(self, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -139,7 +138,6 @@ class Forbidden (WebException):
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -148,7 +146,6 @@ class Unauthorized (WebException):
     def __init__(self, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -157,7 +154,6 @@ class BadRequest (WebException):
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -166,7 +162,6 @@ class Conflict (WebException):
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -175,7 +170,6 @@ class IntegrityError (WebException):
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -184,7 +178,6 @@ class RuntimeError (WebException):
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
-        web.header('X-Error-Description', urlquote(desc % data))
         data = render.Error(status, desc, data)
         WebException.__init__(self, status, headers=headers, data=data)
 
@@ -756,10 +749,12 @@ class Application:
 
         authorized.append('root') # allow root to do everything in case of trouble?
 
+        status = web.ctx.status
         try:
             self.enforce_file_authz_special(mode, data_id, version, owner)
         except:
             # if special rules are violated, treat like unauthorized
+            web.ctx.status = status
             return False
 
         roles = self.authn.roles.copy()
@@ -1097,7 +1092,7 @@ class Application:
                                                     for listtag in listtags]),
                         wheres,
                         ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file, "_tagdef active".file']
-                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue']]) ) )
+                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue', 'tagdef active']]) ) )
             vars = dict(tagname=tagname)
             #web.debug(query, vars)
             return self.db.query(query, vars=vars)
