@@ -697,6 +697,37 @@ class Application:
                 return roleinfo
             except NotImplemented, AttributeError:
                 return None
+
+    def enforce_file_authz_special(self, mode, data_id, version, owner=None):
+        if mode == 'read':
+            # special rules only affect write mode
+            return
+        try:
+            dtype = self.select_file_tag_noauthn('dtype', data_id=data_id, version=version)[0].value
+        except:
+            #raise Conflict('The file "%s@%s" does not have a dtype!' % (data_id, version))
+            return
+
+        if dtype == 'typedef':
+            # check for in-use dependencies before allowing delete
+            used_types = set([ res.typestr for res in self.select_tagdef() ])
+            typestr = self.select_file_tag_noauthn('typedef', data_id=data_id, version=version)
+            if len(typestr) > 0:
+                typestr = typestr[0].value
+            if typestr in used_types:
+                raise Conflict('The type "%s" defined by "%s@%s" is in use and cannot be modified.' % (typestr, data_id, version) )
+
+        if dtype == 'url':
+            try:
+                results = self.select_file_tag('Image Set', data_id=data_id, version=version)
+                if len(results) > 0:
+                    # rewrite dtype for immutable files test
+                    dtype = 'file'
+            except:
+                pass
+
+        if dtype == 'file' and self.localFilesImmutable or dtype == 'url' and self.remoteFilesImmutable:
+            raise Forbidden(data="modification of immutable dataset %s" % data_id)
     
     def test_file_authz(self, mode, data_id=None, version=None, owner=None):
         """Check whether access is allowed to user given mode and owner.
@@ -721,6 +752,12 @@ class Application:
             # authorized.append('*')  # fall back to public model w/o owner?
 
         authorized.append('root') # allow root to do everything in case of trouble?
+
+        try:
+            self.enforce_file_authz_special(mode, data_id, version, owner)
+        except:
+            # if special rules are violated, treat like unauthorized
+            return False
 
         roles = self.authn.roles.copy()
         if roles:
@@ -820,16 +857,10 @@ class Application:
             data_id = self.data_id
         if version == None:
             version = self.version
-        if mode == 'write':
-            if dtype == 'url':
-                try:
-                    results = self.select_file_tag('Image Set', data_id=data_id, version=version)
-                    if len(results) > 0:
-                        dtype = 'file'
-                except:
-                    pass
-            if dtype == 'file' and self.localFilesImmutable or dtype == 'url' and self.remoteFilesImmutable:
-                raise Forbidden(data="access to immutable dataset %s" % data_id)
+
+        # enforce these early, so they can throw more specific exceptions
+        self.enforce_file_authz_special(mode, data_id, version, owner)
+            
         allow = self.test_file_authz(mode, data_id=data_id, version=version, owner=owner)
         if allow == False:
             raise Forbidden(data="access to dataset %s" % data_id)
@@ -1014,16 +1045,6 @@ class Application:
         if not version:
             # we're deleting latest version if one wasn't specified already by caller
             version = versions[0].version
-
-        dtype = self.select_file_tag_noauthn('dtype', data_id=data_id, version=version)
-        if len(dtype) > 0 and dtype[0].value == 'typedef':
-            # check for in-use dependencies before allowing delete
-            used_types = set([ res.typestr for res in self.select_tagdef() ])
-            typestr = self.select_file_tag_noauthn('typedef', data_id=data_id, version=version)
-            if len(typestr) > 0:
-                typestr = typestr[0].value
-                if typestr in used_types:
-                    raise Conflict('The type ("%s") defined by "%s@%s" is in use and cannot be deleted.' % (typestr, data_id, version) )
 
         if version == versions[0].version and len(versions) > 1:
             # we're deleting the latest version and there are previous versions
