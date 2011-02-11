@@ -114,7 +114,6 @@ echo "create core tables..."
 
 psql -q -t -c "CREATE TABLE files ( name text, version int8, PRIMARY KEY(name, version) )"
 psql -q -t -c "CREATE TABLE latestfiles ( name text PRIMARY KEY, version int8, FOREIGN KEY (name, version) REFERENCES files (name, version) ON DELETE CASCADE )"
-psql -q -t -c "CREATE TABLE filetags ( file text, version int8, tagname text REFERENCES tagdefs (tagname) ON DELETE CASCADE, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 
 psql -q -t -c "CREATE SEQUENCE transmitnumber"
 psql -q -t -c "CREATE SEQUENCE keygenerator"
@@ -245,8 +244,10 @@ tagdef_tags()
 
    dataset "_tagdef_\$1" blank "\$3" "*"
 
-   tag "_tagdef_\$1" "tagdef readpolicy" "\$4"
-   tag "_tagdef_\$1" "tagdef writepolicy" "\$5"
+   tag "_tagdef_\$1" "tagdef" text "\$1"
+
+   tag "_tagdef_\$1" "tagdef readpolicy" tagpolicy "\$4"
+   tag "_tagdef_\$1" "tagdef writepolicy" tagpolicy "\$5"
 
    if [[ "\$6" == "true" ]]
    then
@@ -255,15 +256,15 @@ tagdef_tags()
 
    if [[ -n "\$7" ]]
    then
-      tag "_tagdef_\$1" "tagdef type" "\$7"
+      tag "_tagdef_\$1" "tagdef type" type "\$7"
    else
-      tag "_tagdef_\$1" "tagdef type" "\$2"
+      tag "_tagdef_\$1" "tagdef type" type "\$2"
    fi
 }
 
 tagdef_table()
 {
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey]]
 
    if [[ -n "\$2" ]]
    then
@@ -279,7 +280,7 @@ tagdef_table()
       elif [[ "\$7" = "vfile" ]]
       then
          fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
-      elif [[ "\$1" = "vname" ]]
+      elif [[ "\$1" = "vname" ]] || [[ "\$8" = true ]]
       then
          fk="UNIQUE"
       else
@@ -308,22 +309,24 @@ tag_typestrs=()
 
 tagdef()
 {
-   tag_names[${#tag_names[*]}]="\$1"
-   tag_dbtypes[${#tag_dbtypes[*]}]="\$2"
-   tag_owners[${#tag_owners[*]}]="\$3"
-   tag_readpolicies[${#tag_readpolicies[*]}]="\$4"
-   tag_writepolicies[${#tag_writepolicies[*]}]="\$5"
-   tag_multivalues[${#tag_multivalues[*]}]="\$6"
-   tag_typestrs[${#tag_typestrs[*]}]="\$7"
+   tag_names[\${#tag_names[*]}]="\$1"
+   tag_dbtypes[\${#tag_dbtypes[*]}]="\$2"
+   tag_owners[\${#tag_owners[*]}]="\$3"
+   tag_readpolicies[\${#tag_readpolicies[*]}]="\$4"
+   tag_writepolicies[\${#tag_writepolicies[*]}]="\$5"
+   tag_multivalues[\${#tag_multivalues[*]}]="\$6"
+   tag_typestrs[\${#tag_typestrs[*]}]="\$7"
 
    tagdef_table "\$@"
 }
 
 tagdefs_complete()
 {
+   local i
+   echo \${!tag_names[*]}
    for i in \${!tag_names[*]}
    do
-      tagdef_table "\${tag_names[\$i]}" "\${tag_dbtypes[\$i]}" "\${tag_owners[\$i]}" "\${tag_readpolicies[\$i]}" "\${tag_writepolicies[\$i]}" "\${tag_multivalues[\$i]}" "\${tag_typestrs[\$i]}"
+      tagdef_tags "\${tag_names[\$i]}" "\${tag_dbtypes[\$i]}" "\${tag_owners[\$i]}" "\${tag_readpolicies[\$i]}" "\${tag_writepolicies[\$i]}" "\${tag_multivalues[\$i]}" "\${tag_typestrs[\$i]}"
    done
 }
 
@@ -344,23 +347,22 @@ typedef()
 }
 
 
-#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
 
-tagdef 'tagdef'       text        ""      anonymous   system     false
+tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
 tagdef 'typedef'      text        ""      anonymous   file       false
 
 tagdef 'tagdef type'         text ""      anonymous   system     false      type
+
 tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
-tagdef 'tag read users'      text ""      anonymous   system     false      rolepat
-tagdef 'tag write users'     text ""      anonymous   system     false      rolepat
+tagdef 'tag read users'      text ""      anonymous   system     true       rolepat
+tagdef 'tag write users'     text ""      anonymous   system     true       rolepat
 
 tagdef '_type_description' text   ""      anonymous   file       false
 tagdef '_type_dbtype' text        ""      anonymous   file       false
 tagdef '_type_values' text        ""      anonymous   file       true
-
-tagdef 'tagdef type'  text        ""      anonymous   system
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -385,9 +387,20 @@ tagdef key            text        ""      anonymous   file       false
 tagdef "member of"    text        ""      anonymous   file       true
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
-tagdef "Image Set"    ""          "${admin}"   file        file       false
+tagdef "Image Set"    ""          "${admin}"   file   file       false
+
+psql -q -t -c "CREATE TABLE filetags ( file text, version int8, tagname text, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE )"
 
 tagdefs_complete
+
+# redefine tagdef to perform both phases, now that core (recursively constrained) tagdefs are in place
+tagdef()
+{
+   tagdef_table "\$@"
+   tagdef_tags "\$@"
+}
+
+psql -e -t -c "ALTER TABLE filetags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE"
 
 tagacl "list on homepage" read "*"
 tagacl "list on homepage" write "${admin}"
@@ -417,7 +430,11 @@ typedef url          text          'URL'
 typedef file         text          'Dataset'
 typedef vfile        text          'Dataset with version number'
 
+typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'file Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
+
 typedef type         text          'Scalar value type'
+
+
 
 
 dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"

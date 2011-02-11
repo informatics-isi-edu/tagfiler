@@ -1033,10 +1033,12 @@ class Application:
         self.db.query(query, vars=dict(name=data_id, version=version))
 
     def select_tagdef(self, tagname=None, predlist=[], order=None, staticauthz=None):
+        orig_predlist = predlist
+        
         if tagname:
-            predlist += [ dict(tag='tagdef', op='=', vals=[tagname]) ]
+            predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
         else:
-            predlist += [ dict(tag='tagdef', op=None, vals=[]) ]
+            predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
         listtags = [ 'owner' ]
         listas = { 'tagdef': 'tagname', 
@@ -1047,13 +1049,36 @@ class Application:
                    'tag read users': 'tagreaders',
                    'tag write users': 'tagwriters' }
         listtags += listas.keys()
+
         if order:
             ordertags = [ order ]
         else:
             ordertags = []
 
+        def select_clause(listtag):
+            if listtag in [ 'tag read users', 'tag write users' ]:
+                listtagexpr = 'array_agg("_%s".value)' % listtag
+            elif listtag in [ 'tagdef multivalue' ]:
+                listtagexpr = '("_%s".file IS NOT NULL)' % listtag
+            else:
+                listtagexpr = '"_%s".value' % listtag
+            return "%s AS %s" % (listtagexpr, listas.get(listtag, listtag))
+
         # TODO: implement or drop staticauthz=read|write param?
-        return select_files_by_predlist(predlist, listtags, ordertags, listas=listas)
+        if tagname and not orig_predlist:
+            # short-circuit query to avoid infinite recursion in select_files_by_predlist...
+            query = ('SELECT %s FROM %s WHERE "_tagdef".value = $tagname GROUP BY %s'
+                     % (','.join(['latestfiles.name AS file', 'latestfiles.version AS version'] + [select_clause(listtag) for listtag in listtags]),
+                        ' LEFT OUTER JOIN '.join(['latestfiles']
+                                                 + ['"_%s" ON (latestfiles.name = "_%s".file AND latestfiles.version = "_%s".version)' % (listtag, listtag, listtag)
+                                                    for listtag in listtags]),
+                        ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file']
+                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue']]) ) )
+            vars = dict(tagname=tagname)
+            web.debug(query, vars)
+            return self.db.query(query, vars=vars)
+        else:
+            return self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas)
 
     def insert_tagdef(self):
         results = self.select_tagdef(self.tag_id)
@@ -1210,7 +1235,7 @@ class Application:
         tagdeffile =  results[0]
         self.delete_file_tag('tag %s users', user, tagdeffile.file, tagdeffile.version, '')
 
-    def select_filetags_noauthn(self, data_id=None, version=None):
+    def select_filetags_noauthn(self, data_id=None, version=None, tagname=None):
         wheres = []
         vars = dict()
         if data_id == None:
@@ -1223,6 +1248,9 @@ class Application:
             if version:
                 wheres.append("version = $version")
                 vars['version'] = version
+        if tagname:
+            wheres.append("tagname = $tagname")
+            vars['tagname'] = tagname
         
         wheres = ' AND '.join(wheres)
         if wheres:
@@ -1335,7 +1363,7 @@ class Application:
         vars = dict(file=data_id, version=version, value=value, tagname=tagname)
         self.db.query(query, vars=vars)
         
-        results = self.select_filetags_noauthn(tagname, data_id=data_id, version=version)
+        results = self.select_filetags_noauthn(data_id=data_id, version=version, tagname=tagname)
         if len(results) == 0:
             self.db.query("INSERT INTO filetags (file, version, tagname) VALUES ($file, $version, $tagname)", vars=vars)
         else:
@@ -1532,14 +1560,14 @@ class Application:
     def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest', listas=None):
         def select_clause(listtag):
             if listas.has_key(listtag):
-                return "%s AS %s" % (listtag, listas[listtag])
+                return '"%s" AS "%s"' % (listtag, listas[listtag])
             else:
                 return listtag
 
         if listas != None:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], data_id, version, versions=versions)
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], data_id=data_id, version=version, versions=versions)
             query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(["file"])) ]),
                                                   query)
             if ordertags:
@@ -1547,7 +1575,7 @@ class Application:
         else:
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
 
-        #web.debug(query, values)
+        web.debug(query, values)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)
