@@ -1033,13 +1033,6 @@ class Application:
         self.db.query(query, vars=dict(name=data_id, version=version))
 
     def select_tagdef(self, tagname=None, predlist=[], order=None, staticauthz=None):
-        orig_predlist = predlist
-        
-        if tagname:
-            predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
-        else:
-            predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
-
         listtags = [ 'owner' ]
         listas = { 'tagdef': 'tagname', 
                    'tagdef type': 'typestr', 
@@ -1065,19 +1058,30 @@ class Application:
             return "%s AS %s" % (listtagexpr, listas.get(listtag, listtag))
 
         # TODO: implement or drop staticauthz=read|write param?
-        if tagname and not orig_predlist:
+        if not predlist:
             # short-circuit query to avoid infinite recursion in select_files_by_predlist...
-            query = ('SELECT %s FROM %s WHERE "_tagdef".value = $tagname GROUP BY %s'
+            if not tagname:
+                wheres = ''
+            else:
+                wheres = 'WHERE "_tagdef".value = $tagname'
+            
+            query = ('SELECT %s FROM %s %s GROUP BY %s'
                      % (','.join(['latestfiles.name AS file', 'latestfiles.version AS version'] + [select_clause(listtag) for listtag in listtags]),
                         ' LEFT OUTER JOIN '.join(['latestfiles']
                                                  + ['"_%s" ON (latestfiles.name = "_%s".file AND latestfiles.version = "_%s".version)' % (listtag, listtag, listtag)
                                                     for listtag in listtags]),
+                        wheres,
                         ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file']
                                  + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue']]) ) )
             vars = dict(tagname=tagname)
-            web.debug(query, vars)
+            #web.debug(query, vars)
             return self.db.query(query, vars=vars)
         else:
+            if tagname:
+                predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
+            else:
+                predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
+
             return self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas)
 
     def insert_tagdef(self):
@@ -1575,7 +1579,7 @@ class Application:
         else:
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
 
-        web.debug(query, values)
+        #web.debug(query, values)
         #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
         return self.db.query(query, vars=values)
