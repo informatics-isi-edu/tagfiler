@@ -195,7 +195,7 @@ tagdef name           text        ""      anonymous   system     false
 tagdef vname          text        ""      anonymous   system     false
 tagdef dtype          text        ""      anonymous   system     false      dtype
 tagdef storagename    text        ""      system      system     false
-tagdef url            text        ""      file        system     false      url
+tagdef url            text        ""      file        file     false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
@@ -544,16 +544,14 @@ done
 cfgtag "applet tags" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
 cfgtag "applet tags require" tagname  "Modality" "Study Name" "Study Participant" "Study Date"
 
-for tag in '_cfg_file list tags' '_cfg_file list tags write' '_cfg_applet tags' '_cfg_applet tags require'
+for tag in '_cfg_file list tags' '_cfg_file list tags write' '_cfg_applet tags' '_cfg_applet tags require' '_cfg_tag list tags'
 do 
+   tag 'contains tags' "\$tag" tagname "contains"
    tag 'study tags' "\$tag" tagname "Modality" "Study Name" "Study Participant" "Study Date"
+   tag 'typedef tags' "\$tag" tagname "_type_dbtype" "_type_description" "_type_values" "typedef"
+   tag 'url tags' "\$tag" tagname "url"
+   tag 'vcontains tags' "\$tag" tagname "vcontains"
 done
-
-tag 'contains tags' "_cfg_tag list tags" tagname "contains"
-tag 'typedef tags' "_cfg_tag list tags" tagname "_type_dbtype" "_type_description" "_type_values" "typedef"
-tag 'url tags' "_cfg_tag list tags" tagname "url"
-tag 'vcontains tags' "_cfg_tag list tags" tagname "vcontains"
-
 
 #         MOD    TAGNAME                      TYPE   OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
 modtagdef fundus    'Max DRU Size'               int8   "${admin}"   tag         tag        false      'Max DRU Size'
