@@ -150,7 +150,7 @@ class FileIO (Application):
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
             elif result.dtype in ['blank', 'contains', 'typedef', 'vcontains']:
-                raise web.seeother('%s/tags/%s' % (self.globals['home'], urlquote(self.data_id)))
+                raise web.seeother('%s/tags/%s?view=%s' % (self.globals['home'], urlquote(self.data_id), urlquote('%s tags' % result.dtype)))
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
         def preRead():
@@ -911,7 +911,10 @@ class FileIO (Application):
         def putPostCommit(files):
             if files:
                 self.deletePrevious(files)
-            raise web.seeother('/tags/%s@%d' % (urlquote(self.data_id), self.version))
+            view = ''
+            if self.dtype in [ 'contains', 'typedef', 'url', 'vcontains' ]:
+                view = '?view=%s' % urlquote('%s tags' % self.dtype)
+            raise web.seeother('/tags/%s@%d%s' % (urlquote(self.data_id), self.version, view))
 
         def deleteBody():
             filesdict = dict()
@@ -1031,11 +1034,20 @@ class FileIO (Application):
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' , 'putdq' ]:
+            elif self.action in [ 'put', 'putsq' ]:
                 # we only support URL PUT simulation this way
                 self.dtype = 'url'
                 if self.action == 'put':
-                    self.url = storage.url
+                    #self.url = storage.url
+                    self.dtype = storage.type
+                    if storage.type in [ 'contains', 'vcontains' ]:
+                        self.key = self.dbtransact(keyBody, keyPostCommit)
+                        self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
+                    if storage.type == 'url':
+                        try:
+                            self.url = storage.url
+                        except:
+                            pass
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.url = storage.url + '?title=%s' % urlquote(self.data_id)

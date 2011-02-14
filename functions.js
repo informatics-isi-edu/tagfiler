@@ -504,6 +504,71 @@ function checkInput(id, message) {
 	}
 }
 
+/**
+ * Validate and make html transformations for the NameForm
+ * Return True in case of success and False otherwise
+ */
+function validateNameForm() {
+	var res = checkInput('datasetName', 'name of the dataset');
+	if (!res) {
+		return false;
+	}
+	var type = document.getElementById('type').value;
+	var fileInput = null;
+	if (type == 'file') {
+		if (!checkInput('fileName', 'file to be uploaded')) {
+			return false;
+		}
+		fileInput = document.getElementById('fileName');
+	}
+	var data_id = encodeURIComponent(document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, ""));
+	var action = document.NameForm.getAttribute('action');
+	action += data_id;
+	var prefix = '?';
+	if (document.getElementById('read users').value == '*') {
+		action += '?read%20users=*';
+		prefix = '&'
+	}
+	if (document.getElementById('write users').value == '*') {
+		action += prefix + 'write%20users=*';
+	}
+	document.NameForm.setAttribute('action', action);
+	if (type == 'file') {
+		document.NameForm.enctype = 'multipart/form-data';
+	} else {
+		document.NameForm.enctype = 'application/x-www-form-urlencoded';
+	}
+	var form = document.getElementById('NameForm');
+	orig_form = document.getElementById('NameForm_div');
+	form.removeChild(orig_form);
+	document.getElementById('Copy').appendChild(orig_form);
+	input = document.createElement('input');
+	input.setAttribute('type', 'submit');		
+	input.setAttribute('value', 'Proceed');		
+	document.getElementById('Copy').appendChild(input);
+	if (type == 'file') {
+		form.appendChild(fileInput);
+		fileInput.style.display = 'none';
+	} else {
+		input = document.createElement('input');
+		input.setAttribute('type', 'hidden');		
+		input.setAttribute('name', 'action');		
+		input.setAttribute('id', 'action');		
+		input.setAttribute('value', 'put');		
+		form.appendChild(input);
+		input = document.createElement('input');
+		input.setAttribute('type', 'hidden');		
+		input.setAttribute('name', 'type');		
+		input.setAttribute('id', 'type');		
+		input.setAttribute('value', type);		
+		form.appendChild(input);
+	}
+	
+	document.getElementById('submit').style.display = 'none';
+	
+	return true;
+}
+
 var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;

@@ -331,7 +331,7 @@ class FileList (Node):
                     readers = 'owner'
                 if writers not in [ '*', 'owner' ]:
                     writers = 'owner'
-                if filetype not in [ 'file', 'url', 'dataset' ]:
+                if filetype not in [ 'blank', 'contains', 'file', 'typedef', 'url', 'vcontains' ]:
                     filetype = 'file'
 
                 url = self.home + web.ctx.homepath + '/file/' + urlquote(name)
