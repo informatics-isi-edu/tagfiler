@@ -968,17 +968,13 @@ class Application:
         #web.debug(query, vars)
         return self.db.query(query, vars)
 
-    def select_file_members(self, data_id=None, version=None):
-        if data_id == None:
-            data_id = self.data_id
-        if version == None:
-            version = self.version
-        vars = dict(data_id=data_id, version=version)
-        keyquery = 'SELECT value FROM "_key" WHERE file = $data_id AND version = $version'
-        memberquery = 'SELECT file AS name, version FROM "_member of" JOIN (%s) AS a USING (value)' % keyquery
-        query = 'SELECT * FROM files JOIN (%s) AS b USING (name, version)' % memberquery
-        #web.debug(query, vars)
-        return self.db.query(query, vars)
+    def select_file_members(self, data_id=None, version=None, membertag='vcontains'):
+        # return the children of the dataset as referenced by its membertag, e.g. vcontains or contains
+        return self.select_files_by_predlist_path([ ([dict(tag='name', op='=', vals=[data_id]),
+                                                      dict(tag='version', op='=', vals=[version])],
+                                                     [membertag],
+                                                     []),
+                                                    ([], ['name', 'version'], []) ])
 
     def select_file_versions(self, data_id=None):
         if data_id == None:
@@ -1005,16 +1001,12 @@ class Application:
             query += ' WHERE n.value = $name'
         return self.db.query(query, vars)
 
-    def select_dataset_size(self, key):
-        data_id = self.data_id + '/%'
-        vars = dict(data_id=data_id, key=key)
-        what = 'SUM(value) AS size, COUNT(*) AS count'
-        filesquery = 'SELECT file, version FROM "_member of" WHERE value = $key'
-        bytesquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
-        joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (filesquery, bytesquery)
-        query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
-        #web.debug(query, vars)
-        return self.db.query(query, vars)
+    def select_dataset_size(self, key, membertag='vcontains'):
+        # return statistics aout the children of the dataset as referenced by its membertag
+        query, values = self.build_files_by_predlist_path([ ([dict(tag='key', op='=', vals=[key])], [membertag], []),
+                                                            ([], ['name', 'bytes'], []) ])
+        query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
+        return self.db.query(query, values)
 
     def insert_file(self, data_id, version, dtype, storagename):
         newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING id")[0].id
@@ -1694,7 +1686,7 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def select_files_by_predlist_path(self, path=None, versions='latest'):
+    def build_select_files_by_predlist_path(self, path=None, versions='latest'):
         if path == None:
             path = [ ([], [], []) ]
 
@@ -1741,6 +1733,10 @@ class Application:
 
         query = 'SELECT ' + selects + ' FROM ' + query
         #web.debug(query, values)
+        return (query, values)
+
+    def select_files_by_predlist_path(self, path=None, versions='latest'):
+        query, values = self.build_files_by_predlist_path(path, versions)
         return self.db.query(query, values)
 
     
