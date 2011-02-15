@@ -510,7 +510,7 @@ class FileIO (Application):
             self.set_file_tag('vname', '%s@%s' % (self.data_id, self.version))
             # copy basefile tags
             for result in self.select_filetags_noauthn(data_id=basefile.file, version=basefile.version):
-                if result.tagname not in [ 'bytes', 'content-type', 'dtype', 'key', 'member of', 'modified', 'modified by', 'sha256sum', 'url', 'version created', 'version', 'vname' ]:
+                if result.tagname not in [ 'bytes', 'content-type', 'dtype', 'key', 'modified', 'modified by', 'sha256sum', 'url', 'version created', 'version', 'vname' ]:
                     tags = self.select_file_tag_noauthn(result.tagname, data_id=basefile.file, version=basefile.version)
                     for tag in tags:
                         if hasattr(tag, 'value'):
@@ -882,12 +882,6 @@ class FileIO (Application):
                     if not filesdict.has_key(file.name):
                         filesdict[file.name] = file
 
-    def testAndExpandWithMembers(self, filesdict, data_id, version):
-        files = self.select_file_members(data_id=data_id, version=version)
-        if len(files) > 0:
-            for file in files:
-                filesdict[file.name] = file
-
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
         # return same result page as for GET app/tags/data_id for convenience
@@ -931,7 +925,6 @@ class FileIO (Application):
 
             #For now, don't delete the members of a dataset. It is unsafe, as a file might belong to multiple datasets
             #self.testAndExpandFiles(filesdict, self.data_id, 'Image Set', 'contains')
-            #self.testAndExpandWithMembers(filesdict, self.data_id, self.version)
             
             for res in filesdict.itervalues():
                 self.delete_file(res.name, res.version)

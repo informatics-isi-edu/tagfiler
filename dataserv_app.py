@@ -934,18 +934,6 @@ class Application:
                 query += ' AND version = $version'
         return self.db.query(query, vars)
 
-    def select_file_members(self, data_id=None, version=None):
-        if data_id == None:
-            data_id = self.data_id
-        if version == None:
-            version = self.version
-        vars = dict(data_id=data_id, version=version)
-        keyquery = 'SELECT value FROM "_key" WHERE file = $data_id AND version = $version'
-        memberquery = 'SELECT file AS name, version FROM "_member of" JOIN (%s) AS a USING (value)' % keyquery
-        query = 'SELECT * FROM files JOIN (%s) AS b USING (name, version)' % memberquery
-        #web.debug(query, vars)
-        return self.db.query(query, vars)
-
     def select_file_versions(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
@@ -967,11 +955,13 @@ class Application:
     def select_dataset_size(self, key):
         data_id = self.data_id + '/%'
         vars = dict(data_id=data_id, key=key)
-        what = 'SUM(value) AS size, COUNT(*) AS count'
-        filesquery = 'SELECT file, version FROM "_member of" WHERE value = $key'
-        bytesquery = 'SELECT * FROM "_bytes" WHERE file LIKE $data_id'
-        joinquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (filesquery, bytesquery)
-        query = 'SELECT %s FROM (%s) AS c' % (what, joinquery)
+        what = 'SUM(bytes) AS size, COUNT(*) AS count'
+        keyquery = 'SELECT file, version FROM "_key" WHERE value = $key'
+        vcontainsquery = 'SELECT * FROM "_vcontains"'
+        filesquery = 'SELECT * FROM (%s) AS a JOIN (%s) AS b USING(file, version)' % (keyquery, vcontainsquery)
+        bytesquery = 'SELECT file || \'@\' || version AS value, value AS bytes FROM "_bytes"'
+        datasetquery = 'SELECT * FROM (%s) AS c JOIN (%s) AS d USING(value)' % (filesquery, bytesquery)
+        query = 'SELECT %s FROM (%s) AS e' % (what, datasetquery)
         #web.debug(query, vars)
         return self.db.query(query, vars)
 
