@@ -320,8 +320,8 @@ tagdef 'tagdef active'       ""   ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
 
-tagdef 'tag read users'      text ""      anonymous   system     true       rolepat
-tagdef 'tag write users'     text ""      anonymous   system     true       rolepat
+tagdef 'tag read users'      text ""      anonymous   fowner     true       rolepat
+tagdef 'tag write users'     text ""      anonymous   fowner     true       rolepat
 
 tagdef '_type_description' text   ""      anonymous   file       false
 tagdef '_type_dbtype' text        ""      anonymous   file       false

@@ -30,9 +30,7 @@ $				 options=options,
 $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
 $				 writeok=writeok,
 $				 showversions=showversions)
-$if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
-	<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
-$elif tagdef.typestr:
+$if tagdef.typestr:
 	<table class="file-tag-list">
 	$for val in itervals:
 		<tr>

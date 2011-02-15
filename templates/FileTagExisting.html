@@ -7,12 +7,8 @@ $if title != '':
 $if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
-	$if tagspace == 'tagdefacl':
-		<th class="tag-name">ACL name</th>
-		<th class="file-tags">Current Member(s)</th>
-	$else:
-		<th class="tag-name">Tag name</th>
-		<th class="file-tags">Current Value(s)</th>
+	<th class="tag-name">Tag name</th>
+	<th class="file-tags">Current Value(s)</th>
 	</tr>
 	$for tagdef in tagdefs:
 		$if odd:
@@ -27,4 +23,4 @@ $if len(tagdefs) > 0:
 		</tr>
 	</table>
 $else:
-	There are no applicable ${dict(tags="tag", tagdefacl="tagdefacl")[tagspace]}s.
+	There are no applicable tags.
