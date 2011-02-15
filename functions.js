@@ -504,6 +504,9 @@ function checkInput(id, message) {
 	}
 }
 
+var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green">';
+var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
+
 /**
  * Validate and make html transformations for the NameForm
  * Return True in case of success and False otherwise
@@ -521,9 +524,9 @@ function validateNameForm() {
 		}
 		fileInput = document.getElementById('fileName');
 	}
-	var data_id = encodeURIComponent(document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, ""));
+	var data_id = document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, "");
 	var action = document.NameForm.getAttribute('action');
-	action += data_id;
+	action += encodeURIComponent(data_id);
 	var prefix = '?';
 	if (document.getElementById('read users').value == '*') {
 		action += '?read%20users=*';
@@ -541,14 +544,14 @@ function validateNameForm() {
 	var form = document.getElementById('NameForm');
 	orig_form = document.getElementById('NameForm_div');
 	form.removeChild(orig_form);
-	document.getElementById('Copy').appendChild(orig_form);
 	input = document.createElement('input');
 	input.setAttribute('type', 'submit');		
 	input.setAttribute('value', 'Proceed');		
-	document.getElementById('Copy').appendChild(input);
+	var statusValue = datasetStatusPrefix;
 	if (type == 'file') {
 		form.appendChild(fileInput);
 		fileInput.style.display = 'none';
+		statusValue += 'Uploading file "' + fileInput.value + '"';
 	} else {
 		input = document.createElement('input');
 		input.setAttribute('type', 'hidden');		
@@ -562,9 +565,12 @@ function validateNameForm() {
 		input.setAttribute('id', 'type');		
 		input.setAttribute('value', type);		
 		form.appendChild(input);
+		statusValue += 'Registering "' + data_id + '" dataset';
 	}
 	
 	document.getElementById('submit').style.display = 'none';
+	statusValue += datasetStatusSuffix;
+	document.getElementById('Copy').innerHTML = statusValue;
 	
 	return true;
 }
