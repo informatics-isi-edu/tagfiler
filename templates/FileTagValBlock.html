@@ -5,7 +5,7 @@ $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
 $ typename = type['_type_description']
 $ typevals = type['_type_values']
-$ writeok = tagdef.get('writeok', True)
+$ writeok = tagdef.get('writeok', False)
 $ vals = file[tagdef.tagname]
 $ vsuffix = ''
 $if version:
@@ -17,6 +17,13 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
+$if writeok == None:
+	$# writeok depends on file, e.g. is not statically determined
+	$if tagdef.writepolicy == 'fowner':
+		$ writeok = file.owner in authn.roles
+	$else:
+		$# writepolicy == 'file'
+		$ writeok = file.writeok
 $ options = tagOptions(tagdef.tagname, itervals)
 $ params = dict( file=file.file, 
 $ 				 filerecord=file,

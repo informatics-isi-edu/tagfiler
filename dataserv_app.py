@@ -5,6 +5,7 @@ import psycopg2
 import os
 import logging
 import subprocess
+import itertools
 import socket
 import datetime
 import dateutil.parser
@@ -1088,7 +1089,22 @@ class Application:
                 listtagexpr = '"_%s".value' % listtag
             return "%s AS %s" % (listtagexpr, listas.get(listtag, listtag))
 
-        # TODO: implement or drop staticauthz=read|write param?
+        def add_writeok(tagdef):
+            if tagdef['writepolicy'] == 'system':
+                tagdef['writeok'] = False
+            elif tagdef['writepolicy'] in [ 'fowner', 'file' ]:
+                tagdef['writeok'] = None
+            elif tagdef['writepolicy'] == 'tag':
+                tagdef['writeok'] = len(set(self.authn.roles)
+                                        .union(['*'])
+                                        .intersection(set(tagdef['tagwriters']))) > 0
+            elif tagdef['writepolicy'] == 'users':
+                tagdef['writeok'] = self.authn.role != None
+            else:
+                # writepolicy == 'anonymous'
+                tagdef['writeok'] = True
+            return tagdef
+            
         if not predlist:
             # short-circuit query to avoid infinite recursion in select_files_by_predlist...
             if not tagname:
@@ -1116,14 +1132,15 @@ class Application:
                                                                                                        'version']]) ) )
             vars = dict(tagname=tagname)
             #web.debug(query, vars)
-            return self.db.query(query, vars=vars)
+
+            return [ add_writeok(tagdef) for tagdef in self.db.query(query, vars=vars) ]
         else:
             if tagname:
                 predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
             else:
                 predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
-            return self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas)
+            return [ add_writeok(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas) ]
 
     def insert_tagdef(self):
         results = self.select_tagdef(self.tag_id)
