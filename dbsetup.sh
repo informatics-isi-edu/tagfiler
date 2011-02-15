@@ -17,13 +17,34 @@ echo args: "$@"
 echo "create core tables..."
 
 psql -q -t <<EOF
-CREATE TABLE files ( name text, version int8, PRIMARY KEY(name, version) );
-CREATE TABLE latestfiles ( name text PRIMARY KEY, version int8, FOREIGN KEY (name, version) REFERENCES files (name, version) ON DELETE CASCADE );
+CREATE TABLE resources ( id bigserial PRIMARY KEY );
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
 EOF
 
+# insert/get normalized datum id
+dim_datum_id()
+{
+    # args: dimtype datum
+    local id=$(psql -A -t -q <<EOF
+SELECT id FROM "dim_${1}" WHERE "dim_${1}".value = '$2';
+EOF
+    )
+
+    if [[ -z "$id" ]]
+    then
+	id=$(psql -A -t -q <<EOF
+INSERT INTO "dim_${1}" (value) VALUES ($datum) RETURNING id;
+EOF
+	)
+    fi
+
+    echo "$id"
+}
+
 # pre-established stored data
+# MUST NOT be called more than once with same name during deploy 
+# e.g. only deploys version 1 properly
 dataset()
 {
    # args: <name> url <url> <owner> [<readuser>]...
@@ -56,7 +77,7 @@ dataset()
          :
          ;;
       *)
-         echo "Unsupported dataset format: $*"
+         echo "Unsupported dataset format: $*" >&2
          exit 1
          ;;
    esac
@@ -64,30 +85,33 @@ dataset()
    local owner="$1"
    shift
 
-   echo "create $type dataset: '$file'"
+   echo "create $type dataset: '$file'" >&2
 
-   psql -t -q <<EOF
-INSERT INTO files (name, version) VALUES ( '$file', 1 );
-INSERT INTO latestfiles (name, version) VALUES ( '$file', 1 );
+   local subject=$(psql -A -t -q <<EOF
+INSERT INTO resources DEFAULT VALUES RETURNING id;
 EOF
+   )
 
-   tag "$file" name text "$file"
-   tag "$file" vname text "$file@1"
-   tag "$file" version int8 1
-   tag "$file" dtype text "$type"
-   tag "$file" owner text "$owner"
+   tag "$subject" name text "$file" >&2
+   tag "$subject" 'latest with name' text "$file" >&2
+   tag "$subject" vname text "$file@1" >&2
+   tag "$subject" version int8 1 >&2
+   tag "$subject" dtype text "$type" >&2
+   tag "$subject" owner text "$owner" >&2
 
    while [[ $# -gt 0 ]]
    do
-      tag "$file" "read users" text "$1"
+      tag "$subject" "read users" text "$1" >&2
       shift
    done
 
    case "$type" in
       url)
-         tag "$file" url text "$url"
+         tag "$subject" url text "$url" >&2
          ;;
    esac
+
+   echo "$subject"
 }
 
 tag()
@@ -100,21 +124,20 @@ tag()
    local file="$1"
    local tagname="$2"
    local typestr="$3"
-
    shift 3
 
    echo "set /tags/$file/$tagname=" "$@"
    if [[ -z "$typestr" ]] || [[ $# -eq 0 ]]
    then
       cat <<EOF
-INSERT INTO "_$tagname" ( file, version ) VALUES ( '$file', 1 );
+INSERT INTO "_$tagname" ( subject ) VALUES ( '$file' );
 EOF
    elif [[ $# -gt 0 ]]
    then
       while [[ $# -gt 0 ]]
       do
 	cat <<EOF
-INSERT INTO "_$tagname" ( file, version, value ) VALUES ( '$file', 1, '$1' );
+INSERT INTO "_$tagname" ( subject, value ) VALUES ( '$file', '$1' );
 EOF
          shift
       done
@@ -122,17 +145,17 @@ EOF
 
    # add to filetags only if this insert changes status
    untracked=$(psql -A -t -q <<EOF
-SELECT DISTINCT a.file 
+SELECT DISTINCT a.subject
 FROM "_$tagname" AS a 
-LEFT OUTER JOIN filetags AS b ON (a.file = b.file AND a.version = b.version AND b.tagname = '$tagname')
-WHERE b.file IS NULL;
+LEFT OUTER JOIN subjecttags AS b ON (a.subject = b.subject AND b.tagname = '$tagname')
+WHERE b.subject IS NULL AND a.subject = '$file';
 EOF
-)
+   )
 
    if [[ -n "$untracked" ]]
    then
       psql -q -t <<EOF
-INSERT INTO filetags (file, version, tagname) VALUES ('$file', 1, '$tagname');
+INSERT INTO subjecttags (subject, tagname) VALUES ('$file', '$tagname');
 EOF
    fi
 }
@@ -140,12 +163,15 @@ EOF
 tagacl()
 {
    # args: tagname {read|write} [value]...
-   local tag=$1
+   local tag=$(psql -A -t -q <<EOF
+SELECT subject FROM "_tagdef" WHERE value = '$1';
+EOF
+   )
    local mode=$2
    shift 2
    while [[ $# -gt 0 ]]
    do
-      tag "_tagdef_$tag" "tag $mode users" rolepat "$1"
+      tag "$tag" "tag $mode users" rolepat "$1"
       shift
    done
 }
@@ -162,26 +188,26 @@ tagdef_tags()
    #   tag -- tag access rule is observed for tag access
    #   system  -- no client can access
 
-   echo "create tagdef '$1'..."
+   echo "create tagdef '$1'..." >&2
 
-   dataset "_tagdef_$1" tagdef "$3" "*"
+   local subject=$(dataset "_tagdef_$1" tagdef "$3" "*")
 
-   tag "_tagdef_$1" "tagdef" text "$1"
-   tag "_tagdef_$1" "tagdef active"
+   tag "$subject" "tagdef" text "$1" >&2
+   tag "$subject" "tagdef active" >&2
 
-   tag "_tagdef_$1" "tagdef readpolicy" tagpolicy "$4"
-   tag "_tagdef_$1" "tagdef writepolicy" tagpolicy "$5"
+   tag "$subject" "tagdef readpolicy" tagpolicy "$4" >&2
+   tag "$subject" "tagdef writepolicy" tagpolicy "$5" >&2
 
    if [[ "$6" == "true" ]]
    then
-      tag "_tagdef_$1" "tagdef multivalue"
+      tag "$subject" "tagdef multivalue" >&2
    fi
 
    if [[ -n "$7" ]]
    then
-      tag "_tagdef_$1" "tagdef type" type "$7"
+      tag "$subject" "tagdef type" type "$7" >&2
    else
-      tag "_tagdef_$1" "tagdef type" type "$2"
+      tag "$subject" "tagdef type" type "$2" >&2
    fi
 }
 
@@ -199,7 +225,7 @@ tagdef_table()
       fi
       if [[ "$7" = "file" ]]
       then
-         fk="REFERENCES latestfiles (name) ON DELETE CASCADE"
+         fk="REFERENCES \"_latest with name\" (value) ON DELETE CASCADE"
       elif [[ "$7" = "vfile" ]]
       then
          fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
@@ -211,21 +237,19 @@ tagdef_table()
       fi
       if [[ "$6" = "true" ]]
       then
-         uniqueval='UNIQUE(file, version, value)'
+         uniqueval='UNIQUE(subject, value)'
       else
-         uniqueval='UNIQUE(file, version)'
+         uniqueval='UNIQUE(subject)'
       fi
 
       psql -q -t <<EOF
-CREATE TABLE "_$1" ( file text NOT NULL, 
-                       version int8 NOT NULL,
-                       value $2 ${default} NOT NULL ${fk}, ${uniqueval} ,
-                       FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE );
+CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (id) ON DELETE CASCADE, 
+                       value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
 CREATE INDEX "_$1_value_idx" ON "_$1" (value);
 EOF
    else
       psql -q -t <<EOF
-CREATE TABLE "_$1" ( file text NOT NULL, version int8 NOT NULL, UNIQUE (file, version), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE );
+CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (id) ON DELETE CASCADE );
 EOF
    fi
 }
@@ -267,13 +291,13 @@ typedef()
    dbtype="$2"
    desc="$3"
    shift 3
-   dataset "_type_def_${typename}" typedef "${admin}" "*"
-   tag "_type_def_${typename}" "typedef" text "${typename}"
-   tag "_type_def_${typename}" "_type_dbtype" text "${dbtype}"
-   tag "_type_def_${typename}" "_type_description" text "${desc}"
+   local subject=$(dataset "_type_def_${typename}" typedef "${admin}" "*")
+   tag "$subject" "typedef" text "${typename}" >&2
+   tag "$subject" "_type_dbtype" text "${dbtype}" >&2
+   tag "$subject" "_type_description" text "${desc}" >&2
    if [[ $# -gt 0 ]]
    then
-      tag "_type_def_${typename}" "_type_values" text "$@"
+      tag "$subject" "_type_values" text "$@" >&2
    fi
 }
 
@@ -306,6 +330,7 @@ tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
 tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
+tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
 tagdef vname          text        ""      anonymous   system     false
 tagdef dtype          text        ""      anonymous   system     false      dtype
 tagdef storagename    text        ""      system      system     false
@@ -322,7 +347,7 @@ tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "${admin}"   file   file       false
 
 psql -q -t <<EOF
-CREATE TABLE filetags ( file text, version int8, tagname text, UNIQUE (file, version, tagname), FOREIGN KEY (file, version) REFERENCES files (name, version) ON DELETE CASCADE );
+CREATE TABLE subjecttags ( subject bigint REFERENCES resources (id) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
 EOF
 
 tagdefs_complete
@@ -335,22 +360,24 @@ tagdef()
 }
 
 psql -e -t <<EOF
-ALTER TABLE filetags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
+ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 EOF
 
 tagacl "list on homepage" read "*"
 tagacl "list on homepage" write "${admin}"
 
-dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}"
-dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}"
-dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}"
+homelinks=(
+$(dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
+)
 
-for x in "New image studies" "Previous image studies" "All image studies"
+for x in "${homelinks[@]}"
 do
    tag "$x" "list on homepage"
 done
 
-dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*"
+tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")
 
 typedef ''           ''            'No content'
 typedef int8         int8          'Integer'
@@ -373,15 +400,15 @@ typedef type         text          'Scalar value type'
 
 
 
-dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*"
+cfgtags=$(dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*")
 
 cfgtagdef()
 {
    local tagname="_cfg_$1"
    shift
    tagdef "$tagname" "$@"
-   tag "configuration tags" "_cfg_file list tags" tagname "$tagname"
-   [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "configuration tags" "_cfg_tag list tags" tagname "$tagname"
+   tag "$cfgtags" "_cfg_file list tags" tagname "$tagname"
+   [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagname "$tagname"
 }
 
 #         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
@@ -391,7 +418,7 @@ cfgtagdef 'file list tags' text     ""      file        file       true       ta
 # tag list tags MUST BE DEFINED NEXT...
 cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
 # THEN, need to do this manually to break dependency loop
-tag "configuration tags" "_cfg_tag list tags" tagname "_cfg_file list tags"
+tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
 cfgtagdef 'file list tags write' text ""    file        file       true       tagname
 cfgtagdef home          text        ""      file        file       false
@@ -424,7 +451,7 @@ cfgtag()
 {
    tagname="_cfg_$1"
    shift
-   tag "tagfiler configuration" "$tagname" "$@"
+   tag "$tagfilercfg" "$tagname" "$@"
 }
 
 #cfgtag "home" text 'https://${HOME_HOST}'
@@ -451,11 +478,11 @@ cfgtag "file list tags" text dtype bytes owner 'read users' 'write users'
 #cfgtag "local files immutable" text 'True'
 #cfgtag "remote files immutable" text 'True'
 
-dataset "tagdef tags" blank "${admin}" "*"
+tagdeftags=$(dataset "tagdef tags" blank "${admin}" "*")
 for tagname in tagdef "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
 do
-   tag "tagdef tags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "tagdef tags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$tagdeftags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$tagdeftags" "_cfg_tag list tags" "tagname" "$tagname"
 done
 
 # remapping rules:

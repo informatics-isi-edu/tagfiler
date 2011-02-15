@@ -942,7 +942,7 @@ class Application:
                     vals.append( (key, desc) )
                 res['_type_values'] = dict(vals)
             return res
-        predlist = [ dict(tag='_type_dbtype', op=None, vals=[]) ]
+        predlist = [ dict(tag='typedef', op=None, vals=[]) ]
         if typename != None:
             predlist.append( dict(tag='typedef', op='=', vals=[typename]) )
         listtags = [ 'typedef', '_type_description', '_type_dbtype', '_type_values' ]
@@ -953,14 +953,19 @@ class Application:
             data_id = self.data_id
         if version == None:
             version = self.version
-        vars = dict(name=data_id, version=version)
-        query = 'SELECT * FROM files'
-        if not version or not data_id:
-            query += ' JOIN latestfiles USING (name, version)'
-        if data_id:
-            query += ' WHERE name = $name'
-            if version:
-                query += ' AND version = $version'
+        vars = dict(file=data_id, version=version)
+        query = 'SELECT n.subject AS id, n.value AS file, v.value AS version FROM "_name" AS n'
+        if type(data_id) not in [int, long] and (not version or not data_id):
+            query += ' JOIN "_latest with name" AS l ON (n.value = l.value)'
+        query += ' JOIN "_version" AS v ON (v.subject = n.subject)'
+        if type(data_id) in [int, long]:
+            query += ' WHERE n.subject = $file'
+        else:
+            if data_id:
+                query += ' WHERE n.value = $file'
+                if version:
+                    query += ' AND v.value = $version'
+        #web.debug(query, vars)
         return self.db.query(query, vars)
 
     def select_file_members(self, data_id=None, version=None):
@@ -978,19 +983,26 @@ class Application:
     def select_file_versions(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
-        vars = dict(name=data_id)
-        query = 'SELECT * FROM files'
-        if data_id:
-            query += ' WHERE name = $name'
+        if type(data_id) in [int, long]:
+            vars = dict(id=data_id)
+            query = 'SELECT n.subject AS id, n.value AS file, v.value AS version FROM %s WHERE w.subject = $id' \
+                    " JOIN ".join([ '"_name" AS w',
+                                    '"_name" AS n ON (w.value = n.value)',
+                                    '"_version" AS v ON (n.subject = v.subject)' ])
+        else:
+            vars = dict(name=data_id)
+            query = 'SELECT n.subject AS id, n.value AS file, v.value AS version FROM "_name" AS n JOIN "_version" AS v USING (subject)'
+            if data_id:
+                query += ' WHERE n.value = $name'
         return self.db.query(query, vars)
 
     def select_file_max_version(self, data_id=None):
         if data_id == None:
             data_id = self.data_id
         vars = dict(name=data_id)
-        query = 'SELECT MAX(version) AS version FROM files'
+        query = 'SELECT MAX(v.value) AS version FROM "_latest with name" AS n JOIN "_version" AS v USING (subject)'
         if data_id:
-            query += ' WHERE name = $name'
+            query += ' WHERE n.value = $name'
         return self.db.query(query, vars)
 
     def select_dataset_size(self, key):
@@ -1005,17 +1017,21 @@ class Application:
         return self.db.query(query, vars)
 
     def insert_file(self, data_id, version, dtype, storagename):
-        vars = dict(name=data_id, version=version)
-        self.db.query("INSERT INTO files ( name, version ) VALUES ( $name, $version )", vars=vars)
+        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING id")[0].id
+        self.set_file_tag('name', data_id, data_id=newid)
+        self.set_file_tag('version', version, data_id=newid)
+        vars = dict(name=data_id, version=version, newid=newid)
         if version > 1:
-            self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
+            self.db.query('UPDATE "_latest with name" SET subject = $newid WHERE value = $name', vars=vars)
         else:
-            self.db.query("INSERT INTO latestfiles ( name, version ) VALUES ( $name, $version )", vars=vars)
+            self.set_file_tag('latest with name', data_id, data_id=newid)
             
         if dtype:
-            self.set_file_tag('dtype', value=dtype, data_id=data_id, version=version)
+            self.set_file_tag('dtype', value=dtype, data_id=newid)
             if storagename and dtype == 'file':
-                self.set_file_tag('storagename', value=storagename, data_id=data_id, version=version)
+                self.set_file_tag('storagename', value=storagename, data_id=newid)
+
+        return newid
 
     def update_file(self):
         if self.dtype:
@@ -1023,9 +1039,9 @@ class Application:
             if self.storagename and self.dtype == 'file':
                 self.set_file_tag('storagename', value=self.storagename, data_id=self.data_id, version=self.version)
 
-    def update_latestfile_version(self, data_id, next_latest):
-        vars=dict(name=data_id, version=next_latest)
-        self.db.query("UPDATE latestfiles SET version = $version WHERE name = $name", vars=vars)
+    def update_latestfile_version(self, name, next_latest_id):
+        vars=dict(name=name, id=next_latest_id)
+        self.db.query('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
 
     def delete_file(self, data_id=None, version=None):
         if data_id == None:
@@ -1036,20 +1052,23 @@ class Application:
 
         if not data_id:
             raise BadRequest("Dataset deletion requires a dataset name.")
-        
+
         versions = [ file for file in self.select_file_versions(data_id) ]
         versions.sort(key=lambda res: res.version, reverse=True)
-        
-        if not version:
-            # we're deleting latest version if one wasn't specified already by caller
-            version = versions[0].version
 
-        if version == versions[0].version and len(versions) > 1:
+        latest = versions[0]
+        
+        if type(data_id) in [int, long]:
+            victim = dict( [ (v.id, v) for v in versions ] )[data_id]
+        else:
+            victim = dict( [ (v.version, v) for v in versions ] )[version]
+
+        if victim.version == latest.version and len(versions) > 1:
             # we're deleting the latest version and there are previous versions
-            self.update_latestfile_version(data_id, versions[1].version)
+            self.update_latestfile_version(data_id, versions[1].id)
                 
-        query = 'DELETE FROM files WHERE name = $name AND version = $version'
-        self.db.query(query, vars=dict(name=data_id, version=version))
+        query = 'DELETE FROM resources WHERE id = $id'
+        self.db.query(query, vars=dict(id=victim.id))
 
     def select_tagdef(self, tagname=None, predlist=[], order=None, staticauthz=None):
         listtags = [ 'owner' ]
@@ -1072,7 +1091,7 @@ class Application:
             if listtag in [ 'tag read users', 'tag write users' ]:
                 listtagexpr = 'array_agg("_%s".value)' % listtag
             elif listtag in [ 'tagdef multivalue', 'tagdef active' ]:
-                listtagexpr = '("_%s".file IS NOT NULL)' % listtag
+                listtagexpr = '("_%s".subject IS NOT NULL)' % listtag
             else:
                 listtagexpr = '"_%s".value' % listtag
             return "%s AS %s" % (listtagexpr, listas.get(listtag, listtag))
@@ -1086,13 +1105,23 @@ class Application:
                 wheres = 'WHERE "_tagdef".value = $tagname'
             
             query = ('SELECT %s FROM %s %s GROUP BY %s'
-                     % (','.join(['latestfiles.name AS file', 'latestfiles.version AS version'] + [select_clause(listtag) for listtag in listtags]),
-                        ' LEFT OUTER JOIN '.join(['latestfiles']
-                                                 + ['"_%s" ON (latestfiles.name = "_%s".file AND latestfiles.version = "_%s".version)' % (listtag, listtag, listtag)
-                                                    for listtag in listtags]),
+                     % (','.join(['"_latest with name".subject AS id',
+                                  '"_latest with name".value AS file',
+                                  '_version.value AS version'] + [select_clause(listtag) for listtag in listtags]),
+                        ' LEFT OUTER JOIN '.join(['"_latest with name"', '_version USING (subject)']
+                                                 + ['"_%s" USING (subject)' % (listtag) for listtag in listtags]),
                         wheres,
-                        ','.join(['latestfiles.name, latestfiles.version, "_tagdef multivalue".file, "_tagdef active".file']
-                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users', 'tag write users', 'tagdef multivalue', 'tagdef active']]) ) )
+                        ','.join(['"_latest with name".subject',
+                                  '"_latest with name".value',
+                                  '"_version".value',
+                                  '"_tagdef multivalue".subject',
+                                  '"_tagdef active".subject']
+                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users',
+                                                                                                       'tag write users',
+                                                                                                       'tagdef multivalue',
+                                                                                                       'tagdef active',
+                                                                                                       'latest with name',
+                                                                                                       'version']]) ) )
             vars = dict(tagname=tagname)
             #web.debug(query, vars)
             return self.db.query(query, vars=vars)
@@ -1112,7 +1141,7 @@ class Application:
         data_id = '_tagdef_%s' % self.tag_id
         version = 1
         owner = self.authn.role
-        self.insert_file(data_id, version, 'blank', None)
+        newid = self.insert_file(data_id, version, 'blank', None)
         tags = [ ('created', 'now'),
                  ('version created', 'now'),
                  ('version', version),
@@ -1129,7 +1158,7 @@ class Application:
             tags.append( ('tagdef multivalue', None) )
 
         for tag, value in tags:
-            self.set_file_tag(tag, value, data_id, version, owner)
+            self.set_file_tag(tag, value, newid, owner=owner)
 
         self.deploy_tagdef()
 
@@ -1141,7 +1170,7 @@ class Application:
                 raise Conflict('Tagdef "%s" is not defined and cannot be deployed.' % self.tag_id)
 
         tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(tagdef.tagname))
-        tabledef += " ( file text NOT NULL, version int8 NOT NULL, FOREIGN KEY(file, version) REFERENCES files (name, version) ON DELETE CASCADE"
+        tabledef += " ( subject bigint REFERENCES resources(id) ON DELETE CASCADE"
         indexdef = ''
 
         try:
@@ -1155,20 +1184,20 @@ class Application:
                 tabledef += " DEFAULT ''"
             tabledef += ' NOT NULL'
             if tagdef.typestr == 'file':
-                tabledef += " REFERENCES latestfiles (name) ON DELETE CASCADE"
+                tabledef += ' REFERENCES "latest with name" (value) ON DELETE CASCADE'
             elif tagdef.typestr == 'vfile':
-                tabledef += " REFERENCES \"_vname\" (value) ON DELETE CASCADE"
+                tabledef += ' REFERENCES "_vname" (value) ON DELETE CASCADE'
         if not tagdef.multivalue:
-            tabledef += ", UNIQUE(file, version)"
+            tabledef += ", UNIQUE(subject, version)"
             if dbtype != '':
                 indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(tagdef.tagname))
                 indexdef += ' ON "%s_value_idx"' % (self.wraptag(tagdef.tagname))
                 indexdef += ' (value)'
         else:
             if dbtype != '':
-                tabledef += ', UNIQUE(file, version, value)'
+                tabledef += ', UNIQUE(subject, value)'
             else:
-                tabledef += ', UNIQUE(file, version)'
+                tabledef += ', UNIQUE(subject)'
         tabledef += " )"
         self.db.query(tabledef)
         if indexdef:
@@ -1179,11 +1208,11 @@ class Application:
         if len(results) == 0:
             raise NotFound('tagdef "%s"' % self.tag_id)
         tagdeffile = results[0]
-        self.delete_file( tagdeffile.file, tagdeffile.version )
+        self.delete_file( tagdeffile.id )
         self.undeploy_tagdef()
 
     def undeploy_tagdef(self):
-        self.db.query("DROP TABLE \"%s\"" % (self.wraptag(self.tag_id)))
+        self.db.query('DROP TABLE "%s"' % (self.wraptag(self.tag_id)))
 
     def select_file_tag_args_prep(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
         if user == None:
@@ -1204,11 +1233,14 @@ class Application:
                  self.select_file_tag_args_prep(tagname, value, data_id, version, tagdef, user, owner)
 
         query = 'SELECT tag.* FROM "%s" AS tag' % self.wraptag(tagname)
-        if not version:
-            query += ' JOIN latestfiles ON (tag.file = latestfiles.name AND tag.version = latestfiles.version)'
-        query += ' WHERE tag.file = $file'
-        if version:
-            query += ' AND tag.version = $version'
+        if type(data_id) in [int, long]:
+            query += ' WHERE subject = $file'
+        else:
+            if not version:
+                query += ' JOIN "_latest with name" AS l USING (subject)'
+            query += ' JOIN "_name" AS n USING (subject) JOIN _version AS v USING (subject) WHERE n.value = $file'
+            if version:
+                query += ' AND v.value = $version'
         if value == '' or value:
             if value == '':
                 query += ' AND tag.value IS NULL'
@@ -1280,20 +1312,25 @@ class Application:
         if version == None:
             version = self.version
         if data_id:
-            wheres.append("file = $file")
             vars['file'] = data_id
-            if version:
-                wheres.append("version = $version")
-                vars['version'] = version
+            if type(data_id) in [int, long]:
+                wheres.append("n.subject = $file")
+            else:
+                wheres.append("n.value = $file")
+                if version:
+                    wheres.append("v.value = $version")
+                    vars['version'] = version
         if tagname:
-            wheres.append("tagname = $tagname")
+            wheres.append("t.tagname = $tagname")
             vars['tagname'] = tagname
         
         wheres = ' AND '.join(wheres)
         if wheres:
             wheres = "WHERE " + wheres
-        query = "SELECT file, version, tagname FROM filetags " + wheres \
-                + " GROUP BY file, version, tagname ORDER BY file, tagname"
+        query = 'SELECT n.subject AS id, n.value AS file, v.value AS version, t.tagname AS tagname' \
+                + ' FROM "_name" AS n JOIN subjecttags AS t USING (subject) JOIN "_version" AS v USING (subject)' \
+                + wheres \
+                + " GROUP BY id, file, version, tagname ORDER BY file, tagname"
         #web.debug(query, vars)
         return self.db.query(query, vars=vars)
 
@@ -1302,21 +1339,45 @@ class Application:
             data_id = self.data_id
         if version == None:
             version = self.version
-        query = 'DELETE FROM "%s" AS tag' % self.wraptag(tagname)
-        if not version:
-            query += ' USING latestfiles'
-        query += ' WHERE tag.file = $file'
-        if version:
-            query += ' AND tag.version = $version'
-        else:
-            query += ' AND tag.file = latestfiles.name AND tag.version = latestfiles.version'
-        if value or value == '':
-            query += " AND value = $value"
-        self.db.query(query, vars=dict(file=data_id, version=version, value=value))
+
+        def queryprep(value):
+            usings = []
+            wheres = []
+            if type(data_id) in [int, long]:
+                wheres.append('tag.subject = $file')
+            else:
+                if not version:
+                    usings.append('"_latest with name" AS l')
+                    wheres.append('tag.subject = l.subject')
+                    wheres.append('l.value = $file')
+                else:
+                    usings.append('"_name" AS n')
+                    usings.append('"_version" AS v')
+                    wheres.append('n.value = $file')
+                    wheres.append('v.value = $version')
+
+            if value or value == '':
+                wheres.append('tag.value = $value')
+            if usings:
+                usings = ' USING ' + ', '.join(usings)
+            else:
+                usings = ''
+            if wheres:
+                wheres = ' WHERE ' + ' AND '.join(wheres)
+            else:
+                wheres = ''
+            return usings, wheres
+
+        usings, wheres = queryprep(value)
+        query = 'DELETE FROM "%s" AS tag' % self.wraptag(tagname) + usings + wheres
+        vars=dict(file=data_id, version=version, value=value)
+        self.db.query(query, vars=vars)
+
         results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner)
         if len(results) == 0:
-            self.db.delete("filetags", where="file = $file AND tagname = $tagname",
-                           vars=dict(file=data_id, tagname=tagname))
+            usings, wheres = queryprep(None)
+            query = 'DELETE FROM subjecttags AS tag' + usings + wheres
+            self.db.query(query, vars=vars)
 
     def downcast_value(self, dbtype, value):
         if dbtype == 'int8':
@@ -1338,15 +1399,14 @@ class Application:
         if version == None:
             version = self.version
 
-        results = self.select_file(data_id, version)
-        if len(results) == 0:
-            if version == None:
-                raise NotFound(data='dataset "%s"' % data_id)
-            else:
-                raise NotFound(data='dataset "%s"@%d' % (data_id, version))
-
-        file = results[0]
-        version = file.version
+        if type(data_id) not in [int, long]:
+            results = self.select_file(data_id, version)
+            if len(results) == 0:
+                if version == None:
+                    raise NotFound(data='dataset "%s"' % data_id)
+                else:
+                    raise NotFound(data='dataset "%s"@%d' % (data_id, version))
+            data_id = results[0].id
 
         results = self.select_tagdef(tagname)
         if len(results) == 0:
@@ -1358,8 +1418,8 @@ class Application:
         results = self.get_type(tagtype)
         if len(results) == 0:
             raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
-        type = results[0]
-        dbtype = type['_type_dbtype']
+        vtype = results[0]
+        dbtype = vtype['_type_dbtype']
         
         validator = self.tagnameValidators.get(tagname)
         if validator:
@@ -1376,33 +1436,33 @@ class Application:
             raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
         if not multivalue:
-            results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner)
+            results = self.select_file_tag_noauthn(tagname, data_id=data_id, owner=owner)
             if len(results) > 0:
                 if tagtype == '' or results[0].value == value:
                     return
                 else:
-                    self.delete_file_tag(tagname, data_id=data_id, version=version)
+                    self.delete_file_tag(tagname, data_id=data_id)
         else:
-            results = self.select_file_tag_noauthn(tagname, value, data_id=data_id, version=version, owner=owner)
+            results = self.select_file_tag_noauthn(tagname, value, data_id=data_id, owner=owner)
             if len(results) > 0:
                 # (file, tag, value) already set, so we're done
                 return
 
         if tagtype != '' and value != None:
-            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
-                    + " ( file, version, value ) VALUES ( $file, $version, $value )" 
+            query = 'INSERT INTO "%s"' % self.wraptag(tagname) \
+                    + ' (subject, value) VALUES ($file, $value)'
         else:
             # insert untyped or typed w/ default value...
-            query = "INSERT INTO \"%s\"" % (self.wraptag(tagname)) \
-                    + " ( file, version ) VALUES ( $file, $version )"
+            query = 'INSERT INTO "%s"' % self.wraptag(tagname) \
+                    + ' (subject) VALUES ($file)'
 
         #web.debug(query)
-        vars = dict(file=data_id, version=version, value=value, tagname=tagname)
+        vars = dict(file=data_id, value=value, tagname=tagname)
         self.db.query(query, vars=vars)
         
-        results = self.select_filetags_noauthn(data_id=data_id, version=version, tagname=tagname)
+        results = self.select_filetags_noauthn(data_id=data_id, tagname=tagname)
         if len(results) == 0:
-            self.db.query("INSERT INTO filetags (file, version, tagname) VALUES ($file, $version, $tagname)", vars=vars)
+            self.db.query("INSERT INTO subjecttags (subject, tagname) VALUES ($file,$tagname)", vars=vars)
         else:
             # may already be reverse-indexed in multivalue case
             pass            
@@ -1414,8 +1474,7 @@ class Application:
         while True:
             result = self.db.query(query)
             name = str(result[0].nextval).rjust(9, '0')
-            vars['name'] = name
-            res = self.db.query("SELECT * FROM files WHERE name = $name", vars)
+            res = self.select_file(name)
             if len(res) == 0:
                 return name
 
@@ -1485,23 +1544,29 @@ class Application:
                 tagdef = results[0]
                 tagdefs[tagname] = tagdef
 
-        innertables = ['files',
-                       '_owner ON (files.name = _owner.file AND files.version = _owner.version)',
-                       '_vname ON (files.name = _vname.file AND files.version = _vname.version)',
-                       '_dtype ON (files.name = _dtype.file AND files.version = _dtype.version)']
+        innertables = ['_name',
+                       '_version USING (subject)',
+                       '_owner USING (subject)',
+                       '_vname USING (subject)',
+                       '_dtype USING (subject)']
         outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
-                       '_storagename ON (files.name = _storagename.file AND files.version = _storagename.version)',
-                       '_url ON (files.name = _url.file AND files.version = _url.version)',
-                       '(SELECT file, version, array_agg(value) AS value FROM "_read users" GROUP BY file, version) AS "read users" ON (files.name = "read users".file AND files.version = "read users".version)']
-        selects = ['files.name AS file',
-                   'files.version AS version',
+                       '_storagename USING (subject)',
+                       '_url USING (subject)',
+                       '(SELECT subject, array_agg(value) AS value FROM "_read users" GROUP BY subject) AS "read users" USING (subject)']
+        selects = ['_name.subject AS id',
+                   '_name.value AS file',
+                   '_name.value AS name',
+                   '"_latest with name".value AS "latest with name"',
+                   '_version.value AS version',
                    '_owner.value AS owner',
                    '_vname.value AS vname',
                    '_dtype.value AS dtype',
                    '_storagename.value AS storagename',
                    '_url.value AS url']
-        groupbys = ['files.name',
-                    'files.version',
+        groupbys = ['_name.subject',
+                    '_name.value',
+                    '"_latest with name".value',
+                    '_version.value',
                     '_owner.value',
                     '_vname.value',
                     '_dtype.value',
@@ -1511,14 +1576,19 @@ class Application:
         values = dict()
 
         if data_id:
-            wheres.append("files.name = $dataid_%d" % qd)
             values['dataid_%d' % qd] = data_id
+            if type(data_id) in [int, long]:
+                wheres.append("_name.subject = $dataid_$d" % qd)
+            else:
+                wheres.append("_name.value = $dataid_%d" % qd)
             if version:
-                wheres.append("files.version = $version_%d" % qd)
+                wheres.append("_version.value = $version_%d" % qd)
                 values['version_%d' % qd] = version
 
         if (not data_id or not version) and versions == 'latest':
-            innertables.append('latestfiles ON (files.name = latestfiles.name AND files.version = latestfiles.version)')
+            innertables.append('"_latest with name" USING (subject)')
+        else:
+            outertables.append('"_latest with name" USING (subject)')
 
         roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
         for r in range(0, len(roles)):
@@ -1538,17 +1608,17 @@ class Application:
 
             if op == ':not:':
                 # not matches if tag column is null or we lack read access to the tag (act as if not there)
-                outertables.append('"%s" AS t%s ON (files.name = t%s.file AND files.version = t%s.version)' % (self.wraptag(tag), p, p, p))                
+                outertables.append('"%s" AS t%s USING (subject)' % (self.wraptag(tag), p))                
                 if tagdef.readpolicy == 'fowner':
                     # this tag rule is more restrictive than file or static checks already done
-                    wheres.append('t%s.file IS NULL OR (ownrole.role IS NULL)' % p)
+                    wheres.append('t%s.subject IS NULL OR (ownrole.role IS NULL)' % p)
                 else:
                     # covers all cases where tag is more or equally permissive to file or static checks already done
-                    wheres.append('t%s.file IS NULL' % p)
+                    wheres.append('t%s.subject IS NULL' % p)
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
-                innertables.append('"%s" AS t%s ON (files.name = t%s.file AND files.version = t%s.version)' % (self.wraptag(tag), p, p, p))
+                innertables.append('"%s" AS t%s USING (subject)' % (self.wraptag(tag), p))
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
@@ -1561,11 +1631,11 @@ class Application:
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
-                          if not tagdefs[tagname].multivalue and tagname not in ['dtype', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
+                          if not tagdefs[tagname].multivalue and tagname not in ['dtype', 'latest with name', 'name', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
         for tagname in singlevaltags:
-            outertables.append('"_%s" ON (files.name = "_%s".file AND files.version = "_%s".version)' % (tagname, tagname, tagname))
+            outertables.append('"_%s" USING (subject)' % (tagname))
             if tagdefs[tagname].typestr == '':
-                selects.append('("_%s".file IS NOT NULL) AS "%s"' % (tagname, tagname))
+                selects.append('("_%s".subject IS NOT NULL) AS "%s"' % (tagname, tagname))
                 groupbys.append('"%s"' % tagname)
             else:
                 selects.append('"_%s".value AS "%s"' % (tagname, tagname))
@@ -1576,7 +1646,7 @@ class Application:
                          if tagdefs[tagname].multivalue and tagname not in [] ]
         for tagname in multivaltags:
             if tagname != 'read users':
-                outertables.append('(SELECT file, version, array_agg(value) AS value FROM "_%s" GROUP BY file, version) AS "%s" ON (files.name = "%s".file AND files.version = "%s".version)' % (tagname, tagname, tagname, tagname))
+                outertables.append('(SELECT subject, array_agg(value) AS value FROM "_%s" GROUP BY subject) AS "%s" USING (subject)' % (tagname, tagname))
             selects.append('"%s".value AS "%s"' % (tagname, tagname))
             groupbys.append('"%s".value' % tagname)
 
@@ -1666,7 +1736,7 @@ class Application:
         listtags = set(listtags)
         
         selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
-                    for listtag in listtags.union(set(['file', 'dtype', 'storagename', 'url', 'owner', 'version'])) ]
+                    for listtag in listtags.union(set(['dtype', 'file', 'id', 'owner', 'storagename', 'url', 'version'])) ]
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query
