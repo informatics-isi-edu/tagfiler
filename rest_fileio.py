@@ -134,7 +134,10 @@ class FileIO (Application):
                         querystr = '?' + querystr
                 else:
                     querystr = ''
-                raise web.seeother(result.url + querystr)
+                if not result.url:
+                    raise web.seeother('%s/tags/%s?view=%s' % (self.globals['home'], urlquote(self.data_id), urlquote('url tags')))
+                else:
+                    raise web.seeother(result.url + querystr)
             elif result.dtype == 'file':
                 self.storagename = result.storagename
                 filename = self.store_path + '/' + self.storagename
