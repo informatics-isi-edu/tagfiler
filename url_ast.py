@@ -1160,6 +1160,8 @@ class Query (Node):
             
         def body():
             listtags = self.queryopts.get('list', self.path[-1][1])
+            if type(listtags) == type('text'):
+                listtags = listtags.split(',')
             if len(listtags) == 0:
                 listtags = self.getParamsDb('file list tags', data_id=self.globals['view'])
             listtags = [ t for t in listtags ]
