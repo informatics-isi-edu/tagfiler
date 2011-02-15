@@ -1483,6 +1483,7 @@ class Application:
                 return value
 
     def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest', tagdefs=None):
+        tagdefs = None # always use internal support
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1505,36 +1506,29 @@ class Application:
             roles.append('*')
 
         if tagdefs == None:
-            tagdefs = dict()
+            tagdefs = self.globals['tagdefsdict']
 
         for pred in predlist:
             # do static checks on each referenced tag at most once
-            if not tagdefs.has_key(pred['tag']):
-                results = self.select_tagdef(pred['tag'])
-                if len(results) == 0:
-                    raise BadRequest(data='The tag "%s" is not defined on this server.' % pred['tag'])
-                tagdef = results[0]
-                if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
-                    user = self.authn.role
-                    if user == None:
-                        raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
-                    if tagdef.readpolicy == 'tag':
-                        authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
-                        authorized.append(tagdef.owner)
-                        if not set(roles).intersection(set(authorized)):
-                            # warn or return an empty result set since nothing can match?
-                            raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
-                    # fall off, enforce dynamic security below
-                tagdefs[tagdef.tagname] = tagdef
+            tagdef = tagdefs.get(pred['tag'], None)
+            if tagdef == None:
+                raise BadRequest(data='The tag "%s" is not defined on this server.' % pred['tag'])
+            if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
+                user = self.authn.role
+                if user == None:
+                    raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
+                if tagdef.readpolicy == 'tag':
+                    authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
+                    authorized.append(tagdef.owner)
+                    if not set(roles).intersection(set(authorized)):
+                        # warn or return an empty result set since nothing can match?
+                        raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
+                # fall off, enforce dynamic security below
 
         # also prefetch custom per-file tags
         for tagname in listtags:
             if not tagdefs.has_key(tagname):
-                results = self.select_tagdef(tagname)
-                if len(results) == 0:
-                    raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
-                tagdef = results[0]
-                tagdefs[tagname] = tagdef
+                raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
 
         innertables = ['_name',
                        '_version USING (subject)',
@@ -1686,20 +1680,20 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def build_select_files_by_predlist_path(self, path=None, versions='latest'):
+    def build_files_by_predlist_path(self, path=None, versions='latest'):
         if path == None:
             path = [ ([], [], []) ]
 
         queries = []
         values = dict()
-        tagdefs = dict()
+        tagdefs = self.globals['tagdefsdict']
 
         context = ''
         context_attr = None
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions, tagdefs=tagdefs)
+            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions)
             values.update(v)
 
             if e < len(path) - 1:
