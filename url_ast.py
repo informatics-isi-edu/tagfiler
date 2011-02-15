@@ -279,11 +279,12 @@ class FileList (Node):
 
             listtags = self.queryopts.get('list', None)
             if listtags:
-                if type(listtags) != set:
-                    listtags = [ listtags ]
-                self.globals['filelisttags'] = [ tag for tag in listtags if tag ]
+                self.globals['filelisttags'] = listtags
             else:
                 self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
+            builtinlist = [ 'name' ]
+            self.globals['filelisttags'] = builtinlist + [ tag for tag in self.globals['filelisttags'] if tag not in builtinlist ]
+                
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
@@ -291,7 +292,7 @@ class FileList (Node):
             else:
                 self.predlist=[]
 
-            files = [ res for res in self.select_files_by_predlist(listtags=self.globals['filelisttags'] + ['Image Set']) ]
+            files = [ res for res in self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'version']))) ]
             for res in files:
                 # decorate each result with writeok information
                 res.writeok = self.gui_test_file_authz('write',
@@ -803,6 +804,9 @@ class FileTags (Node):
                 files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, version=self.version, listtags=self.listtags) ]
             else:
                 files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, listtags=self.listtags) ]
+            if len(files) == 0:
+                raise NotFound('dataset "%s"' % self.data_id)
+
         else:
             files = [ file for file in self.select_files_by_predlist(predlist=[], listtags=self.listtags) ]
 
@@ -1278,11 +1282,19 @@ class Query (Node):
             if len(listtags) == 0:
                 listtags = self.getParamsDb('file list tags', data_id=self.globals['view'])
             listtags = [ t for t in listtags ]
+            builtinlist = [ tag for tag in ['name', 'tagdef', 'typedef'] if tag in listtags ]
+            listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
             self.globals['filelisttags'] = listtags
+            
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
             predlist, listtags, ordertags = self.path[-1]
             self.path[-1] = predlist, list(self.globals['filelisttags']), ordertags
-            self.path[-1][1].append('Image Set') # we always need this
+            # we always want these
+            self.path[-1][1].append('name')
+            self.path[-1][1].append('version')
+            self.path[-1][1].append('tagdef')
+            self.path[-1][1].append('typedef')
+            self.path[-1][1].append('Image Set')
 
             files = [ res for res in self.select_files_by_predlist_path(path=self.path, versions=versions) ]
 

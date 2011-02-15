@@ -1,4 +1,5 @@
 $def with (args)
+$ filerecord = args.get('filerecord')
 $ tagname = args.get('tagname')
 $ typestr = args.get('typestr')
 $ typevals = args.get('typevals')
@@ -8,6 +9,7 @@ $ id = args.get('id')
 $ name = args.get('name')
 $ disabled = args.get('disabled')
 $ readonly = args.get('readonly', '')
+$ showversions = args.get('showversions', False)
 $if type:
 	<td>
 	<input id="${id}" type="${type}" value="${val}" ${readonly} 
@@ -18,7 +20,38 @@ $if type:
 	/>
 $else:
 	<td class="file-tag ${idquote(tagname)} multivalue">
-	$if typevals:
+	$if tagname == 'name':
+		$ version = filerecord.get('version', None)
+		$if version != None and showversions:
+			$ dataid = '%s@%s' % (urlquote(val), version) 
+			$ dataname = '%s@%s' % (val, version)
+		$else:
+			$ dataid = urlquote(val)
+			$ dataname = val
+		<table><tr><td><a href="${home}/file/${dataid}">${dataname}</a> <a href="${home}/tags/${dataid}">(tags)</a>
+		$if filerecord.get('Image Set', False):
+			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
+		</td>
+		$if filerecord.writeok:
+			<td>
+			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${dataid}" method="post">
+			    <div>
+			    <input type="hidden" name="action" value="delete" />
+			    <input type="hidden" name="referer" value="${referer}" />
+			    <input type="submit" value="Delete" />
+			    </div>
+			</form>
+			</td>
+			</tr>
+			<tr>
+			<td colspan="2">
+			Replace with: <a href="${home}/file/${dataid}?action=define&amp;type=file">file</a>, <a href="${home}/file/${dataid}?action=define&amp;type=url">url</a>, <a href="${home}/file/${dataid}?action=define&amp;type=dataset">dataset</a>
+			</td>
+		</tr>
+		</table>
+	$elif tagname == 'tagdef':
+		<a href="${home}/tags/${urlquote(val)}?view=tagdef%20tags">${val}</a>
+	$elif typevals:
 		$# this lambda is to simulate ternary operator in Python 2.4
 		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
 	$elif typestr == 'url':

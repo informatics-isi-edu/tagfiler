@@ -1,4 +1,4 @@
-$def with (file, tagdef, writetags, version)
+$def with (file, tagdef, writetags, version, showversions=False)
 $ writetags = [ tag for tag in writetags ]
 $ tagnames = tagdefsdict.iterkeys()
 $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
@@ -19,6 +19,7 @@ $else:
 		$ itervals = [ vals ]
 $ options = tagOptions(tagdef.tagname, itervals)
 $ params = dict( file=file.file, 
+$ 				 filerecord=file,
 $				 tagname=tagdef.tagname, 
 $				 typestr=tagdef.typestr, 
 $				 typename=typename, 
@@ -27,7 +28,8 @@ $				 vsuffix=vsuffix,
 $				 vals=vals, 
 $				 options=options,
 $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
-$				 writeok=writeok)
+$				 writeok=writeok,
+$				 showversions=showversions)
 $if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
 	<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
 $elif tagdef.typestr:
