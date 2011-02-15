@@ -953,8 +953,7 @@ class Application:
         return self.db.query(query, vars)
 
     def select_dataset_size(self, key):
-        data_id = self.data_id + '/%'
-        vars = dict(data_id=data_id, key=key)
+        vars = dict(key=key)
         what = 'SUM(bytes) AS size, COUNT(*) AS count'
         keyquery = 'SELECT file, version FROM "_key" WHERE value = $key'
         vcontainsquery = 'SELECT * FROM "_vcontains"'
