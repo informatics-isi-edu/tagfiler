@@ -178,7 +178,7 @@ EOF
 
 tagdef_tags()
 {
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr]
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey]]
 
    # policy is one of:
    #   anonymous  -- any client can access
@@ -208,6 +208,11 @@ tagdef_tags()
       tag "$subject" "tagdef type" type "$7" >&2
    else
       tag "$subject" "tagdef type" type "$2" >&2
+   fi
+
+   if [[ "$8" == "true" ]]
+   then
+      tag "$subject" "tagdef unique" >&2
    fi
 }
 
@@ -305,14 +310,16 @@ typedef()
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
 
 tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
-tagdef 'typedef'      text        ""      anonymous   file       false
+tagdef 'typedef'      text        ""      anonymous   file       false      ""         true
 
 tagdef 'tagdef type'         text ""      anonymous   system     false      type
+tagdef 'tagdef unique' ""         ""      anonymous   system     false      ""
 
 tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
-tagdef 'tagdef active'      ""   ""      anonymous   system     false
+tagdef 'tagdef active'       ""   ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
+
 tagdef 'tag read users'      text ""      anonymous   system     true       rolepat
 tagdef 'tag write users'     text ""      anonymous   system     true       rolepat
 
@@ -331,16 +338,16 @@ tagdef bytes          int8        ""      anonymous   system     false
 tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
-tagdef vname          text        ""      anonymous   system     false
+tagdef vname          text        ""      anonymous   system     false      ""         true
 tagdef dtype          text        ""      anonymous   system     false      dtype
-tagdef storagename    text        ""      system      system     false
+tagdef storagename    text        ""      system      system     false      ""         true
 tagdef url            text        ""      file        system     false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
 tagdef contains       text        ""      file        file       true       file
 tagdef vcontains      text        ""      file        file       true       vfile
-tagdef key            text        ""      anonymous   file       false
+tagdef key            text        ""      anonymous   file       false      ""         true
 
 tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "${admin}"   file   file       false
