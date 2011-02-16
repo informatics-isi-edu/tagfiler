@@ -488,7 +488,7 @@ cfgtag "client download chunks" text 'True'
 cfgtag "client socket buffer size" text '8192'
 cfgtag "client chunk bytes" text '4194304'
 
-cfgtag "file list tags" text dtype bytes owner 'read users' 'write users'
+cfgtag "file list tags" text bytes owner 'read users' 'write users'
 cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...
