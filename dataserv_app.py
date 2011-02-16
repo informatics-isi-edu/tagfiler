@@ -347,7 +347,7 @@ class Application:
                                    'read users' : self.validateRolePattern,
                                    'write users' : self.validateRolePattern,
                                    'modified by' : self.validateRole,
-                                   '_type_values' : self.validateEnumeration,
+                                   'typedef values' : self.validateEnumeration,
                                    '_cfg_policy remappings' : self.validatePolicyRule }
         
         self.tagtypeValidators = { 'tagname' : self.validateTagname,
@@ -407,20 +407,20 @@ class Application:
         except:
             raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
 
-        if tagname == '_type_values':
+        if tagname == 'typedef values':
             results = self.gettagvals('typedef', data_id=data_id)
             if len(results) == 0:
-                raise Conflict('Set the "typedef" tag before trying to set "_type_values".')
+                raise Conflict('Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
             results = self.get_type(typename)
             if len(results) == 0:
                 raise Conflict('The type "%s" is not defined!' % typename)
             type = results[0]
-            dbtype = type['_type_dbtype']
+            dbtype = type['typedef dbtype']
             try:
                 key = self.downcast_value(dbtype, key)
             except:
-                raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['_type_description'], dbtype))
+                raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
 
     def validatePolicyRule(self, rule, tagname=None, data_id=None):
         try:
@@ -570,7 +570,7 @@ class Application:
                             tagdef = self.globals['tagdefsdict'][tagname]
                             tagnames = self.globals['tagdefsdict'].keys()
                             type = self.globals['typesdict'][tagdef.typestr]
-                            typevals = type['_type_values']
+                            typevals = type['typedef values']
                             roleinfo = self.globals['roleinfo']
                             if tagdef.typestr in ['role', 'rolepat', 'tagname'] or typevals:
                                 if typevals:
@@ -933,20 +933,21 @@ class Application:
     def get_type(self, typename=None):
         def valexpand(res):
             # replace raw "key desc" string with (key, desc) pair
-            if res['_type_values'] != None:
+            if res['typedef values'] != None:
                 vals = []
-                for val in res['_type_values']:
+                for val in res['typedef values']:
                     key, desc = val.split(" ", 1)
                     key = urlunquote(key)
-                    dbtype = res['_type_dbtype']
+                    dbtype = res['typedef dbtype']
                     key = self.downcast_value(dbtype, key)
                     vals.append( (key, desc) )
-                res['_type_values'] = dict(vals)
+                res['typedef values'] = dict(vals)
             return res
-        predlist = [ dict(tag='typedef', op=None, vals=[]) ]
         if typename != None:
-            predlist.append( dict(tag='typedef', op='=', vals=[typename]) )
-        listtags = [ 'typedef', '_type_description', '_type_dbtype', '_type_values' ]
+            predlist = [ dict(tag='typedef', op='=', vals=[typename]) ]
+        else:
+            predlist = [ dict(tag='typedef', op=None, vals=[]) ]
+        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
 
     def select_file(self, data_id=None, version=None):
@@ -1079,11 +1080,11 @@ class Application:
         static_tagdefs = []
         for prototype in [ ('tagdef', 'text', False, 'system', True),
                            ('tagdef type', 'type', False, 'system', False),
-                           ('tagdef multivalue', '', False, 'system', False),
-                           ('tagdef active', '', False, 'system', False),
+                           ('tagdef multivalue', 'empty', False, 'system', False),
+                           ('tagdef active', 'empty', False, 'system', False),
                            ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
                            ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
-                           ('tagdef unique', '', False, 'system', False),
+                           ('tagdef unique', 'empty', False, 'system', False),
                            ('tag read users', 'rolepat', True, 'fowner', False),
                            ('tag write users', 'rolepat', True, 'fowner', False),
                            ('read users', 'rolepat', True, 'fowner', False),
@@ -1182,7 +1183,7 @@ class Application:
             type = self.get_type(typename=tagdef.typestr)[0]
         except:
             raise BadRequest('Referenced type "%s" is not defined.' % tagdef.typestr)
-        dbtype = type['_type_dbtype']
+        dbtype = type['typedef dbtype']
         if dbtype != '':
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
@@ -1424,7 +1425,7 @@ class Application:
         if len(results) == 0:
             raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
         vtype = results[0]
-        dbtype = vtype['_type_dbtype']
+        dbtype = vtype['typedef dbtype']
         
         validator = self.tagnameValidators.get(tagname)
         if validator:
@@ -1668,7 +1669,7 @@ class Application:
         for tagname in singlevaltags:
             jointags.add(tagname)
             outertables.append((self.wraptag(tagname), None))
-            if tagdefs[tagname].typestr == '':
+            if tagdefs[tagname].typestr == 'empty':
                 expr = '%s.subject IS NOT NULL' % self.wraptag(tagname)
                 groupbys.append('%s.subject' % self.wraptag(tagname))
             else:

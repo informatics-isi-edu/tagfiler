@@ -227,7 +227,7 @@ tagdef_table()
 {
    # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey]]
 
-   if [[ -n "$2" ]]
+   if [[ -n "$2" ]] && [[ "$2" != empty ]]
    then
       if [[ "$2" = "text" ]]
       then
@@ -304,13 +304,13 @@ typedef()
    dbtype="$2"
    desc="$3"
    shift 3
-   local subject=$(dataset "_type_def_${typename}" typedef "${admin}" "*")
+   local subject=$(dataset "" typedef "${admin}" "*")
    tag "$subject" "typedef" text "${typename}" >&2
-   tag "$subject" "_type_dbtype" text "${dbtype}" >&2
-   tag "$subject" "_type_description" text "${desc}" >&2
+   tag "$subject" "typedef dbtype" text "${dbtype}" >&2
+   tag "$subject" "typedef description" text "${desc}" >&2
    if [[ $# -gt 0 ]]
    then
-      tag "$subject" "_type_values" text "$@" >&2
+      tag "$subject" "typedef values" text "$@" >&2
    fi
 }
 
@@ -321,20 +321,20 @@ tagdef 'id'           int8        ""      anonymous   system     false      ""  
 tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
 tagdef 'typedef'      text        ""      anonymous   file       false      ""         true
 
-tagdef 'tagdef type'         text ""      anonymous   system     false      type
-tagdef 'tagdef unique' ""         ""      anonymous   system     false      ""
+tagdef 'tagdef type'  text        ""      anonymous   system     false      type
+tagdef 'tagdef unique' empty      ""      anonymous   system     false      ""
 
-tagdef 'tagdef multivalue'   ""   ""      anonymous   system     false
-tagdef 'tagdef active'       ""   ""      anonymous   system     false
+tagdef 'tagdef multivalue'  empty ""      anonymous   system     false
+tagdef 'tagdef active'      empty ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
 
 tagdef 'tag read users'      text ""      anonymous   fowner     true       rolepat
 tagdef 'tag write users'     text ""      anonymous   fowner     true       rolepat
 
-tagdef '_type_description' text   ""      anonymous   file       false
-tagdef '_type_dbtype' text        ""      anonymous   file       false
-tagdef '_type_values' text        ""      anonymous   file       true
+tagdef 'typedef description' text   ""      anonymous   file       false
+tagdef 'typedef dbtype' text        ""      anonymous   file       false
+tagdef 'typedef values' text        ""      anonymous   file       true
 
 tagdef owner          text        ""      anonymous   fowner     false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -358,8 +358,8 @@ tagdef contains       text        ""      file        file       true       file
 tagdef vcontains      text        ""      file        file       true       vfile
 tagdef key            text        ""      anonymous   file       false      ""         true
 
-tagdef "list on homepage" ""      ""      anonymous   tag        false
-tagdef "Image Set"    ""          "${admin}"   file   file       false
+tagdef "list on homepage" empty   ""      anonymous   tag        false
+tagdef "Image Set"    empty       "${admin}"   file   file       false
 
 psql -q -t <<EOF
 CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
@@ -397,7 +397,7 @@ done
 
 tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")
 
-typedef ''           ''            'No content'
+typedef empty        ''            'No content'
 typedef int8         int8          'Integer'
 typedef float8       float8        'Floating point'
 typedef date         date          'Date'
@@ -415,9 +415,6 @@ typedef vfile        text          'Dataset with version number'
 typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'file Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
 
 typedef type         text          'Scalar value type'
-
-
-
 
 cfgtags=$(dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=configuration%20tags" "${admin}" "*")
 

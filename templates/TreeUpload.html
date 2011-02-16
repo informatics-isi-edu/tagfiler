@@ -1,11 +1,11 @@
 $def with ()
 $for type in types:
-	$ values = type['_type_values']
+	$ values = type['typedef values']
 	$if values:
 		$ values = dict(values)
 	$else:
 		$ values = None
-	$ type['_type_values'] = values
+	$ type['typedef values'] = values
 $ typesdict = dict ( [ (type['typedef'], type) for type in types ] )
 <div>
 	<h3>Status</h3>
@@ -107,8 +107,8 @@ $ typesdict = dict ( [ (type['typedef'], type) for type in types ] )
 	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 	$for tagdef in tagdefs:
 		$ type = typesdict[tagdef.typestr]
-		$ typedesc = type['_type_description']
-		$ typevals = type['_type_values']		
+		$ typedesc = type['typedef description']
+		$ typevals = type['typedef values']		
 		<tr>
 		<td class="tag-name">${tagdef.tagname} (${typedesc})</td>
 		$ options = tagOptions(tagdef.tagname)

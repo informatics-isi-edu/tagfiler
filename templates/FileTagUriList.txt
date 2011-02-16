@@ -7,7 +7,7 @@ $code
 		for file in files:
 			for tagdef in tagdefs:
 				if file[tagdef.tagname]:
-					if tagdef.typestr == '':
+					if tagdef.typestr == 'empty':
 						s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "\n"
 					elif tagdef.multivalue:
 						for val in file[tagdef.tagname]:

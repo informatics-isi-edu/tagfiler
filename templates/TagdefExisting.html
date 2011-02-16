@@ -1,6 +1,6 @@
 $def with (title, test_tagdef_authz)
 $ target = home + '/tagdef'
-$ typenames = [ (type['typedef'], type['_type_description']) for type in typeinfo ]
+$ typenames = [ (type['typedef'], type['typedef description']) for type in typeinfo ]
 $ typenames.sort(key=lambda x: x[1])
 $ typedict = dict(typenames)
 <h2>${title}</h2>
@@ -19,7 +19,7 @@ $if title == 'User':
     <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
     <td><input name="tag-1" type="text" /></td>
     <td><select name="type-1">
-    $ deftypestr = ''
+    $ deftypestr = 'empty'
     <option value="${deftypestr}">${typedict[deftypestr]}</option>
     $for type in [ type for type in typenames if type[0] != deftypestr ]:
         $ typestr = type[0]

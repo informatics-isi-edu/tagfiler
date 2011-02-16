@@ -547,7 +547,7 @@ class Tagdef (Node):
             try:
                 self.typestr = self.queryopts['typestr']
             except:
-                self.typestr = ''
+                self.typestr = 'empty'
 
         if self.readpolicy == None:
             try:
@@ -865,7 +865,7 @@ class FileTags (Node):
                 for file in files:
                     for tagdef in tagdefs:
                         if file[tagdef.tagname]:
-                            if tagdef.typestr == '':
+                            if tagdef.typestr == 'empty':
                                 body.append(urlquote(tagdef.tagname))
                             elif tagdef.multivalue:
                                 for val in file[tagdef.tagname]:

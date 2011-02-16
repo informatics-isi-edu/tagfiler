@@ -3,8 +3,8 @@ $ writetags = [ tag for tag in writetags ]
 $ tagnames = tagdefsdict.iterkeys()
 $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
-$ typename = type['_type_description']
-$ typevals = type['_type_values']
+$ typename = type['typedef description']
+$ typevals = type['typedef values']
 $ writeok = tagdef.get('writeok', False)
 $ vals = file[tagdef.tagname]
 $ vsuffix = ''
@@ -36,7 +36,7 @@ $				 options=options,
 $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
 $				 writeok=writeok,
 $				 showversions=showversions)
-$if tagdef.typestr:
+$if tagdef.typestr != 'empty':
 	$if len(itervals) > 0:
 		<table class="file-tag-list">
 		$for val in itervals:
