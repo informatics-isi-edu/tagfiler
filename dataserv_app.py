@@ -227,6 +227,34 @@ class Application:
         self.predlist = []
         self.globals = dict()
 
+        self.ops = [ ('', 'Tagged'),
+                     (':not:', 'Not tagged'),
+                     ('=', 'Equal'),
+                     ('!=', 'Not equal'),
+                     (':lt:', 'Less than'),
+                     (':leq:', 'Less than or equal'),
+                     (':gt:', 'Greater than'),
+                     (':geq:', 'Greater than or equal'),
+                     (':like:', 'LIKE (SQL operator)'),
+                     (':simto:', 'SIMILAR TO (SQL operator)'),
+                     (':regexp:', 'Regular expression (case sensitive)'),
+                     (':!regexp:', 'Negated regular expression (case sensitive)'),
+                     (':ciregexp:', 'Regular expression (case insensitive)'),
+                     (':!ciregexp:', 'Negated regular expression (case insensitive)')]
+
+        self.opsDB = dict([ ('=', '='),
+                            ('!=', '!='),
+                            (':lt:', '<'),
+                            (':leq:', '<='),
+                            (':gt:', '>'),
+                            (':geq:', '>='),
+                            (':like:', 'LIKE'),
+                            (':simto:', 'SIMILAR TO'),
+                            (':regexp:', '~'),
+                            (':!regexp:', '!~'),
+                            (':ciregexp:', '~*'),
+                            (':!ciregexp:', '!~*') ])
+
         # this ordered list can be pruned to optimize transactions
         self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
 
@@ -314,34 +342,6 @@ class Application:
             self.storage = web.storage([]) 
 
         self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
-
-        self.ops = [ ('', 'Tagged'),
-                     (':not:', 'Not tagged'),
-                     ('=', 'Equal'),
-                     ('!=', 'Not equal'),
-                     (':lt:', 'Less than'),
-                     (':leq:', 'Less than or equal'),
-                     (':gt:', 'Greater than'),
-                     (':geq:', 'Greater than or equal'),
-                     (':like:', 'LIKE (SQL operator)'),
-                     (':simto:', 'SIMILAR TO (SQL operator)'),
-                     (':regexp:', 'Regular expression (case sensitive)'),
-                     (':!regexp:', 'Negated regular expression (case sensitive)'),
-                     (':ciregexp:', 'Regular expression (case insensitive)'),
-                     (':!ciregexp:', 'Negated regular expression (case insensitive)')]
-
-        self.opsDB = dict([ ('=', '='),
-                            ('!=', '!='),
-                            (':lt:', '<'),
-                            (':leq:', '<='),
-                            (':gt:', '>'),
-                            (':geq:', '>='),
-                            (':like:', 'LIKE'),
-                            (':simto:', 'SIMILAR TO'),
-                            (':regexp:', '~'),
-                            (':!regexp:', '!~'),
-                            (':ciregexp:', '~*'),
-                            (':!ciregexp:', '!~*') ])
 
         self.tagnameValidators = { 'owner' : self.validateRole,
                                    'read users' : self.validateRolePattern,
@@ -914,8 +914,8 @@ class Application:
         else:
             pass
 
-    def wraptag(self, tagname):
-        return '_' + tagname.replace('"','""')
+    def wraptag(self, tagname, suffix='', prefix='_'):
+        return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
     def gettagvals(self, tagname, data_id=None, version=None, owner=None, user=None):
         results = self.select_file_tag(tagname, data_id=data_id, version=version, owner=owner, user=user)
@@ -1010,7 +1010,7 @@ class Application:
         return self.db.query(query, values)
 
     def insert_file(self, data_id, version, dtype, storagename):
-        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING id")[0].id
+        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].id
         self.set_file_tag('name', data_id, data_id=newid)
         self.set_file_tag('version', version, data_id=newid)
         vars = dict(name=data_id, version=version, newid=newid)
@@ -1060,7 +1060,7 @@ class Application:
             # we're deleting the latest version and there are previous versions
             self.update_latestfile_version(data_id, versions[1].id)
                 
-        query = 'DELETE FROM resources WHERE id = $id'
+        query = 'DELETE FROM resources WHERE subject = $id'
         self.db.query(query, vars=dict(id=victim.id))
 
     def select_tagdef(self, tagname=None, predlist=[], order=None, staticauthz=None):
@@ -1071,23 +1071,47 @@ class Application:
                    'tagdef active': 'active',
                    'tagdef readpolicy': 'readpolicy',
                    'tagdef writepolicy': 'writepolicy',
+                   'tagdef unique': 'unique',
                    'tag read users': 'tagreaders',
                    'tag write users': 'tagwriters' }
+
+        # static representation of the system tagdefs needed by the select_files_by_predlist call we make below
+        static_tagdefs = []
+        for prototype in [ ('tagdef', 'text', False, 'system', True),
+                           ('tagdef type', 'type', False, 'system', False),
+                           ('tagdef multivalue', '', False, 'system', False),
+                           ('tagdef active', '', False, 'system', False),
+                           ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
+                           ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
+                           ('tagdef unique', '', False, 'system', False),
+                           ('tag read users', 'rolepat', True, 'fowner', False),
+                           ('tag write users', 'rolepat', True, 'fowner', False),
+                           ('read users', 'rolepat', True, 'fowner', False),
+                           ('write users', 'rolepat', True, 'fowner', False),
+                           ('owner', 'role', False, 'fowner', False),
+                           ('name', 'text', False, 'system', False),
+                           ('version', 'int8', False, 'system', False),
+                           ('latest with name', 'text', False, 'system', True) ]:
+            deftagname, typestr, multivalue, writepolicy, unique = prototype
+            static_tagdefs.append(web.Storage(tagname=deftagname,
+                                              owner=None,
+                                              typestr=typestr,
+                                              multivalue=multivalue,
+                                              active=True,
+                                              readpolicy='anonymous',
+                                              writepolicy=writepolicy,
+                                              unique=unique,
+                                              tagreaders=[],
+                                              tagwriters=[]))
+
+        static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
+                           
         listtags += listas.keys()
 
         if order:
             ordertags = [ order ]
         else:
             ordertags = []
-
-        def select_clause(listtag):
-            if listtag in [ 'tag read users', 'tag write users' ]:
-                listtagexpr = 'array_agg("_%s".value)' % listtag
-            elif listtag in [ 'tagdef multivalue', 'tagdef active' ]:
-                listtagexpr = '("_%s".subject IS NOT NULL)' % listtag
-            else:
-                listtagexpr = '"_%s".value' % listtag
-            return "%s AS %s" % (listtagexpr, listas.get(listtag, listtag))
 
         def add_writeok(tagdef):
             if tagdef['writepolicy'] == 'system':
@@ -1105,42 +1129,14 @@ class Application:
                 tagdef['writeok'] = True
             return tagdef
             
-        if not predlist:
-            # short-circuit query to avoid infinite recursion in select_files_by_predlist...
-            if not tagname:
-                wheres = 'WHERE "_tagdef".value IS NOT NULL'
-            else:
-                wheres = 'WHERE "_tagdef".value = $tagname'
-            
-            query = ('SELECT %s FROM %s %s GROUP BY %s'
-                     % (','.join(['"_latest with name".subject AS id',
-                                  '"_latest with name".value AS file',
-                                  '_version.value AS version'] + [select_clause(listtag) for listtag in listtags]),
-                        ' LEFT OUTER JOIN '.join(['"_latest with name"', '_version USING (subject)']
-                                                 + ['"_%s" USING (subject)' % (listtag) for listtag in listtags]),
-                        wheres,
-                        ','.join(['"_latest with name".subject',
-                                  '"_latest with name".value',
-                                  '"_version".value',
-                                  '"_tagdef multivalue".subject',
-                                  '"_tagdef active".subject']
-                                 + ['"_%s".value' % listtag for listtag in listtags if listtag not in ['tag read users',
-                                                                                                       'tag write users',
-                                                                                                       'tagdef multivalue',
-                                                                                                       'tagdef active',
-                                                                                                       'latest with name',
-                                                                                                       'version']]) ) )
-            vars = dict(tagname=tagname)
-            #web.debug(query, vars)
-
-            return [ add_writeok(tagdef) for tagdef in self.db.query(query, vars=vars) ]
+        if tagname:
+            predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
         else:
-            if tagname:
-                predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
-            else:
-                predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
+            predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
-            return [ add_writeok(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas) ]
+        results = [ add_writeok(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas, tagdefs=static_tagdefs) ]
+        #web.debug(results)
+        return results
 
     def insert_tagdef(self):
         results = self.select_tagdef(self.tag_id)
@@ -1178,8 +1174,8 @@ class Application:
             except:
                 raise Conflict('Tagdef "%s" is not defined and cannot be deployed.' % self.tag_id)
 
-        tabledef = "CREATE TABLE \"%s\"" % (self.wraptag(tagdef.tagname))
-        tabledef += " ( subject bigint REFERENCES resources(id) ON DELETE CASCADE"
+        tabledef = "CREATE TABLE %s" % (self.wraptag(tagdef.tagname))
+        tabledef += " ( subject bigint REFERENCES resources(subject) ON DELETE CASCADE"
         indexdef = ''
 
         try:
@@ -1199,8 +1195,8 @@ class Application:
         if not tagdef.multivalue:
             tabledef += ", UNIQUE(subject, version)"
             if dbtype != '':
-                indexdef = 'CREATE INDEX "%s_value_idx"' % (self.wraptag(tagdef.tagname))
-                indexdef += ' ON "%s_value_idx"' % (self.wraptag(tagdef.tagname))
+                indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
+                indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
                 indexdef += ' (value)'
         else:
             if dbtype != '':
@@ -1221,7 +1217,7 @@ class Application:
         self.undeploy_tagdef()
 
     def undeploy_tagdef(self):
-        self.db.query('DROP TABLE "%s"' % (self.wraptag(self.tag_id)))
+        self.db.query('DROP TABLE %s' % (self.wraptag(self.tag_id)))
 
     def select_file_tag_args_prep(self, tagname, value=None, data_id=None, version=None, tagdef=None, user=None, owner=None):
         if user == None:
@@ -1241,7 +1237,7 @@ class Application:
         data_id, version, tagdef, user = \
                  self.select_file_tag_args_prep(tagname, value, data_id, version, tagdef, user, owner)
 
-        query = 'SELECT tag.* FROM "%s" AS tag' % self.wraptag(tagname)
+        query = 'SELECT tag.* FROM %s AS tag' % self.wraptag(tagname)
         if type(data_id) in [int, long]:
             query += ' WHERE subject = $file'
         else:
@@ -1378,7 +1374,7 @@ class Application:
             return usings, wheres
 
         usings, wheres = queryprep(value)
-        query = 'DELETE FROM "%s" AS tag' % self.wraptag(tagname) + usings + wheres
+        query = 'DELETE FROM %s AS tag' % self.wraptag(tagname) + usings + wheres
         vars=dict(file=data_id, version=version, value=value)
         self.db.query(query, vars=vars)
 
@@ -1458,11 +1454,11 @@ class Application:
                 return
 
         if tagtype != '' and value != None:
-            query = 'INSERT INTO "%s"' % self.wraptag(tagname) \
+            query = 'INSERT INTO %s' % self.wraptag(tagname) \
                     + ' (subject, value) VALUES ($file, $value)'
         else:
             # insert untyped or typed w/ default value...
-            query = 'INSERT INTO "%s"' % self.wraptag(tagname) \
+            query = 'INSERT INTO %s' % self.wraptag(tagname) \
                     + ' (subject) VALUES ($file)'
 
         #web.debug(query)
@@ -1500,7 +1496,7 @@ class Application:
                 return value
 
     def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, qd=0, versions='latest', tagdefs=None):
-        tagdefs = None # always use internal support
+
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -1512,96 +1508,49 @@ class Application:
         else:
             listtags = [ x for x in listtags ]
 
-        if not 'Image Set' in listtags:
-            listtags.append('Image Set')
-
         # make sure we have no repeats in listtags before embedding in query
         listtags = [ t for t in set(listtags) ]
 
         roles = [ r for r in self.authn.roles ]
-        if roles:
-            roles.append('*')
+        roles.append('*')
 
         if tagdefs == None:
             tagdefs = self.globals['tagdefsdict']
 
-        for pred in predlist:
-            # do static checks on each referenced tag at most once
-            tagdef = tagdefs.get(pred['tag'], None)
-            if tagdef == None:
-                raise BadRequest(data='The tag "%s" is not defined on this server.' % pred['tag'])
-            if tagdef.readpolicy in ['tag', 'users', 'fowner', 'file']:
-                user = self.authn.role
-                if user == None:
-                    raise Unauthorized(data='read of tag "%s"' % tagdef.tagname)
-                if tagdef.readpolicy == 'tag':
-                    authorized = [ res.value for res in self.select_tag_acl('read', tag_id=tagdef.tagname) ]
-                    authorized.append(tagdef.owner)
-                    if not set(roles).intersection(set(authorized)):
-                        # warn or return an empty result set since nothing can match?
-                        raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
-                # fall off, enforce dynamic security below
+        #web.debug(predlist, listtags, tagdefs)
 
-        # also prefetch custom per-file tags
-        for tagname in listtags:
-            if not tagdefs.has_key(tagname):
+        tags_needed = set([ pred['tag'] for pred in predlist ])
+        tags_needed = tags_needed.union(set([ tagname for tagname in ['read users',
+                                                                      'write users',
+                                                                      'owner',
+                                                                      'name',
+                                                                      'version',
+                                                                      'latest with name']]))
+        tags_needed = tags_needed.union(set([ tagname for tagname in listtags ]))
+        tagdefs_needed = []
+        for tagname in tags_needed:
+            try:
+                tagdefs_needed.append(tagdefs[tagname])
+            except KeyError:
+                #web.debug(tagname)
                 raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
 
-        innertables = ['_name',
-                       '_version USING (subject)',
-                       '_owner USING (subject)',
-                       '_vname USING (subject)',
-                       '_dtype USING (subject)']
-        outertables = ['', # to trigger generatation of LEFT OUTER JOIN prefix
-                       '_storagename USING (subject)',
-                       '_url USING (subject)',
-                       '(SELECT subject, array_agg(value) AS value FROM "_read users" GROUP BY subject) AS "read users" USING (subject)']
-        selects = ['_name.subject AS id',
-                   '_name.value AS file',
-                   '_name.value AS name',
-                   '"_latest with name".value AS "latest with name"',
-                   '_version.value AS version',
-                   '_owner.value AS owner',
-                   '_vname.value AS vname',
-                   '_dtype.value AS dtype',
-                   '_storagename.value AS storagename',
-                   '_url.value AS url']
-        groupbys = ['_name.subject',
-                    '_name.value',
-                    '"_latest with name".value',
-                    '_version.value',
-                    '_owner.value',
-                    '_vname.value',
-                    '_dtype.value',
-                    '_storagename.value',
-                    '_url.value']
+        for tagdef in tagdefs_needed:
+            if tagdef.readpolicy == 'system' \
+                   or (tagdef.readpolicy in ['tag', 'users', 'fowner', 'file'] and self.authn.role == None) \
+                   or (tagdef.readpolicy == 'tag' and not set(roles).intersection(set(tagdef.readers).union(set([tagdef.owner])))):
+                raise Forbidden(data='read of tag "%s"' % tagdef.tagname)
+            # fall off, enforce dynamic security below
+
+        innertables = [('resources', None)]  # (table, alias)
+        outertables = [('_owner', None)]
+        selects = ['resources.subject AS subject', '_owner.value AS owner']
         wheres = []
         values = dict()
 
-        if data_id:
-            values['dataid_%d' % qd] = data_id
-            if type(data_id) in [int, long]:
-                wheres.append("_name.subject = $dataid_$d" % qd)
-            else:
-                wheres.append("_name.value = $dataid_%d" % qd)
-            if version:
-                wheres.append("_version.value = $version_%d" % qd)
-                values['version_%d' % qd] = version
+        need_fowner_test = False
+        role_val_list = ','.join(["'%s'" % dbquote(role) for role in roles])
 
-        if (not data_id or not version) and versions == 'latest':
-            innertables.append('"_latest with name" USING (subject)')
-        else:
-            outertables.append('"_latest with name" USING (subject)')
-
-        roletable = [ "(NULL)" ]  # TODO: make sure this is safe?
-        for r in range(0, len(roles)):
-            roletable.append("('%s')" % dbquote(roles[r]))
-        roletable = ", ".join(roletable)
-
-        outertables.append( '(VALUES %s) AS ownrole (role) ON ("_owner".value = ownrole.role)' % roletable)
-        outertables.append( '(VALUES %s) AS readrole (role) ON (readrole.role = ANY ("read users".value)) ' % roletable)
-        wheres.append('ownrole.role IS NOT NULL OR readrole.role IS NOT NULL')
-        
         for p in range(0, len(predlist)):
             pred = predlist[p]
             tag = pred['tag']
@@ -1610,64 +1559,154 @@ class Application:
             tagdef = tagdefs[tag]
 
             if op == ':not:':
-                # not matches if tag column is null or we lack read access to the tag (act as if not there)
-                outertables.append('"%s" AS t%s USING (subject)' % (self.wraptag(tag), p))                
+                # not matches if tag column is null
+                if tag == 'id':
+                    raise Conflict('The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
+                outertables.append((self.wraptag(tag), 't%s' % p ))
                 if tagdef.readpolicy == 'fowner':
                     # this tag rule is more restrictive than file or static checks already done
-                    wheres.append('t%s.subject IS NULL OR (ownrole.role IS NULL)' % p)
+                    # act like it is NULL if user isn't allowed to read this tag
+                    wheres.append('t%s.subject IS NULL OR (_owner.value NOT IN (%s))' % (p, role_val_list))
                 else:
                     # covers all cases where tag is more or equally permissive to file or static checks already done
                     wheres.append('t%s.subject IS NULL' % p)
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
-                innertables.append('"%s" AS t%s USING (subject)' % (self.wraptag(tag), p))
+                if tag != 'id':
+                    innertables.append((self.wraptag(tag), 't%s' % p))
                 if op and vals and len(vals) > 0:
                     valpreds = []
                     for v in range(0, len(vals)):
-                        valpreds.append("t%s.value %s $val%s_%s_%d" % (p, self.opsDB[op], p, v, qd))
+                        if tag != 'id':
+                            valpreds.append("t%s.value %s $val%s_%s_%d" % (p, self.opsDB[op], p, v, qd))
+                        else:
+                            valpreds.append("subject %s $val%s_%s_%d" % (self.opsDB[op], p, v, qd))
                         values["val%s_%s_%d" % (p, v, qd)] = vals[v]
                     wheres.append(" OR ".join(valpreds))
                 if tagdef.readpolicy == 'fowner':
-                    # this tag rule is more restrictive than file or static checks already done
-                    wheres.append('ownrole.role IS NOT NULL' % p)
+                    # this predicate is conjunctive with more restrictive access check, which we only need to add once
+                    need_fowner_test = True
+
+        if need_fowner_test:
+            # at least one predicate test requires fowner-based read access rights
+            wheres.append('_owner.value IN (%s)' % role_val_list)
+
+        # all results are filtered by file read access rights
+        wheres.append('_owner.value IN (%s) OR "_read users".value IN (%s)' % (role_val_list, role_val_list))
+        # compute file write access rights for later consumption
+        selects.append('bool_or(_owner.value IN (%s) OR "_write users".value IN (%s)) AS writeok' % (role_val_list, role_val_list))
+
+        if data_id:
+            # special single-entry lookup
+            values['dataid_%d' % qd] = data_id
+            if type(data_id) in [int, long]:
+                wheres.append("resources.subject = $dataid_$d" % qd)
+            else:
+                innertables.append(('"_name"', None))
+                wheres.append("_name.value = $dataid_%d" % qd)
+            if version:
+                innertables.append(('"_version"', None))
+                wheres.append("_version.value = $version_%d" % qd)
+                values['version_%d' % qd] = version
+            elif versions == 'latest':
+                innertables.append(('"_latest with name"', None))
+        else:
+            # constrain to latest, but only for datasets using (name, version) identity scheme
+            if versions == 'latest':
+                outertables.append(('"_latest with name"', None))
+                outertables.append(('_name', None))
+                wheres.append('"_name".value IS NULL OR "_latest with name".value IS NOT NULL')
+
+        outertables = outertables \
+                      + [('_owner', None),
+                         ('"_read users"', None),
+                         ('"_write users"', None)]
+
+        # idempotent insertion of (table, alias)
+        joinset = set()
+        innertables2 = []
+        outertables2 = []
+
+        for tablepair in innertables:
+            if tablepair not in joinset:
+                innertables2.append(tablepair)
+                joinset.add(tablepair)
+
+        for tablepair in outertables:
+            if tablepair not in joinset:
+                outertables2.append(tablepair)
+                joinset.add(tablepair)
+
+        def rewrite_tablepair(tablepair, suffix=''):
+            table, alias = tablepair
+            if alias:
+                table += ' AS %s' % alias
+            return table + suffix
+
+        innertables2 = [ rewrite_tablepair(innertables2[0]) ] \
+                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables2[1:] ]
+        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ]
+
+        # this query produces a set of (subject, owner, writeok) rows that match the query result set
+        subject_query = 'SELECT %s' % ','.join(selects) \
+                        + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
+                        + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
+                        + ' GROUP BY subject, owner'
+
+        # now build the outer query that attaches listtags metadata to results
+        selects = ['subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
+        innertables = [('(%s)' % subject_query, 'subjects')]
+        outertables = []
+        groupbys = ['subjects.subject', 'subjects.owner', 'subjects.writeok']
+
+        jointags = set(['subject', 'id', 'owner', 'writeok'])
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
-                          if not tagdefs[tagname].multivalue and tagname not in ['dtype', 'latest with name', 'name', 'owner', 'storagename', 'url', 'vname', 'version' ] ]
+                          if not tagdefs[tagname].multivalue and tagname not in jointags ]
         for tagname in singlevaltags:
-            outertables.append('"_%s" USING (subject)' % (tagname))
+            jointags.add(tagname)
+            outertables.append((self.wraptag(tagname), None))
             if tagdefs[tagname].typestr == '':
-                selects.append('("_%s".subject IS NOT NULL) AS "%s"' % (tagname, tagname))
-                groupbys.append('"%s"' % tagname)
+                expr = '%s.subject IS NOT NULL' % self.wraptag(tagname)
+                groupbys.append('%s.subject' % self.wraptag(tagname))
             else:
-                selects.append('"_%s".value AS "%s"' % (tagname, tagname))
-                groupbys.append('"_%s".value' % tagname)
+                expr = '%s.value' % self.wraptag(tagname)
+                groupbys.append('%s.value' % self.wraptag(tagname))
+            if tagdefs[tagname].readpolicy == 'fowner':
+                expr = 'CASE WHEN subjects.owner IN (%s)' % role_val_list \
+                       + ' THEN %s ELSE NULL END' % expr
+            selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
 
         # add custom per-file multi-val tags to results
         multivaltags = [ tagname for tagname in listtags
-                         if tagdefs[tagname].multivalue and tagname not in [] ]
+                         if tagdefs[tagname].multivalue and tagname not in jointags ]
         for tagname in multivaltags:
-            if tagname != 'read users':
-                outertables.append('(SELECT subject, array_agg(value) AS value FROM "_%s" GROUP BY subject) AS "%s" USING (subject)' % (tagname, tagname))
-            selects.append('"%s".value AS "%s"' % (tagname, tagname))
-            groupbys.append('"%s".value' % tagname)
+            jointags.add(tagname)
+            outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s GROUP BY subject)' % self.wraptag(tagname), self.wraptag(tagname)))
+            groupbys.append('%s.value' % self.wraptag(tagname))
+            expr = '%s.value' % self.wraptag(tagname)
+            if tagdefs[tagname].readpolicy == 'fowner':
+                expr = 'CASE WHEN subjects.owner IN (%s)' % role_val_list \
+                       + ' THEN %s ELSE NULL END' % expr
+            selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
 
-        groupbys = ", ".join(groupbys)
-        selects = ", ".join(selects)
-        tables = "(" + " JOIN ".join(innertables) + ")" + " LEFT OUTER JOIN ".join(outertables)
+        innertables2 = [ rewrite_tablepair(innertables[0]) ] \
+                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables[1:] ]
+        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables ]
 
-        wheres = " AND ".join([ "(%s)" % where for where in wheres])
-        if wheres:
-            wheres = "WHERE " + wheres
+        # this query produces a set of (subject, owner, writeok) rows that match the query result set
+        value_query = 'SELECT %s' % ','.join(selects) \
+                        + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
+                        + ' GROUP BY %s' % ','.join(groupbys)
 
-        query = 'SELECT %s FROM %s %s GROUP BY %s' % (selects, tables, wheres, groupbys)
+        value_query += " ORDER BY " + ", ".join([self.wraptag(tag) for tag in ordertags] + ['id'])
 
-        query += " ORDER BY " + ", ".join(['"%s"' % self.wraptag(tag) for tag in ordertags] + ['file'])
-        
-        return (query, values)
+        #web.debug(query)
+        return (value_query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest', listas=None):
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], data_id=None, version=None, versions='latest', listas=None, tagdefs=None):
         def select_clause(listtag):
             if listas.has_key(listtag):
                 return '"%s" AS "%s"' % (listtag, listas[listtag])
@@ -1679,13 +1718,13 @@ class Application:
         if listas != None:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], data_id=data_id, version=version, versions=versions)
-            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(["file"])) ]),
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], data_id=data_id, version=version, versions=versions, tagdefs=tagdefs)
+            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['writeok', 'owner', 'id'])) ]),
                                                   query)
             if ordertags:
                 query += " ORDER BY " + ",".join(ordertags)
         else:
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions)
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, data_id, version, versions=versions, tagdefs=tagdefs)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -1710,7 +1749,7 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions)
+            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
@@ -1736,10 +1775,10 @@ class Application:
             
         if listtags == None:
             listtags = self.listtags
-        listtags = set(listtags)
+        listtags = set(listtags).union(set(['writeok', 'owner', 'id']))
         
         selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
-                    for listtag in listtags.union(set(['dtype', 'file', 'id', 'owner', 'storagename', 'url', 'version'])) ]
+                    for listtag in listtags ]
         selects = ', '.join(selects)
 
         query = 'SELECT ' + selects + ' FROM ' + query

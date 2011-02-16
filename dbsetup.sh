@@ -17,7 +17,7 @@ echo args: "$@"
 echo "create core tables..."
 
 psql -q -t <<EOF
-CREATE TABLE resources ( id bigserial PRIMARY KEY );
+CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
 EOF
@@ -88,16 +88,23 @@ dataset()
    echo "create $type dataset: '$file'" >&2
 
    local subject=$(psql -A -t -q <<EOF
-INSERT INTO resources DEFAULT VALUES RETURNING id;
+INSERT INTO resources DEFAULT VALUES RETURNING subject;
 EOF
    )
 
-   tag "$subject" name text "$file" >&2
-   tag "$subject" 'latest with name' text "$file" >&2
-   tag "$subject" vname text "$file@1" >&2
-   tag "$subject" version int8 1 >&2
+   if [[ -n "$file" ]]
+   then
+       tag "$subject" name text "$file" >&2
+       tag "$subject" 'latest with name' text "$file" >&2
+       tag "$subject" vname text "$file@1" >&2
+       tag "$subject" version int8 1 >&2
+   fi
    tag "$subject" dtype text "$type" >&2
-   tag "$subject" owner text "$owner" >&2
+
+   if [[ -n "$owner" ]]
+   then
+       tag "$subject" owner text "$owner" >&2
+   fi
 
    while [[ $# -gt 0 ]]
    do
@@ -190,7 +197,7 @@ tagdef_tags()
 
    echo "create tagdef '$1'..." >&2
 
-   local subject=$(dataset "_tagdef_$1" tagdef "$3" "*")
+   local subject=$(dataset "" tagdef "$3" "*")
 
    tag "$subject" "tagdef" text "$1" >&2
    tag "$subject" "tagdef active" >&2
@@ -248,13 +255,13 @@ tagdef_table()
       fi
 
       psql -q -t <<EOF
-CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (id) ON DELETE CASCADE, 
+CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
 CREATE INDEX "_$1_value_idx" ON "_$1" (value);
 EOF
    else
       psql -q -t <<EOF
-CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (id) ON DELETE CASCADE );
+CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (subject) ON DELETE CASCADE );
 EOF
    fi
 }
@@ -276,6 +283,7 @@ tagdef()
    tag_writepolicies[${#tag_writepolicies[*]}]="$5"
    tag_multivalues[${#tag_multivalues[*]}]="$6"
    tag_typestrs[${#tag_typestrs[*]}]="$7"
+   tag_uniques[${#tag_uniques[*]}]="$8"
 
    tagdef_table "$@"
 }
@@ -286,7 +294,7 @@ tagdefs_complete()
    echo ${!tag_names[*]}
    for i in ${!tag_names[*]}
    do
-      tagdef_tags "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_typestrs[$i]}"
+      tagdef_tags "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_typestrs[$i]}" "${tag_uniques[$i]}"
    done
 }
 
@@ -309,6 +317,7 @@ typedef()
 
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
 
+tagdef 'id'           int8        ""      anonymous   system     false      ""         true
 tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
 tagdef 'typedef'      text        ""      anonymous   file       false      ""         true
 
@@ -353,7 +362,7 @@ tagdef "list on homepage" ""      ""      anonymous   tag        false
 tagdef "Image Set"    ""          "${admin}"   file   file       false
 
 psql -q -t <<EOF
-CREATE TABLE subjecttags ( subject bigint REFERENCES resources (id) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
+CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
 EOF
 
 tagdefs_complete
@@ -365,8 +374,11 @@ tagdef()
    tagdef_tags "$@"
 }
 
+# add tagdef foreign key referencing constraint
+# drop storage for psuedo tag 'id' which we can synthesize from any subject column
 psql -e -t <<EOF
 ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
+DROP TABLE "_id";
 EOF
 
 tagacl "list on homepage" read "*"
@@ -383,7 +395,7 @@ do
    tag "$x" "list on homepage"
 done
 
-tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")
+tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")
 
 typedef ''           ''            'No content'
 typedef int8         int8          'Integer'
@@ -394,6 +406,7 @@ typedef text         text          'Text'
 typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
+typedef tagdef       text          'Tag definition'
 typedef dtype       text          'Dataset type' 'url URL redirecting dataset' 'blank Metadata-only dataset' 'typedef Type definition' 'tagdef Tag definition' 'file Locally stored file' 'contains Collection of unversioned datasets' 'vcontains Collection of versioned datasets'
 typedef url          text          'URL'
 typedef file         text          'Dataset'
@@ -406,7 +419,7 @@ typedef type         text          'Scalar value type'
 
 
 
-cfgtags=$(dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/configuration%20tags" "${admin}" "*")
+cfgtags=$(dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=configuration%20tags" "${admin}" "*")
 
 cfgtagdef()
 {
@@ -475,8 +488,8 @@ cfgtag "client download chunks" text 'True'
 cfgtag "client socket buffer size" text '8192'
 cfgtag "client chunk bytes" text '4194304'
 
-cfgtag "file list tags" text name dtype bytes owner 'read users' 'write users'
-#cfgtag "file list tags write" text 'read users' 'write users'
+cfgtag "file list tags" text dtype bytes owner 'read users' 'write users'
+cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'
@@ -485,7 +498,7 @@ cfgtag "file list tags" text name dtype bytes owner 'read users' 'write users'
 #cfgtag "remote files immutable" text 'True'
 
 tagdeftags=$(dataset "tagdef tags" blank "${admin}" "*")
-for tagname in tagdef "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
+for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
 do
    tag "$tagdeftags" "_cfg_file list tags" "tagname" "$tagname"
    tag "$tagdeftags" "_cfg_tag list tags" "tagname" "$tagname"

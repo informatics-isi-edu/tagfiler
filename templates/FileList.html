@@ -8,7 +8,10 @@ $if len(files) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
 	$for tag in filelisttags:
-		<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
+		$if tag == 'id':
+			<th class="file-tag subject">subject</th>
+		$else:
+			<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
 	</tr>
 	$for file in files:
 		$if odd:

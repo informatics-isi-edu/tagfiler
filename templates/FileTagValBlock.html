@@ -20,13 +20,12 @@ $else:
 $if writeok == None:
 	$# writeok depends on file, e.g. is not statically determined
 	$if tagdef.writepolicy == 'fowner':
-		$ writeok = file.owner in authn.roles
+		$ writeok = file.owner and file.owner in authn.roles
 	$else:
 		$# writepolicy == 'file'
 		$ writeok = file.writeok
 $ options = tagOptions(tagdef.tagname, itervals)
-$ params = dict( file=file.file, 
-$ 				 filerecord=file,
+$ params = dict( filerecord=file,
 $				 tagname=tagdef.tagname, 
 $				 typestr=tagdef.typestr, 
 $				 typename=typename, 

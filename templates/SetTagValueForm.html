@@ -1,5 +1,6 @@
 $def with (args)
 $ file = args.get('file')
+$ filerecord = args.get('filerecord')
 $ vsuffix = args.get('vsuffix')
 $ tagname = args.get('tagname')
 $ typestr = args.get('typestr')
@@ -7,7 +8,7 @@ $ typename = args.get('typename')
 $ options = args.get('options')
 $ name = args.get('name')
 $ required = args.get('required')
-$if file:
+$if filerecord:
 	<tr>
 	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
 	<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
@@ -36,7 +37,7 @@ $else:
 $if typestr == 'date':
 	<a href="javascript:generateCalendar('${tagname}_id')"><img src="${home}/static/calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>
 </td>
-$if file:
+$if filerecord:
 	<input type="hidden" name="action" value="put" />
 	<td class="file-tag ${idquote(tagname)} multivalue set">
 	<input type="hidden" name="referer" value="${referer}" />

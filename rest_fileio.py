@@ -99,7 +99,7 @@ class FileIO (Application):
         self.bytes = None
         self.referer = None
         self.update = False
-        self.needed_db_globals = []  # turn off expensive db queries we ignore
+        #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.key = None
 
     def GETfile(self, uri, sendBody=True):

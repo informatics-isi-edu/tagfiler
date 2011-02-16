@@ -282,7 +282,7 @@ class FileList (Node):
                 self.globals['filelisttags'] = listtags
             else:
                 self.globals['filelisttags'] = self.getParamsDb('file list tags', data_id=self.globals['view'])
-            builtinlist = [ 'name' ]
+            builtinlist = [ 'id' ]
             self.globals['filelisttags'] = builtinlist + [ tag for tag in self.globals['filelisttags'] if tag not in builtinlist ]
                 
             self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', data_id=self.globals['view'])
@@ -292,15 +292,7 @@ class FileList (Node):
             else:
                 self.predlist=[]
 
-            files = [ res for res in self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'version']))) ]
-            for res in files:
-                # decorate each result with writeok information
-                res.writeok = self.gui_test_file_authz('write',
-                                                       owner=res.owner,
-                                                       data_id=res.file,
-                                                       dtype=res.dtype)
-
-            return files
+            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'name', 'version'])))
 
         def postCommit(files):
             target = self.home + web.ctx.homepath
@@ -669,14 +661,9 @@ class FileTags (Node):
 
     __slots__ = [ 'data_id', 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, data_id=None, tag_id='', value=None, tagvals=None, queryopts={}):
+    def __init__(self, appname, predlist=None, tag_id='', value=None, tagvals=None, queryopts={}):
         Node.__init__(self, appname)
-        if type(data_id) == web.utils.Storage:
-            self.data_id = data_id.data_id
-            self.version = data_id.version
-        else:
-            self.data_id = data_id
-            self.version = None
+        self.predlist = predlist
         self.tag_id = tag_id
         self.value = value
         self.typestr = None
@@ -687,17 +674,27 @@ class FileTags (Node):
         else:
             self.tagvals = dict()
         self.queryopts = queryopts
+        self.globals['predlist'] = predlist
 
-        self.globals['data_id'] = self.data_id 
-        self.globals['version'] = self.version
+    def validate_predlist_unique(self):
+        for pred in self.predlist:
+            tagdef = self.globals['tagdefsdict'].get(pred['tag'], None)
+            if tagdef == None:
+                raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred['tag'])
+            if tagdef.get('unique', False) \
+               and pred['op'] == '=' \
+               and len(pred['vals']) > 0:
+                return
+        raise Conflict('Tag subject predicate list requires at least one tag=val comparison with a unique identifying tag.')
 
     def get_tag_body(self):
+        self.validate_predlist_unique()
+
         owner = self.owner()
         results = self.select_tagdef(self.tag_id)
         if len(results) == 0:
             raise NotFound(data='tag definition "%s"' % self.tag_id)
         tagdef = results[0]
-        tagdef.writeok = self.test_tag_authz('write', tagdef.tagname, fowner=owner)
         self.tagdef = tagdef
         self.typestr = tagdef.typestr
         self.contentType = None
@@ -725,18 +722,20 @@ class FileTags (Node):
         if self.contentType == None:
             self.contentType = 'text/html'
         
-        results = self.select_file()
+        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] + [self.tag_id, 'owner', 'write users'])
         if len(results) == 0:
-            raise NotFound(data='data set "%s"' % self.data_id)
+            raise NotFound(data='subject matching "%s"' % self.predlist)
+        self.file = results[0]
+        self.data_id = self.file.id
         owner = self.owner()
         results = self.select_file_tag(self.tag_id, self.value, tagdef=tagdef, owner=owner)
         if len(results) == 0 and self.contentType not in ['text/uri-list', 'text/html']:
             if self.value == None:
-                raise NotFound(data='tag "%s" on dataset "%s"' % (self.tag_id, self.data_id))
+                raise NotFound(data='tag "%s" on subject matching "%s"' % (self.tag_id, self.predlist))
             elif self.value == '':
-                raise NotFound(data='tag "%s" = "" on dataset "%s"' % (self.tag_id, self.data_id))
+                raise NotFound(data='tag "%s" = "" on subject matching "%s"' % (self.tag_id, self.predlist))
             else:
-                raise NotFound(data='tag "%s" = "%s" on dataset "%s"' % (self.tag_id, self.value, self.data_id))
+                raise NotFound(data='tag "%s" = "%s" on subject matching "%s"' % (self.tag_id, self.value, self.predlist))
         values = []
         for res in results:
             try:
@@ -759,18 +758,18 @@ class FileTags (Node):
         elif self.contentType == 'text/uri-list':
             if self.typestr == 'url':
                 return '\n'.join(values + [''])
-            if self.typestr == 'file':
-                return '\n'.join(['%s/%s/file/%s' % (self.home, web.ctx.homepath, urlquote_name(val)) for val in values]
-                                 + [''])
             else:
                 raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s"' % self.typestr)
         elif self.contentType == 'text/plain':
             return '\n'.join(values) + '\n'
         else:
             # 'text/html'
-            file = web.storage(file=self.data_id)
-            file[self.tag_id] = values
-            return self.renderlist('Dataset "%s" Tag "%s" Values' % (self.data_id, self.tag_id),
+            file = self.file
+            return self.renderlist('Dataset "%s" Tag "%s" Values' % (';'.join(['%s%s%s' % (pred['tag'],
+                                                                                           pred['op'],
+                                                                                           ','.join(pred['vals']))
+                                                                               for pred in self.predlist]),
+                                                                     self.tag_id),
                                    [self.render.FileTagValBlock(file,
                                                                 self.tagdef,
                                                                 [self.tag_id],
@@ -781,66 +780,64 @@ class FileTags (Node):
         return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
 
     def get_all_body(self):
-        self.txlog('GET ALL TAGS', dataset=self.data_id)
+        self.txlog('GET ALL TAGS', dataset=self.predlist)
 
         custom_tags = self.getParamsDb('tag list tags', data_id=self.view_type)
-        self.listtags = self.queryopts.get('list', set(custom_tags))
+        self.listtags = self.queryopts.get('list', custom_tags)
         if not self.listtags:
             self.listtags = set()
-        if type(self.listtags) != set:
-            self.listtags = set([self.listtags])
+        if type(self.listtags) == type('text'):
+            self.listtags = self.listtags.split(',')
+
+        predtags = [ pred['tag'] for pred in self.predlist ]
 
         all = self.globals['tagdefsdict'].values()
         if len(self.listtags) > 0:
-            all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags ]
+            all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags or tagdef.tagname in predtags ]
         else:
             self.listtags = [ tagdef.tagname for tagdef in all ]
         all.sort(key=lambda tagdef: tagdef.tagname)
-        system = [ tagdef for tagdef in all if tagdef.owner == None ]
-        userdefined = [ tagdef for tagdef in all if tagdef.owner != None ]
 
-        if self.data_id != None:
-            if self.version != None:
-                files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, version=self.version, listtags=self.listtags) ]
-            else:
-                files = [ file for file in self.select_files_by_predlist(predlist=[], data_id=self.data_id, listtags=self.listtags) ]
-            if len(files) == 0:
-                raise NotFound('dataset "%s"' % self.data_id)
-
-        else:
-            files = [ file for file in self.select_files_by_predlist(predlist=[], listtags=self.listtags) ]
+        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags)  ]
+        if len(files) == 0:
+            raise NotFound('subject matching "%s"' % self.predlist)
 
         length = 0
         for file in files:
             for tagname in self.listtags:
                 length = listOrStringMax(file[tagname], length)
 
-        return (files, system, userdefined, all, length)
-
+        return (files, all, length)
+    
     def get_title_one(self):
-        suffix = ''
-        if self.version:
-            suffix = '@%s' % self.version
-        return 'Tags for dataset "%s%s"' % (self.data_id, suffix)
+        return 'Tags for subject matching "%s"' % (';'.join(['%s%s%s' % (pred['tag'],
+                                                                         pred['op'],
+                                                                         ','.join(pred['vals']))
+                                                             for pred in self.predlist]))
 
     def get_title_all(self):
-        return 'Tags for all datasets'
+        return 'Tags for subjects matching "%s"' % (';'.join(['%s%s%s' % (pred['tag'],
+                                                                          pred['op'],
+                                                                          ','.join(pred['vals']))
+                                                              for pred in self.predlist]))
 
     def get_all_html_render(self, results):
-        files, system, userdefined, all, length = results
+        files, all, length = results
         #web.debug(system, userdefined, all)
-        if self.data_id:
-            self.globals['version'] = self.version
+        status = web.ctx.status
+        try:
+            self.validate_predlist_unique()
+            self.globals['version'] = None
             return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('User', files[0], userdefined),
-                                    self.render.FileTagExisting('System', files[0], system),
-                                    self.render.TagdefNewShortcut('Define more tags')])
-        else:
+                                   [self.render.FileTagExisting('', files[0], all)])
+
+        except:
+            web.ctx.status = status
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', files, all)])
-
+ 
     def get_all_postCommit(self, results):
-        files, system, userdefined, all, length = results
+        files, all, length = results
 
         if 'name' not in self.listtags:
             addName = True
@@ -910,17 +907,23 @@ class FileTags (Node):
             return self.GETall(uri)
 
     def put_body(self):
-        try:
-            # custom DEI EIU hack, proxy tag ops on Image Set to all member files
-            results = self.select_file_tag('Image Set')
-            if len(results) > 0:
-                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
-                         ( [], [], [] ) ]
-                subfiles = [ res.file for res in self.select_files_by_predlist_path(path=path) ]
-            else:
-                subfiles = []
-        except:
+        self.validate_predlist_unique()
+        
+        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist]
+                                                + [self.tag_id, 'owner', 'write users', 'Image Set'])
+        if len(results) == 0:
+            raise NotFound(data='subject matching "%s"' % self.predlist)
+        self.file = results[0]
+        self.data_id = self.file.id
+
+        # custom DEI EIU hack, proxy tag ops on Image Set to all member files
+        if self.file['Image Set']:
+            path = [ ( [ { 'tag' : 'id', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
+                     ( [], [], [] ) ]
+            subfiles = [ res.id for res in self.select_files_by_predlist_path(path=path) ]
+        else:
             subfiles = []
+
         for tag_id in self.tagvals.keys():
             results = self.select_tagdef(tag_id)
             if len(results) == 0:
@@ -928,7 +931,7 @@ class FileTags (Node):
             self.enforce_tag_authz('write', tag_id)
             for value in self.tagvals[tag_id]:
                 self.set_file_tag(tag_id, value)
-                self.txlog('SET', dataset=self.data_id, tag=tag_id, value=value)
+                self.txlog('SET', dataset=self.predlist, tag=tag_id, value=value)
                 if tag_id not in ['Image Set', 'contains', 'vcontains' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', tag_id, data_id=subfile)
@@ -967,19 +970,24 @@ class FileTags (Node):
         return self.dbtransact(self.put_body, self.put_postCommit)
 
     def delete_body(self):
-        try:
-            # custom DEI EIU hack
-            results = self.select_file_tag('Image Set')
-            if len(results) > 0:
-                path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
-                         ( [], [], [] ) ]
-                subfiles = [ res.file for res in self.select_files_by_predlist_path(path=path) ]
-            else:
-                subfiles = []
-        except:
+        self.validate_predlist_unique()
+        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist]
+                                                + [self.tag_id, 'owner', 'write users', 'Image Set'])
+        if len(results) == 0:
+            raise NotFound(data='subject matching "%s"' % self.predlist)
+        self.file = results[0]
+        self.data_id = self.file.id
+
+        # custom DEI EIU hack
+        if self.file['Image Set']:
+            path = [ ( [ { 'tag' : 'name', 'op' : '=', 'vals' : [self.data_id] } ], ['vcontains'], [] ),
+                     ( [], [], [] ) ]
+            subfiles = [ res.id for res in self.select_files_by_predlist_path(path=path) ]
+        else:
             subfiles = []
+
         self.enforce_tag_authz('write')
-        self.txlog('DELETE', dataset=self.data_id, tag=self.tag_id, value=self.value)
+        self.txlog('DELETE', dataset=self.predlist, tag=self.tag_id, value=self.value)
         self.delete_file_tag(self.tag_id, self.value)
         if self.tag_id in [ 'read users', 'write users' ]:
             for subfile in subfiles:
@@ -1165,7 +1173,7 @@ class Query (Node):
             if len(listtags) == 0:
                 listtags = self.getParamsDb('file list tags', data_id=self.globals['view'])
             listtags = [ t for t in listtags ]
-            builtinlist = [ tag for tag in ['name', 'tagdef', 'typedef'] if tag in listtags ]
+            builtinlist = [ 'id' ] 
             listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
             self.globals['filelisttags'] = listtags
             
@@ -1179,15 +1187,7 @@ class Query (Node):
             self.path[-1][1].append('typedef')
             self.path[-1][1].append('Image Set')
 
-            files = [ res for res in self.select_files_by_predlist_path(path=self.path, versions=versions) ]
-
-            for res in files:
-                # decorate each result with writeok information
-                res.writeok = self.gui_test_file_authz('write',
-                                                       owner=res.owner,
-                                                       data_id=res.file,
-                                                       dtype=res.dtype)
-            return files
+            return self.select_files_by_predlist_path(path=self.path, versions=versions)
 
         def postCommit(files):
             listtags = self.globals['filelisttags']

@@ -99,17 +99,17 @@ def p_tags_all_slash_opts(p):
     p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
 
 def p_tags(p):
-    """tags : slash string slash TAGS slash filename 
-            | slash string slash TAGS slash filename slash"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
+    """tags : slash string slash TAGS slash predlist_nonempty 
+            | slash string slash TAGS slash predlist_nonempty slash"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6])
 
 def p_tags_opts(p):
-    """tags : slash string slash TAGS slash filename queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], queryopts=p[7])
+    """tags : slash string slash TAGS slash predlist_nonempty queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], queryopts=p[7])
 
 def p_tagsvalrest(p):
-    """tags : slash string slash TAGS slash filename slash tagvals"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tagvals=p[8])
+    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8])
 
 def p_tagvals(p):
     """tagvals : tagval"""
@@ -189,12 +189,16 @@ def p_predlist_empty(p):
     """predlist : """
     p[0] = []
 
+def p_predlist_nonempty(p):
+    """predlist : predlist_nonempty"""
+    p[0] = p[1]
+
 def p_predlist(p):
-    """predlist : pred"""
+    """predlist_nonempty : pred"""
     p[0] = list([ p[1] ])
 
 def p_predlist_grow(p):
-    """predlist : predlist ';' pred"""
+    """predlist_nonempty : predlist_nonempty ';' pred"""
     p[0] = p[1]
     p[0].append(p[3])
 

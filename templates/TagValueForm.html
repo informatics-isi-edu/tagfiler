@@ -20,15 +20,33 @@ $if type:
 	/>
 $else:
 	<td class="file-tag ${idquote(tagname)} multivalue">
-	$if tagname == 'name':
+	$if tagname == 'id':
+		$ datapred = None
+		$for tagname in [ 'tagdef', 'typedef' ]:
+			$ keyv = filerecord.get(tagname, None)
+			$if keyv:
+				$if tagdefsdict[tagname].multivalue:
+					$ keyv = keyv[0]
+				$ datapred = '%s=%s' % (urlquote(tagname), urlquote(keyv))
+				$ dataid = datapred
+				$ dataname = '%s=%s' % (tagname, keyv)
+				$break
+		$ name = filerecord.get('name', None)
 		$ version = filerecord.get('version', None)
-		$if version != None and showversions:
-			$ dataid = '%s@%s' % (urlquote(val), version) 
-			$ dataname = '%s@%s' % (val, version)
-		$else:
-			$ dataid = urlquote(val)
-			$ dataname = val
-		<table><tr><td><a href="${home}/file/${dataid}">${dataname}</a> <a href="${home}/tags/${dataid}">(tags)</a>
+		$if datapred == None:
+			$if version != None and name != None and showversions:
+				$ dataid = '%s@%s' % (urlquote(name), version)
+				$ datapred = 'name=%s;version=%s' % (urlquote(name), version) 
+				$ dataname = '%s@%s' % (name, version)
+			$elif name != None:
+				$ dataid = urlquote(name)
+				$ datapred = 'name=%s' % urlquote(name) 
+				$ dataname = name
+			$else:
+				$ datapred = 'id=%s' % filerecord.id
+				$ dataid = datapred
+				$ dataname = datapred
+		<table><tr><td><a href="${home}/file/${dataid}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
 		</td>
@@ -49,8 +67,8 @@ $else:
 			</td>
 		</tr>
 		</table>
-	$elif tagname == 'tagdef':
-		<a href="${home}/tags/${urlquote(val)}?view=tagdef%20tags">${val}</a>
+	$elif tagname == 'tagdef' or typestr in ['tagname', 'tagdef']:
+		<a href="${home}/tags/tagdef=${urlquote(val)}?view=tagdef%20tags">${val}</a>
 	$elif typevals:
 		$# this lambda is to simulate ternary operator in Python 2.4
 		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
