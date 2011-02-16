@@ -41,15 +41,15 @@ $if authn.role:
 	$if passwdurl:
 		<tr><td></td><td><a href="${passwdurl}">change&nbsp;password</a></td></tr>
 	$if authn.since:
-		<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span></td>
+		<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span>
 		<script type="text/javascript">
 		localizeDate("sincetime");
-		</script></tr>
+		</script></td></tr>
 	$if authn.until:
-		<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span></td>
+		<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span>
 		<script type="text/javascript">
 		localizeDate("untiltime");
-		</script></tr>
+		</script></td></tr>
 $else:
 	<tr class="noauthn"><td>Login User:</td><td>not logged in</td></tr>
 	$ loginurl = authn.getLoginUrl()

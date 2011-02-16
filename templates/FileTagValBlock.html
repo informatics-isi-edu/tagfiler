@@ -38,18 +38,19 @@ $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
 $				 writeok=writeok,
 $				 showversions=showversions)
 $if tagdef.typestr:
-	<table class="file-tag-list">
-	$for val in itervals:
-		<tr>
-		$ params['val'] = val
-		$:{render.TagValueForm(params)}
-		<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
+	$if len(itervals) > 0:
+		<table class="file-tag-list">
+		$for val in itervals:
+			<tr>
+			$ params['val'] = val
+			$:{render.TagValueForm(params)}
+			<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
+			$if tagdef.tagname in writetags and writeok:
+				$:{render.RemoveTagValueForm(params)}
+			</td>
+			</tr>
 		$if tagdef.tagname in writetags and writeok:
-			$:{render.RemoveTagValueForm(params)}
-		</td>
-		</tr>
-	$if tagdef.tagname in writetags and writeok:
-		$:{render.SetTagValueForm(params)}
-	</table>
+			$:{render.SetTagValueForm(params)}
+		</table>
 $else:
 	$:{render.SetTagForm(params)}
