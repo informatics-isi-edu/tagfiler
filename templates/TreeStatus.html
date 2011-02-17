@@ -1,23 +1,25 @@
 $def with (transmissionnum, direction, success, error, files)
 $ odd = True
+$ classname = 'transmissionnum'
 $if success:
 	<h2>Completed</h2>
 	<p>
 	<b>${success}</b>
+	See below for a summary of the study.
+	</p>
 $elif error:
+	$ classname = 'error'
 	<h2>Failed</h2>
-	<div class="error">${error}</div>
+	<div class="${classname}">${error}</div>
 $else:
 	<h2>Status</h2>
 	The status of the transfer is unknown.
-See below for a summary of the study.
-</p>
 <h2>Study Information</h2>
 $if transmissionnum:
-	<p><div class="transmissionnum">Dataset Name: ${transmissionnum}</div></p>
+	<p><div class="${classname}">Dataset Name: ${transmissionnum}</div></p>
 	$if version:
-		<p><div class="transmissionnum">Dataset Version: ${version}</div></p>
-	$if direction == 'upload':
+		<p><div class="${classname}">Dataset Version: ${version}</div></p>
+	$if direction == 'upload' and success:
 		<p>Please write this Dataset Name on the visit inventory form.</p>
 <p>
 <table class="file-tag-list">
