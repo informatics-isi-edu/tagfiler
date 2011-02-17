@@ -119,7 +119,7 @@ def buildPolicyRules(rules, fatal=False):
     return remap
 
 class WebException (web.HTTPError):
-    def __init__(self, status, desc='%s', data='', headers={}):
+    def __init__(self, status, data='', headers={}, desc='%s'):
         self.detail = urlquote(desc % data)
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
