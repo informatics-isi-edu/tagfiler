@@ -119,7 +119,9 @@ def buildPolicyRules(rules, fatal=False):
     return remap
 
 class WebException (web.HTTPError):
-    def __init__(self, status, data='', headers={}):
+    def __init__(self, status, desc='%s', data='', headers={}):
+        self.detail = urlquote(desc % data)
+        data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
         if m:
@@ -131,56 +133,49 @@ class NotFound (WebException):
     def __init__(self, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class Forbidden (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class Unauthorized (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class IntegrityError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class RuntimeError (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
-        data = render.Error(status, desc, data)
-        WebException.__init__(self, status, headers=headers, data=data)
+        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 # BUG: use locking to avoid assumption that global interpreter lock protects us?
 configDataCache = dict()
@@ -1011,7 +1006,7 @@ class Application:
         return self.db.query(query, values)
 
     def insert_file(self, data_id, version, dtype, storagename):
-        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].id
+        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         self.set_file_tag('name', data_id, data_id=newid)
         self.set_file_tag('version', version, data_id=newid)
         vars = dict(name=data_id, version=version, newid=newid)
