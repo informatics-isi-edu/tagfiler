@@ -149,6 +149,7 @@ class Study (Node):
                 if len(results) == 0:
                     raise NotFound('study "%s@%s"' % (self.name, self.version))
                 subject = results[0]
+                files = subject.vcontains
     
                 self.globals['appletTagvals'] = [ (tagname,
                                                    [ subject.tagname ])
@@ -157,7 +158,7 @@ class Study (Node):
             elif self.action == 'upload' or self.action == 'download':
                 self.globals['tagdefsdict'] = dict([ item for item in self.globals['tagdefsdict'].iteritems()
                                                      if item[0] in self.globals['appletTagnames'] ])
-            return subject.vcontains
+            return files
     
         def postCommit(files):
             if self.action == 'upload':

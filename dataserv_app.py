@@ -1298,7 +1298,8 @@ class Application:
         while True:
             result = self.db.query(query)
             name = str(result[0].nextval).rjust(9, '0')
-            res = self.select_file(name)
+            vars['value'] = name
+            res = self.db.query('SELECT * FROM "_name" WHERE value = $value', vars)
             if len(res) == 0:
                 return name
 
