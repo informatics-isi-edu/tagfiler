@@ -1,26 +1,18 @@
 $def with (title, files, tagdefs)
 $if title:
 	<h2>${title}</h2>
-$if title == 'System' and data_id:
-	<a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
+$if title == 'System' and datapred:
+	<a href="${home + '/file/' + datapred}">Link to ${dataname}</a>
 $ odd = True
 <table class="file-list">
 <tr class="file-heading"><th class="file-name">Subject</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
-$ uniquetags = [ tagdef for tagdef in tagdefs if tagdef.tagname in ['tagdef', 'typedef', 'vname', 'id' ] ]
 $for file in files:
-	$for tagdef in uniquetags:
-		$ keyv = file.get(tagdef['tagname'], None)
-		$if keyv:
-			$if tagdef['multivalue']:
-				$ filepred = '%s=%s' % (tagdef['tagname'], keyv[0])
-			$else:
-				$ filepred = '%s=%s' % (tagdef['tagname'], keyv)
-			$break
+	$ datapred, dataid, dataname = subject2identifiers(file)
 	$for tagdef in tagdefs:
 		$if odd:
-			<tr class="file odd"><td class="file-name">${filepred}</td><td>${tagdef.tagname}</td>
+			<tr class="file odd"><td class="file-name">${dataname}</td><td>${tagdef.tagname}</td>
 		$else:
-			<tr class="file even"><td class="file-name">${filepred}</td><td>${tagdef.tagname}</td>
+			<tr class="file even"><td class="file-name">${dataname}</td><td>${tagdef.tagname}</td>
 		$ odd = not odd
 		<td class="file-tag">$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}</td>
 		</tr>

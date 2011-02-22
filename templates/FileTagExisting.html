@@ -1,7 +1,7 @@
 $def with (title, file, tagdefs)
 $ odd = True
-$if title == 'User' and data_id:
-	<p><a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
+$if title == 'User' and datapred:
+	<p><a href="${home + '/file/' + datapred}">Link to ${dataname}</a></p>
 $if title != '':
 	<h2>${title}</h2>
 $if len(tagdefs) > 0:

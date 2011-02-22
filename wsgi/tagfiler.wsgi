@@ -59,6 +59,7 @@ class Dispatcher:
             raise web.NoMethod()
         ast.preDispatch(uri)
         astmethod = getattr(ast, methodname)
+
         try:
         	result = astmethod(uri)
         	return result
@@ -66,6 +67,7 @@ class Dispatcher:
         	if hasattr(e, 'detail'):
         		web.header('X-Error-Description', e.detail)
         	raise e
+
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         # return result
 

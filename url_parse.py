@@ -53,20 +53,20 @@ def p_filelist_opts2(p):
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 
 def p_file(p):
-    """file : slash string slash FILE slash filename"""
-    p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
+    """file : slash string slash FILE slash predlist_nonempty"""
+    p[0] = url_ast.FileId(appname=p[2], predlist=p[6])
 
 def p_log(p):
     """log : slash string slash LOG slash string"""
-    p[0] = url_ast.LogId(appname=p[2], data_id=p[6])
+    p[0] = url_ast.LogId(appname=p[2], name=p[6])
 
 def p_log_opts(p):
-    """file : slash string slash LOG slash string queryopts"""
-    p[0] = url_ast.LogId(appname=p[2], data_id=p[6], queryopts=p[7])
+    """log : slash string slash LOG slash string queryopts"""
+    p[0] = url_ast.LogId(appname=p[2], name=p[6], queryopts=p[7])
 
 def p_file_opts(p):
-    """file : slash string slash FILE slash filename queryopts"""
-    p[0] = url_ast.FileId(appname=p[2], data_id=p[6], queryopts=p[7])
+    """file : slash string slash FILE slash predlist_nonempty queryopts"""
+    p[0] = url_ast.FileId(appname=p[2], predlist=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
@@ -325,11 +325,11 @@ def p_study(p):
 
 def p_study_num(p):
     """study : slash string slash STUDY slash filename"""
-    p[0] = url_ast.Study(appname=p[2], data_id=p[6])
+    p[0] = url_ast.Study(appname=p[2], name=p[6])
 
 def p_study_num_opts(p):
     """study : slash string slash STUDY slash filename queryopts"""
-    p[0] = url_ast.Study(appname=p[2], data_id=p[6], queryopts=p[7])
+    p[0] = url_ast.Study(appname=p[2], name=p[6], queryopts=p[7])
 
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
@@ -351,7 +351,7 @@ def p_slash(p):
 
 def p_filename(p):
     """filename : string"""
-    p[0] = web.storage(data_id=p[1], version=None)
+    p[0] = web.storage(name=p[1], version=None)
 
 def p_filename_version(p):
     """filename : string '@' string"""
@@ -359,7 +359,7 @@ def p_filename_version(p):
         x = int(p[3])
     except:
         raise ParseError(p[3], 'Filename part of URL has invalid version number:')
-    p[0] = web.storage(data_id=p[1], version=p[3])
+    p[0] = web.storage(name=p[1], version=p[3])
 
 def p_spacestring(p):
     """spacestring : '+'"""

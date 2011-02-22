@@ -21,38 +21,14 @@ $if type:
 $else:
 	<td class="file-tag ${idquote(tagname)} multivalue">
 	$if tagname == 'id':
-		$ datapred = None
-		$for tagname in [ 'tagdef', 'typedef' ]:
-			$ keyv = filerecord.get(tagname, None)
-			$if keyv:
-				$if tagdefsdict[tagname].multivalue:
-					$ keyv = keyv[0]
-				$ datapred = '%s=%s' % (urlquote(tagname), urlquote(keyv))
-				$ dataid = datapred
-				$ dataname = '%s=%s' % (tagname, keyv)
-				$break
-		$ name = filerecord.get('name', None)
-		$ version = filerecord.get('version', None)
-		$if datapred == None:
-			$if version != None and name != None and showversions:
-				$ dataid = '%s@%s' % (urlquote(name), version)
-				$ datapred = 'name=%s;version=%s' % (urlquote(name), version) 
-				$ dataname = '%s@%s' % (name, version)
-			$elif name != None:
-				$ dataid = urlquote(name)
-				$ datapred = 'name=%s' % urlquote(name) 
-				$ dataname = name
-			$else:
-				$ datapred = 'id=%s' % filerecord.id
-				$ dataid = datapred
-				$ dataname = datapred
-		<table><tr><td><a href="${home}/file/${dataid}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
+		$ datapred, dataid, dataname = subject2identifiers(filerecord, showversions)
+		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
 		</td>
 		$if filerecord.writeok:
 			<td>
-			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${dataid}" method="post">
+			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />
@@ -63,7 +39,7 @@ $else:
 			</tr>
 			<tr>
 			<td colspan="2">
-			Replace with: <a href="${home}/file/${dataid}?action=define&amp;type=file">file</a>, <a href="${home}/file/${dataid}?action=define&amp;type=url">url</a>, <a href="${home}/file/${dataid}?action=define&amp;type=dataset">dataset</a>
+			Replace with: <a href="${home}/file/${datapred}?action=define&amp;type=file">file</a>, <a href="${home}/file/${datapred}?action=define&amp;type=url">url</a>, <a href="${home}/file/${datapred}?action=define&amp;type=dataset">dataset</a>
 			</td>
 		</tr>
 		</table>
