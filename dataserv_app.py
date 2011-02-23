@@ -541,8 +541,6 @@ class Application:
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
         if dataset:
-            if self.version:
-                dataset += '@%s' % self.version
             parts.append('dataset "%s"' % dataset)
         if tag:
             parts.append('tag "%s"' % tag)
@@ -616,10 +614,14 @@ class Application:
         def body():
             if self.globals['webauthnhome']:
                 t = self.db.transaction()
-                webauthn.session.test_and_update_session(self.db, self.authn.guid,
-                                                         ignoremustchange=True,
-                                                         setcookie=False)
-                t.commit()
+                try:
+                    webauthn.session.test_and_update_session(self.db, self.authn.guid,
+                                                             ignoremustchange=True,
+                                                             setcookie=False)
+                    t.commit()
+                except:
+                    t.rollback()
+                    raise
 
         def postCommit(results):
             pass
@@ -655,7 +657,7 @@ class Application:
 
         try:
             count = 0
-            limit = 10
+            limit = 3
             while True:
                 try:
                     t = self.db.transaction()
@@ -708,7 +710,9 @@ class Application:
                                                      ('datapred', self.datapred),
                                                      ('dataname', self.dataname),
                                                      ('dataid', self.dataid) ]:
-                            self.globals[globalname] = self.globals.get(globalname, default)
+                            current = self.globals.get(globalname, None)
+                            if not current:
+                                self.globals[globalname] = default
 
                         bodyval = body()
                         t.commit()
@@ -716,6 +720,7 @@ class Application:
                         # syntax "Type as var" not supported by Python 2.4
                     except (psycopg2.InterfaceError), te:
                         # pass this to outer handler
+
                         raise te
                     except (web.SeeOther), te:
                         t.commit()
@@ -736,7 +741,7 @@ class Application:
                         t.rollback()
                         if count > limit:
                             self.logException('too many retries during transaction body')
-                            raise IntegrityError(data=str(te))
+                            raise te
                         # else fall through to retry...
                     except:
                         t.rollback()
@@ -1215,12 +1220,13 @@ class Application:
             wheres = ''
 
         query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres
-        vars=dict(id=subject.id, value=value)
+        vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
         self.db.query(query, vars=vars)
 
-        results = self.select_tag(subject, tagdef)
+        results = self.select_tag_noauthn(subject, tagdef)
         if len(results) == 0:
-            query = 'DELETE FROM subjecttags AS tag' + wheres
+            web.debug('delete from subjecttags %s %s' % (subject.id, tagdef.tagname))
+            query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
             self.db.query(query, vars=vars)
 
     def downcast_value(self, dbtype, value):
@@ -1284,7 +1290,7 @@ class Application:
         
         results = self.select_filetags_noauthn(subject, tagdef.tagname)
         if len(results) == 0:
-            self.db.query("INSERT INTO subjecttags (subject, tagname) VALUES ($subject,$tagname)", vars=vars)
+            results = self.db.query("INSERT INTO subjecttags (subject, tagname) VALUES ($subject, $tagname)", vars=vars)
         else:
             # may already be reverse-indexed in multivalue case
             pass            

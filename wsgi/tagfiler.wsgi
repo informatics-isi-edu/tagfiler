@@ -61,12 +61,12 @@ class Dispatcher:
         astmethod = getattr(ast, methodname)
 
         try:
-        	result = astmethod(uri)
-        	return result
+            result = astmethod(uri)
+            return result
         except dataserv_app.WebException, e:
-        	if hasattr(e, 'detail'):
-        		web.header('X-Error-Description', e.detail)
-        	raise e
+            if hasattr(e, 'detail'):
+                web.header('X-Error-Description', e.detail)
+            raise e
 
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         # return result
