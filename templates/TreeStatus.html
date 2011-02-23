@@ -10,7 +10,7 @@ $if success:
 $elif error:
 	$ classname = 'error'
 	<h2>Failed</h2>
-	<div class="${classname}">${error}</div>
+	<div class="${classname}">$:{error}</div>
 $else:
 	<h2>Status</h2>
 	The status of the transfer is unknown.
