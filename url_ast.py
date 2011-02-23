@@ -147,9 +147,11 @@ class Study (Node):
                                                         listtags=['vcontains'] + [ tagname for tagname in self.globals['appletTagnames']],
                                                         versions=versions)
                 if len(results) == 0:
-                    raise NotFound('study "%s@%s"' % (self.name, self.version))
-                subject = results[0]
-                files = subject.vcontains
+                    if not self.status:
+                        raise NotFound('study "%s@%s"' % (self.name, self.version))
+                else:
+                    subject = results[0]
+                    files = subject.vcontains
     
                 self.globals['appletTagvals'] = [ (tagname,
                                                    [ subject.tagname ])
