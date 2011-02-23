@@ -871,7 +871,7 @@ class Application:
            None: user needs to authenticate to be sure"""
         if tagdef[mode + 'ok']:
             return True
-        elif tagdef[mode + 'ok'] == 'None':
+        elif tagdef[mode + 'ok'] == None:
             if tagdef[mode + 'policy'] == 'file' and dict(read=True, write=subject.writeok)[mode]:
                 return True
             elif tagdef[mode + 'policy']  == 'fowner' and subject.owner in self.authn.roles:
