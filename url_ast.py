@@ -339,7 +339,7 @@ class FileList (Node):
                 if filetype not in [ 'file', 'url', 'dataset' ]:
                     filetype = 'file'
 
-                url = self.home + web.ctx.homepath + '/file/' + urlquote(name)
+                url = self.home + web.ctx.homepath + '/file/name=' + urlquote(name)
                 url += '?action=define'
                 url += '&type=' + urlquote(filetype)
                 if readers == '*':

@@ -118,11 +118,12 @@ class FileIO (Application):
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
         self.subject = results[0]
+        self.datapred, self.dataid, self.dataname = self.subject2identifiers(self.subject)
        
         # get storagename tag which is 'system' authz model so not included already
         results = self.select_tag_noauthn(self.subject, self.globals['tagdefsdict']['storagename'])
         if len(results) > 0:
-            self.subject.storagename = results[0].storagename
+            self.subject.storagename = results[0].value
         else:
             self.subject.storagename = None
 
@@ -372,6 +373,11 @@ class FileIO (Application):
 
             def body():
                 status = web.ctx.status
+                name = dict([ (pred['tag'], pred['vals'][0]) for pred in self.predlist
+                              if pred['op'] == '=' and len(pred['vals']) > 0 ]).get('name', None)
+                if name == None:
+                    raise BadRequest('POST action=define method to upload files requires name=... key data')
+                self.globals['datapred'] = 'name=%s' % urlquote(name)
                 try:
                     self.populate_subject()
                 except NotFound:
@@ -482,11 +488,11 @@ class FileIO (Application):
             self.name = self.subject.name
         else:
             self.version = 1
-            self.name = reduce(reduce_name_pred, self.predlist)
+            self.name = reduce(reduce_name_pred, self.predlist + [ dict(tag='', op='', vals=[]) ] )
 
         if self.bytes != None:
-            if file:
-                tagged_content_type = file['content-type']
+            if self.subject:
+                tagged_content_type = self.subject['content-type']
             else:
                 tagged_content_type = None
 
@@ -511,14 +517,14 @@ class FileIO (Application):
             self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
             self.id = self.insert_file(self.name, self.version, self.dtype, self.storagename)
 
-        newfile = dict(id=self.id,
-                       name=self.name,
-                       version=self.version,
-                       dtype='file',
-                       bytes=self.bytes,
-                       storagename=self.storagename,
-                       owner=self.authn.role,
-                       writeok=True)
+        newfile = web.Storage(id=self.id,
+                              name=self.name,
+                              version=self.version,
+                              dtype='file',
+                              bytes=self.bytes,
+                              storagename=self.storagename,
+                              owner=self.authn.role,
+                              writeok=True)
         newfile['content-type'] = content_type
         
         self.updateFileTags(newfile, self.subject)
@@ -527,22 +533,20 @@ class FileIO (Application):
         return results
 
     def updateFileTags(self, newfile, basefile):
+        #web.debug(newfile, basefile)
         if not basefile:
             # set initial tags
             self.set_tag(newfile, self.globals['tagdefsdict']['owner'], newfile.owner)
             self.set_tag(newfile, self.globals['tagdefsdict']['created'], 'now')
             self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
-            self.set_tag(newfile, self.globals['tagdefsdict']['version'], newfile.version)
-            self.set_tag(newfile, self.globals['tagdefsdict']['name'], newfile.name)
             self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
         elif newfile.version != basefile.version:
             self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
-            self.set_tag(newfile, self.globals['tagdefsdict']['version'], newfile.version)
-            self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.data_id, newfile.version))
+            self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
             # copy basefile tags
             for result in self.select_filetags_noauthn(basefile):
                 if result.tagname not in [ 'bytes', 'content-type', 'dtype', 'key', 
-                                           'modified', 'modified by', 'sha256sum',
+                                           'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
                                            'url', 'version created', 'version', 'vname' ]:
                     tags = self.select_tag_noauthn(basefile, self.globals['tagdefsdict'][result.tagname])
                     for tag in tags:
@@ -594,6 +598,7 @@ class FileIO (Application):
                     t = self.db.transaction()
                     srcrole = srcroles.pop()
                     dstrole, readusers, writeusers = self.remap[srcrole]
+                    #web.debug(self.remap)
                     #web.debug('remap:', self.remap[srcrole])
                     for readuser in readusers:
                         self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
@@ -601,7 +606,8 @@ class FileIO (Application):
                     for writeuser in writeusers:
                         self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
                         self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=writeuser)
-                    self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
+                    if dstrole:
+                        self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
                     self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
                     t.commit()
                 except:
@@ -896,7 +902,7 @@ class FileIO (Application):
         def preWritePostCommit(results):
             f = results
             if f != None:
-                raise BadRequest(data='Cannot perform range-based access via POST.')
+                raise BadRequest(data='Cannot update an existing file version via POST.')
             return None
         
         def putBody():

@@ -991,7 +991,7 @@ class Application:
 
     def insert_file(self, name, version, dtype, storagename=None):
         newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
-        subject = dict(id=newid)
+        subject = web.Storage(id=newid)
 
         if version:
             self.set_tag(subject, self.globals['tagdefsdict']['version'], version)
@@ -1153,14 +1153,15 @@ class Application:
     def select_tag_noauthn(self, subject, tagdef, value=None):
         query = 'SELECT tag.* FROM %s AS tag' % self.wraptag(tagdef.tagname) \
                 + ' WHERE subject = $subject'
-        if tagdef.typestr != 'empty':
+        if tagdef.typestr != 'empty' and value != None:
             if value == '':
                 query += ' AND tag.value IS NULL'
             else:
                 query += ' AND tag.value = $value'
             query += '  ORDER BY value'
-        #web.debug(query)
-        return self.db.query(query, vars=dict(subject=subject.id, value=value))
+        vars = dict(subject=subject.id, value=value)
+        #web.debug(query, vars)
+        return self.db.query(query, vars=vars)
 
     def select_tag(self, subject, tagdef, value=None):
         # subject would not be found if read of subject is not OK
@@ -1181,24 +1182,25 @@ class Application:
                 pass
         return values
 
-    def select_filetags_noauthn(self, subject, tagname=None):
+    def select_filetags_noauthn(self, subject=None, tagname=None):
         wheres = []
         vars = dict()
         if subject:
             vars['id'] = subject.id
-            wheres.append("n.subject = $id")
+            wheres.append("subject = $id")
 
         if tagname:
-            wheres.append("t.tagname = $tagname")
             vars['tagname'] = tagname
+            wheres.append("tagname = $tagname")
         
         wheres = ' AND '.join(wheres)
         if wheres:
-            wheres = "WHERE " + wheres
-        query = 'SELECT t.subject AS id, t.tagname AS tagname' \
-                + ' FROM subjecttags AS t' \
+            wheres = " WHERE " + wheres
+            
+        query = 'SELECT subject AS id, tagname FROM subjecttags' \
                 + wheres \
                 + " ORDER BY id, tagname"
+        
         #web.debug(query, vars)
         return self.db.query(query, vars=vars)
 
@@ -1236,11 +1238,7 @@ class Application:
         return value
             
     def set_tag(self, subject, tagdef, value=None):
-        tagdef = self.globals['tagdefsdict'].get(tagname, None)
-        if tagdef == None:
-            raise BadRequest(data="The tag %s is not defined on this server." % tagname)
-
-        typedef = self.globals['typesdict'].get(tagdef.typstr, None)
+        typedef = self.globals['typesdict'].get(tagdef.typestr, None)
         if typedef == None:
             raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
         dbtype = typedef['typedef dbtype']
@@ -1280,8 +1278,8 @@ class Application:
             query = 'INSERT INTO %s' % self.wraptag(tagdef.tagname) \
                     + ' (subject) VALUES ($subject)'
 
-        #web.debug(query)
         vars = dict(subject=subject.id, value=value, tagname=tagdef.tagname)
+        #web.debug(query, vars)
         self.db.query(query, vars=vars)
         
         results = self.select_filetags_noauthn(subject, tagdef.tagname)
