@@ -1002,7 +1002,7 @@ class Application:
             if version > 1:
                 self.update_latestfile_version(name, newid)
             elif version == 1:
-                self.set_tag(subject, self.globals['tagdefsdict']['latest with name'], newid)
+                self.set_tag(subject, self.globals['tagdefsdict']['latest with name'], name)
 
         self.set_tag(subject, self.globals['tagdefsdict']['dtype'], dtype)
 
@@ -1025,10 +1025,10 @@ class Application:
         
         if subject.version == latest.version and len(versions) > 1:
             # we're deleting the latest version and there are previous versions
-            self.update_latestfile_version(data_id, versions[1].id)
+            self.update_latestfile_version(subject.name, versions[1].id)
                 
         query = 'DELETE FROM resources WHERE subject = $id'
-        self.db.query(query, vars=dict(id=victim.id))
+        self.db.query(query, vars=dict(id=subject.id))
 
     def select_tagdef(self, tagname=None, predlist=[], order=None):
         listtags = [ 'owner' ]

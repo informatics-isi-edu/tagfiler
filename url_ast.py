@@ -794,7 +794,7 @@ class FileTags (Node):
             self.listtags = [ tagdef.tagname for tagdef in all ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags + extratags)  ]
+        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags + extratags, versions='any')  ]
         if len(files) == 0:
             raise NotFound('subject matching "%s"' % self.predlist)
         elif len(files) == 1:

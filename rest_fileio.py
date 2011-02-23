@@ -936,6 +936,8 @@ class FileIO (Application):
             return ftype
 
         def preDeletePostCommit(ftype):
+            self.globals['datapred'] = self.datapred
+            self.globals['dataname'] = self.dataname
             return self.renderlist("Delete Confirmation",
                                    [self.render.ConfirmForm(ftype)])
         
