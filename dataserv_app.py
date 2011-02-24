@@ -1577,7 +1577,7 @@ class Application:
         else:
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id, version, versions=versions, tagdefs=tagdefs)
 
-        web.debug(len(query), query, values)
+        #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
         #for string in query.split(','):
         #    web.debug (string)
