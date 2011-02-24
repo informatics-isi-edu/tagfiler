@@ -112,6 +112,8 @@ class FileIO (Application):
 #        self.skip_preDispatch = True
         self.action = None
         self.filetype = 'file'
+        self.key = None
+        self.url = None
         self.bytes = None
         self.referer = None
         self.update = False
@@ -483,7 +485,6 @@ class FileIO (Application):
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         saved_subject = self.subject
-        assert not self.unique
         
         status = web.ctx.status
         try:
@@ -537,11 +538,12 @@ class FileIO (Application):
         newfile = web.Storage(id=self.id,
                               name=self.name,
                               version=self.version,
-                              dtype='file',
+                              dtype=self.dtype,
                               bytes=self.bytes,
                               storagename=self.storagename,
                               owner=self.authn.role,
-                              writeok=True)
+                              writeok=True,
+                              url=self.url)
         newfile['content-type'] = content_type
         
         self.updateFileTags(newfile, self.subject)
