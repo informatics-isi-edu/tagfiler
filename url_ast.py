@@ -166,8 +166,9 @@ class Study (Node):
                     if not self.status:
                         raise NotFound('study "%s@%s"' % (self.name, self.version))
                 else:
-                    subject = results[0]
-                    files = subject.vcontains
+                    files = results[0].vcontains
+                    if not files:
+                        files = []
     
                 self.globals['appletTagvals'] = [ (tagname,
                                                    [ subject.tagname ])
@@ -974,6 +975,10 @@ class FileTags (Node):
         return ''
 
     def PUT(self, uri):
+        keys = self.tagvals.keys()
+        if len(keys) == 1:
+            self.tag_id = keys[0]
+            
         try:
             content_type = web.ctx.env['CONTENT_TYPE'].lower()
         except:
