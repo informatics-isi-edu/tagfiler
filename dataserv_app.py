@@ -1538,7 +1538,15 @@ class Application:
                         + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
                         + ' GROUP BY %s' % ','.join(groupbys)
 
-        value_query += " ORDER BY " + ", ".join([self.wraptag(tag) for tag in ordertags] + ['id'])
+        # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
+        order_suffix = ['id']
+        for tagname in [ 'typedef', 'tagdef', 'name' ]:
+            if tagname in listtags:
+                order_suffix.insert(0, '"%s" NULLS LAST' % tagname)
+        if 'modified' in listtags:
+            order_suffix.insert(0, 'modified DESC NULLS LAST')
+
+        value_query += " ORDER BY " + ", ".join([self.wraptag(tag) for tag in ordertags] + order_suffix)
 
         #web.debug(query)
         return (value_query, values)
