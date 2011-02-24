@@ -495,7 +495,7 @@ class Application:
             if g['data_id'] == '':
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
             results = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[file]),
-                                                              dict(tag='version', op='=', version=[version])],
+                                                              dict(tag='version', op='=', vals=[version])],
                                                     listtags=['id'],
                                                     versions='any')
             if len(results) == 0:
