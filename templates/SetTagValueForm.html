@@ -14,7 +14,6 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-$ file = args.get('file')
 $ filerecord = args.get('filerecord')
 $ vsuffix = args.get('vsuffix')
 $ tagname = args.get('tagname')
@@ -25,7 +24,7 @@ $ name = args.get('name')
 $ required = args.get('required')
 $if filerecord:
 	<tr>
-	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
+	<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${subject2identifiers(filerecord)[0]}" method="post">
 	<input type="hidden" name="set-${urlquote(tagname)}" value="true" />
 	<td class="file-tag ${idquote(tagname)} multivalue input">
 $else:

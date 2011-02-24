@@ -20,7 +20,6 @@ $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
 $ typename = type['typedef description']
 $ typevals = type['typedef values']
-$ writeok = tagdef.get('writeok', False)
 $ vals = file[tagdef.tagname]
 $ vsuffix = ''
 $if version:
@@ -32,13 +31,12 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
+$ writeok = tagdef.writeok
 $if writeok == None:
-	$# writeok depends on file, e.g. is not statically determined
 	$if tagdef.writepolicy == 'fowner':
-		$ writeok = file.owner and file.owner in authn.roles
-	$else:
-		$# writepolicy == 'file'
-		$ writeok = file.writeok
+		$ writeok = file.owner in authn.roles
+	$elif tagdef.writepolicy == 'file':
+		$ writeok = file.owner in authn.roles or len( set(authn.roles).intersection(set(file['write users'])) ) > 0
 $ options = tagOptions(tagdef.tagname, itervals)
 $ params = dict( filerecord=file,
 $				 tagname=tagdef.tagname, 
@@ -52,8 +50,8 @@ $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
 $				 writeok=writeok,
 $				 showversions=showversions)
 $if tagdef.typestr != 'empty':
+	<table class="file-tag-list">
 	$if len(itervals) > 0:
-		<table class="file-tag-list">
 		$for val in itervals:
 			<tr>
 			$ params['val'] = val
@@ -63,8 +61,8 @@ $if tagdef.typestr != 'empty':
 				$:{render.RemoveTagValueForm(params)}
 			</td>
 			</tr>
-		$if tagdef.tagname in writetags and writeok:
-			$:{render.SetTagValueForm(params)}
-		</table>
+	$if tagdef.tagname in writetags and writeok:
+		$:{render.SetTagValueForm(params)}
+	</table>
 $else:
 	$:{render.SetTagForm(params)}

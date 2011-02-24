@@ -14,11 +14,11 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-$ file = args.get('file')
+$ filerecord = args.get('filerecord')
 $ vsuffix = args.get('vsuffix')
 $ tagname = args.get('tagname')
 $ val = args.get('val')
-<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${urlquote(file)}${vsuffix}" method="post">
+<form enctype="application/x-www-form-urlencoded" action="${home}/${tagspace}/${subject2identifiers(filerecord)[0]}" method="post">
 <input type="hidden" name="tag" value="${tagname}" />
 <input type="hidden" name="value" value="${val}" />
 <input type="hidden" name="action" value="delete" />

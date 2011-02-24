@@ -1082,9 +1082,10 @@ class Application:
                 elif policy in [ 'fowner', 'file' ]:
                     return None
                 elif policy == 'tag':
-                    return len(set(self.authn.roles)
-                               .union(['*'])
-                               .intersection(set(tagdef['tag'] + mode[0:4] + 'ers'))) > 0
+                    return tagdef.owner in self.authn.roles \
+                           or len(set(self.authn.roles)
+                                  .union(['*'])
+                                  .intersection(set(tagdef['tag'] + mode[0:4] + 'ers'))) > 0
                 elif policy == 'users':
                     return self.authn.role != None
                 else:

@@ -33,7 +33,7 @@ $if len(tagdefs) > 0:
 		$ odd = not odd
 		<td class="tag name">${tagdef.tagname}</td>
 		<td class="file-tag ${idquote(tagdef.tagname)}">
-		$:{render.FileTagValBlock(file, tagdef, tagdefsdict.iterkeys(), version)}
+		$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], version)}
 		</td>
 		</tr>
 	</table>

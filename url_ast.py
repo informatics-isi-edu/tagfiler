@@ -940,9 +940,10 @@ class FileTags (Node):
 
     def put_body(self):
         self.validate_predlist_unique()
-        
-        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist]
-                                                + [self.tag_id, 'owner', 'write users', 'Image Set'])
+        list_additional =  ['owner', 'write users', 'Image Set']
+        if self.tag_id:
+            list_additional.append(self.tag_id)
+        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] + list_additional)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.predlist)
         self.subject = results[0]
@@ -961,7 +962,7 @@ class FileTags (Node):
             if tagdef == None:
                 raise NotFound(data='tag definition "%s"' % tag_id)
             self.enforce_tag_authz('write', self.subject, tagdef)
-            self.txlog('SET', dataset=subject2identifiers(self.subject), tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
+            self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
             for value in self.tagvals[tag_id]:
                 self.set_tag(self.subject, tagdef, value)
                 if tag_id not in ['Image Set', 'contains', 'vcontains' ]:
