@@ -132,7 +132,7 @@ class FileIO (Application):
             self.versions = 'latest'
         # 'read' authz is implicit in this query
         results = self.select_files_by_predlist(predlist=self.predlist,
-                                                listtags=['dtype', 'content-type', 'bytes', 'url', 'modified', 'modified by', 'name', 'version'],
+                                                listtags=['dtype', 'content-type', 'bytes', 'url', 'modified', 'modified by', 'name', 'version', 'Image Set'],
                                                 versions=self.versions)
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
