@@ -349,6 +349,7 @@ class Application:
                            ('read users', 'rolepat', True, 'fowner', False),
                            ('write users', 'rolepat', True, 'fowner', False),
                            ('owner', 'role', False, 'fowner', False),
+                           ('modified', 'timestamptz', False, 'system', False),
                            ('name', 'text', False, 'system', False),
                            ('version', 'int8', False, 'system', False),
                            ('latest with name', 'text', False, 'system', True),
@@ -1350,7 +1351,13 @@ class Application:
             listtags = [ x for x in listtags ]
 
         # make sure we have no repeats in listtags before embedding in query
-        listtags = [ t for t in set(listtags) ]
+        listtags = [ t for t in set(listtags).union( set([ tagname for tagname in ['read users',
+                                                                      'write users',
+                                                                      'owner',
+                                                                      'name',
+                                                                      'version',
+                                                                      'latest with name',
+                                                                      'modified']]) )]
 
         roles = [ r for r in self.authn.roles ]
         roles.append('*')
@@ -1358,15 +1365,7 @@ class Application:
         if tagdefs == None:
             tagdefs = self.globals['tagdefsdict']
 
-        #web.debug(predlist, listtags, tagdefs)
-
         tags_needed = set([ pred['tag'] for pred in predlist ])
-        tags_needed = tags_needed.union(set([ tagname for tagname in ['read users',
-                                                                      'write users',
-                                                                      'owner',
-                                                                      'name',
-                                                                      'version',
-                                                                      'latest with name']]))
         tags_needed = tags_needed.union(set([ tagname for tagname in listtags ]))
         tagdefs_needed = []
         for tagname in tags_needed:
