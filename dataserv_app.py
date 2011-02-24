@@ -1601,14 +1601,14 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=e, versions=versions, tagdefs=tagdefs)
+            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
                 if len(listtags) != 1:
                     raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
                 projection = listtags[0]
-                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile' ]:
+                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 if tagdefs[projection].multivalue:
                     projectclause = 'unnest("%s")' % projection
@@ -1618,7 +1618,7 @@ class Application:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
                 else:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.%s IN (%s))' % (projectclause, q, e, e, context_attr, context)
-                context_attr = dict(text='file', file='file', vfile='vname')[tagdefs[projection].typestr]
+                context_attr = dict(text='name', file='name', vfile='vname', id='id')[tagdefs[projection].typestr]
             else:
                 if context:
                     query = '(%s) AS q_%d WHERE q_%d.%s IN (%s)' % (q, e, e, context_attr, context)
