@@ -410,10 +410,11 @@ $(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags
 $(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
 )
 
+i=0
 while [[ $i -lt "${#homelinks[*]}" ]]
 do
    tag "${homelinks[$i]}" "list on homepage"
-   tag "${homelinks[$i]}" "homepage order" $i
+   tag "${homelinks[$i]}" "homepage order" int "$i"
    i=$(( $i + 1 ))
 done
 
