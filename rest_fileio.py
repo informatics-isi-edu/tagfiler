@@ -1009,6 +1009,7 @@ class FileIO (Application):
                 raise
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
+            self.key = self.queryopts.get('key')
             storage = web.input()
             self.action = storage.action
 
