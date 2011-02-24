@@ -1041,31 +1041,33 @@ class Application:
     def delete_file(self, subject):
         wheres = []
 
-        versions = [ file for file in self.select_file_versions(subject.name) ]
-        versions.sort(key=lambda res: res.version, reverse=True)
+        if subject.has_key('name') and subject.has_key('version'):
+            versions = [ file for file in self.select_file_versions(subject.name) ]
+            versions.sort(key=lambda res: res.version, reverse=True)
 
-        latest = versions[0]
+            latest = versions[0]
         
-        if subject.version == latest.version and len(versions) > 1:
-            # we're deleting the latest version and there are previous versions
-            self.update_latestfile_version(subject.name, versions[1].id)
+            if subject.version == latest.version and len(versions) > 1:
+                # we're deleting the latest version and there are previous versions
+                self.update_latestfile_version(subject.name, versions[1].id)
                 
         query = 'DELETE FROM resources WHERE subject = $id'
         self.db.query(query, vars=dict(id=subject.id))
 
+    tagdef_listas =  { 'tagdef': 'tagname', 
+                       'tagdef type': 'typestr', 
+                       'tagdef multivalue': 'multivalue',
+                       'tagdef active': 'active',
+                       'tagdef readpolicy': 'readpolicy',
+                       'tagdef writepolicy': 'writepolicy',
+                       'tagdef unique': 'unique',
+                       'tag read users': 'tagreaders',
+                       'tag write users': 'tagwriters' }
+
     def select_tagdef(self, tagname=None, predlist=[], order=None):
         listtags = [ 'owner' ]
-        listas = { 'tagdef': 'tagname', 
-                   'tagdef type': 'typestr', 
-                   'tagdef multivalue': 'multivalue',
-                   'tagdef active': 'active',
-                   'tagdef readpolicy': 'readpolicy',
-                   'tagdef writepolicy': 'writepolicy',
-                   'tagdef unique': 'unique',
-                   'tag read users': 'tagreaders',
-                   'tag write users': 'tagwriters' }
                            
-        listtags += listas.keys()
+        listtags += Application.tagdef_listas.keys()
 
         if order:
             ordertags = [ order ]
@@ -1098,7 +1100,7 @@ class Application:
         else:
             predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=listas, tagdefs=self.static_tagdefs) ]
+        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs) ]
         #web.debug(results)
         return results
 
@@ -1109,6 +1111,7 @@ class Application:
 
         owner = self.authn.role
         newid = self.insert_file(None, None, 'dtype', None)
+        subject = web.Storage(id=newid)
         tags = [ ('created', 'now'),
                  ('tagdef', self.tag_id),
                  ('tagdef active', None),
@@ -1121,9 +1124,9 @@ class Application:
             tags.append( ('tagdef multivalue', None) )
 
         for tag, value in tags:
-            self.set_tag(tag, value, newid, owner=owner)
+            self.set_tag(subject, self.globals['tagdefsdict'][tag], value)
 
-        tagdef = dict(tags)
+        tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
         tagdef.id = newid
         if owner == None:
             tagdef.owner = None
@@ -1133,7 +1136,7 @@ class Application:
 
     def deploy_tagdef(self, tagdef):
         tabledef = "CREATE TABLE %s" % (self.wraptag(tagdef.tagname))
-        tabledef += " ( subject bigint REFERENCES resources(subject) ON DELETE CASCADE"
+        tabledef += " ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE"
         indexdef = ''
 
         type = self.globals['typesdict'].get(tagdef.typestr, None)
@@ -1146,21 +1149,23 @@ class Application:
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             tabledef += ' NOT NULL'
+            
             if tagdef.typestr == 'file':
-                tabledef += ' REFERENCES "latest with name" (value) ON DELETE CASCADE'
+                tabledef += ' REFERENCES "_latest with name" (value) ON DELETE CASCADE'
             elif tagdef.typestr == 'vfile':
                 tabledef += ' REFERENCES "_vname" (value) ON DELETE CASCADE'
-        if not tagdef.multivalue:
-            tabledef += ", UNIQUE(subject, version)"
-            if dbtype != '':
-                indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
-                indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
-                indexdef += ' (value)'
-        else:
-            if dbtype != '':
-                tabledef += ', UNIQUE(subject, value)'
+                
+            if not tagdef.multivalue:
+                tabledef += ", UNIQUE(subject)"
             else:
-                tabledef += ', UNIQUE(subject)'
+                tabledef += ", UNIQUE(subject, value)"
+                
+            indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
+            indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
+            indexdef += ' (value)'
+        else:
+            tabledef += ', UNIQUE(subject)'
+            
         tabledef += " )"
         self.db.query(tabledef)
         if indexdef:
@@ -1168,7 +1173,7 @@ class Application:
 
     def delete_tagdef(self, tagdef):
         self.undeploy_tagdef(tagdef)
-        self.delete_file( tagdef.id )
+        self.delete_file( tagdef )
 
     def undeploy_tagdef(self, tagdef):
         self.db.query('DROP TABLE %s' % (self.wraptag(tagdef.tagname)))
@@ -1351,13 +1356,16 @@ class Application:
             listtags = [ x for x in listtags ]
 
         # make sure we have no repeats in listtags before embedding in query
-        listtags = [ t for t in set(listtags).union( set([ tagname for tagname in ['read users',
-                                                                      'write users',
-                                                                      'owner',
-                                                                      'name',
-                                                                      'version',
-                                                                      'latest with name',
-                                                                      'modified']]) )]
+        listtags = set(listtags)
+        listtags = listtags.union( set(['read users',
+                                        'write users',
+                                        'owner',
+                                        'name',
+                                        'version',
+                                        'latest with name',
+                                        'modified']) )
+        listtags = listtags.union( set(ordertags) )
+        listtags = [ t for t in listtags ]
 
         roles = [ r for r in self.authn.roles ]
         roles.append('*')
@@ -1545,7 +1553,7 @@ class Application:
         if 'modified' in listtags:
             order_suffix.insert(0, 'modified DESC NULLS LAST')
 
-        value_query += " ORDER BY " + ", ".join([self.wraptag(tag) for tag in ordertags] + order_suffix)
+        value_query += " ORDER BY " + ", ".join([self.wraptag(tag, prefix='') for tag in ordertags] + order_suffix)
 
         #web.debug(query)
         return (value_query, values)
@@ -1560,15 +1568,16 @@ class Application:
         if listas != None:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
+
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs)
             query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['writeok', 'owner', 'id'])) ]),
                                                   query)
             if ordertags:
-                query += " ORDER BY " + ",".join(ordertags)
+                query += " ORDER BY " + ",".join([self.wraptag(tag, prefix='') for tag in ordertags])
         else:
             query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id, version, versions=versions, tagdefs=tagdefs)
 
-        #web.debug(len(query), query, values)
+        web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
         #for string in query.split(','):
         #    web.debug (string)

@@ -23,7 +23,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -322,7 +322,13 @@ class FileList (Node):
             else:
                 self.predlist=[]
 
-            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'name', 'version'])))
+            if self.globals['tagdefsdict'].has_key('homepage order'):
+                ordertags = ['homepage order']
+            else:
+                ordertags = []
+
+            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'name', 'version'])),
+                                                 ordertags=ordertags)
 
         def postCommit(files):
             target = self.home + web.ctx.homepath
@@ -546,11 +552,11 @@ class Tagdef (Node):
     def DELETE(self, uri):
         
         def body():
-            results = self.select_tagdef(self.tag_id)
-            if len(results) == 0:
+            tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
+            if tagdef == None:
                 raise NotFound(data='tag definition %s' % (self.tag_id))
-            self.enforce_tagdef_authz('write')
-            self.delete_tagdef()
+            self.enforce_tagdef_authz('write', tagdef)
+            self.delete_tagdef(tagdef)
             return ''
 
         def postCommit(results):
@@ -636,7 +642,7 @@ class Tagdef (Node):
                             multivalue = storage['multivalue-%s' % (key[4:])]
                         except:
                             raise BadRequest(data="The value cardinality must be specified.")
-                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, multivalue)
+                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, parseBoolString(multivalue))
             try:
                 self.tag_id = storage.tag
             except:
@@ -660,11 +666,19 @@ class Tagdef (Node):
                     self.insert_tagdef()
                     self.log('CREATE', tag=self.tag_id)
             elif self.action == 'delete' or self.action == 'CancelDelete':
-                self.enforce_tagdef_authz('write')
+                tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
+                if tagdef == None:
+                    raise NotFound('tag definition "%s"' % self.tag_id)
+                self.globals['dataname'] = self.tag_id
+                self.globals['datapred'] = urlquote(self.tag_id)
+                self.enforce_tagdef_authz('write', tagdef)
                 return None
             elif self.action == 'ConfirmDelete':
-                self.enforce_tagdef_authz('write')
-                self.delete_tagdef()
+                tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
+                if tagdef == None:
+                    raise NotFound('tag definition "%s"' % self.tag_id)
+                self.enforce_tagdef_authz('write', tagdef)
+                self.delete_tagdef(tagdef)
                 self.log('DELETE', tag=self.tag_id)
             else:
                 raise BadRequest(data="Form field action=%s not understood." % self.action)

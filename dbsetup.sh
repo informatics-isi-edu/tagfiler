@@ -375,6 +375,7 @@ tagdef vcontains      text        ""      file        file       true       vfil
 tagdef key            text        ""      anonymous   file       false      ""         true
 
 tagdef "list on homepage" empty   ""      anonymous   tag        false
+tagdef "homepage order" int       ""      anonymous   tag        false
 tagdef "Image Set"    empty       "${admin}"   file   file       false
 
 psql -q -t <<EOF
@@ -400,15 +401,20 @@ EOF
 tagacl "list on homepage" read "*"
 tagacl "list on homepage" write "${admin}"
 
+tagacl "homepage order" read "*"
+tagacl "homepage order" write "${admin}"
+
 homelinks=(
 $(dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}")
 $(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}")
 $(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
 )
 
-for x in "${homelinks[@]}"
+while [[ $i -lt "${#homelinks[*]}" ]]
 do
-   tag "$x" "list on homepage"
+   tag "${homelinks[$i]}" "list on homepage"
+   tag "${homelinks[$i]}" "homepage order" $i
+   i=$(( $i + 1 ))
 done
 
 tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")

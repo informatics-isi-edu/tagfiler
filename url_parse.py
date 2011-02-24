@@ -176,31 +176,65 @@ def p_query4(p):
     """query : slash string slash QUERY slash querypath queryopts"""
     p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=p[7])
 
-def p_querypath_listonly(p):
-    """querypath : listtags"""
-    p[0] = [ ( [], p[1], [] ) ]
+def p_querypath_general(p):
+    """querypath_elem : predlist listtags_nonepsilon ordertags"""
+    p[0] = ( p[1], p[2], p[3] )
 
-def p_querypath(p):
-    """querypath : predlist listtags"""
-    p[0] = [ ( p[1], p[2], [] ) ]
+def p_querypath_nopred(p):
+    """querypath_elem : listtags_nonepsilon ordertags"""
+    p[0] = ( [], p[1], p[2] )
+
+def p_querypath_noorder(p):
+    """querypath_elem : predlist listtags"""
+    p[0] = ( p[1], p[2], [] )
+
+def p_querypath_listonly(p):
+    """querypath_elem : listtags"""
+    p[0] = ( [], p[1], [] )
+
+def p_querypath_base(p):
+    """querypath : querypath_elem"""
+    p[0] = [ p[1] ]
 
 def p_querypath_extend(p):
-    """querypath : querypath slash predlist listtags"""
+    """querypath : querypath slash querypath_elem"""
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
     if len(plisttags) == 0:
         # the parent path element has no listtags, default to 'vcontains'
         p[0][-1] = ( ppreds, [ 'vcontains' ], pordertags )
-    p[0].append( ( p[3], p[4], [] ) )
-
-def p_listtags_empty(p):
-    """listtags :
-                | '(' ')'"""
-    p[0] = []
+    p[0].append( p[3] )
 
 def p_listtags(p):
-    """listtags : '(' vallist ')'"""
+    """listtags : listtags_epsilon
+                | listtags_empty
+                | listtags_nonempty"""
+    p[0] = p[1]
+
+def p_listtags_nonepsilon(p):
+    """listtags_nonepsilon : listtags_empty
+                           | listtags_nonempty"""
+    p[0] = p[1]
+
+def p_listtags_epsilon(p):
+    """listtags_epsilon : """
+    p[0] = []
+
+def p_listtags_empty(p):
+    """listtags_empty : '(' ')'"""
+    p[0] = []
+
+def p_listtags_nonempty(p):
+    """listtags_nonempty : '(' vallist ')'"""
     p[0] = p[2]
+
+def p_ordertags_empty(p):
+    """ordertags : """
+    p[0] = []
+
+def p_ordertags_nonempty(p):
+    """ordertags : vallist"""
+    p[0] = p[1]
 
 def p_predlist_empty(p):
     """predlist : """
