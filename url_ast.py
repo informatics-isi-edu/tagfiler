@@ -1242,7 +1242,7 @@ class Query (Node):
             def jsonFile(file):
                 tagvals = [ ( tag, file[tag] ) for tag in listtags ]
                 if addName:
-                    tagvals.append( ( 'name', file.file ) )
+                    tagvals.append( ( 'name', file.name ) )
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
                     tagvals[tagname] = str(tagvals[tagname])
