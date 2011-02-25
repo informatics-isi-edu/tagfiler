@@ -484,7 +484,10 @@ class Application:
         if len(results) == 0:
             raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
 
-    def validateVersionedFilename(self, vfile, tagname='', subject=None):
+    def validateVersionedFilename(self, vfile, tagdef=None, subject=None):
+        tagname = ''
+        if tagdef:
+            tagname = tagdef.tagname
         m = re.match('^(?P<data_id>.*)@(?P<version>[0-9]+)', vfile)
         if m:
             g = m.groupdict()
@@ -494,7 +497,7 @@ class Application:
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
             if g['data_id'] == '':
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
-            results = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[file]),
+            results = self.select_files_by_predlist(predlist=[dict(tag='vname', op='=', vals=[vfile]),
                                                               dict(tag='version', op='=', vals=[version])],
                                                     listtags=['id'],
                                                     versions='any')
@@ -503,14 +506,17 @@ class Application:
         else:
             raise BadRequest('Supplied versioned file name "%s" for tag "%s" has invalid syntax.' % (vfile, tagname))
 
-    def validateTagname(self, tag, tagname=None, subject=None):
+    def validateTagname(self, tag, tagdef=None, subject=None):
+        tagname = ''
+        if tagdef:
+            tagname = tagdef.tagname
         if tag == '':
             raise Conflict('You must specify a defined tag name to set values for "%s".' % tagname)
         results = self.select_tagdef(tag)
         if len(results) == 0:
             raise Conflict('Supplied tag name "%s" is not defined.' % tag)
 
-    def validateRole(self, role, tagname=None, subject=None):
+    def validateRole(self, role, tagdef=None, subject=None):
         if self.authn:
             try:
                 valid = self.authn.roleProvider.testRole(self.db, role)
@@ -520,12 +526,15 @@ class Application:
                 web.debug('Supplied tag value "%s" is not a valid role.' % role)
                 raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
                 
-    def validateRolePattern(self, role, tagname=None, subject=None):
+    def validateRolePattern(self, role, tagdef=None, subject=None):
         if role in [ '*' ]:
             return
         return self.validateRole(role)
 
-    def validateEnumeration(self, enum, tagname=None, subject=None):
+    def validateEnumeration(self, enum, tagdef=None, subject=None):
+        tagname = ''
+        if tagdef:
+            tagname = tagdef.tagname
         try:
             key, desc = enum.split(" ", 1)
             key = urlunquote(key)
@@ -547,7 +556,10 @@ class Application:
             except:
                 raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
 
-    def validatePolicyRule(self, rule, tagname=None, subject=None):
+    def validatePolicyRule(self, rule, tagdef=None, subject=None):
+        tagname = ''
+        if tagdef:
+            tagname = tagdef.tagname
         try:
             remap = buildPolicyRules([rule], fatal=True)
         except (ValueError, KeyError):
