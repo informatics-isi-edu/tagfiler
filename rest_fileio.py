@@ -613,12 +613,12 @@ class FileIO (Application):
 
         if not basefile:
             # only remap on newly created files
-            srcroles = set(self.remap.keys()).intersection(self.authn.roles)
+            srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
             if len(srcroles) == 1:
                 try:
                     t = self.db.transaction()
                     srcrole = srcroles.pop()
-                    dstrole, readusers, writeusers = self.remap[srcrole]
+                    dstrole, readusers, writeusers = self.config['policy remappings'][srcrole]
                     #web.debug(self.remap)
                     #web.debug('remap:', self.remap[srcrole])
                     for readuser in readusers:
