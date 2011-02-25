@@ -189,14 +189,14 @@ class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
-        desc = 'The request is malformed. %s'
+        desc = 'The request is malformed. %s.'
         WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
-        desc = 'The request conflicts with the state of the server. %s'
+        desc = 'The request conflicts with the state of the server. %s.'
         WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class IntegrityError (WebException):
