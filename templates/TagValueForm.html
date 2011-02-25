@@ -59,7 +59,9 @@ $else:
 		</tr>
 		</table>
 	$elif tagname == 'tagdef' or typestr in ['tagname', 'tagdef']:
-		<a href="${home}/tags/tagdef=${urlquote(val)}?view=tagdef%20tags">${val}</a>
+		<a href="${home}/tags/tagdef=${urlquote(val)}?view=tagdef">${val}</a>
+	$elif typestr == 'type':
+		<a href="${home}/tags/typedef=${urlquote(val)}?view=typedef">${val}</a>
 	$elif typevals:
 		$# this lambda is to simulate ternary operator in Python 2.4
 		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}

@@ -325,7 +325,7 @@ typedef()
    dbtype="$2"
    desc="$3"
    shift 3
-   local subject=$(dataset "" typedef "${admin}" "*")
+   local subject=$(dataset "" typedef "" "*")
    tag "$subject" "typedef" text "${typename}" >&2
    tag "$subject" "typedef dbtype" text "${dbtype}" >&2
    tag "$subject" "typedef description" text "${desc}" >&2

@@ -1235,6 +1235,8 @@ class Query (Node):
                 listtags = view['file list tags']
                 writetags = view['file list tags write']
 
+                
+
             listtags = [ t for t in listtags ]
             builtinlist = [ 'id' ] 
             listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
