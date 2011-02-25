@@ -63,7 +63,7 @@ class Node (object, Application):
         Application.__init__(self)
 
     def uri2referer(self, uri):
-        return self.home + uri
+        return self.config['home'] + uri
 
 class TransmitNumber (Node):
     """Represents a transmitnumber URI
@@ -89,7 +89,7 @@ class TransmitNumber (Node):
             return result
 
         def postCommit(results):
-            uri = self.home + '/transmitnumber/' + results
+            uri = self.config['home'] + '/transmitnumber/' + results
             web.header('Location', results)
             return results
 
@@ -148,9 +148,10 @@ class Study (Node):
 
         def body():
             files = []
-            
-            self.globals['appletTagnames'] = self.getParamsDb('applet tags', name=self.study_type)
-            self.globals['appletTagnamesRequire'] = self.getParamsDb('applet tags require', name=self.study_type)
+
+            config = self.select_config(self.study_type, [ ('applet tags', []), ('applet tags require', []) ])
+            self.globals['appletTagnames'] = config['applet tags']
+            self.globals['appletTagnamesRequire'] = config['applet tags require']
             
             if self.action == 'get' and self.name:
                 predlist = [ dict(tag='name', op='=', vals=[self.name]) ]
@@ -278,7 +279,7 @@ class AppletError (Node):
 
         # the applet needs to manage expiration itself
         # since it may be active while the html page is idle
-        target = self.home + web.ctx.homepath
+        target = self.config['home'] + web.ctx.homepath
         self.setNoCache()
         return self.renderlist("Study Transfer Applet",
                                [self.render.AppletError(self.status)])
@@ -301,7 +302,7 @@ class FileList (Node):
     def GET(self, uri):
         
         web.header('Content-Type', 'text/html;charset=ISO-8859-1')
-        self.globals['referer'] = self.home + uri
+        self.globals['referer'] = self.config['home'] + uri
         self.storage = web.input()
 
         def body():
@@ -309,14 +310,15 @@ class FileList (Node):
                         for tagdef in self.select_tagdef() ]
 
             listtags = self.queryopts.get('list', None)
-            if listtags:
-                self.globals['filelisttags'] = listtags
-            else:
-                self.globals['filelisttags'] = self.getParamsDb('file list tags', name=self.globals['view'])
+            writetags = None
+            if not listtags:
+                view = self.select_view(self.globals['view'])
+                listtags = view['file list tags']
+                writetags = view['file list tags write']
+
             builtinlist = [ 'id' ]
-            self.globals['filelisttags'] = builtinlist + [ tag for tag in self.globals['filelisttags'] if tag not in builtinlist ]
-                
-            self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', name=self.globals['view'])
+            self.globals['filelisttags'] = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
+            self.globals['filelisttagswrite'] = writetags
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
@@ -328,11 +330,14 @@ class FileList (Node):
             else:
                 ordertags = []
 
-            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'name', 'version'])),
+            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set',
+                                                                                                       'name', 'version',
+                                                                                                       'tagdef', 'typedef',
+                                                                                                       'config', 'view'])),
                                                  ordertags=ordertags)
 
         def postCommit(files):
-            target = self.home + web.ctx.homepath
+            target = self.config['home'] + web.ctx.homepath
             self.setNoCache()
             return self.renderlist(None,
                                    [self.render.Commands(),
@@ -364,7 +369,7 @@ class FileList (Node):
                 if filetype not in [ 'file', 'url', 'dataset' ]:
                     filetype = 'file'
 
-                url = self.home + web.ctx.homepath + '/file/name=' + urlquote(name)
+                url = self.config['home'] + web.ctx.homepath + '/file/name=' + urlquote(name)
                 url += '?action=define'
                 url += '&type=' + urlquote(filetype)
                 if readers == '*':
@@ -412,13 +417,13 @@ class LogList (Node):
         if not self.authn.hasRoles(['admin']):
             raise Forbidden('listing of log files')
         
-        if self.log_path:
-            lognames = sorted(os.listdir(self.log_path), reverse=True)
+        if self.config['log path']:
+            lognames = sorted(os.listdir(self.config['log path']), reverse=True)
                               
         else:
             lognames = []
         
-        target = self.home + web.ctx.homepath
+        target = self.config['home'] + web.ctx.homepath
         
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
@@ -810,10 +815,12 @@ class FileTags (Node):
     def get_all_body(self):
         self.txlog('GET ALL TAGS', dataset=self.predlist)
 
-        custom_tags = self.getParamsDb('tag list tags', name=self.view_type)
-        self.listtags = self.queryopts.get('list', custom_tags)
+        self.listtags = self.queryopts.get('list', [])
         if not self.listtags:
-            self.listtags = set()
+            try_default_view = True
+        else:
+            try_default_view = False
+
         if type(self.listtags) == type('text'):
             self.listtags = self.listtags.split(',')
 
@@ -833,6 +840,18 @@ class FileTags (Node):
         elif len(files) == 1:
             self.subject = files[0]
             self.datapred, self.dataid, self.dataname = self.subject2identifiers(self.subject)
+
+            if try_default_view:
+                view = self.select_view(self.subject.dtype)
+                if view['tag list tags']:
+                    self.listtags = view['tag list tags']
+        else:
+            if try_default_view:
+                view = self.select_view('default')
+                if view['tag list tags']:
+                    self.listtags = view['tag list tags']
+
+        all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags or tagdef.tagname in predtags ]
 
         length = 0
         for file in files:
@@ -918,7 +937,7 @@ class FileTags (Node):
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
-        self.globals['referer'] = self.home + uri
+        self.globals['referer'] = self.config['home'] + uri
         try:
             self.view_type = urllib.unquote_plus(self.storage.view)
         except:
@@ -1133,7 +1152,7 @@ class Query (Node):
             else:
                 listpart = '(' + ','.join([ urlquote(tag) for tag in listtags ]) + ')'
             qpath.append( ';'.join(terms) + listpart )
-        return self.home + web.ctx.homepath + '/query/' + '/'.join(qpath)
+        return self.config['home'] + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
         # this interface has both REST and form-based functions
@@ -1208,23 +1227,29 @@ class Query (Node):
             
         def body():
             listtags = self.queryopts.get('list', self.path[-1][1])
+            writetags = None
             if type(listtags) == type('text'):
                 listtags = listtags.split(',')
             if len(listtags) == 0:
-                listtags = self.getParamsDb('file list tags', name=self.globals['view'])
+                view = self.select_view(self.globals['view'])
+                listtags = view['file list tags']
+                writetags = view['file list tags write']
+                    
             listtags = [ t for t in listtags ]
             builtinlist = [ 'id' ] 
             listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
             self.globals['filelisttags'] = listtags
-            
-            self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write', name=self.globals['view'])
+            self.globals['filelisttagswrite'] = writetags
+
             predlist, listtags, ordertags = self.path[-1]
             self.path[-1] = predlist, list(self.globals['filelisttags']), ordertags
-            # we always want these
+            # we always want these for subject psuedo-column
             self.path[-1][1].append('name')
             self.path[-1][1].append('version')
             self.path[-1][1].append('tagdef')
             self.path[-1][1].append('typedef')
+            self.path[-1][1].append('config')
+            self.path[-1][1].append('view')
             self.path[-1][1].append('Image Set')
 
             return self.select_files_by_predlist_path(path=self.path, versions=versions)

@@ -132,7 +132,9 @@ class FileIO (Application):
             self.versions = 'latest'
         # 'read' authz is implicit in this query
         results = self.select_files_by_predlist(predlist=self.predlist,
-                                                listtags=['dtype', 'content-type', 'bytes', 'url', 'modified', 'modified by', 'name', 'version', 'Image Set'],
+                                                listtags=['dtype', 'content-type', 'bytes', 'url',
+                                                          'modified', 'modified by', 'name', 'version', 'Image Set',
+                                                          'tagdef', 'typedef', 'config', 'view'],
                                                 versions=self.versions)
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
@@ -169,7 +171,7 @@ class FileIO (Application):
                     querystr = ''
                 raise web.seeother(result.url + querystr)
             elif result.dtype == 'file':
-                filename = self.store_path + '/' + self.subject.storagename
+                filename = self.config['store path'] + '/' + self.subject.storagename
                 try:
                     f = open(filename, "rb", 0)
                     if content_type == None:
@@ -181,7 +183,7 @@ class FileIO (Application):
                     # this may happen sporadically under race condition:
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
-            elif result.dtype in ['blank', 'contains', 'typedef', 'tagdef', 'vcontains']:
+            else:
                 datapred, dataid, dataname = self.subject2identifiers(result)
                 raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
 
@@ -316,7 +318,7 @@ class FileIO (Application):
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-                    for res in yieldBytes(f, first, last, self.chunkbytes):
+                    for res in yieldBytes(f, first, last, self.config['chunk bytes']):
                         self.midDispatch()
                         yield res
                 else:
@@ -330,7 +332,7 @@ class FileIO (Application):
                         first, last = rangeset[r]
                         yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
                               % (boundary, content_type, first, last, length, disposition_name)
-                        for res in yieldBytes(f, first, last, self.chunkbytes):
+                        for res in yieldBytes(f, first, last, self.config['chunk bytes']):
                             self.midDispatch()
                             yield res
                         if r == len(rangeset) - 1:
@@ -343,7 +345,7 @@ class FileIO (Application):
                 web.header('Content-Length', length)
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
-                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                for buf in yieldBytes(f, 0, length - 1, self.config['chunk bytes']):
                     self.midDispatch()
                     yield buf
 
@@ -441,7 +443,7 @@ class FileIO (Application):
     def delete_postCommit(self, result, set_status=True):
         if result.dtype == 'file' and result.storagename != None:
             """delete the file"""
-            filename = self.store_path + '/' + result.storagename
+            filename = self.config['store path'] + '/' + result.storagename
             dir = os.path.dirname(filename)
             self.deleteFile(filename)
             web.ctx.status = '204 No Content'
@@ -515,7 +517,7 @@ class FileIO (Application):
                 tagged_content_type = None
 
             try:
-                filename = self.store_path + '/' + self.storagename
+                filename = self.config['store path'] + '/' + self.storagename
                 p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                 line = p.stdout.readline()
                 guessed_content_type = line.strip()
@@ -648,9 +650,9 @@ class FileIO (Application):
         eof = False
         while not eof:
             if clen != None:
-                buf = inf.read(min((clen - bytes), self.chunkbytes))
+                buf = inf.read(min((clen - bytes), self.config['chunk bytes']))
             else:
-                buf = inf.read(self.chunkbytes)
+                buf = inf.read(self.config['chunk bytes'])
 
             f.write(buf)
             buflen = len(buf)
@@ -686,7 +688,7 @@ class FileIO (Application):
         else:
             prefix = 'anonymous-'
             
-        dir = self.store_path + '/' + predlist_linearize(self.predlist)
+        dir = self.config['store path'] + '/' + predlist_linearize(self.predlist)
 
         """posible race condition in mkdir and rmdir"""
         count = 0
@@ -720,7 +722,7 @@ class FileIO (Application):
     def deletePrevious(self, files):
         for file in files:
             if file.dtype == 'file' and file.storagename != None:
-                self.deleteFile(self.store_path + '/' + file.storagename)
+                self.deleteFile(self.config['store path'] + '/' + file.storagename)
 
     def putPreWriteBody(self):
         status = web.ctx.status
@@ -731,7 +733,7 @@ class FileIO (Application):
             self.newMatch = True
             if self.unique:
                 if self.subject.dtype == 'file' and self.subject.storagename:
-                    filename = self.store_path + '/' + self.subject.storagename
+                    filename = self.config['store path'] + '/' + self.subject.storagename
                     f = open(filename, 'r+b', 0)
                     return f
                 else:
@@ -800,9 +802,6 @@ class FileIO (Application):
             # try update-in-place if user is doing Range: partial PUT
             self.update = True
             self.dtype = 'file'
-            # if checksum is not set, then allow chunk updates # BUG: this is improper outside transaction body
-            #if len(self.gettagvals('sha256sum')) == 0:
-            #    self.localFilesImmutable = False
         else:
             self.update = False
 
@@ -815,7 +814,7 @@ class FileIO (Application):
                 ctime, subject = cached
                 if (now - ctime).seconds < file_cache_time:
                     self.subject = subject
-                    filename = self.store_path + '/' + self.subject.storagename
+                    filename = self.config['store path'] + '/' + self.subject.storagename
                     f = open(filename, 'r+b', 0)
                     if not f:
                         file_cache.pop((self.authn.role, cachekey), None)
@@ -839,7 +838,7 @@ class FileIO (Application):
         # we get here if write is not disallowed
         if f == None:
             f, filename = self.getTemporary('wb')
-            self.storagename = filename[len(self.store_path)+1:]
+            self.storagename = filename[len(self.config['store path'])+1:]
             self.dtype = 'file'
             mustInsert = True
         else:
@@ -870,7 +869,7 @@ class FileIO (Application):
         def postWritePostCommit(files):
             if not content_range and files:
                 self.deletePrevious(files)
-            uri = self.home + self.store_path + '/' + self.subject2identifiers(self.subject)[0]
+            uri = self.config['home'] + self.config['store path'] + '/' + self.subject2identifiers(self.subject)[0]
             web.header('Location', uri)
             if filename:
                 web.ctx.status = '201 Created'
@@ -996,7 +995,7 @@ class FileIO (Application):
                 if buf != boundaryN:
                     # we did not get an entire multipart body apparently
                     raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
-                self.storagename = tempFileName[len(self.store_path)+1:len(tempFileName)]
+                self.storagename = tempFileName[len(self.config['store path'])+1:len(tempFileName)]
                 self.dtype = 'file'
                 self.bytes = bytes
 
@@ -1058,7 +1057,7 @@ class LogFileIO (FileIO):
         if not self.authn.hasRoles(['admin']):
             raise Forbidden('read access to log file "%s"' % self.name)
 
-        if not self.log_path:
+        if not self.config['log path']:
             raise Conflict('log_path is not configured on this server')
 
         if self.queryopts.get('action', None) == 'view':
@@ -1066,7 +1065,7 @@ class LogFileIO (FileIO):
         else:
             disposition_name = self.name
 
-        filename = self.log_path + '/' + self.name
+        filename = self.config['log path'] + '/' + self.name
         try:
             f = open(filename, "rb")
             
@@ -1089,7 +1088,7 @@ class LogFileIO (FileIO):
             if sendBody:
                 if not disposition_name:
                     yield top
-                for buf in yieldBytes(f, 0, length - 1, self.chunkbytes):
+                for buf in yieldBytes(f, 0, length - 1, self.config['chunk bytes']):
                     self.midDispatch()
                     yield buf
                 if not disposition_name:

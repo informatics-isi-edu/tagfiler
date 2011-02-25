@@ -67,6 +67,8 @@ dataset()
    # args: <name> blank <owner> [<readuser>]...
    # args: <name> typedef <owner> [<readuser>]...
    # args: <name> tagdef <owner> [<readuser>]...
+   # args: <name> config <owner> [<readuser>]...
+   # args: <name> view <owner> [<readuser>]...
 
    local file="$1"
    local type="$2"
@@ -89,7 +91,7 @@ dataset()
               ;;
          esac
          ;;
-      blank|typedef|tagdef)
+      blank|typedef|tagdef|config|view)
          :
          ;;
       *)
@@ -101,20 +103,11 @@ dataset()
    local owner="$1"
    shift
 
-   echo "create $type dataset: '$file'" >&2
-
    local subject=$(psql -A -t -q <<EOF
 INSERT INTO resources DEFAULT VALUES RETURNING subject;
 EOF
    )
 
-   if [[ -n "$file" ]]
-   then
-       tag "$subject" name text "$file" >&2
-       tag "$subject" 'latest with name' text "$file" >&2
-       tag "$subject" vname text "$file@1" >&2
-       tag "$subject" version int8 1 >&2
-   fi
    tag "$subject" dtype text "$type" >&2
 
    if [[ -n "$owner" ]]
@@ -129,9 +122,21 @@ EOF
    done
 
    case "$type" in
-      url)
-         tag "$subject" url text "$url" >&2
-         ;;
+      file|url)
+	 tag "$subject" name text "$file" >&2
+	 tag "$subject" 'latest with name' text "$file" >&2
+	 tag "$subject" vname text "$file@1" >&2
+	 tag "$subject" version int8 1 >&2
+
+	 case "$type" in
+	     url)
+		 tag "$subject" url text "$url" >&2
+		 ;;
+	 esac
+	 ;;
+      config|view)
+	 tag "$subject" "$type" text "$file" >&2
+	 ;;
    esac
 
    echo "$subject"
@@ -336,6 +341,10 @@ typedef()
 tagdef 'id'           int8        ""      anonymous   system     false      ""         true
 tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
 tagdef 'typedef'      text        ""      anonymous   file       false      ""         true
+tagdef 'config'       text        ""      anonymous   file       false      ""         true
+tagdef 'view'         text        ""      anonymous   file       false      ""         true
+
+tagdef 'default view' text        ""      file        file       false      viewname
 
 tagdef 'tagdef type'  text        ""      anonymous   system     false      type
 tagdef 'tagdef unique' empty      ""      anonymous   system     false      ""
@@ -375,7 +384,7 @@ tagdef vcontains      text        ""      file        file       true       vfil
 tagdef key            text        ""      anonymous   file       false      ""         true
 
 tagdef "list on homepage" empty   ""      anonymous   tag        false
-tagdef "homepage order" int       ""      anonymous   tag        false
+tagdef "homepage order" int8      ""      anonymous   tag        false
 tagdef "Image Set"    empty       "${admin}"   file   file       false
 
 psql -q -t <<EOF
@@ -404,21 +413,30 @@ tagacl "list on homepage" write "${admin}"
 tagacl "homepage order" read "*"
 tagacl "homepage order" write "${admin}"
 
+
+homepath="https://${HOME_HOST}/${SVCPREFIX}"
+
 homelinks=(
-$(dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}")
-$(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}")
-$(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "Manage roles" url "https://${HOME_HOST}/webauthn/roles"               "${admin}")
+$(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"        "${admin}")
+$(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define" "${admin}")
+$(dataset "Upload study" url "${homepath}/study?action=upload"                   "${admin}" "${curator}" "${uploader}")
+$(dataset "Download study" url "${homepath}/study?action=download"               "${admin}" "${curator}" "${downloader}")
+$(dataset "Query by tags, latest versions" url "${homepath}/query?action=edit"   "${admin}" "${curator}" "${downloader}")
+$(dataset "Query by tags, all versions" url "${homepath}/query?action=edit&versions=any"   "${admin}" "${curator}" "${downloader}")
+$(dataset "View tag definitions" url "${homepath}/query/tagdef?view=tagdef"      "${admin}" "*")
 )
 
 i=0
 while [[ $i -lt "${#homelinks[*]}" ]]
 do
    tag "${homelinks[$i]}" "list on homepage"
-   tag "${homelinks[$i]}" "homepage order" int "$i"
+   tag "${homelinks[$i]}" "homepage order" int8 "$i"
    i=$(( $i + 1 ))
 done
 
-tagfilercfg=$(dataset "tagfiler configuration" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=tagfiler%20configuration?view=configuration%20tags" "${admin}" "*")
+tagfilercfg=$(dataset "tagfiler" config "${admin}" "*")
+tag $tagfilercfg "view" text "default"  # config="tagfiler" is also view="default"
 
 typedef empty        ''            'No content'
 typedef int8         int8          'Integer'
@@ -430,16 +448,18 @@ typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef tagname      text          'Tag name'
 typedef tagdef       text          'Tag definition'
-typedef dtype       text          'Dataset type' 'url URL redirecting dataset' 'blank Metadata-only dataset' 'typedef Type definition' 'tagdef Tag definition' 'file Locally stored file' 'contains Collection of unversioned datasets' 'vcontains Collection of versioned datasets'
+typedef dtype        text          'Dataset type' 'blank Metadata-only dataset' 'config Configuration data' 'file Locally stored file' 'contains Collection of unversioned datasets' 'tagdef Tag definition' 'typedef Type definition' 'url URL redirecting dataset' 'vcontains Collection of versioned datasets' 'view View definition'
 typedef url          text          'URL'
-typedef file         text          'Dataset'
-typedef vfile        text          'Dataset with version number'
+typedef id           int8          'Dataset ID'
+typedef file         text          'Dataset name'
+typedef vfile        text          'Dataset name with version number'
 
 typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'file Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
 
 typedef type         text          'Scalar value type'
+typedef viewname     text          'View name'
 
-cfgtags=$(dataset "configuration tags" url "https://${HOME_HOST}/${SVCPREFIX}/tags/name=configuration%20tags" "${admin}" "*")
+cfgtags=$(dataset "config" view "${admin}" "*")
 
 cfgtagdef()
 {
@@ -450,7 +470,7 @@ cfgtagdef()
    [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagname "$tagname"
 }
 
-#         TAGNAME       TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR
+#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
 
 # file list tags MUST BE DEFINED FIRST
 cfgtagdef 'file list tags' text     ""      file        file       true       tagname
@@ -462,27 +482,27 @@ tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 cfgtagdef 'file list tags write' text ""    file        file       true       tagname
 cfgtagdef home          text        ""      file        file       false
 cfgtagdef 'webauthn home' text      ""      file        file       false
-cfgtagdef 'webauthn require' text   ""      file        file       false
+cfgtagdef 'webauthn require' empty  ""      file        file       false
 cfgtagdef 'store path'  text        ""      file        file       false
 cfgtagdef 'log path'    text        ""      file        file       false
 cfgtagdef 'template path' text      ""      file        file       false
-cfgtagdef 'chunk bytes' text        ""      file        file       false
-cfgtagdef 'local files immutable' text ""   file        file       false
-cfgtagdef 'remote files immutable' text ""  file        file       false
+cfgtagdef 'chunk bytes' int8        ""      file        file       false
+cfgtagdef 'local files immutable' empty ""  file        file       false
+cfgtagdef 'remote files immutable' empty "" file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
 cfgtagdef subtitle      text        ""      file        file       false
 cfgtagdef logo          text        ""      file        file       false
 cfgtagdef contact       text        ""      file        file       false
 cfgtagdef help          text        ""      file        file       false
 cfgtagdef bugs          text        ""      file        file       false
-cfgtagdef 'client connections' text ""      file        file       false
-cfgtagdef 'client upload chunks' text ""    file        file       false
-cfgtagdef 'client download chunks' text ""  file        file       false
-cfgtagdef 'client socket buffer size' text "" file      file       false
-cfgtagdef 'client chunk bytes' text ""      file        file       false
+cfgtagdef 'client connections' int8 ""      file        file       false
+cfgtagdef 'client upload chunks' empty ""   file        file       false
+cfgtagdef 'client download chunks' empty "" file        file       false
+cfgtagdef 'client socket buffer size' int8 "" file      file       false
+cfgtagdef 'client chunk bytes' int8 ""      file        file       false
 cfgtagdef 'applet tags' text        ""      file        file       true       tagname
 cfgtagdef 'applet tags require' text ""     file        file       true       tagname
-cfgtagdef 'applet custom properties' text "" file       file       false
+cfgtagdef 'applet custom properties' text "" file       file       true
 cfgtagdef 'applet test log' text    ""      file        file       false
 cfgtagdef 'applet test properties' text ""  file        file       true
 
@@ -495,18 +515,18 @@ cfgtag()
 
 #cfgtag "home" text 'https://${HOME_HOST}'
 cfgtag "webauthn home" text "https://${HOME_HOST}/webauthn"
-cfgtag "webauthn require" text 'True'
+cfgtag "webauthn require"
 
 #cfgtag "store path" text '${DATADIR}'
 #cfgtag "log path" text '${LOGDIR}'
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
 #cfgtag "chunk bytes" text '1048576'
 
-cfgtag "client connections" text '4'
-cfgtag "client upload chunks" text 'True'
-cfgtag "client download chunks" text 'True'
-cfgtag "client socket buffer size" text '8192'
-cfgtag "client chunk bytes" text '4194304'
+cfgtag "client connections" int8 '4'
+cfgtag "client upload chunks"
+cfgtag "client download chunks"
+cfgtag "client socket buffer size" int8 '8192'
+cfgtag "client chunk bytes" int8 '4194304'
 
 cfgtag "file list tags" text bytes owner 'read users' 'write users'
 cfgtag "file list tags write" text 'read users' 'write users' 'owner'
@@ -514,14 +534,28 @@ cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 #cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'
 
-#cfgtag "local files immutable" text 'True'
-#cfgtag "remote files immutable" text 'True'
+#cfgtag "local files immutable"
+#cfgtag "remote files immutable"
 
-tagdeftags=$(dataset "tagdef tags" blank "${admin}" "*")
+tagdeftags=$(dataset "tagdef" view "${admin}" "*")
 for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
 do
    tag "$tagdeftags" "_cfg_file list tags" "tagname" "$tagname"
    tag "$tagdeftags" "_cfg_tag list tags" "tagname" "$tagname"
+done
+
+typedeftags=$(dataset "typedef" view "${admin}" "*")
+for tagname in "typedef description" "typedef dbtype" "typedef values"
+do
+   tag "$typedeftags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$typedeftags" "_cfg_tag list tags" "tagname" "$tagname"
+done
+
+viewtags=$(dataset "view" view "${admin}" "*")
+for tagname in "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
+do
+   tag "$viewtags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$viewtags" "_cfg_tag list tags" "tagname" "$tagname"
 done
 
 # remapping rules:

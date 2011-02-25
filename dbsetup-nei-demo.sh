@@ -18,6 +18,21 @@
 
 ## Types and Tags for NEI MISD/DEI demo...
 
+homelinks=(
+$(dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
+)
+
+i=0
+while [[ $i -lt "${#homelinks[*]}" ]]
+do
+   tag "${homelinks[$i]}" "list on homepage"
+   tag "${homelinks[$i]}" "homepage order" int "$i"
+   i=$(( $i + 1 ))
+done
+
+
 tagdef "Downloaded"   ""          ""      tag         tag        false
 tagacl "Downloaded" read "${downloader}"
 tagacl "Downloaded" write "${downloader}"

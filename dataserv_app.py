@@ -220,57 +220,62 @@ class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
-    def getParamDb(self, suffix, default=None, name=None):
-        results = self.getParamsDb(suffix, name)
+    def select_config(self, pred=None, params_and_defaults=None):
+        
+        if pred == None:
+            pred = dict(tag='config', op='=', vals=['tagfiler'])
+            if params_and_defaults == None:
+                params_and_defaults = [ ('applet custom properties', []),
+                                        ('applet test properties', []),
+                                        ('applet test log', None),
+                                        ('bugs', None),
+                                        ('chunk bytes', 64 * 1024),
+                                        ('client chunk bytes', 4194304),
+                                        ('client connections', 2),
+                                        ('client download chunks', False),
+                                        ('client socket buffer size', 8192),
+                                        ('client upload chunks', False),
+                                        ('contact', None),
+                                        ('file list tags', []),
+                                        ('file list tags write', []),
+                                        ('help', None),
+                                        ('home', 'https://%s' % self.hostname),
+                                        ('local files immutable', False),
+                                        ('log path', '/var/www/%s-logs' % self.daemonuser),
+                                        ('policy remappings', []),
+                                        ('remote files immutable', False),
+                                        ('store path', '/var/www/%s-data' % self.daemonuser),
+                                        ('subtitle', ''),
+                                        ('logo', ''),
+                                        ('tag list tags', []),
+                                        ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
+                                        ('webauthn home', None),
+                                        ('webauthn require', 'False') ]
+
+        results = self.select_files_by_predlist(predlist=[pred],
+                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred['tag'] ],
+                                                listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
-            return results[0]
-        elif len(results) == 0:
-            return default
+            config = results[0]
         else:
-            raise ValueError
+            #len(results) > 1:
+            web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
+            config = web.Storage(params_and_defaults)
 
-    def getParamsDb(self, suffix, name=None):
-        if name == None:
-            name = 'tagfiler configuration'
+        for key, default in params_and_defaults:
+            if config[key] == None or config[key] == []:
+                config[key] = default
 
-        if configDataCache.has_key(name):
-            l1 = configDataCache[name]
-            if l1.has_key(suffix):
-                return l1[suffix]
+        return config
 
-        status = web.ctx.status
-        try:
-            tagdef = self.static_tagdefs.get('_cfg_%s' % suffix, None)
-            if tagdef == None:
-                web.debug('getParamsDb: Cannot find tagdef for _cfg_%s' % suffix)
-                return []
-            results = self.select_files_by_predlist(predlist=[ dict(tag='name', op='=', vals=[name]) ],
-                                                    listtags=[ 'id', '_cfg_%s' % suffix ],
-                                                    versions='latest',
-                                                    tagdefs=self.static_tagdefs)
-            if len(results) == 0:
-                web.debug('getParamsDb: Cannot find subject %s' % name)
-                return []
-            
-            subject = results[0]
-            results = subject['_cfg_%s' % suffix]
-            if tagdef.multivalue:
-                if results == None:
-                    results = []
-            else:
-                if results == None:
-                    results = []
-                else:
-                    results = [ results ]
-            if not configDataCache.has_key(name):
-                configDataCache[name] = dict()
-            configDataCache[name][suffix] = results
-            return results
-
-        except NotFound:
-            web.ctx.status = status
-            return []
-
+    def select_view(self, viewname=None):
+        if viewname == None:
+            viewname = 'default'
+        return self.select_config(dict(tag='view', op='=', vals=[viewname]),
+                                  [ ('file list tags', []),
+                                    ('file list tags write', []),
+                                    ('tag list tags', []) ])
+        
     def __init__(self):
         "store common configuration data for all service classes"
         global render
@@ -401,23 +406,16 @@ class Application:
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
 
-        # these properties are used by Python code but not templates
-        self.store_path = self.getParamDb('store path', '/var/www/%s-data' % self.daemonuser)
-        self.chunkbytes = int(self.getParamDb('chunk bytes', 64 * 1024))
-        self.log_path = self.getParamDb('log path', '/var/www/%s-logs' % self.daemonuser)
-        self.template_path = self.getParamDb('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib())
-        self.home = self.getParamDb('home', 'https://%s' % self.hostname)
-        
-        self.remap = buildPolicyRules(self.getParamsDb('policy remappings'))
-        self.localFilesImmutable = parseBoolString(self.getParamDb('local files immutable', 'False'))
-        self.remoteFilesImmutable = parseBoolString(self.getParamDb('remote files immutable', 'False'))
-
-        self.render = web.template.render(self.template_path, globals=self.globals)
-        render = self.render # HACK: make this available to exception classes too
-        
-        # we need this early for getParamsDb() to work... so it's not optional anymore
+        # we need this early for select_config() to work... so it's not optional anymore
         self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
+        # get full config
+        self.config = self.select_config()
+        self.config['policy remappings'] = buildPolicyRules(self.config['policy remappings'])
+        
+        self.render = web.template.render(self.config['template path'], globals=self.globals)
+        render = self.render # HACK: make this available to exception classes too
+        
         # 'globals' are local to this Application instance and also used by its templates
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
@@ -425,28 +423,27 @@ class Application:
         self.globals['jsonWriter'] = jsonWriter
         self.globals['subject2identifiers'] = lambda subject, showversions=True: self.subject2identifiers(subject, showversions)
 
-        self.globals['home'] = self.home + web.ctx.homepath
+        self.globals['home'] = self.config.home + web.ctx.homepath
         self.globals['homepath'] = web.ctx.homepath
-        self.globals['help'] = self.getParamDb('help')
-        self.globals['bugs'] = self.getParamDb('bugs')
-        self.globals['subtitle'] = self.getParamDb('subtitle', '')
-        self.globals['logo'] = self.getParamDb('logo', '')
-        self.globals['contact'] = self.getParamDb('contact', None)
 
-        self.globals['webauthnhome'] = self.getParamDb('webauthn home')
-        self.globals['webauthnrequire'] = parseBoolString(self.getParamDb('webauthn require', 'False'))
-
-        self.globals['filelisttags'] = self.getParamsDb('file list tags')
-        self.globals['filelisttagswrite'] = self.getParamsDb('file list tags write')
-                
-        self.globals['appletTestProperties'] = self.getParamDb('applet test properties', None)
-        self.globals['appletLogfile'] = self.getParamDb('applet test log', None)
-        self.globals['appletCustomProperties'] = None # self.getParamDb('applet custom properties', None)
-        self.globals['clientChunkbytes'] = int(self.getParamDb('client chunk bytes', 4194304))
-        self.globals['clientConnections'] = self.getParamDb('client connections', '2')
-        self.globals['clientUploadChunks'] = parseBoolString(self.getParamDb('client upload chunks', 'False'))
-        self.globals['clientDownloadChunks'] = parseBoolString(self.getParamDb('client download chunks', 'False'))
-        self.globals['clientSocketBufferSize'] = int(self.getParamDb('client socket buffer size', 8192))
+        # copy many config values to globals map for templates
+        self.globals['help'] = self.config.help
+        self.globals['bugs'] = self.config.bugs
+        self.globals['subtitle'] = self.config.subtitle
+        self.globals['logo'] = self.config.logo
+        self.globals['contact'] = self.config.contact
+        self.globals['webauthnhome'] = self.config['webauthn home']
+        self.globals['webauthnrequire'] = self.config['webauthn require']
+        self.globals['filelisttags'] = self.config['file list tags']
+        self.globals['filelisttagswrite'] = self.config['file list tags write']
+        self.globals['appletTestProperties'] = self.config['applet test properties']
+        self.globals['appletLogfile'] = self.config['applet test log']
+        self.globals['appletCustomProperties'] = self.config['applet custom properties']
+        self.globals['clientChunkbytes'] = self.config['client chunk bytes']
+        self.globals['clientConnections'] = self.config['client connections']
+        self.globals['clientUploadChunks'] = self.config['client upload chunks']
+        self.globals['clientDownloadChunks'] = self.config['client download chunks']
+        self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
         
         # END: get runtime parameters from database
 
@@ -474,9 +471,6 @@ class Application:
         self.tagtypeValidators = { 'tagname' : self.validateTagname,
                                    'file' : self.validateFilename,
                                    'vfile' : self.validateVersionedFilename }
-
-        self.systemTags = ['created', 'modified', 'modified by', 'bytes', 'name', 'url', 'sha256sum']
-        self.ownerTags = ['read users', 'write users']
 
     def validateFilename(self, file, tagname='', subject=None):        
         results = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[file])],
@@ -565,7 +559,7 @@ class Application:
         except (ValueError, KeyError):
             raise BadRequest('Supplied rule "%s" is invalid for tag "%s"' % (rule, tagname))
         srcrole, mapping = remap.items()[0]
-        if self.remap.has_key(srcrole):
+        if self.config['policy remappings'].has_key(srcrole):
             raise BadRequest('Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
@@ -616,11 +610,11 @@ class Application:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
             self.set_authn(webauthn.session.test_and_update_session(self.db,
-                                                                    referer=self.home + uri,
+                                                                    referer=self.config.home + uri,
                                                                     setcookie=setcookie))
             self.middispatchtime = datetime.datetime.now()
             if not self.authn.role and self.globals['webauthnrequire']:
-                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.home + uri))
+                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.config.home + uri))
         else:
             try:
                 user = web.ctx.env['REMOTE_USER']
@@ -955,7 +949,7 @@ class Application:
 
     def subject2identifiers(self, subject, showversions=True):
         datapred = None
-        for tagname in [ 'tagdef', 'typedef' ]:
+        for tagname in [ 'tagdef', 'typedef', 'config', 'view' ]:
             keyv = subject.get(tagname, None)
             if keyv:
                 if self.globals['tagdefsdict'][tagname].multivalue:
@@ -1560,7 +1554,7 @@ class Application:
 
         # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
         order_suffix = ['id']
-        for tagname in [ 'typedef', 'tagdef', 'name' ]:
+        for tagname in [ 'typedef', 'tagdef', 'view', 'config', 'name' ]:
             if tagname in listtags:
                 order_suffix.insert(0, '"%s" NULLS LAST' % tagname)
         if 'modified' in listtags:
@@ -1613,7 +1607,7 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
+            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
@@ -1630,7 +1624,7 @@ class Application:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
                 else:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.%s IN (%s))' % (projectclause, q, e, e, context_attr, context)
-                context_attr = dict(text='name', file='name', vfile='vname', id='id')[tagdefs[projection].typestr]
+                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view')[tagdefs[projection].typestr]
             else:
                 if context:
                     query = '(%s) AS q_%d WHERE q_%d.%s IN (%s)' % (q, e, e, context_attr, context)
@@ -1639,7 +1633,7 @@ class Application:
             
         if listtags == None:
             listtags = self.listtags
-        listtags = set(listtags).union(set(['writeok', 'owner', 'id']))
+        listtags = set(listtags).union(set(['writeok', 'owner', 'id', 'view']))
         
         selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
                     for listtag in listtags ]
