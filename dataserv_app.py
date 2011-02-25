@@ -875,6 +875,8 @@ class Application:
             return False
 
         # read is authorized or subject would not be found
+        if subject['write users'] == None:
+            subject['write users'] = []
         if mode == 'write':
             if len(set(subject.get('%s users' % mode, []))
                    .union(set(['*']))

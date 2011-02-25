@@ -32,6 +32,8 @@ $else:
 	$else:
 		$ itervals = [ vals ]
 $ writeok = tagdef.writeok
+$if file['write users'] == None:
+	$ file['write users'] = []
 $if writeok == None:
 	$if tagdef.writepolicy == 'fowner':
 		$ writeok = file.owner in authn.roles
