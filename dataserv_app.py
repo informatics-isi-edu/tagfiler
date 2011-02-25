@@ -1568,9 +1568,9 @@ class Application:
     def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None):
         def select_clause(listtag):
             if listas.has_key(listtag):
-                return '"%s" AS "%s"' % (listtag, listas[listtag])
+                return '%s AS %s' % (self.wraptag(listtag, prefix=""), self.wraptag(listas[listtag], prefix=""))
             else:
-                return listtag
+                return self.wraptag(listtag, prefix="")
 
         if listas != None:
             if listtags == None:
@@ -1607,14 +1607,14 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
+            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view', 'config', 'tagdef'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
             values.update(v)
 
             if e < len(path) - 1:
                 if len(listtags) != 1:
                     raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
                 projection = listtags[0]
-                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id' ]:
+                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id', 'tagname', 'viewname' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 if tagdefs[projection].multivalue:
                     projectclause = 'unnest("%s")' % projection
@@ -1624,7 +1624,7 @@ class Application:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
                 else:
                     context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.%s IN (%s))' % (projectclause, q, e, e, context_attr, context)
-                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view')[tagdefs[projection].typestr]
+                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view', tagname='tagdef')[tagdefs[projection].typestr]
             else:
                 if context:
                     query = '(%s) AS q_%d WHERE q_%d.%s IN (%s)' % (q, e, e, context_attr, context)
