@@ -1234,7 +1234,7 @@ class Query (Node):
                 view = self.select_view(self.globals['view'])
                 listtags = view['file list tags']
                 writetags = view['file list tags write']
-                    
+
             listtags = [ t for t in listtags ]
             builtinlist = [ 'id' ] 
             listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
@@ -1251,6 +1251,7 @@ class Query (Node):
             self.path[-1][1].append('config')
             self.path[-1][1].append('view')
             self.path[-1][1].append('Image Set')
+            self.path[-1][1].append('write users')
 
             return self.select_files_by_predlist_path(path=self.path, versions=versions)
 
