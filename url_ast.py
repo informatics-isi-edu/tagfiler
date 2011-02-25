@@ -815,11 +815,14 @@ class FileTags (Node):
     def get_all_body(self):
         self.txlog('GET ALL TAGS', dataset=self.predlist)
 
+        
+        try_default_view = True
         self.listtags = self.queryopts.get('list', [])
         if not self.listtags:
-            try_default_view = True
-        else:
-            try_default_view = False
+            view = self.select_view(self.queryopts.get('view', None), None)
+            if view:
+                self.listtags = view['tag list tags']
+                try_default_view = False
 
         if type(self.listtags) == type('text'):
             self.listtags = self.listtags.split(',')

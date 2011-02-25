@@ -271,16 +271,19 @@ class Application:
 
         return config
 
-    def select_view(self, viewname=None):
+    def select_view(self, viewname=None, default='default'):
         if viewname == None:
-            viewname = 'default'
+            viewname = default
+        if viewname == None:
+            return None
+
         view = self.select_config(dict(tag='view', op='=', vals=[viewname]),
                                   [ ('file list tags', []),
                                     ('file list tags write', []),
                                     ('tag list tags', []) ],
                                   fake_missing=False)
         if view == None:
-            return self.select_view()
+            return self.select_view(default, None)
         else:
             return view
         
