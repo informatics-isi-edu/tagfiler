@@ -220,7 +220,7 @@ class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
-    def select_config(self, pred=None, params_and_defaults=None):
+    def select_config(self, pred=None, params_and_defaults=None, fake_missing=True):
         
         if pred == None:
             pred = dict(tag='config', op='=', vals=['tagfiler'])
@@ -260,6 +260,9 @@ class Application:
         else:
             #len(results) > 1:
             web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
+
+            if not fake_missing:
+                return None
             config = web.Storage(params_and_defaults)
 
         for key, default in params_and_defaults:
@@ -271,10 +274,15 @@ class Application:
     def select_view(self, viewname=None):
         if viewname == None:
             viewname = 'default'
-        return self.select_config(dict(tag='view', op='=', vals=[viewname]),
+        view = self.select_config(dict(tag='view', op='=', vals=[viewname]),
                                   [ ('file list tags', []),
                                     ('file list tags write', []),
-                                    ('tag list tags', []) ])
+                                    ('tag list tags', []) ],
+                                  fake_missing=False)
+        if view == None:
+            return self.select_view()
+        else:
+            return view
         
     def __init__(self):
         "store common configuration data for all service classes"
