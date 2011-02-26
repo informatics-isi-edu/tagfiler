@@ -815,7 +815,7 @@ class FileIO (Application):
             cached = file_cache.get((self.authn.role, cachekey), None)
             if cached:
                 ctime, subject = cached
-                if (now - ctime).seconds < file_cache_time:
+                if subject and (now - ctime).seconds < file_cache_time:
                     self.subject = subject
                     filename = self.config['store path'] + '/' + self.subject.storagename
                     f = open(filename, 'r+b', 0)
@@ -823,11 +823,12 @@ class FileIO (Application):
                         file_cache.pop((self.authn.role, cachekey), None)
                 else:
                     file_cache.pop((self.authn.role, cachekey), None)
+                    
             if not f:
                 return self.dbtransact(preWriteBody, preWritePostCommit)
             else:
                 self.newMatch = False
-                return (f, content_type)
+                return f
             
         # this retries if a file was found but could not be opened due to races
         if self.update and len(self.queryopts) == 0:
