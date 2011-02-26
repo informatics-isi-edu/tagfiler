@@ -837,6 +837,8 @@ class FileIO (Application):
             # don't trust cache for version updates nor queryopts-based tag writing...
             f = self.dbtransact(preWriteBody, preWritePostCommit)
 
+        self.subject_prewrite = self.subject
+
         self.mustInsert = False
 
         # we get here if write is not disallowed
@@ -867,6 +869,7 @@ class FileIO (Application):
                 return self.insertForStore()
             else:
                 # simplified path for chunk updates
+                self.subject = self.subject_prewrite
                 newfile = self.subject.copy()
                 newfile.bytes = self.bytes
                 self.updateFileTags(newfile, self.subject)
