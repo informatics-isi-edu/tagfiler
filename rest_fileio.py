@@ -836,7 +836,7 @@ class FileIO (Application):
             # don't trust cache for version updates nor queryopts-based tag writing...
             f = self.dbtransact(preWriteBody, preWritePostCommit)
 
-        mustInsert = False
+        self.mustInsert = False
 
         # we get here if write is not disallowed
         if f == None:
@@ -844,7 +844,8 @@ class FileIO (Application):
             f, filename = self.getTemporary('wb')
             self.storagename = filename[len(self.config['store path'])+1:]
             self.dtype = 'file'
-            mustInsert = True
+            self.mustInsert = True
+            self.update = False
         else:
             filename = None
 
@@ -857,7 +858,7 @@ class FileIO (Application):
 
         def postWriteBody():
             # this may repeat in case of database races
-            if mustInsert:
+            if self.mustInsert:
                 try:
                     self.client_content_type = web.ctx.env['CONTENT_TYPE'].lower()
                 except:
@@ -887,7 +888,7 @@ class FileIO (Application):
             # cache newly obtained results
             cachekey = (self.authn.role, predlist_linearize(self.predlist))
             file_cache[cachekey] = (now, self.subject)
-        if not mustInsert \
+        if not self.mustInsert \
                 and self.subject.dtype == 'file' \
                 and self.unique \
                 and self.authn.role == self.subject['modified by'] \
