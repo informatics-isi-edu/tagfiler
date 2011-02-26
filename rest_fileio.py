@@ -870,7 +870,7 @@ class FileIO (Application):
             else:
                 # simplified path for chunk updates
                 self.subject = self.subject_prewrite
-                newfile = self.subject.copy()
+                newfile = web.Storage(self.subject)
                 newfile.bytes = self.bytes
                 self.updateFileTags(newfile, self.subject)
                 return []
