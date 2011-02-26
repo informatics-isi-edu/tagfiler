@@ -1301,8 +1301,8 @@ class Query (Node):
                         if files:
                             yield jsonFile(files[0]) + '\n'
                         if len(files) > 1:
-                            for file in files[1:]:
-                                yield ',' + jsonFile(file) + '\n'
+                            for i in range(1,len(files)):
+                                yield ',' + jsonFile(files[i]) + '\n'
                         yield ']\n'
                         return
                     elif acceptType == 'text/html':
