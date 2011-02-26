@@ -118,6 +118,7 @@ class FileIO (Application):
         self.referer = None
         self.update = False
         self.subject = None
+        self.newMatch = None
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
 
@@ -153,6 +154,7 @@ class FileIO (Application):
 
         def body():
             self.populate_subject()
+            # read authz implied by finding subject
             self.newMatch = True
             return (self.subject, self.subject['content-type'])
 
@@ -192,7 +194,7 @@ class FileIO (Application):
             f = None
             content_type = None
             self.subject = None
-            cachekey = predlist_linearize(self.predlist)
+            cachekey = (self.authn.role, predlist_linearize(self.predlist))
             cached = file_cache.get((self.authn.role, cachekey), None)
             if cached:
                 ctime, subject = cached
@@ -206,6 +208,7 @@ class FileIO (Application):
             if not f:
                 return self.dbtransact(body, postCommit)
             else:
+                # never re-cache a cache hit
                 self.newMatch = False
                 return (f, content_type)
 
@@ -223,7 +226,7 @@ class FileIO (Application):
             f, content_type = preRead()
 
         if self.newMatch:
-            cachekey = predlist_linearize(self.predlist)
+            cachekey = (self.authn.role, predlist_linearize(self.predlist))
             file_cache[(self.authn.role, cachekey)] = (now, self.subject)
 
         # we only get here if we were able to both:
@@ -499,7 +502,6 @@ class FileIO (Application):
             web.ctx.status = status
             self.subject = None
             self.update = False
-            self.newMatch = False
 
         assert not self.unique
 
@@ -730,14 +732,18 @@ class FileIO (Application):
             self.populate_subject()
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
-            self.newMatch = True
-            if self.unique:
-                if self.subject.dtype == 'file' and self.subject.storagename:
-                    filename = self.config['store path'] + '/' + self.subject.storagename
-                    f = open(filename, 'r+b', 0)
-                    return f
+            if self.update:
+                if self.unique:
+                    if self.subject.dtype == 'file' and self.subject.storagename:
+                        # we can cache this validated result
+                        self.newMatch = True
+                        filename = self.config['store path'] + '/' + self.subject.storagename
+                        f = open(filename, 'r+b', 0)
+                        return f
+                    else:
+                        raise Conflict(data='The resource "%s" does not support byte-range update.' % predlist_linearize(self.predlist))
                 else:
-                    raise Conflict(data='The resource "%s" is does not support partial byte access.' % predlist_linearize(self.predlist))
+                    raise Conflict(data='The resource "%s" is not unique, so byte-range update is unsafe.' % predlist_linearize(self.predlist))
                 
         except NotFound:
             web.ctx.status = status
@@ -746,8 +752,6 @@ class FileIO (Application):
                 # not found w/ unique predlist is not to be confused with creating new files
                 raise
             # not found and not unique, treat as new file put
-            self.update = False
-            self.newMatch = False
 
         return None
 
@@ -801,14 +805,13 @@ class FileIO (Application):
         if cfirst != None and clast:
             # try update-in-place if user is doing Range: partial PUT
             self.update = True
-            self.dtype = 'file'
         else:
             self.update = False
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
         def preWriteCached():
             f = None
-            cachekey = predlist_linearize(self.predlist)
+            cachekey = (self.authn.role, predlist_linearize(self.predlist))
             cached = file_cache.get((self.authn.role, cachekey), None)
             if cached:
                 ctime, subject = cached
@@ -837,6 +840,7 @@ class FileIO (Application):
 
         # we get here if write is not disallowed
         if f == None:
+            # create a new disk file for 
             f, filename = self.getTemporary('wb')
             self.storagename = filename[len(self.config['store path'])+1:]
             self.dtype = 'file'
@@ -880,16 +884,16 @@ class FileIO (Application):
             return res
 
         if self.newMatch:
-            cachekey = predlist_linearize(self.predlist)
+            # cache newly obtained results
+            cachekey = (self.authn.role, predlist_linearize(self.predlist))
             file_cache[cachekey] = (now, self.subject)
         if not mustInsert \
-                and self.dtype == 'file' \
-                and self.fileMatch \
-                and self.version == self.fileMatch.version \
-                and self.authn.role == self.fileMatch['modified by'] \
-                and self.fileMatch['modified'] and (now - self.fileMatch['modified']).seconds < 5 \
-                and self.fileMatch['bytes'] == self.bytes \
-                and not self.fileMatch['url'] \
+                and self.subject.dtype == 'file' \
+                and self.unique \
+                and self.authn.role == self.subject['modified by'] \
+                and self.subject['modified'] and (now - self.subject['modified']).seconds < 5 \
+                and self.subject['bytes'] == self.bytes \
+                and not self.subject['url'] \
                 and len(self.queryopts.keys()) == 0:
             # skip tag update transaction if and only if it is a noop
             return postWritePostCommit([])
