@@ -991,7 +991,7 @@ class FileTags (Node):
             self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
             for value in self.tagvals[tag_id]:
                 self.set_tag(self.subject, tagdef, value)
-                if tag_id not in ['Image Set', 'contains', 'vcontains' ]:
+                if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', subfile, tagdef)
                         self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
