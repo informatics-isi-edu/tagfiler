@@ -261,7 +261,7 @@ class Application:
             config = results[0]
         else:
             #len(results) > 1:
-            web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
+            #web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
 
             if not fake_missing:
                 return None
@@ -354,7 +354,8 @@ class Application:
         # static representation of important tagdefs
         self.static_tagdefs = []
         # -- the system tagdefs needed by the select_files_by_predlist call we make below
-        for prototype in [ ('id', 'int8', False, 'system', True),
+        for prototype in [ ('config', 'text', False, 'file', True),
+                           ('id', 'int8', False, 'system', True),
                            ('tagdef', 'text', False, 'system', True),
                            ('tagdef type', 'type', False, 'system', False),
                            ('tagdef multivalue', 'empty', False, 'system', False),
@@ -364,6 +365,10 @@ class Application:
                            ('tagdef unique', 'empty', False, 'system', False),
                            ('tag read users', 'rolepat', True, 'fowner', False),
                            ('tag write users', 'rolepat', True, 'fowner', False),
+                           ('typedef', 'text', False, 'file', True),
+                           ('typedef description', 'text', False, 'file', False),
+                           ('typedef dbtype', 'text', False, 'file', False),
+                           ('typedef values', 'text', True, 'file', False),
                            ('read users', 'rolepat', True, 'fowner', False),
                            ('write users', 'rolepat', True, 'fowner', False),
                            ('owner', 'role', False, 'fowner', False),
@@ -371,36 +376,36 @@ class Application:
                            ('name', 'text', False, 'system', False),
                            ('version', 'int8', False, 'system', False),
                            ('latest with name', 'text', False, 'system', True),
-                           ('_cfg_applet custom properties', 'text', False, 'file', False),
+                           ('_cfg_applet custom properties', 'text', True, 'file', False),
                            ('_cfg_applet tags', 'tagname', True, 'file', False),
                            ('_cfg_applet tags require', 'tagname', True, 'file', False),
                            ('_cfg_applet test log', 'text', False, 'file', False),
                            ('_cfg_applet test properties', 'text', True, 'file', False),
                            ('_cfg_bugs', 'text', False, 'file', False),
                            ('_cfg_chunk bytes', 'text', False, 'file', False),
-                           ('_cfg_client chunk bytes', 'text', False, 'file', False),
-                           ('_cfg_client connections', 'text', False, 'file', False),
-                           ('_cfg_client download chunks', 'text', False, 'file', False),
-                           ('_cfg_client socket buffer size', 'text', False, 'file', False),
-                           ('_cfg_client upload chunks', 'text', False, 'file', False),
+                           ('_cfg_client chunk bytes', 'int8', False, 'file', False),
+                           ('_cfg_client connections', 'int8', False, 'file', False),
+                           ('_cfg_client download chunks', 'empty', False, 'file', False),
+                           ('_cfg_client socket buffer size', 'int8', False, 'file', False),
+                           ('_cfg_client upload chunks', 'empty', False, 'file', False),
                            ('_cfg_contact', 'text', False, 'file', False),
                            ('_cfg_file list tags', 'tagname', True, 'file', False),
                            ('_cfg_file list tags write', 'tagname', True, 'file', False),
                            ('_cfg_file write users', 'rolepat', True, 'file', False),
                            ('_cfg_help', 'text', False, 'file', False),
                            ('_cfg_home', 'text', False, 'file', False),
-                           ('_cfg_local files immutable', 'text', False, 'file', False),
+                           ('_cfg_local files immutable', 'empty', False, 'file', False),
                            ('_cfg_log path', 'text', False, 'file', False),
                            ('_cfg_logo', 'text', False, 'file', False),
                            ('_cfg_policy remappings', 'text', True, 'file', False),
-                           ('_cfg_remote files immutable', 'text', False, 'file', False),
+                           ('_cfg_remote files immutable', 'empty', False, 'file', False),
                            ('_cfg_store path', 'text', False, 'file', False),
                            ('_cfg_subtitle', 'text', False, 'file', False),
                            ('_cfg_tag list tags', 'tagname', True, 'file', False),
                            ('_cfg_tagdef write users', 'rolepat', True, 'file', False),
                            ('_cfg_template path', 'text', False, 'file', False),
                            ('_cfg_webauthn home', 'text', False, 'file', False),
-                           ('_cfg_webauthn require', 'text', False, 'file', False) ]:
+                           ('_cfg_webauthn require', 'empty', False, 'file', False) ]:
             deftagname, typestr, multivalue, writepolicy, unique = prototype
             self.static_tagdefs.append(web.Storage(tagname=deftagname,
                                                    owner=None,
@@ -417,12 +422,10 @@ class Application:
         self.static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in self.static_tagdefs ] )
 
         # BEGIN: get runtime parameters from database
+        self.globals['tagdefsdict'] = self.static_tagdefs # need these for select_config() below
 
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
-
-        # we need this early for select_config() to work... so it's not optional anymore
-        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
         # get full config
         self.config = self.select_config()
@@ -638,6 +641,9 @@ class Application:
                 user = None
                 roles = set()
             self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
+
+        # we need to re-do this after having proper authn info
+        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatch(self, uri):
         def body():
@@ -1105,19 +1111,22 @@ class Application:
                 elif policy in [ 'fowner', 'file' ]:
                     return None
                 elif policy == 'tag':
+                    if tagdef.tagname == 'list on homepage':
+                        web.debug(mode, tagdef, self.authn.roles, 'tag' + mode[0:4] + 'ers')
                     return tagdef.owner in self.authn.roles \
                            or len(set(self.authn.roles)
-                                  .union(['*'])
-                                  .intersection(set(tagdef['tag'] + mode[0:4] + 'ers'))) > 0
+                                  .union(set(['*']))
+                                  .intersection(set(tagdef['tag' + mode[0:4] + 'ers']))) > 0
                 elif policy == 'users':
                     return self.authn.role != None
                 else:
                     # policy == 'anonymous'
                     return True
             
-            for mode in 'read', 'write':
+            for mode in ['read', 'write']:
                 tagdef['%sok' % mode] = compute_authz(mode, tagdef)
-                return tagdef
+
+            return tagdef
             
         if tagname:
             predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]

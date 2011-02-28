@@ -884,7 +884,7 @@ class FileTags (Node):
         #web.debug(system, userdefined, all)
         status = web.ctx.status
         try:
-            self.validate_predlist_unique()
+            self.validate_predlist_unique(acceptName=True)
             self.globals['version'] = None
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('', files[0], all)])
