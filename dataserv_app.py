@@ -1111,8 +1111,6 @@ class Application:
                 elif policy in [ 'fowner', 'file' ]:
                     return None
                 elif policy == 'tag':
-                    if tagdef.tagname == 'list on homepage':
-                        web.debug(mode, tagdef, self.authn.roles, 'tag' + mode[0:4] + 'ers')
                     return tagdef.owner in self.authn.roles \
                            or len(set(self.authn.roles)
                                   .union(set(['*']))
