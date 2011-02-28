@@ -608,6 +608,9 @@ class Tagdef (Node):
                 self.multivalue = False
 
         def body():
+            if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                raise Forbidden('creation of tag definitions')
+                
             results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
             if len(results) > 0:
                 raise Conflict(data="Tag %s is already defined." % self.tag_id)
@@ -661,6 +664,9 @@ class Tagdef (Node):
 
         def body():
             if self.action == 'add':
+                if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                    raise Forbidden('creation of tag definitions')
+                
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
                     self.typestr, self.readpolicy, self.writepolicy, self.multivalue = self.tagdefs[tagname]

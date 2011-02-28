@@ -238,6 +238,7 @@ class Application:
                                         ('contact', None),
                                         ('file list tags', []),
                                         ('file list tags write', []),
+                                        ('file write users', []),
                                         ('help', None),
                                         ('home', 'https://%s' % self.hostname),
                                         ('local files immutable', False),
@@ -248,6 +249,7 @@ class Application:
                                         ('subtitle', ''),
                                         ('logo', ''),
                                         ('tag list tags', []),
+                                        ('tagdef write users', []),
                                         ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
                                         ('webauthn home', None),
                                         ('webauthn require', 'False') ]
@@ -384,6 +386,7 @@ class Application:
                            ('_cfg_contact', 'text', False, 'file', False),
                            ('_cfg_file list tags', 'tagname', True, 'file', False),
                            ('_cfg_file list tags write', 'tagname', True, 'file', False),
+                           ('_cfg_file write users', 'rolepat', True, 'file', False),
                            ('_cfg_help', 'text', False, 'file', False),
                            ('_cfg_home', 'text', False, 'file', False),
                            ('_cfg_local files immutable', 'text', False, 'file', False),
@@ -394,6 +397,7 @@ class Application:
                            ('_cfg_store path', 'text', False, 'file', False),
                            ('_cfg_subtitle', 'text', False, 'file', False),
                            ('_cfg_tag list tags', 'tagname', True, 'file', False),
+                           ('_cfg_tagdef write users', 'rolepat', True, 'file', False),
                            ('_cfg_template path', 'text', False, 'file', False),
                            ('_cfg_webauthn home', 'text', False, 'file', False),
                            ('_cfg_webauthn require', 'text', False, 'file', False) ]:

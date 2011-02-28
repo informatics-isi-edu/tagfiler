@@ -480,6 +480,8 @@ cfgtagdef 'tag list tags' text      ""      file        file       true       ta
 tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
 cfgtagdef 'file list tags write' text ""    file        file       true       tagname
+cfgtagdef 'tagdef write users' text ""      file        file       true       rolepat
+cfgtagdef 'file write users' text   ""      file        file       true       rolepat
 cfgtagdef home          text        ""      file        file       false
 cfgtagdef 'webauthn home' text      ""      file        file       false
 cfgtagdef 'webauthn require' empty  ""      file        file       false
@@ -528,8 +530,12 @@ cfgtag "client download chunks"
 cfgtag "client socket buffer size" int8 '8192'
 cfgtag "client chunk bytes" int8 '4194304'
 
+cfgtag "file write users" text "*" "admin"
+cfgtag "tagdef write users" text "*" "admin"
+
 cfgtag "file list tags" text bytes owner 'read users' 'write users'
 cfgtag "file list tags write" text 'read users' 'write users' 'owner'
+
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'

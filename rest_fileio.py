@@ -755,6 +755,8 @@ class FileIO (Application):
                 # not found w/ unique predlist is not to be confused with creating new files
                 raise
             # not found and not unique, treat as new file put
+            if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                raise Forbidden('creation of datasets')
 
         return None
 
