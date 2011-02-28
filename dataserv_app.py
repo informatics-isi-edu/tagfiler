@@ -1083,7 +1083,7 @@ class Application:
                        'tag read users': 'tagreaders',
                        'tag write users': 'tagwriters' }
 
-    def select_tagdef(self, tagname=None, predlist=[], order=None):
+    def select_tagdef(self, tagname=None, predlist=[], order=None, enforce_read_authz=True):
         listtags = [ 'owner' ]
                            
         listtags += Application.tagdef_listas.keys()
@@ -1120,7 +1120,7 @@ class Application:
         else:
             predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs) ]
+        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
 
@@ -1363,7 +1363,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True):
 
         def dbquote(s):
             return s.replace("'", "''")
@@ -1425,10 +1425,10 @@ class Application:
                 if tag == 'id':
                     raise Conflict('The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
                 outertables.append((self.wraptag(tag), 't%s' % p ))
-                if tagdef.readok == False:
+                if tagdef.readok == False and enforce_read_authz:
                     # this tag cannot be read so act like it is absent
                     wheres.append('True')
-                elif tagdef.readpolicy == 'fowner':
+                elif tagdef.readpolicy == 'fowner' and enforce_read_authz:
                     # this tag rule is more restrictive than file or static checks already done
                     # act like it is NULL if user isn't allowed to read this tag
                     wheres.append('t%s.subject IS NULL OR (_owner.value NOT IN (%s))' % (p, role_val_list))
@@ -1438,11 +1438,11 @@ class Application:
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
-                if tagdef.readok == False:
+                if tagdef.readok == False and enforce_read_authz:
                     # this predicate is conjunctive with access denial
                     wheres.append('False')
                 else:
-                    if tagdef.readpolicy == 'fowner':
+                    if tagdef.readpolicy == 'fowner' and enforce_read_authz:
                         # this predicate is conjunctive with more restrictive access check, which we only need to add once
                         need_fowner_test = True
                                     
@@ -1460,12 +1460,19 @@ class Application:
                         wheres.append(" OR ".join(valpreds))
                     
 
-        if need_fowner_test:
-            # at least one predicate test requires fowner-based read access rights
-            wheres.append('_owner.value IN (%s)' % role_val_list)
+        if enforce_read_authz:
+            if need_fowner_test:
+                # at least one predicate test requires fowner-based read access rights
+                wheres.append('_owner.value IN (%s)' % role_val_list)
 
-        # all results are filtered by file read access rights
-        wheres.append('_owner.value IN (%s) OR "_read users".value IN (%s)' % (role_val_list, role_val_list))
+            # all results are filtered by file read access rights
+            wheres.append('_owner.value IN (%s) OR "_read users".value IN (%s)' % (role_val_list, role_val_list))
+            # compute read access rights for later consumption
+            selects.append('bool_or(True) AS readok')
+        else:
+            # compute read access rights for later consumption
+            selects.append('bool_or(_owner.value IN (%s) OR "_read users".value IN (%s)) AS readok' % (role_val_list, role_val_list))
+            
         # compute file write access rights for later consumption
         selects.append('bool_or(_owner.value IN (%s) OR "_write users".value IN (%s)) AS writeok' % (role_val_list, role_val_list))
 
@@ -1513,19 +1520,19 @@ class Application:
                        + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables2[1:] ]
         outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ]
 
-        # this query produces a set of (subject, owner, writeok) rows that match the query result set
+        # this query produces a set of (subject, owner, readok, writeok) rows that match the query result set
         subject_query = 'SELECT %s' % ','.join(selects) \
                         + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
                         + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
                         + ' GROUP BY subject, owner'
 
         # now build the outer query that attaches listtags metadata to results
-        selects = ['subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
+        selects = ['subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
         innertables = [('(%s)' % subject_query, 'subjects')]
         outertables = []
-        groupbys = ['subjects.subject', 'subjects.owner', 'subjects.writeok']
+        groupbys = ['subjects.subject', 'subjects.owner', 'subjects.readok', 'subjects.writeok']
 
-        jointags = set(['subject', 'id', 'owner', 'writeok'])
+        jointags = set(['subject', 'id', 'owner', 'writeok', 'readok'])
 
         # add custom per-file single-val tags to results
         singlevaltags = [ tagname for tagname in listtags
@@ -1561,7 +1568,7 @@ class Application:
                        + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables[1:] ]
         outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables ]
 
-        # this query produces a set of (subject, owner, writeok) rows that match the query result set
+        # this query produces a set of (subject, owner, readok, writeok, other tags...) rows that match the query result set
         value_query = 'SELECT %s' % ','.join(selects) \
                         + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
                         + ' GROUP BY %s' % ','.join(groupbys)
@@ -1579,7 +1586,7 @@ class Application:
         #web.debug(query)
         return (value_query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None):
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True):
         def select_clause(listtag):
             if listas.has_key(listtag):
                 return '%s AS %s' % (self.wraptag(listtag, prefix=""), self.wraptag(listas[listtag], prefix=""))
@@ -1590,13 +1597,13 @@ class Application:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
 
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs)
-            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['writeok', 'owner', 'id'])) ]),
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz)
+            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['readok', 'writeok', 'owner', 'id'])) ]),
                                                   query)
             if ordertags:
                 query += " ORDER BY " + ",".join([self.wraptag(tag, prefix='') for tag in ordertags])
         else:
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id, version, versions=versions, tagdefs=tagdefs)
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -1647,7 +1654,7 @@ class Application:
             
         if listtags == None:
             listtags = self.listtags
-        listtags = set(listtags).union(set(['writeok', 'owner', 'id', 'view']))
+        listtags = set(listtags).union(set(['readok', 'writeok', 'owner', 'id', 'view']))
         
         selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
                     for listtag in listtags ]

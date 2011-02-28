@@ -508,10 +508,8 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, None)
-                     for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagname') ]
-            userdefined = [ ( tagdef.tagname, tagdef.typestr, tagdef.multivalue, tagdef.readpolicy, tagdef.writepolicy, tagdef.owner)
-                     for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagname') ]
+            predefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagname') ]
+            userdefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagname') ]
             types = self.get_type()
             
             return (predefined, userdefined, types)
@@ -522,8 +520,8 @@ class Tagdef (Node):
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
             return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting('User', test_tagdef_authz),
-                                    self.render.TagdefExisting('System', test_tagdef_authz)])
+                                   [self.render.TagdefExisting('User', userdefined),
+                                    self.render.TagdefExisting('System', predefined )])
 
         if len(self.queryopts) > 0:
             raise BadRequest(data="Query options are not supported on this interface.")
@@ -610,7 +608,7 @@ class Tagdef (Node):
                 self.multivalue = False
 
         def body():
-            results = self.select_tagdef(self.tag_id)
+            results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
             if len(results) > 0:
                 raise Conflict(data="Tag %s is already defined." % self.tag_id)
             self.insert_tagdef()
@@ -666,7 +664,7 @@ class Tagdef (Node):
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
                     self.typestr, self.readpolicy, self.writepolicy, self.multivalue = self.tagdefs[tagname]
-                    results = self.select_tagdef(self.tag_id)
+                    results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
                     if len(results) > 0:
                         raise Conflict(data="Tag %s is already defined." % self.tag_id)
                     self.insert_tagdef()

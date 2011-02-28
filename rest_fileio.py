@@ -122,7 +122,7 @@ class FileIO (Application):
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
 
-    def populate_subject(self):
+    def populate_subject(self, enforce_read_authz=True):
         self.unique = self.validate_predlist_unique(acceptName=True)
 
         # override self.versions ?
@@ -136,7 +136,8 @@ class FileIO (Application):
                                                 listtags=['dtype', 'content-type', 'bytes', 'url',
                                                           'modified', 'modified by', 'name', 'version', 'Image Set',
                                                           'tagdef', 'typedef', 'config', 'view'],
-                                                versions=self.versions)
+                                                versions=self.versions,
+                                                enforce_read_authz=enforce_read_authz)
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
         self.subject = results[0]
@@ -729,7 +730,9 @@ class FileIO (Application):
     def putPreWriteBody(self):
         status = web.ctx.status
         try:
-            self.populate_subject()
+            self.populate_subject(enforce_read_authz=False)
+            if not self.subject.readok:
+                raise Forbidden('access to file "%s"' % predlist_linearize(self.predlist))
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
             if self.update:
