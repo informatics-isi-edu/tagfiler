@@ -401,7 +401,7 @@ class FileIO (Application):
                 name = dict([ (pred['tag'], pred['vals'][0]) for pred in self.predlist
                               if pred['op'] == '=' and len(pred['vals']) > 0 ]).get('name', None)
                 if name == None:
-                    raise BadRequest('POST action=define method to upload files requires name=... key data')
+                    raise BadRequest('POST action=define method to upload files requires name=... key data.')
                 self.globals['datapred'] = 'name=%s' % urlquote(name)
                 try:
                     self.populate_subject()
@@ -429,7 +429,7 @@ class FileIO (Application):
                     return self.renderlist("Register a dataset",
                                            [self.render.DatasetForm(suffix)])
                 else:
-                    raise BadRequest(data='Unexpected dataset type "%s"' % self.filetype)
+                    raise BadRequest(data='Unexpected dataset type "%s".' % self.filetype)
 
             return self.dbtransact(body, postCommit)
         else:
@@ -641,7 +641,7 @@ class FileIO (Application):
                     t.rollback()
                     raise
             elif len(srcroles) > 1:
-                raise Conflict("Ambiguous remap rules encountered")
+                raise Conflict("Ambiguous remap rules encountered.")
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
@@ -785,7 +785,7 @@ class FileIO (Application):
 
             if clen != None:
                 if clast - cfirst + 1 != clen:
-                    raise BadRequest(data='Range: %s does not match content-length %s' % (content_range, clen))
+                    raise BadRequest(data='Range: %s does not match content-length %s.' % (content_range, clen))
             else:
                 clen = clast - cfirst + 1
 
@@ -1072,7 +1072,7 @@ class LogFileIO (FileIO):
             raise Forbidden('read access to log file "%s"' % self.name)
 
         if not self.config['log path']:
-            raise Conflict('log_path is not configured on this server')
+            raise Conflict('log_path is not configured on this server.')
 
         if self.queryopts.get('action', None) == 'view':
             disposition_name = None

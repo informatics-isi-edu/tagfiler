@@ -189,14 +189,14 @@ class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '400 Bad Request'
-        desc = 'The request is malformed. %s.'
+        desc = 'The request is malformed. %s'
         WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
     def __init__(self, data='', headers={}):
         status = '409 Conflict'
-        desc = 'The request conflicts with the state of the server. %s.'
+        desc = 'The request conflicts with the state of the server. %s'
         WebException.__init__(self, status, headers=headers, data=data, desc=desc)
 
 class IntegrityError (WebException):
@@ -575,7 +575,7 @@ class Application:
         try:
             remap = buildPolicyRules([rule], fatal=True)
         except (ValueError, KeyError):
-            raise BadRequest('Supplied rule "%s" is invalid for tag "%s"' % (rule, tagname))
+            raise BadRequest('Supplied rule "%s" is invalid for tag "%s".' % (rule, tagname))
         srcrole, mapping = remap.items()[0]
         if self.config['policy remappings'].has_key(srcrole):
             raise BadRequest('Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
@@ -777,7 +777,7 @@ class Application:
                     except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                         t.rollback()
                         self.logException('database error in transaction body')
-                        raise BadRequest(data='Logical error: ' + str(te))
+                        raise BadRequest(data='Logical error: %s.' % str(te))
                     except TypeError, te:
                         t.rollback()
                         self.logException('programming error in transaction body')
@@ -1644,7 +1644,7 @@ class Application:
 
             if e < len(path) - 1:
                 if len(listtags) != 1:
-                    raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags" % (e, len(path), len(listtags)))
+                    raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags." % (e, len(path), len(listtags)))
                 projection = listtags[0]
                 if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id', 'tagname', 'viewname' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)

@@ -796,7 +796,7 @@ class FileTags (Node):
             if self.typestr == 'url':
                 return '\n'.join(values + [''])
             else:
-                raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s"' % self.typestr)
+                raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s".' % self.typestr)
         elif self.contentType == 'text/plain':
             return '\n'.join(values) + '\n'
         else:
