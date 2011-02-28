@@ -1137,7 +1137,8 @@ class Application:
                  ('tagdef active', None),
                  ('tagdef type', self.typestr),
                  ('tagdef readpolicy', self.readpolicy),
-                 ('tagdef writepolicy', self.writepolicy) ]
+                 ('tagdef writepolicy', self.writepolicy),
+                 ('read users', '*') ]
         if owner:
             tags.append( ('owner', owner) )
         if self.multivalue:
