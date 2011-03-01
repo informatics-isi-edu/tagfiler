@@ -432,20 +432,21 @@ tagacl "homepage order" write "${admin}"
 homepath="https://${HOME_HOST}/${SVCPREFIX}"
 
 homelinks=(
-$(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"        "${admin}")
-$(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define" "${admin}")
-$(dataset "Upload study" url "${homepath}/study?action=upload"                   "${admin}" "${curator}" "${uploader}")
-$(dataset "Download study" url "${homepath}/study?action=download"               "${admin}" "${curator}" "${downloader}")
-$(dataset "Query by tags, latest versions" url "${homepath}/query?action=edit"   "${admin}" "${curator}" "${downloader}")
-$(dataset "Query by tags, all versions" url "${homepath}/query?action=edit&versions=any"   "${admin}" "${curator}" "${downloader}")
-$(dataset "View tag definitions" url "${homepath}/query/tagdef?view=tagdef"      "${admin}" "*")
+$(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}")
+$(dataset "Upload study"                         url "${homepath}/study?action=upload"             "${admin}" "${curator}" "${uploader}")
+$(dataset "Download study"                       url "${homepath}/study?action=download"           "${admin}" "${curator}" "${downloader}")
+$(dataset "Query by tags, latest versions"       url "${homepath}/query?action=edit"               "${admin}" "${curator}" "${downloader}")
+$(dataset "Query by tags, all versions"          url "${homepath}/query?action=edit&versions=any"  "${admin}" "${curator}" "${downloader}")
+$(dataset "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*")
+$(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}")
+$(dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}")
 )
 
 i=0
 while [[ $i -lt "${#homelinks[*]}" ]]
 do
    tag "${homelinks[$i]}" "list on homepage"
-   tag "${homelinks[$i]}" "homepage order" int8 "$i"
+   tag "${homelinks[$i]}" "homepage order" int8 "$(( $i + 100 ))"
    i=$(( $i + 1 ))
 done
 
