@@ -1287,6 +1287,16 @@ class Application:
             query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
             self.db.query(query, vars=vars)
 
+        # update in-memory representation too for caller's sake
+        if tagdef.multivalue:
+            subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
+        else:
+            results = self.select_tag_noauthn(subject, tagdef)
+            if len(results) > 0:
+                subject[tagdef.tagname] = results[0].value
+            else:
+                subject[tagdef.tagname] = None
+            
     def downcast_value(self, dbtype, value):
         if dbtype == 'int8':
             value = int(value)
@@ -1345,6 +1355,12 @@ class Application:
         vars = dict(subject=subject.id, value=value, tagname=tagdef.tagname)
         #web.debug(query, vars)
         self.db.query(query, vars=vars)
+
+        # update in-memory representation too for caller's sake
+        if tagdef.multivalue:
+            subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
+        else:
+            subject[tagdef.tagname] = self.select_tag_noauthn(subject, tagdef)[0].value
         
         results = self.select_filetags_noauthn(subject, tagdef.tagname)
         if len(results) == 0:

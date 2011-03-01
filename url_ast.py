@@ -1002,6 +1002,11 @@ class FileTags (Node):
                         self.enforce_tag_authz('write', subfile, tagdef)
                         self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
                         self.set_tag(subfile, tagdef, value)
+
+        if not self.referer:
+            # set updated referer based on updated subject, unless client provided a referer
+            self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
+            
         return None
 
     def put_postCommit(self, results):
@@ -1066,6 +1071,11 @@ class FileTags (Node):
                 self.enforce_tag_authz('write', subfile, tagdef)
                 self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=self.tag_id, value=self.value)
                 self.delete_tag(subfile, tagdef, self.value)
+
+        if not self.referer:
+            # set updated referer based on updated subject, unless client provided a referer
+            self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
+            
         return None
 
     def delete_postCommit(self, results):
@@ -1123,7 +1133,7 @@ class FileTags (Node):
             try:
                 self.referer = storage.referer
             except:
-                self.referer = '/tags/' + predlist_linearize(self.predlist)
+                self.referer = None
         except:
             raise BadRequest(data="Error extracting form data.")
 
