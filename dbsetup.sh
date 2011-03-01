@@ -34,6 +34,7 @@ echo "create core tables..."
 
 psql -q -t <<EOF
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
+CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
 EOF
@@ -290,14 +291,24 @@ tagdef_table()
          uniqueval='UNIQUE(subject)'
       fi
 
+      # hack to use implicit indexes created by postgresql rather than creating redundant indexes
+      # UNIQUE(subject, value) implies index _$1_subject_key on (subject, value)
+      # UNIQUE(subject) implies index _$1_subject_key on (subject)
+
       psql -q -t <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
-CREATE INDEX "_$1_value_idx" ON "_$1" (value);
+$(if [[ "$uniqueval" = "UNIQUE(subject)" ]] ; then 
+     echo "CREATE INDEX \"_$1_subject_value_idx\" ON \"_$1\" (subject, value);" ;
+     echo "CLUSTER \"_$1\" USING \"_$1_subject_value_idx\";" ;
+  else ;
+     echo "CLUSTER \"_$1\" USING \"_$1_subject_key\";" ;
+  fi)
 EOF
    else
       psql -q -t <<EOF
 CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (subject) ON DELETE CASCADE );
+CLUSTER "_$1" USING "_$1_subject_key";
 EOF
    fi
 }
@@ -404,6 +415,7 @@ tagdef "Image Set"    empty       "${admin}"   file   file       false
 
 psql -q -t <<EOF
 CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
+CLUSTER subjecttags USING subjecttags_subject_key;
 EOF
 
 tagdefs_complete
