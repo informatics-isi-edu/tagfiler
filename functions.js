@@ -577,13 +577,7 @@ function renderTagdefs(table) {
     }
 
     for (i=1; i<rows.length; i++) {
-	if (rows[i].getAttribute("class") == "tagdef") {
-	    if ( i % 2 == 1 ) {
-		rows[i].className = "tagdef odd";
-	    }
-	    else {
-		rows[i].className = "tagdef even";
-	    }
+	if ( (rows[i].getAttribute("class") == "tagdef writeok") || (rows[i].getAttribute("class") == "tagdef readonly") ) {
 	    var cells = rows[i].children;
 	    var namecell = cells[columnmap["tagname"]];
 	    var tagname = namecell.innerHTML;
@@ -607,13 +601,21 @@ function renderTagdefs(table) {
 	    var writepolcell = cells[columnmap["writepolicy"]];
 	    writepolcell.innerHTML = policy[writepolcell.innerHTML];
 
-	    namecell.innerHTML = "<form "
-		+ "encoding=\"application/x-www-url-encoded\" "
-		+ "action=\"/tagfiler/tagdef\" method=\"post\">"
-		+ "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
-		+ "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
-		+ "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
-		+ tagname + "</form>";
+	    if ( rows[i].getAttribute("class") == "tagdef writeok" ) {
+		namecell.innerHTML = "<form "
+		    + "encoding=\"application/x-www-url-encoded\" "
+		    + "action=\"/tagfiler/tagdef\" method=\"post\">"
+		    + "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
+		    + "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
+		    + "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
+		    + tagname + "</form>";
+	    }
+	    if ( i % 2 == 1 ) {
+		rows[i].className = "tagdef odd";
+	    }
+	    else {
+		rows[i].className = "tagdef even";
+	    }
 	}
     }
 }

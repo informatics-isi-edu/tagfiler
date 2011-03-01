@@ -445,6 +445,7 @@ class Application:
         self.globals['homepath'] = web.ctx.homepath
 
         # copy many config values to globals map for templates
+        self.globals['config'] = self.config
         self.globals['help'] = self.config.help
         self.globals['bugs'] = self.config.bugs
         self.globals['subtitle'] = self.config.subtitle

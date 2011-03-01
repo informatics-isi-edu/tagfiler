@@ -29,7 +29,7 @@ $ typedict = dict(typenames)
 <th name="readpolicy">readpolicy</th>
 <th name="writepolicy">writepolicy</th>
 </tr>
-$if title == 'User':
+$if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config['tagdef write users']))) > 0:
 	<tr class="tagdefcreate">
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 	<td><input name="tag-1" type="text" /></td>
@@ -60,7 +60,11 @@ $if title == 'User':
 	<tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></form></tr>
 $ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 $for tagdef in tagdefs:
-	<tr class="tagdef"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
+	$if tagdef.owner in authn.roles:
+		$ writeclass = 'writeok'
+	$else:
+		$ writeclass = 'readonly'
+	<tr class="tagdef ${writeclass}"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
 </table>
 <script type="text/javascript">
 renderTagdefs(document.getElementById("${idquote(title) + '_tagdefs'}"));
