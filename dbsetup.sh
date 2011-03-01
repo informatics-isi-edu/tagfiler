@@ -432,7 +432,6 @@ tagacl "homepage order" write "${admin}"
 homepath="https://${HOME_HOST}/${SVCPREFIX}"
 
 homelinks=(
-$(dataset "Manage roles" url "https://${HOME_HOST}/webauthn/roles"               "${admin}")
 $(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"        "${admin}")
 $(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define" "${admin}")
 $(dataset "Upload study" url "${homepath}/study?action=upload"                   "${admin}" "${curator}" "${uploader}")
@@ -549,7 +548,7 @@ cfgtag "file write users" text "*" "admin"
 cfgtag "tagdef write users" text "*" "admin"
 
 cfgtag "file list tags" text bytes owner 'read users' 'write users'
-cfgtag "file list tags write" text 'read users' 'write users' 'owner'
+#cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...
