@@ -156,7 +156,7 @@ def buildPolicyRules(rules, fatal=False):
 class WebException (web.HTTPError):
     def __init__(self, status, data='', headers={}, desc='%s'):
         self.detail = urlquote(desc % data)
-        web.debug(self.detail, desc, data)
+        #web.debug(self.detail, desc, data)
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
