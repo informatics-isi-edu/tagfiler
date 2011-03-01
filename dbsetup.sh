@@ -152,24 +152,39 @@ tag()
    local file="$1"
    local tagname="$2"
    local typestr="$3"
+   local count
    shift 3
 
    echo "set /tags/$file/$tagname=" "$@"
    if [[ -z "$typestr" ]] || [[ $# -eq 0 ]]
    then
-      cat <<EOF
+       count=$(psql -A -t -q <<EOF
+SELECT count(*) FROM "_$tagname" WHERE subject = '$file';
+EOF
+       )
+       if [[ $count -eq 0 ]]
+	   then
+	   psql -q -t <<EOF
 INSERT INTO "_$tagname" ( subject ) VALUES ( '$file' );
 EOF
+       fi
    elif [[ $# -gt 0 ]]
    then
-      while [[ $# -gt 0 ]]
-      do
-	cat <<EOF
+       while [[ $# -gt 0 ]]
+	 do
+	 count=$(psql -A -t -q <<EOF
+SELECT count(*) FROM "_$tagname" WHERE subject = '$file' AND value = '$1';
+EOF
+	 )
+	 if [[ $count -eq 0 ]]
+	     then
+	     psql -q -t <<EOF
 INSERT INTO "_$tagname" ( subject, value ) VALUES ( '$file', '$1' );
 EOF
+	 fi
          shift
       done
-   fi | psql -q -t
+   fi
 
    # add to filetags only if this insert changes status
    untracked=$(psql -A -t -q <<EOF
