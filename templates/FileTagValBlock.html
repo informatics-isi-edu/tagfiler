@@ -14,7 +14,10 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-$ writetags = [ tag for tag in writetags ]
+$if writetags:
+	$ writetags = [ tag for tag in writetags ]
+$else:
+	$ writetags = []
 $ tagnames = tagdefsdict.iterkeys()
 $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
