@@ -623,6 +623,8 @@ class Application:
     def preDispatchFake(self, uri, app):
         self.db = app.db
         self.set_authn(app.authn)
+        # we need to re-do this after having proper authn info
+        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatchCore(self, uri, setcookie=True):
         if self.globals['webauthnhome']:

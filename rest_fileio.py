@@ -1044,7 +1044,7 @@ class FileIO (Application):
                     self.url = storage.url
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
-                    self.url = storage.url + '?title=%s' % urlquote(self.data_id)
+                    self.url = storage.url + '?title=%s' % urlquote(storage.name)
                 elif self.action == 'putdq':
                     self.dtype = storage.type
                     if storage.type in [ 'contains', 'vcontains' ]:
