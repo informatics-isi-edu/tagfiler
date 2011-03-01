@@ -24,11 +24,11 @@
 # role mapping used in default data and ACLs
 
 # default for trial-data demo
-admin=${admin:-admin}
-uploader=${uploader:-uploader}
-downloader=${downloader:-downloader}
-curator=${curator:-coordinator}
-grader=${grader:-grader}
+admin="${admin:-admin}"
+uploader="${uploader:-uploader}"
+downloader="${downloader:-downloader}"
+curator="${curator:-coordinator}"
+grader="${grader:-grader}"
 
 # alternates
 #admin=MISD
@@ -118,7 +118,7 @@ chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
 chmod a+x /home/${SVCUSER}/dbsetup.sh
 
 # setup db tables
-runuser -c "~${SVCUSER}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} ${admin} ${uploader} ${downloader} ${curator} ${grader}" - ${SVCUSER}
+runuser -c "~${SVCUSER}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\"" - ${SVCUSER}
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
