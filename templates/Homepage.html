@@ -25,14 +25,15 @@ $if len(files) > 0:
 		$ datapred, dataid, dataname = subject2identifiers(file, showversions=showversions)
 		<li><a href="${home}/file/${datapred}">${dataname}</a>
 		$if file.writeok:
-			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
+			<ul><li><form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
 			    <div>
 			    <input type="hidden" name="action" value="delete" />
 			    <input type="hidden" name="referer" value="${referer}" />
 			    <input type="submit" value="Delete" />
 			    </div>
-			</form>
-			Replace with: <a href="${home}/file/${datapred}?action=define&amp;type=file">file</a>, <a href="${home}/file/${datapred}?action=define&amp;type=url">url</a>, <a href="${home}/file/${datapred}?action=define&amp;type=dataset">dataset</a>
+			</form></li>
+			<li>Replace with: <a href="${home}/file/${datapred}?action=define&amp;type=file">file</a>, <a href="${home}/file/${datapred}?action=define&amp;type=url">url</a>, <a href="${home}/file/${datapred}?action=define&amp;type=dataset">dataset</a></li>
+			</ul>
 		</li>
 	</ol>
 $else:

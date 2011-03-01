@@ -343,8 +343,7 @@ class FileList (Node):
             self.setNoCache()
             if self.homepage:
                 return self.renderlist(None,
-                                       [self.render.Commands(),
-                                        self.render.Homepage(files)])
+                                       [self.render.Homepage(files)])
             else:
                 return self.renderlist(None,
                                        [self.render.Commands(),
