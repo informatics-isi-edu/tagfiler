@@ -591,6 +591,20 @@ do
    tag "$viewtags" "_cfg_tag list tags" "tagname" "$tagname"
 done
 
+vcontainstags=$(dataset "vcontains" view "${admin}" "*")
+for tagname in "vcontains"
+do
+   tag "$vcontainstags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$vcontainstags" "_cfg_tag list tags" "tagname" "$tagname"
+done
+
+containstags=$(dataset "contains" view "${admin}" "*")
+for tagname in "contains"
+do
+   tag "$containstags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$containstags" "_cfg_tag list tags" "tagname" "$tagname"
+done
+
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...
 # semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
