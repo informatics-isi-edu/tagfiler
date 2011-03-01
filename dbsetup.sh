@@ -398,8 +398,8 @@ tagdef contains       text        ""      file        file       true       file
 tagdef vcontains      text        ""      file        file       true       vfile
 tagdef key            text        ""      anonymous   file       false      ""         true
 
-tagdef "list on homepage" empty   ""      anonymous   tag        false
-tagdef "homepage order" int8      ""      anonymous   tag        false
+tagdef "list on homepage" empty   "${admin}"      anonymous   tag        false
+tagdef "homepage order" int8      "${admin}"      anonymous   tag        false
 tagdef "Image Set"    empty       "${admin}"   file   file       false
 
 psql -q -t <<EOF

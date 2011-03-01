@@ -322,8 +322,10 @@ class FileList (Node):
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
                 self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
+                self.homepage = True
             else:
                 self.predlist=[]
+                self.homepage = False
 
             if self.globals['tagdefsdict'].has_key('homepage order'):
                 ordertags = ['homepage order']
@@ -339,9 +341,14 @@ class FileList (Node):
         def postCommit(files):
             target = self.config['home'] + web.ctx.homepath
             self.setNoCache()
-            return self.renderlist(None,
-                                   [self.render.Commands(),
-                                    self.render.FileList(files)])
+            if self.homepage:
+                return self.renderlist(None,
+                                       [self.render.Commands(),
+                                        self.render.Homepage(files)])
+            else:
+                return self.renderlist(None,
+                                       [self.render.Commands(),
+                                        self.render.FileList(files)])
 
         action = None
         name = None
