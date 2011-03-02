@@ -1401,7 +1401,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True, limit=None):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
 
         def dbquote(s):
             return s.replace("'", "''")
@@ -1416,14 +1416,15 @@ class Application:
 
         # make sure we have no repeats in listtags before embedding in query
         listtags = set(listtags)
-        listtags = listtags.union( set(['read users',
-                                        'write users',
-                                        'owner',
-                                        'name',
-                                        'version',
-                                        'latest with name',
-                                        'modified']) )
-        listtags = listtags.union( set(ordertags) )
+        listtags_extra = listtags.union( set(['read users',
+                                              'write users',
+                                              'owner',
+                                              'name',
+                                              'version',
+                                              'latest with name',
+                                              'modified']) )
+        if ordertags:
+            listtags = listtags.union( set(ordertags) )
         listtags = [ t for t in listtags ]
 
         roles = [ r for r in self.authn.roles ]
@@ -1443,13 +1444,17 @@ class Application:
                 raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
 
         innertables = []  # (table, alias)
+        innertables_special = []
         outertables = [('_owner', None)]
+        outertables_special = []
         selects = ['subject AS subject', '_owner.value AS owner']
         wheres = []
         values = dict()
 
         need_fowner_test = False
-        role_val_list = ','.join(["'%s'" % dbquote(role) for role in roles])
+
+        with_prefix = 'WITH rawroles (role) AS ( VALUES %s )' % ','.join(["('%s')" % dbquote(role) for role in roles] + [ '( NULL )'])
+        with_prefix += ', roles (role) AS ( SELECT role FROM rawroles WHERE role IS NOT NULL ) '
 
         for p in range(0, len(predlist)):
             pred = predlist[p]
@@ -1469,10 +1474,18 @@ class Application:
                 elif tagdef.readpolicy == 'fowner' and enforce_read_authz:
                     # this tag rule is more restrictive than file or static checks already done
                     # act like it is NULL if user isn't allowed to read this tag
-                    wheres.append('t%s.subject IS NULL OR (_owner.value NOT IN (%s))' % (p, role_val_list))
+                    outertables_special.append( 'roles AS ownerrole_%d ON (_owner.value = ownerrole_%d.role)' % (p, p) )
+                    wheres.append('t%s.subject IS NULL OR (ownerrole_%d.role IS NULL)' % (p, p))
                 else:
                     # covers all cases where tag is more or equally permissive to file or static checks already done
                     wheres.append('t%s.subject IS NULL' % p)
+            elif op == 'IN':
+                # special internal operation to restrict by sub-query, doesn't need to be sanity checked
+                if tag == 'id':
+                    wheres.append('subject IN (%s)' % (vals))
+                else:
+                    innertables.append((self.wraptag(tag), 't%s' % p))
+                    wheres.append('t%s.value IN (%s)' % (p, vals))
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
@@ -1498,21 +1511,26 @@ class Application:
                         wheres.append(" OR ".join(valpreds))
                     
 
+        outertables_special.append( 'roles AS readerrole ON ("_read users".value = readerrole.role)' )
         if enforce_read_authz:
             if need_fowner_test:
                 # at least one predicate test requires fowner-based read access rights
-                wheres.append('_owner.value IN (%s)' % role_val_list)
+                innertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
+            else:
+                outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
 
             # all results are filtered by file read access rights
-            wheres.append('_owner.value IN (%s) OR "_read users".value IN (%s)' % (role_val_list, role_val_list))
+            wheres.append('ownerrole.role IS NOT NULL OR readerrole.role IS NOT NULL')
             # compute read access rights for later consumption
             selects.append('bool_or(True) AS readok')
         else:
             # compute read access rights for later consumption
-            selects.append('bool_or(_owner.value IN (%s) OR "_read users".value IN (%s)) AS readok' % (role_val_list, role_val_list))
+            outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
+            selects.append('bool_or(ownerrole.role IS NOT NULL OR readerrole.role IS NOT NULL) AS readok')
             
         # compute file write access rights for later consumption
-        selects.append('bool_or(_owner.value IN (%s) OR "_write users".value IN (%s)) AS writeok' % (role_val_list, role_val_list))
+        outertables_special.append( 'roles AS writerrole ON ("_write users".value = writerrole.role)' )
+        selects.append('bool_or(ownerrole.role IS NOT NULL OR writerrole.role IS NOT NULL) AS writeok')
 
         if id:
             # special single-entry lookup
@@ -1555,8 +1573,10 @@ class Application:
             return table + suffix
 
         innertables2 = [ rewrite_tablepair(innertables2[0]) ] \
-                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables2[1:] ]
-        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ]
+                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables2[1:] ] \
+                       + innertables_special
+        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ] \
+                       + outertables_special
 
         # this query produces a set of (subject, owner, readok, writeok) rows that match the query result set
         subject_query = 'SELECT %s' % ','.join(selects) \
@@ -1588,8 +1608,7 @@ class Application:
                 expr = '%s.value' % self.wraptag(tagname)
                 groupbys.append('%s.value' % self.wraptag(tagname))
             if tagdefs[tagname].readpolicy == 'fowner':
-                expr = 'CASE WHEN subjects.owner IN (%s)' % role_val_list \
-                       + ' THEN %s ELSE NULL END' % expr
+                expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
             selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
 
         # add custom per-file multi-val tags to results
@@ -1601,8 +1620,7 @@ class Application:
             groupbys.append('%s.value' % self.wraptag(tagname))
             expr = '%s.value' % self.wraptag(tagname)
             if tagdefs[tagname].readpolicy == 'fowner':
-                expr = 'CASE WHEN subjects.owner IN (%s)' % role_val_list \
-                       + ' THEN %s ELSE NULL END' % expr
+                expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
             selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
 
         innertables2 = [ rewrite_tablepair(innertables[0]) ] \
@@ -1614,6 +1632,9 @@ class Application:
                         + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
                         + ' GROUP BY %s' % ','.join(groupbys)
 
+        if not assume_roles:
+            value_query = with_prefix + value_query
+
         # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
         order_suffix = ['id']
         for tagname in [ 'typedef', 'tagdef', 'view', 'config', 'name' ]:
@@ -1622,9 +1643,10 @@ class Application:
         if 'modified' in listtags:
             order_suffix.insert(0, 'modified DESC NULLS LAST')
 
-        value_query += " ORDER BY " + ", ".join([self.wraptag(tag, prefix='') for tag in ordertags] + order_suffix)
+        if ordertags != None:
+            value_query += " ORDER BY " + ", ".join([self.wraptag(tag, prefix='') for tag in ordertags] + order_suffix)
 
-        #web.debug(query)
+        #web.debug(value_query)
         return (value_query, values)
 
     def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
@@ -1657,55 +1679,52 @@ class Application:
         return self.db.query(query, vars=values)
 
     def build_files_by_predlist_path(self, path=None, versions='latest', limit=None):
-        if path == None:
-            path = [ ([], [], []) ]
-
-        queries = []
         values = dict()
         tagdefs = self.globals['tagdefsdict']
-
-        context = ''
-        context_attr = None
-
-        for e in range(0, len(path)):
-            predlist, listtags, ordertags = path[e]
-            if e < len(path) - 1:
-                use_limit = None
+        
+        def build_query_recursive(stack, qd, limit):
+            predlist, listtags, ordertags = stack[0]
+            predlist = [ p for p in predlist ]
+            if len(stack) == 1:
+                # this query element is not contextualized
+                q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                values.update(v)
+                return q
             else:
-                use_limit = limit
-            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view', 'config', 'tagdef'], ordertags, qd=e, versions=versions, tagdefs=tagdefs, limit=use_limit)
-            values.update(v)
-
-            if e < len(path) - 1:
-                if len(listtags) != 1:
-                    raise BadRequest("Path element %d of %d has ambiguous projection with %d list-tags." % (e, len(path), len(listtags)))
-                projection = listtags[0]
+                # this query element is contextualized
+                cstack = stack[1:]
+                cpredlist, clisttags, cordertags = cstack[0]
+                
+                if len(clisttags) != 1:
+                    raise BadRequest("Path context %d has ambiguous projection with %d list-tags." % (len(cstack)-1, len(clisttags)))
+                projection = clisttags[0]
                 if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id', 'tagname', 'viewname' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
+                
+                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view', tagname='tagdef')[tagdefs[projection].typestr]
                 if tagdefs[projection].multivalue:
                     projectclause = 'unnest("%s")' % projection
                 else:
                     projectclause = '"%s"' % projection
-                if e == 0:
-                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d)' % (projectclause, q, e)
-                else:
-                    context = '(SELECT DISTINCT %s FROM (%s) AS q_%d WHERE q_%d.%s IN (%s))' % (projectclause, q, e, e, context_attr, context)
-                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view', tagname='tagdef')[tagdefs[projection].typestr]
-            else:
-                if context:
-                    query = '(%s) AS q_%d WHERE q_%d.%s IN (%s)' % (q, e, e, context_attr, context)
-                else:
-                    query = '(%s) AS q_%d' % (q, e)
-            
-        if listtags == None:
-            listtags = self.listtags
-        listtags = set(listtags).union(set(['readok', 'writeok', 'owner', 'id', 'view']))
+                    
+                cstack[0] = cpredlist, clisttags, None # don't bother sorting context more than necessary
+                cq = build_query_recursive(cstack, qd + 1, limit=None)
+                cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
+                
+                predlist.append( dict(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
+                q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                values.update(v)
+                return q
         
-        selects = [ 'q_%d."%s" AS "%s"' % (len(path)-1, listtag, listtag)
-                    for listtag in listtags ]
-        selects = ', '.join(selects)
+        if path == None:
+            path = [ ([], [], []) ]
 
-        query = 'SELECT ' + selects + ' FROM ' + query
+        # query stack is path in reverse... final result element in front, projected context behind
+        stack = [ e for e in path ]
+        stack.reverse()
+
+        query = build_query_recursive(stack, qd=0, limit=limit)
+
         #web.debug(query, values)
         return (query, values)
 
