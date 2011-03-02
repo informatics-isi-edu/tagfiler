@@ -840,7 +840,7 @@ class FileTags (Node):
             self.listtags = self.listtags.split(',')
 
         predtags = [ pred['tag'] for pred in self.predlist ]
-        extratags = [ 'name', 'version', 'tagdef', 'typedef' ]
+        extratags = [ 'name', 'version', 'tagdef', 'typedef', 'write users' ]
 
         all = self.globals['tagdefsdict'].values()
         if len(self.listtags) > 0:
