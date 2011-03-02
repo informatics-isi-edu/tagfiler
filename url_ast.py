@@ -833,6 +833,8 @@ class FileTags (Node):
             if view:
                 self.listtags = view['tag list tags']
                 try_default_view = False
+        else:
+            try_default_view = False
 
         if type(self.listtags) == type('text'):
             self.listtags = self.listtags.split(',')
@@ -854,7 +856,7 @@ class FileTags (Node):
             self.subject = files[0]
             self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
 
-            if try_default_view:
+            if try_default_view and self.subject.dtype:
                 view = self.select_view(self.subject.dtype)
                 if view['tag list tags']:
                     self.listtags = view['tag list tags']
