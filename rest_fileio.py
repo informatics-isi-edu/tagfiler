@@ -943,10 +943,7 @@ class FileIO (Application):
         def putPostCommit(files):
             if files:
                 self.deletePrevious(files)
-            view = ''
-            if self.dtype in [ 'contains', 'typedef', 'vcontains' ]:
-                view = '?view=%s' % urlquote('%s' % self.dtype)
-            raise web.seeother('/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view))
+            raise web.seeother('/tags/%s' % self.subject2identifiers(self.subject)[0])
 
         def deleteBody():
             return self.delete_body()
