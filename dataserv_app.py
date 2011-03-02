@@ -1401,7 +1401,10 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
+
+        if listas == None:
+            listas = dict()
 
         def dbquote(s):
             return s.replace("'", "''")
@@ -1609,7 +1612,7 @@ class Application:
                 groupbys.append('%s.value' % self.wraptag(tagname))
             if tagdefs[tagname].readpolicy == 'fowner':
                 expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
-            selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
+            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tagname, tagname), prefix='')))
 
         # add custom per-file multi-val tags to results
         multivaltags = [ tagname for tagname in listtags
@@ -1621,7 +1624,7 @@ class Application:
             expr = '%s.value' % self.wraptag(tagname)
             if tagdefs[tagname].readpolicy == 'fowner':
                 expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
-            selects.append('%s AS %s' % (expr, self.wraptag(tagname, prefix='')))
+            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tagname, tagname), prefix='')))
 
         innertables2 = [ rewrite_tablepair(innertables[0]) ] \
                        + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables[1:] ]
@@ -1636,12 +1639,11 @@ class Application:
             value_query = with_prefix + value_query
 
         # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
-        order_suffix = ['id']
-        for tagname in [ 'typedef', 'tagdef', 'view', 'config', 'name' ]:
+        order_suffix = []
+        for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef']:
             if tagname in listtags:
-                order_suffix.insert(0, '"%s" NULLS LAST' % tagname)
-        if 'modified' in listtags:
-            order_suffix.insert(0, 'modified DESC NULLS LAST')
+                order_suffix.append('%s NULLS LAST' % self.wraptag(listas.get(tagname, tagname), prefix=''))
+        order_suffix.append( 'id' )
 
         if ordertags != None:
             value_query += " ORDER BY " + ", ".join([self.wraptag(tag, prefix='') for tag in ordertags] + order_suffix)
@@ -1650,23 +1652,8 @@ class Application:
         return (value_query, values)
 
     def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
-        def select_clause(listtag):
-            if listas.has_key(listtag):
-                return '%s AS %s' % (self.wraptag(listtag, prefix=""), self.wraptag(listas[listtag], prefix=""))
-            else:
-                return self.wraptag(listtag, prefix="")
 
-        if listas != None:
-            if listtags == None:
-                listtags = [ x for x in self.globals['filelisttags'] ]
-
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
-            query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['readok', 'writeok', 'owner', 'id'])) ]),
-                                                  query)
-            if ordertags:
-                query += " ORDER BY " + ",".join([self.wraptag(tag, prefix='') for tag in ordertags])
-        else:
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
+        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
