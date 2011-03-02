@@ -398,7 +398,7 @@ tagdef name           text        ""      anonymous   system     false
 tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
 tagdef vname          text        ""      anonymous   system     false      ""         true
 tagdef file           text        ""      system      system     false      ""         true
-tagdef url            text        ""      file        system     false      url
+tagdef url            text        ""      file        file     false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false
 
@@ -600,6 +600,13 @@ for tagname in "contains"
 do
    tag "$containstags" "_cfg_file list tags" "tagname" "$tagname"
    tag "$containstags" "_cfg_tag list tags" "tagname" "$tagname"
+done
+
+urltags=$(dataset "url" view "${admin}" "*")
+for tagname in "url"
+do
+   tag "$urltags" "_cfg_file list tags" "tagname" "$tagname"
+   tag "$urltags" "_cfg_tag list tags" "tagname" "$tagname"
 done
 
 # remapping rules:

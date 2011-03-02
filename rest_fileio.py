@@ -417,6 +417,14 @@ class FileIO (Application):
                     if not self.subject.writeok:
                         raise Forbidden('write to existing file "%s"' % predlist_linearize(self.predlist))
 
+                self.globals['dtypes'] = []
+                res = self.select_typedef_values('dtype')
+                if len(res) > 0:
+                    vals = res[0]['typedef values']
+                    for val in vals:
+                        key, desc = val.split(" ", 1)
+                        self.globals['dtypes'].append( (key, desc) )
+                    
                 return None
 
             def postCommit(results):
@@ -944,7 +952,8 @@ class FileIO (Application):
         def putPostCommit(junk_files):
             if junk_files:
                 self.deletePrevious(junk_files)
-            raise web.seeother('/tags/%s' % self.subject2identifiers(self.subject)[0])
+            view = '?view=%s' % urlquote('%s' % self.dtype)
+            raise web.seeother('/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view))
 
         def deleteBody():
             return self.delete_body()
@@ -1051,6 +1060,12 @@ class FileIO (Application):
                     if storage.type in [ 'contains', 'vcontains' ]:
                         self.key = self.dbtransact(keyBody, keyPostCommit)
                         self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
+                    if storage.type == 'url':
+                        try:
+                            self.url = storage.url
+                        except:
+                            pass
+                        
                 return self.dbtransact(putBody, putPostCommit)
 
             else:

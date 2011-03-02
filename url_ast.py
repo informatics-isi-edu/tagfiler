@@ -348,6 +348,23 @@ class FileList (Node):
                 return self.renderlist(None,
                                        [self.render.Commands(),
                                         self.render.FileList(files)])
+                
+        def defineDataset():
+            def body():
+                self.globals['dtypes'] = []
+                res = self.select_typedef_values('dtype')
+                if len(res) > 0:
+                    vals = res[0]['typedef values']
+                    for val in vals:
+                        key, desc = val.split(" ", 1)
+                        self.globals['dtypes'].append( (key, desc) )
+                return None
+            
+            def postCommit(results):
+                return self.renderlist("Define a dataset",
+                                       [self.render.NameForm()])
+                
+            return self.dbtransact(body, postCommit)
 
         action = None
         name = None
@@ -384,8 +401,7 @@ class FileList (Node):
                     url += '&write%20users=*'
                 raise web.seeother(url)
             else:
-                return self.renderlist("Define a dataset",
-                                       [self.render.NameForm()])
+                return defineDataset()
         else:
             try:
                 self.globals['view'] = urllib.unquote_plus(self.storage.view)

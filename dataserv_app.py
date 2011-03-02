@@ -1051,6 +1051,12 @@ class Application:
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
         return self.db.query(query, values)
 
+    def select_typedef_values(self, typedef):
+        # return the typedef values
+        query, values = self.build_files_by_predlist_path([ ([dict(tag='typedef', op='=', vals=[typedef])], ['typedef values'], []) ])
+        #web.debug(query,values)
+        return self.db.query(query, values)
+
     def insert_file(self, name, version, file=None):
         newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)

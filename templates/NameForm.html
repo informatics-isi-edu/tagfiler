@@ -14,25 +14,31 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
+<form id="NameForm"  name="NameForm" enctype="application/x-www-form-urlencoded" action="${home + "/file/"}" method="post" onsubmit="return validateNameForm()" >
+<div id="NameForm_div">
 <h3>Choose Name and Type of Data</h3>
-<form enctype="application/x-www-form-urlencoded" action="${home + "/file"}" method="get" onsubmit="return checkInput('datasetName', 'name of the dataset')" >
-Enter a name for the dataset: <input name="name" type="text" id="datasetName" /><br />
+<input type="hidden" name="action" value="put" />
+<td>Enter a name for the dataset:</td>
+<input name="name" type="text" id="datasetName" /><br />
 Select a type of dataset definition: 
-<input type="hidden" name="action" value="define" />
-<select name="type">
-  <option value="file">Upload a file</option>
-  <option value="url">Register a remote URL</option>
-  <option value="dataset">Register a dataset</option>
-</select><br />
+<select name="type" id="type" onchange="document.getElementById('fileName').style.display = (document.getElementById('type').value == 'file' ? 'inline' : 'none');">
+	$for type in dtypes:
+		$ value, desc = type
+  		<option value="${value}">${value} (${desc})</option>
+</select>
+<input name="myfile" type="file" id="fileName" style="display:none;"/><br />
 Select an initial read permission:
-<select name="read users">
+<select name="read users" id="read users">
   <option value="owner">Only owner may read</option>
   <option value="*">Anybody may read</option>
 </select><br />
 Select an initial write permission:
-<select name="write users">
+<select name="write users" id="write users">
   <option value="owner">Only owner may write</option>
   <option value="*">Anybody may write</option>
 </select><br />
-<input type="submit" value="Proceed" />
+</div>
+<input type="submit"  id="submit" value="Submit" />
 </form>
+<div id="Copy">
+</div>
