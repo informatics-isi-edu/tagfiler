@@ -1401,7 +1401,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True):
+    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', tagdefs=None, enforce_read_authz=True, limit=None):
 
         def dbquote(s):
             return s.replace("'", "''")
@@ -1564,6 +1564,9 @@ class Application:
                         + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
                         + ' GROUP BY subject, owner'
 
+        if limit:
+            subject_query += ' LIMIT %d' % limit
+
         # now build the outer query that attaches listtags metadata to results
         selects = ['subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
         innertables = [('(%s)' % subject_query, 'subjects')]
@@ -1624,7 +1627,7 @@ class Application:
         #web.debug(query)
         return (value_query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True):
+    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
         def select_clause(listtag):
             if listas.has_key(listtag):
                 return '%s AS %s' % (self.wraptag(listtag, prefix=""), self.wraptag(listas[listtag], prefix=""))
@@ -1635,13 +1638,13 @@ class Application:
             if listtags == None:
                 listtags = [ x for x in self.globals['filelisttags'] ]
 
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz)
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags=[], id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
             query = "SELECT %s FROM (%s) AS a" % (",".join([ select_clause(listtag) for listtag in set(listtags).union(set(['readok', 'writeok', 'owner', 'id'])) ]),
                                                   query)
             if ordertags:
                 query += " ORDER BY " + ",".join([self.wraptag(tag, prefix='') for tag in ordertags])
         else:
-            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz)
+            query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -1653,7 +1656,7 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def build_files_by_predlist_path(self, path=None, versions='latest'):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None):
         if path == None:
             path = [ ([], [], []) ]
 
@@ -1666,7 +1669,11 @@ class Application:
 
         for e in range(0, len(path)):
             predlist, listtags, ordertags = path[e]
-            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view', 'config', 'tagdef'], ordertags, qd=e, versions=versions, tagdefs=tagdefs)
+            if e < len(path) - 1:
+                use_limit = None
+            else:
+                use_limit = limit
+            q, v = self.build_select_files_by_predlist(predlist, listtags + ['vname', 'name', 'view', 'config', 'tagdef'], ordertags, qd=e, versions=versions, tagdefs=tagdefs, limit=use_limit)
             values.update(v)
 
             if e < len(path) - 1:
@@ -1702,8 +1709,8 @@ class Application:
         #web.debug(query, values)
         return (query, values)
 
-    def select_files_by_predlist_path(self, path=None, versions='latest'):
-        query, values = self.build_files_by_predlist_path(path, versions)
+    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None):
+        query, values = self.build_files_by_predlist_path(path, versions, limit=limit)
         return self.db.query(query, values)
 
     

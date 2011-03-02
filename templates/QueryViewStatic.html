@@ -1,4 +1,4 @@
-$def with (ops, predlist)
+$def with (ops, predlist, limit=None)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -34,3 +34,5 @@ $for pred in predlist:
 	</li>
 </ul>
 <h3>Matching Datasets</h3>
+$if limit:
+	<p><b>Results limited to ${limit} matches. Use limit=none query parameter to retrieve all matches.</b></p>

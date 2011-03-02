@@ -1260,7 +1260,14 @@ class Query (Node):
                 listtags = view['file list tags']
                 writetags = view['file list tags write']
 
-                
+            self.limit = self.queryopts.get('limit', 25)
+            if self.limit == 'none':
+                self.limit = None
+            elif type(self.limit) == type('text'):
+                try:
+                    self.limit = int(self.limit)
+                except:
+                    self.limit = 25
 
             listtags = [ t for t in listtags ]
             builtinlist = [ 'id' ] 
@@ -1280,7 +1287,7 @@ class Query (Node):
             self.path[-1][1].append('Image Set')
             self.path[-1][1].append('write users')
 
-            return self.select_files_by_predlist_path(path=self.path, versions=versions)
+            return self.select_files_by_predlist_path(path=self.path, versions=versions, limit=self.limit)
 
         def postCommit(files):
             listtags = self.globals['filelisttags']
@@ -1330,12 +1337,12 @@ class Query (Node):
                     elif acceptType == 'text/html':
                         break
                 yield self.renderlist(self.title,
-                                       [self.render.QueryViewStatic(self.ops, self.predlist),
+                                       [self.render.QueryViewStatic(self.ops, self.predlist, self.limit),
                                         self.render.FileList(files, showversions=self.showversions)])
             else:
                 yield self.renderlist(self.title,
                                        [self.render.QueryAdd(self.ops),
-                                        self.render.QueryView(self.ops, self.predlist),
+                                        self.render.QueryView(self.ops, self.predlist, self.limit),
                                         self.render.FileList(files, showversions=self.showversions)])
 
         for res in self.dbtransact(body, postCommit):
