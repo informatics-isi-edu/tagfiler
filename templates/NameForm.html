@@ -22,8 +22,11 @@ $#
 <input name="name" type="text" id="datasetName" /><br />
 Select a type of dataset definition: 
 <select name="type" id="type" onchange="document.getElementById('fileName').style.display = (document.getElementById('type').value == 'file' ? 'inline' : 'none');">
-	$for type in dtypes:
-		$ value, desc = type
+	$ types = typesdict['dtype']['typedef values'].keys()
+	$ types.sort()
+	$for type in types:
+		$ value = type
+		$ desc = typesdict['dtype']['typedef values'][type]
   		<option value="${value}">${value} (${desc})</option>
 </select>
 <input name="myfile" type="file" id="fileName" style="display:none;"/><br />

@@ -17,8 +17,11 @@ $#
 <form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + datapred + suffix}" method="post" >
 Select a type of dataset: 
 <select name="type">
-	$for type in dtypes:
-		$ value, desc = type
+	$ types = typesdict['dtype']['typedef values'].keys()
+	$ types.sort()
+	$for type in types:
+		$ value = type
+		$ desc = typesdict['dtype']['typedef values'][type]
   		<option value="${value}">${value} (${desc})</option>
 </select><br />
 <input type="submit" value="Register" />

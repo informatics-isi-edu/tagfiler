@@ -417,14 +417,6 @@ class FileIO (Application):
                     if not self.subject.writeok:
                         raise Forbidden('write to existing file "%s"' % predlist_linearize(self.predlist))
 
-                self.globals['dtypes'] = []
-                res = self.select_typedef_values('dtype')
-                if len(res) > 0:
-                    vals = res[0]['typedef values']
-                    for val in vals:
-                        key, desc = val.split(" ", 1)
-                        self.globals['dtypes'].append( (key, desc) )
-                    
                 return None
 
             def postCommit(results):
