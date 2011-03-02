@@ -875,7 +875,7 @@ class Application:
             # special rules only affect write mode
             return
 
-        dtype = subject.dtype
+        dtype = self.classify_subject(subject)
         if dtype == 'url':
             if subject['Image Set']:
                 # rewrite dtype for immutable files test
@@ -973,33 +973,40 @@ class Application:
     def wraptag(self, tagname, suffix='', prefix='_'):
         return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
-    def subject2identifiers(self, subject, showversions=True):
+    def classify_subject(self, subject):
         datapred = None
-        for tagname in [ 'tagdef', 'typedef', 'config', 'view' ]:
-            keyv = subject.get(tagname, None)
+        for dtype in [ 'file', 'url', 'tagdef', 'typedef', 'config', 'view' ]:
+            keyv = subject.get(dtype, None)
             if keyv:
-                if self.globals['tagdefsdict'][tagname].multivalue:
-                    keyv = keyv[0]
-                datapred = '%s=%s' % (urlquote(tagname), urlquote(keyv))
-                dataid = datapred
-                dataname = '%s=%s' % (tagname, keyv)
-                break
-        name = subject.get('name', None)
-        version = subject.get('version', None)
-        if datapred == None:
-            if version != None and name != None and showversions:
-                dataid = '%s@%s' % (urlquote(name), version)
-                datapred = 'name=%s;version=%s' % (urlquote(name), version) 
-                dataname = '%s@%s' % (name, version)
-            elif name != None:
-                dataid = urlquote(name)
-                datapred = 'name=%s' % urlquote(name) 
-                dataname = name
+                return dtype
+        return None
+
+    def subject2identifiers(self, subject, showversions=True):
+        dtype = self.classify_subject(subject)
+        if dtype in [ 'tagdef', 'typedef', 'config', 'view' ]:
+            keyv = subject.get(dtype, None)
+            if self.globals['tagdefsdict'][dtype].multivalue:
+                keyv = keyv[0]
+            datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
+            dataid = datapred
+            dataname = '%s=%s' % (dtype, keyv)
+        else:
+            name = subject.get('name', None)
+            version = subject.get('version', None)
+            if name != None:
+                if version != None and showversions:
+                    dataid = '%s@%s' % (urlquote(name), version)
+                    datapred = 'name=%s;version=%s' % (urlquote(name), version) 
+                    dataname = '%s@%s' % (name, version)
+                else:
+                    dataid = urlquote(name)
+                    datapred = 'name=%s' % urlquote(name) 
+                    dataname = name
             else:
                 datapred = 'id=%s' % subject.id
                 dataid = datapred
                 dataname = datapred
-        return (datapred, dataid, dataname)
+        return (datapred, dataid, dataname, dtype)
 
     def get_type(self, typename=None):
         def valexpand(res):
@@ -1044,7 +1051,7 @@ class Application:
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
         return self.db.query(query, values)
 
-    def insert_file(self, name, version, dtype, storagename=None):
+    def insert_file(self, name, version, file=None):
         newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)
 
@@ -1059,10 +1066,8 @@ class Application:
             elif version == 1:
                 self.set_tag(subject, self.globals['tagdefsdict']['latest with name'], name)
 
-        self.set_tag(subject, self.globals['tagdefsdict']['dtype'], dtype)
-
-        if storagename and dtype == 'file':
-            self.set_tag(subject, self.globals['tagdefsdict']['storagename'], storagename)
+        if file:
+            self.set_tag(subject, self.globals['tagdefsdict']['file'], file)
 
         return newid
 
@@ -1144,7 +1149,7 @@ class Application:
             raise Conflict('Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
         owner = self.authn.role
-        newid = self.insert_file(None, None, 'dtype', None)
+        newid = self.insert_file(None, None, None)
         subject = web.Storage(id=newid)
         tags = [ ('created', 'now'),
                  ('tagdef', self.tag_id),

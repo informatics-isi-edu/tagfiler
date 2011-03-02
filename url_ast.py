@@ -462,11 +462,11 @@ class FileId(Node, FileIO):
 
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
-    def __init__(self, appname, predlist, storagename=None, dtype='url', queryopts={}, versions='any', url=None):
+    def __init__(self, appname, predlist, file=None, dtype='url', queryopts={}, versions='any', url=None):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         self.predlist = predlist
-        self.storagename = storagename
+        self.file = file
         self.dtype = dtype
         self.url = url
         self.queryopts = queryopts
@@ -852,7 +852,7 @@ class FileTags (Node):
             raise NotFound('subject matching "%s"' % self.predlist)
         elif len(files) == 1:
             self.subject = files[0]
-            self.datapred, self.dataid, self.dataname = self.subject2identifiers(self.subject)
+            self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
 
             if try_default_view:
                 view = self.select_view(self.subject.dtype)

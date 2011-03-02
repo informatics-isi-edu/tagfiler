@@ -109,8 +109,6 @@ INSERT INTO resources DEFAULT VALUES RETURNING subject;
 EOF
    )
 
-   tag "$subject" dtype text "$type" >&2
-
    if [[ -n "$owner" ]]
    then
        tag "$subject" owner text "$owner" >&2
@@ -301,7 +299,7 @@ CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON D
 $(if [[ "$uniqueval" = "UNIQUE(subject)" ]] ; then 
      echo "CREATE INDEX \"_$1_subject_value_idx\" ON \"_$1\" (subject, value);" ;
      echo "CLUSTER \"_$1\" USING \"_$1_subject_value_idx\";" ;
-  else ;
+  else 
      echo "CLUSTER \"_$1\" USING \"_$1_subject_key\";" ;
   fi)
 EOF
@@ -399,8 +397,7 @@ tagdef version        int8        ""      anonymous   system     false
 tagdef name           text        ""      anonymous   system     false
 tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
 tagdef vname          text        ""      anonymous   system     false      ""         true
-tagdef dtype          text        ""      anonymous   system     false      dtype
-tagdef storagename    text        ""      system      system     false      ""         true
+tagdef file           text        ""      system      system     false      ""         true
 tagdef url            text        ""      file        system     false      url
 tagdef content-type   text        ""      anonymous   file       false
 tagdef sha256sum      text        ""      anonymous   file       false

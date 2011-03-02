@@ -133,7 +133,7 @@ class FileIO (Application):
             self.versions = 'latest'
         # 'read' authz is implicit in this query
         results = self.select_files_by_predlist(predlist=self.predlist,
-                                                listtags=['dtype', 'content-type', 'bytes', 'url',
+                                                listtags=['content-type', 'bytes', 'url',
                                                           'modified', 'modified by', 'name', 'version', 'Image Set',
                                                           'tagdef', 'typedef', 'config', 'view'],
                                                 versions=self.versions,
@@ -141,14 +141,15 @@ class FileIO (Application):
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
         self.subject = results[0]
-        self.datapred, self.dataid, self.dataname = self.subject2identifiers(self.subject)
        
-        # get storagename tag which is 'system' authz model so not included already
-        results = self.select_tag_noauthn(self.subject, self.globals['tagdefsdict']['storagename'])
+        # get file tag which is 'system' authz model so not included already
+        results = self.select_tag_noauthn(self.subject, self.globals['tagdefsdict']['file'])
         if len(results) > 0:
-            self.subject.storagename = results[0].value
+            self.subject.file = results[0].value
         else:
-            self.subject.storagename = None
+            self.subject.file = None
+
+        self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
 
     def GETfile(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -174,7 +175,7 @@ class FileIO (Application):
                     querystr = ''
                 raise web.seeother(result.url + querystr)
             elif result.dtype == 'file':
-                filename = self.config['store path'] + '/' + self.subject.storagename
+                filename = self.config['store path'] + '/' + self.subject.file
                 try:
                     f = open(filename, "rb", 0)
                     if content_type == None:
@@ -187,7 +188,7 @@ class FileIO (Application):
                     # query found unique file, but someone replaced it before we opened it
                     return (None, None)
             else:
-                datapred, dataid, dataname = self.subject2identifiers(result)
+                datapred, dataid, dataname, dtype = self.subject2identifiers(result)
                 raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
@@ -445,9 +446,9 @@ class FileIO (Application):
         return (self.subject)
 
     def delete_postCommit(self, result, set_status=True):
-        if result.dtype == 'file' and result.storagename != None:
+        if result.dtype == 'file' and result.file != None:
             """delete the file"""
-            filename = self.config['store path'] + '/' + result.storagename
+            filename = self.config['store path'] + '/' + result.file
             dir = os.path.dirname(filename)
             self.deleteFile(filename)
             web.ctx.status = '204 No Content'
@@ -487,7 +488,6 @@ class FileIO (Application):
     def insertForStore(self):
         """Only call this after creating a new file on disk!"""
         content_type = None
-        results = []
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         saved_subject = self.subject
@@ -520,7 +520,7 @@ class FileIO (Application):
                 tagged_content_type = None
 
             try:
-                filename = self.config['store path'] + '/' + self.storagename
+                filename = self.config['store path'] + '/' + self.file
                 p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                 line = p.stdout.readline()
                 guessed_content_type = line.strip()
@@ -533,19 +533,19 @@ class FileIO (Application):
 
         if self.subject:
             # register as a new version of the existing file
-            self.id = self.insert_file(self.name, self.version, self.dtype, self.storagename)
+            self.id = self.insert_file(self.name, self.version, self.file)
             self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
-            self.id = self.insert_file(self.name, self.version, self.dtype, self.storagename)
+            self.id = self.insert_file(self.name, self.version, self.file)
 
         newfile = web.Storage(id=self.id,
                               name=self.name,
                               version=self.version,
                               dtype=self.dtype,
                               bytes=self.bytes,
-                              storagename=self.storagename,
+                              file=self.file,
                               owner=self.authn.role,
                               writeok=True,
                               url=self.url)
@@ -554,7 +554,8 @@ class FileIO (Application):
         self.updateFileTags(newfile, self.subject)
 
         self.subject = newfile
-        return results
+        # we never have previous files to delete now that we use version-control?
+        return []
 
     def updateFileTags(self, newfile, basefile):
         #web.debug(newfile, basefile)
@@ -569,9 +570,9 @@ class FileIO (Application):
             self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
             # copy basefile tags
             for result in self.select_filetags_noauthn(basefile):
-                if result.tagname not in [ 'bytes', 'content-type', 'dtype', 'key', 
+                if result.tagname not in [ 'bytes', 'content-type', 'key', 
                                            'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
-                                           'url', 'storagename', 'version created', 'version', 'vname' ]:
+                                           'url', 'file', 'version created', 'version', 'vname' ]:
                     tags = self.select_tag_noauthn(basefile, self.globals['tagdefsdict'][result.tagname])
                     for tag in tags:
                         if hasattr(tag, 'value'):
@@ -594,7 +595,7 @@ class FileIO (Application):
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.version != newfile.version):
                 self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
-        elif newfile.dtype in [ 'blank', 'contains', 'typedef', 'url', 'vcontains' ]:
+        elif newfile.dtype in [ None, 'contains', 'typedef', 'url', 'vcontains' ]:
             if basefile and basefile.bytes != None and basefile.version == newfile.version:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
             if basefile and basefile['content-type'] != None and basefile.version == newfile.version:
@@ -724,8 +725,8 @@ class FileIO (Application):
             
     def deletePrevious(self, files):
         for file in files:
-            if file.dtype == 'file' and file.storagename != None:
-                self.deleteFile(self.config['store path'] + '/' + file.storagename)
+            if file.dtype == 'file' and file.file != None:
+                self.deleteFile(self.config['store path'] + '/' + file.file)
 
     def putPreWriteBody(self):
         status = web.ctx.status
@@ -737,10 +738,10 @@ class FileIO (Application):
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
             if self.update:
                 if self.unique:
-                    if self.subject.dtype == 'file' and self.subject.storagename:
+                    if self.subject.dtype == 'file' and self.subject.file:
                         # we can cache this validated result
                         self.newMatch = True
-                        filename = self.config['store path'] + '/' + self.subject.storagename
+                        filename = self.config['store path'] + '/' + self.subject.file
                         f = open(filename, 'r+b', 0)
                         return f
                     else:
@@ -822,7 +823,7 @@ class FileIO (Application):
                 ctime, subject = cached
                 if subject and (now - ctime).seconds < file_cache_time:
                     self.subject = subject
-                    filename = self.config['store path'] + '/' + self.subject.storagename
+                    filename = self.config['store path'] + '/' + self.subject.file
                     f = open(filename, 'r+b', 0)
                     if not f:
                         file_cache.pop((self.authn.role, cachekey), None)
@@ -850,7 +851,7 @@ class FileIO (Application):
         if f == None:
             # create a new disk file for 
             f, filename = self.getTemporary('wb')
-            self.storagename = filename[len(self.config['store path'])+1:]
+            self.file = filename[len(self.config['store path'])+1:]
             self.dtype = 'file'
             self.mustInsert = True
             self.update = False
@@ -880,9 +881,9 @@ class FileIO (Application):
                 self.updateFileTags(newfile, self.subject)
                 return []
 
-        def postWritePostCommit(files):
-            if not content_range and files:
-                self.deletePrevious(files)
+        def postWritePostCommit(junk_files):
+            if not content_range and junk_files:
+                self.deletePrevious(junk_files)
             uri = self.config['home'] + self.config['store path'] + '/' + self.subject2identifiers(self.subject)[0]
             web.header('Location', uri)
             if filename:
@@ -940,9 +941,9 @@ class FileIO (Application):
         def putBody():
             return self.insertForStore()
 
-        def putPostCommit(files):
-            if files:
-                self.deletePrevious(files)
+        def putPostCommit(junk_files):
+            if junk_files:
+                self.deletePrevious(junk_files)
             raise web.seeother('/tags/%s' % self.subject2identifiers(self.subject)[0])
 
         def deleteBody():
@@ -1009,7 +1010,7 @@ class FileIO (Application):
                 if buf != boundaryN:
                     # we did not get an entire multipart body apparently
                     raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
-                self.storagename = tempFileName[len(self.config['store path'])+1:len(tempFileName)]
+                self.file = tempFileName[len(self.config['store path'])+1:len(tempFileName)]
                 self.dtype = 'file'
                 self.bytes = bytes
 

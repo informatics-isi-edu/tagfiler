@@ -36,7 +36,7 @@ $if type:
 $else:
 	<td class="file-tag ${idquote(tagname)} multivalue">
 	$if tagname == 'id':
-		$ datapred, dataid, dataname = subject2identifiers(filerecord, showversions)
+		$ datapred, dataid, dataname, dtype = subject2identifiers(filerecord, showversions)
 		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}?view=default">(tags)</a>
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
