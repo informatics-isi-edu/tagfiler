@@ -1288,7 +1288,6 @@ class Application:
 
         results = self.select_tag_noauthn(subject, tagdef)
         if len(results) == 0:
-            web.debug('delete from subjecttags %s %s' % (subject.id, tagdef.tagname))
             query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
             self.db.query(query, vars=vars)
 
