@@ -1295,12 +1295,14 @@ class Application:
         # update in-memory representation too for caller's sake
         if tagdef.multivalue:
             subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
-        else:
+        elif tagdef.typestr != 'empty':
             results = self.select_tag_noauthn(subject, tagdef)
             if len(results) > 0:
                 subject[tagdef.tagname] = results[0].value
             else:
                 subject[tagdef.tagname] = None
+        else:
+            subject[tagdef.tagname ] = False
             
     def downcast_value(self, dbtype, value):
         if dbtype == 'int8':
@@ -1364,8 +1366,10 @@ class Application:
         # update in-memory representation too for caller's sake
         if tagdef.multivalue:
             subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
-        else:
+        elif tagdef.typestr != 'empty':
             subject[tagdef.tagname] = self.select_tag_noauthn(subject, tagdef)[0].value
+        else:
+            subject[tagdef.tagname] = True
         
         results = self.select_filetags_noauthn(subject, tagdef.tagname)
         if len(results) == 0:
