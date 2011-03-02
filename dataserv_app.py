@@ -1587,9 +1587,6 @@ class Application:
                         + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
                         + ' GROUP BY subject, owner'
 
-        if limit:
-            subject_query += ' LIMIT %d' % limit
-
         # now build the outer query that attaches listtags metadata to results
         selects = ['subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
         innertables = [('(%s)' % subject_query, 'subjects')]
@@ -1647,6 +1644,9 @@ class Application:
 
         if ordertags != None:
             value_query += " ORDER BY " + ", ".join([self.wraptag(tag, prefix='') for tag in ordertags] + order_suffix)
+
+        if limit:
+            value_query += ' LIMIT %d' % limit
 
         #web.debug(value_query)
         return (value_query, values)
