@@ -1286,6 +1286,7 @@ class Query (Node):
             self.path[-1][1].append('view')
             self.path[-1][1].append('Image Set')
             self.path[-1][1].append('write users')
+            self.path[-1][1].append('modified')
 
             return self.select_files_by_predlist_path(path=self.path, versions=versions, limit=self.limit)
 
