@@ -122,13 +122,16 @@ class FileIO (Application):
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
 
-    def populate_subject(self, enforce_read_authz=True):
-        self.unique = self.validate_predlist_unique(acceptName=True)
+    def populate_subject(self, enforce_read_authz=True, allow_blank=False):
+        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank)
 
-        # override self.versions ?
-        if self.unique:
+        if self.unique == None:
+            # this happens only with allow_blank=True when there is no uniqueness and no name
+            raise NotFound('dataset matching non-unique predicate list')
+        elif self.unique:
+            # this means we have an exact match which may not be the latest version
             self.versions = 'any'
-        else:
+        elif self.unique == False:
             # this happens when we accept a name w/o version in lieu of unique predicate(s)
             self.versions = 'latest'
         # 'read' authz is implicit in this query
@@ -485,7 +488,7 @@ class FileIO (Application):
 
         return (boundary1, boundaryN)
 
-    def insertForStore(self):
+    def insertForStore(self, allow_blank=False):
         """Only call this after creating a new file on disk!"""
         content_type = None
 
@@ -494,7 +497,7 @@ class FileIO (Application):
         
         status = web.ctx.status
         try:
-            self.populate_subject()
+            self.populate_subject(allow_blank=allow_blank)
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % predlist_linearize(self.predlist))
             self.newMatch = True
@@ -504,16 +507,27 @@ class FileIO (Application):
             self.subject = None
             self.update = False
 
-        assert not self.unique
-
-        if self.subject:
-            self.version = self.subject.version + 1
-            self.name = self.subject.name
+        if self.unique == False:
+            # this is the case where we are using name/version semantics for files
+            if self.subject:
+                self.version = self.subject.version + 1
+                self.name = self.subject.name
+            else:
+                self.version = 1
+                self.name = reduce(reduce_name_pred, self.predlist + [ dict(tag='', op='', vals=[]) ] )
+        elif self.unique:
+            # this is the case where we create some kind of uniquely keyed object
+            assert self.bytes == None
+            self.name = None
+            self.version = None
         else:
-            self.version = 1
-            self.name = reduce(reduce_name_pred, self.predlist + [ dict(tag='', op='', vals=[]) ] )
+            # this is the case where we create a blank node
+            assert self.bytes == None
+            self.name = None
+            self.version = None
 
         if self.bytes != None:
+            # only deal with content_type guessing when we have byte payload
             if self.subject:
                 tagged_content_type = self.subject['content-type']
             else:
@@ -541,14 +555,15 @@ class FileIO (Application):
             self.id = self.insert_file(self.name, self.version, self.file)
 
         newfile = web.Storage(id=self.id,
+                              dtype=self.dtype,
                               name=self.name,
                               version=self.version,
-                              dtype=self.dtype,
                               bytes=self.bytes,
                               file=self.file,
                               owner=self.authn.role,
                               writeok=True,
                               url=self.url)
+
         newfile['content-type'] = content_type
         
         self.updateFileTags(newfile, self.subject)
@@ -560,11 +575,13 @@ class FileIO (Application):
     def updateFileTags(self, newfile, basefile):
         #web.debug(newfile, basefile)
         if not basefile:
-            # set initial tags
+            # set initial tags on new objects
             self.set_tag(newfile, self.globals['tagdefsdict']['owner'], newfile.owner)
             self.set_tag(newfile, self.globals['tagdefsdict']['created'], 'now')
-            self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
-            self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
+            if newfile.version:
+                self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
+            if newfile.name and newfile.version:
+                self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
         elif newfile.version != basefile.version:
             self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
             self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
@@ -939,7 +956,8 @@ class FileIO (Application):
             return None
         
         def putBody():
-            return self.insertForStore()
+            # we can accept a non-unique predlist only for blank nodes
+            return self.insertForStore(allow_blank=(self.dtype==None and self.action=='post'))
 
         def putPostCommit(junk_files):
             if junk_files:
@@ -1024,14 +1042,28 @@ class FileIO (Application):
                 raise
 
         elif contentType[0:33] == 'application/x-www-form-urlencoded':
-            self.key = self.queryopts.get('key')
             storage = web.input()
-            self.action = storage.action
+            
+            def get_param(param, default=None):
+                """get params from any of web.input(), self.queryopts, self.storage"""
+                try:
+                    value = storage[param]
+                except:
+                    value = self.queryopts.get(param)
+                    if value == None:
+                        value = self.storage.get(param)
+                        if value == None:
+                            return default
+                        else:
+                            return urllib.unquote_plus(value)
 
-            try:
-                self.referer = storage.referer
-            except:
-                self.referer = "/file"
+            
+            self.key = get_param('key')
+            self.action = get_param('action')
+            if self.action == None:
+                raise BadRequest('Form field "action" is required.')
+
+            self.referer = get_param('referer', "/file")
 
             if self.action == 'delete':
                 return self.dbtransact(preDeleteBody, preDeletePostCommit)
@@ -1039,23 +1071,21 @@ class FileIO (Application):
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' , 'putdq' ]:
-                # we only support URL PUT simulation this way
-                self.dtype = 'url'
-                if self.action == 'put':
-                    self.url = storage.url
+            elif self.action in [ 'put', 'putsq' , 'putdq', 'post' ]:
+                # we only support non-file PUT and POST simulation this way
+                self.url = get_param('url')
+                self.dtype = get_param('dtype')
+                if self.action in ['put', 'post']:
+                    if self.url != None:
+                        self.dtype = 'url'
+                    else:
+                        self.dtype = None
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
-                    self.url = storage.url + '?title=%s' % urlquote(storage.name)
+                    self.url = get_param('url', '/query') + '?title=%s' % get_param('name')
                 elif self.action == 'putdq':
-                    self.dtype = storage.type
                     if self.dtype == 'blank':
                         self.dtype = None
-                    if storage.type == 'url':
-                        try:
-                            self.url = storage.url
-                        except:
-                            pass
                         
                 return self.dbtransact(putBody, putPostCommit)
 

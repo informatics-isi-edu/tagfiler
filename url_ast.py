@@ -397,16 +397,30 @@ class FileList (Node):
         storage = web.input()
         name = None
         url = None
+        dtype = None
         try:
             action = storage.action
-            name = storage.name
-            url = storage.url
+            
+            try:
+                name = storage.name
+            except:
+                pass
+            
+            try:
+                url = storage.url
+                dtype = 'url'
+            except:
+                pass
         except:
-            raise BadRequest('Expected action, name, and url form fields.')
+            raise BadRequest('Expected action form field.')
+        predlist = []
+        if name:
+            predlist.append( dict(tag='name', op='=', vals=[name]) )
         ast = FileId(appname=self.appname,
-                     predlist=[dict(tag='name', op='=', vals=[name])],
+                     predlist=predlist,
                      url=url,
-                     dtype='url')
+                     dtype=dtype,
+                     queryopts=dict([item for item in storage.items()]))
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 

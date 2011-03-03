@@ -848,8 +848,20 @@ class Application:
             except NotImplemented, AttributeError:
                 return None
 
-    def validate_predlist_unique(self, acceptName=False):
-        """Evaluate self.predlist as True for guaranteed unique, False for named latest iff acceptName=True, else raise Conflict."""
+    def validate_predlist_unique(self, acceptName=False, acceptBlank=False):
+        """Evaluate self.predlist for subject-identifying uniqueness.
+
+           Returns (in prioritized order):
+
+              True if predlist is uniquely constraining
+
+              False if predlist is weakly constraining AND acceptName==True
+
+              None if predlist is not constraining AND acceptBlank==True
+
+           Else raises Conflict
+
+        """
         got_name = False
         got_version = False
         for pred in self.predlist:
@@ -867,6 +879,8 @@ class Application:
             return True
         elif got_name and acceptName:
             return False
+        elif acceptBlank:
+            return None
         else:
             raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
 
