@@ -1640,7 +1640,13 @@ class Application:
         order_suffix = []
         for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef']:
             if tagname in listtags:
-                order_suffix.append('%s NULLS LAST' % self.wraptag(listas.get(tagname, tagname), prefix=''))
+                orderstmt = self.wraptag(listas.get(tagname, tagname), prefix='')
+                if tagname in [ 'modified' ]:
+                    orderstmt += ' DESC'
+                else:
+                    orderstmt += ' ASC'
+                orderstmt += ' NULLS LAST'
+                order_suffix.append(orderstmt)
         order_suffix.append( 'id' )
 
         if ordertags != None:
