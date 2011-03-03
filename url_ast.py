@@ -514,8 +514,8 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagname') ]
-            userdefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagname') ]
+            predefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagdef') ]
+            userdefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagdef') ]
             types = self.get_type()
             
             return (predefined, userdefined, types)
