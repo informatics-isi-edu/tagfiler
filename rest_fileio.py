@@ -154,7 +154,7 @@ class FileIO (Application):
 
         self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
 
-    def GETfile(self, uri, sendBody=True):
+    def GET(self, uri, sendBody=True):
         global mime_types_suffixes
 
         def body():
@@ -367,79 +367,8 @@ class FileIO (Application):
 
 
     def HEAD(self, uri):
-        return self.GETfile(uri, sendBody=False)
+        return self.GET(uri, sendBody=False)
 
-    def GET(self, uri):
-
-        suffix = ''
-        try:
-            self.action = urllib.unquote_plus(self.storage.action)
-            self.filetype = urllib.unquote_plus(self.storage.type)
-        except:
-            #et, ev, tb = sys.exc_info()
-            #web.debug('got exception during self.storage access',
-            #          traceback.format_exception(et, ev, tb))
-            pass
-        
-        params = []
-        
-        try:
-            if urllib.unquote_plus(self.storage['read users']) == '*':
-                params.append('read users=*')
-        except:
-            pass
-        
-        try:
-            if urllib.unquote_plus(self.storage['write users']) == '*':
-                params.append('write users=*')
-        except:
-            pass
-        
-        if len(params) > 0:
-            suffix = '?' + '&'.join(params)
-
-        if self.action == 'define':
-
-            def body():
-                status = web.ctx.status
-                name = dict([ (pred['tag'], pred['vals'][0]) for pred in self.predlist
-                              if pred['op'] == '=' and len(pred['vals']) > 0 ]).get('name', None)
-                if name == None:
-                    raise BadRequest('POST action=define method to upload files requires name=... key data.')
-                self.globals['datapred'] = 'name=%s' % urlquote(name)
-                try:
-                    self.populate_subject()
-                except NotFound:
-                    web.ctx.status = status
-                    self.subject = None
-                    if self.unique:
-                        # not found w/ unique predlist is not to be confused with creating new files
-                        raise
-
-                if self.subject:
-                    if not self.subject.writeok:
-                        raise Forbidden('write to existing file "%s"' % predlist_linearize(self.predlist))
-
-                return None
-
-            def postCommit(results):
-                if self.filetype == 'file':
-                    return self.renderlist("Upload data file",
-                                           [self.render.FileForm(suffix)])
-                elif self.filetype == 'url':
-                    return self.renderlist("Register a remote URL",
-                                           [self.render.UrlForm(suffix)])
-                elif self.filetype == 'dataset':
-                    return self.renderlist("Register a dataset",
-                                           [self.render.DatasetForm(suffix)])
-                else:
-                    raise BadRequest(data='Unexpected dataset type "%s".' % self.filetype)
-
-            return self.dbtransact(body, postCommit)
-        else:
-            return self.GETfile(uri)
-
-        
     def delete_body(self):
         self.populate_subject()
         if not self.subject.writeok:
