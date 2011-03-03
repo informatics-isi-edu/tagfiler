@@ -1103,9 +1103,7 @@ class Application:
 
     def select_tagdef(self, tagname=None, predlist=[], order=None, enforce_read_authz=True):
         listtags = [ 'owner' ]
-        web.debug(listtags)
         listtags = listtags + Application.tagdef_listas.keys()
-        web.debug(listtags)
 
         if order:
             ordertags = [ order ]
@@ -1140,7 +1138,6 @@ class Application:
         else:
             predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
 
-        web.debug(listtags)
         results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
@@ -1405,7 +1402,7 @@ class Application:
 
     def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
 
-        web.debug(predlist, listtags, ordertags, listas)
+        #web.debug(predlist, listtags, ordertags, listas)
 
         if listas == None:
             listas = dict()
@@ -1652,7 +1649,7 @@ class Application:
         if limit:
             value_query += ' LIMIT %d' % limit
 
-        web.debug(value_query)
+        #web.debug(value_query)
         return (value_query, values)
 
     def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
