@@ -547,12 +547,11 @@ class FileIO (Application):
 
         if self.subject:
             # register as a new version of the existing file
-            self.id = self.insert_file(self.name, self.version, self.file)
             self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
-            self.id = self.insert_file(self.name, self.version, self.file)
+        self.id = self.insert_file(self.name, self.version, self.file)
 
         newfile = web.Storage(id=self.id,
                               dtype=self.dtype,
@@ -627,7 +626,7 @@ class FileIO (Application):
         for tagname in self.queryopts.keys():
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
-                raise NotFound('tagdef="%s"', tagname)
+                raise NotFound('tagdef="%s"' % tagname)
             self.enforce_tag_authz('write', newfile, tagdef)
             self.set_tag(newfile, self.globals['tagdefsdict'][tagname], self.queryopts[tagname])
             self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=self.queryopts[tagname])
@@ -1049,13 +1048,16 @@ class FileIO (Application):
                 try:
                     value = storage[param]
                 except:
-                    value = self.queryopts.get(param)
+                    value = None
+                if value == None:
+                    value = self.storage.get(param)
                     if value == None:
-                        value = self.storage.get(param)
+                        value = self.queryopts.get(param)
                         if value == None:
                             return default
-                        else:
-                            return urllib.unquote_plus(value)
+                    else:
+                        return urllib.unquote_plus(value)
+                return value
 
             
             self.key = get_param('key')
@@ -1071,22 +1073,17 @@ class FileIO (Application):
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' , 'putdq', 'post' ]:
+            elif self.action in [ 'put', 'putsq' , 'post' ]:
                 # we only support non-file PUT and POST simulation this way
                 self.url = get_param('url')
-                self.dtype = get_param('dtype')
+                self.dtype = None
                 if self.action in ['put', 'post']:
                     if self.url != None:
                         self.dtype = 'url'
-                    else:
-                        self.dtype = None
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
                     self.url = get_param('url', '/query') + '?title=%s' % get_param('name')
-                elif self.action == 'putdq':
-                    if self.dtype == 'blank':
-                        self.dtype = None
-                        
+                       
                 return self.dbtransact(putBody, putPostCommit)
 
             else:

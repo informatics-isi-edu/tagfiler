@@ -586,13 +586,7 @@ function validateNameForm() {
 		input.setAttribute('type', 'hidden');		
 		input.setAttribute('name', 'action');		
 		input.setAttribute('id', 'action');		
-		input.setAttribute('value', 'putdq');		
-		form.appendChild(input);
-		input = document.createElement('input');
-		input.setAttribute('type', 'hidden');		
-		input.setAttribute('name', 'type');		
-		input.setAttribute('id', 'type');		
-		input.setAttribute('value', type);		
+		input.setAttribute('value', 'post');		
 		form.appendChild(input);
 		statusValue += 'Registering "' + data_id + '" dataset';
 	}

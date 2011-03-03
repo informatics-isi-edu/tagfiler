@@ -414,13 +414,14 @@ class FileList (Node):
         except:
             raise BadRequest('Expected action form field.')
         predlist = []
+        storage=dict([(k, urlquote(v)) for k, v in storage.items()])
         if name:
             predlist.append( dict(tag='name', op='=', vals=[name]) )
         ast = FileId(appname=self.appname,
                      predlist=predlist,
                      url=url,
                      dtype=dtype,
-                     queryopts=dict([item for item in storage.items()]))
+                     storage=storage)
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 
@@ -476,7 +477,7 @@ class FileId(Node, FileIO):
 
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
-    def __init__(self, appname, predlist, file=None, dtype='url', queryopts={}, versions='any', url=None):
+    def __init__(self, appname, predlist, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
         Node.__init__(self, appname)
         FileIO.__init__(self)
         self.predlist = predlist
@@ -485,6 +486,8 @@ class FileId(Node, FileIO):
         self.url = url
         self.queryopts = queryopts
         self.versions = versions
+        if storage:
+            self.storage = storage
 
 class LogId(Node, LogFileIO):
     """Represents a direct LOG/predlist URI
