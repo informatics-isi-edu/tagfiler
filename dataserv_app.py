@@ -848,7 +848,7 @@ class Application:
             except NotImplemented, AttributeError:
                 return None
 
-    def validate_predlist_unique(self, acceptName=False, acceptBlank=False):
+    def validate_predlist_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False):
         """Evaluate self.predlist for subject-identifying uniqueness.
 
            Returns (in prioritized order):
@@ -864,25 +864,34 @@ class Application:
         """
         got_name = False
         got_version = False
+        unique = None
         for pred in self.predlist:
             tagdef = self.globals['tagdefsdict'].get(pred['tag'], None)
             if tagdef == None:
                 raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred['tag'])
+
+            if restrictSchema:
+                if tagdef.typestr == 'empty' and pred['op'] != '' or \
+                       tagdef.typestr != 'empty' and pred['op'] != '=':
+                    raise Conflict('Subject-identifying predicate has inappropriate operator "%s" on tag "%s"' % (pred['op'], tagdef.tagname))
+                    
             if tagdef.get('unique', False) and pred['op'] == '=' and len(pred['vals']) > 0:
-                return True
+                unique = True
             elif tagdef.tagname == 'name' and pred['op'] == '=' and len(pred['vals']) > 0:
                 got_name = True
             elif tagdef.tagname == 'version' and pred['op'] == '=' and len(pred['vals']) > 0:
                 got_version = True
+                
         if got_name and got_version:
-            # we accept fully constrained name+version as a unique key too
-            return True
-        elif got_name and acceptName:
-            return False
-        elif acceptBlank:
-            return None
-        else:
-            raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
+            unique = True
+
+        if not unique:
+            if got_name and acceptName:
+                return False
+            elif acceptBlank:
+                return None
+            else:
+                raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
 
     def enforce_file_authz_special(self, mode, subject):
         if mode == 'read':

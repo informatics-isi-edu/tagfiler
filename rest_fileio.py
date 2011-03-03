@@ -122,8 +122,8 @@ class FileIO (Application):
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
 
-    def populate_subject(self, enforce_read_authz=True, allow_blank=False):
-        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank)
+    def populate_subject(self, enforce_read_authz=True, allow_blank=False, restrict_schema=False):
+        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=restrict_schema)
 
         if self.unique == None:
             # this happens only with allow_blank=True when there is no uniqueness and no name
@@ -491,13 +491,14 @@ class FileIO (Application):
     def insertForStore(self, allow_blank=False):
         """Only call this after creating a new file on disk!"""
         content_type = None
+        junk_files = []
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         saved_subject = self.subject
         
         status = web.ctx.status
         try:
-            self.populate_subject(allow_blank=allow_blank)
+            self.populate_subject(allow_blank=allow_blank, restrict_schema=True)
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % predlist_linearize(self.predlist))
             self.newMatch = True
@@ -546,45 +547,62 @@ class FileIO (Application):
                                                tagged_content_type)
 
         if self.subject:
-            # register as a new version of the existing file
-            self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
+            if self.unique == False:
+                # this is the case where we create a new version of an existing named file
+                self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
+                self.id = self.insert_file(self.name, self.version, self.file)
+            elif self.unique:
+                # this is the case where we update an existing uniquely tagged file in place
+                self.enforce_file_authz('write', self.subject)
+                self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
+                self.id = None
+                if self.file and self.subject.file:
+                    junk_files.append(self.subject.file)
+                    self.set_tag(self.subject, self.globals['tagdefsdict']['file'], self.file)
+            else:
+                # this is the case where we create a new blank node similar to an existing blank node
+                self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
+                self.id = self.insert_file(self.name, self.version, self.file)
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
-        self.id = self.insert_file(self.name, self.version, self.file)
+            self.id = self.insert_file(self.name, self.version, self.file)
 
-        newfile = web.Storage(id=self.id,
-                              dtype=self.dtype,
-                              name=self.name,
-                              version=self.version,
-                              bytes=self.bytes,
-                              file=self.file,
-                              owner=self.authn.role,
-                              writeok=True,
-                              url=self.url)
+        if self.id != None:
+            newfile = web.Storage(id=self.id,
+                                  dtype=self.dtype,
+                                  name=self.name,
+                                  version=self.version,
+                                  bytes=self.bytes,
+                                  file=self.file,
+                                  owner=self.authn.role,
+                                  writeok=True,
+                                  url=self.url)
 
-        newfile['content-type'] = content_type
+            newfile['content-type'] = content_type
+        else:
+            # we are updating an existing (unique) object rather than inserting a new one
+            newfile = self.subject
         
         self.updateFileTags(newfile, self.subject)
 
         self.subject = newfile
-        # we never have previous files to delete now that we use version-control?
-        return []
+        return junk_files
 
     def updateFileTags(self, newfile, basefile):
-        #web.debug(newfile, basefile)
         if not basefile:
-            # set initial tags on new objects
+            # set initial tags on all new, independent objects
             self.set_tag(newfile, self.globals['tagdefsdict']['owner'], newfile.owner)
             self.set_tag(newfile, self.globals['tagdefsdict']['created'], 'now')
             if newfile.version:
                 self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
             if newfile.name and newfile.version:
                 self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
-        elif newfile.version != basefile.version:
+        elif newfile.id != basefile.id and newfile.version and basefile.version:
+            # create derived versioned file from existing versioned file
             self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
             self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
-            # copy basefile tags
+
             for result in self.select_filetags_noauthn(basefile):
                 if result.tagname not in [ 'bytes', 'content-type', 'key', 
                                            'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
@@ -596,25 +614,25 @@ class FileIO (Application):
                         else:
                             self.set_tag(newfile, self.globals['tagdefsdict'][result.tagname])
 
-        if not basefile or self.authn.role != basefile['modified by'] or basefile.version != newfile.version:
+        if not basefile or self.authn.role != basefile['modified by'] or basefile.id != newfile.id:
             self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.authn.role)
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
-        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5 or basefile.version != newfile.version:
+        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5 or basefile.id != newfile.id:
             self.set_tag(newfile, self.globals['tagdefsdict']['modified'], 'now')
 
         if newfile.dtype == 'file':
-            if not basefile or newfile.bytes != basefile.bytes or basefile.version != newfile.version:
+            if not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id:
                 self.set_tag(newfile, self.globals['tagdefsdict']['bytes'], newfile.bytes)
             if not basefile or basefile.url and basefile.version == newfile.version:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['url'])
                 
-            if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.version != newfile.version):
+            if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
         elif newfile.dtype in [ None, 'url' ]:
-            if basefile and basefile.bytes != None and basefile.version == newfile.version:
+            if basefile and basefile.bytes != None and basefile.id == newfile.id:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
-            if basefile and basefile['content-type'] != None and basefile.version == newfile.version:
+            if basefile and basefile['content-type'] != None and basefile.id == newfile.id:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['content-type'])
             if newfile.url:
                 self.set_tag(newfile, self.globals['tagdefsdict']['url'], newfile.url)
@@ -622,14 +640,19 @@ class FileIO (Application):
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
+        # as well as tags constrained in predlist
         # they all must work to complete transaction
-        for tagname in self.queryopts.keys():
+        for tagname, values in [ (k, [v]) for k, v in self.queryopts.items() ] + [ (pred['tag'], pred['vals']) for pred in self.predlist ]:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
                 raise NotFound('tagdef="%s"' % tagname)
             self.enforce_tag_authz('write', newfile, tagdef)
-            self.set_tag(newfile, self.globals['tagdefsdict'][tagname], self.queryopts[tagname])
-            self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=self.queryopts[tagname])
+            if tagdef.typestr == 'empty':
+                self.set_tag(newfile, tagdef)
+            else:
+                for value in values:
+                    self.set_tag(newfile, tagdef, value)
+            self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=values)
 
         if not basefile:
             # only remap on newly created files
@@ -747,7 +770,7 @@ class FileIO (Application):
     def putPreWriteBody(self):
         status = web.ctx.status
         try:
-            self.populate_subject(enforce_read_authz=False)
+            self.populate_subject(enforce_read_authz=False, restrict_schema=True)
             if not self.subject.readok:
                 raise Forbidden('access to file "%s"' % predlist_linearize(self.predlist))
             if not self.subject.writeok:
