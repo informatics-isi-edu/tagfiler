@@ -1,4 +1,4 @@
-$def with (files, showversions=False)
+$def with (files, showversions=False, limit=None)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -20,6 +20,8 @@ $if view:
 $else:
 	$ querystr = ''
 $if len(files) > 0:
+	$if limit and limit == len(files):
+		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}?limit=none">View all results.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
 	$for tag in filelisttags:
