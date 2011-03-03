@@ -595,7 +595,7 @@ class FileIO (Application):
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.version != newfile.version):
                 self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
-        elif newfile.dtype in [ None, 'contains', 'typedef', 'url', 'vcontains' ]:
+        elif newfile.dtype in [ None, 'url' ]:
             if basefile and basefile.bytes != None and basefile.version == newfile.version:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
             if basefile and basefile['content-type'] != None and basefile.version == newfile.version:
@@ -1049,9 +1049,8 @@ class FileIO (Application):
                     self.url = storage.url + '?title=%s' % urlquote(storage.name)
                 elif self.action == 'putdq':
                     self.dtype = storage.type
-                    if storage.type in [ 'contains', 'vcontains' ]:
-                        self.key = self.dbtransact(keyBody, keyPostCommit)
-                        self.url = self.globals['home'] + '/query/key=%s(%s)/' % (urlquote(self.key), storage.type)
+                    if self.dtype == 'blank':
+                        self.dtype = None
                     if storage.type == 'url':
                         try:
                             self.url = storage.url

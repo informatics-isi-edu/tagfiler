@@ -16,12 +16,14 @@ $# limitations under the License.
 $#
 <form id="NameForm"  name="NameForm" enctype="application/x-www-form-urlencoded" action="${home + "/file/"}" method="post" onsubmit="return validateNameForm()" >
 <div id="NameForm_div">
-<h3>Choose Name and Type of Data</h3>
+<h3>Choose Type of Data</h3>
 <input type="hidden" name="action" value="put" />
-<td>Enter a name for the dataset:</td>
-<input name="name" type="text" id="datasetName" /><br />
+<div id="namedDataset" style="display:none;">
+Enter a name for the dataset:
+<input name="name" type="text" id="datasetName" />
+</div>
 Select a type of dataset definition: 
-<select name="type" id="type" onchange="document.getElementById('fileName').style.display = (document.getElementById('type').value == 'file' ? 'inline' : 'none');">
+<select name="type" id="type" onchange="changeNameFormType();">
 	$ types = typesdict['dtype']['typedef values'].keys()
 	$ types.sort()
 	$for type in types:

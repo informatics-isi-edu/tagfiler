@@ -523,12 +523,24 @@ var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green"
 var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
 
 /**
+ * Make html transformations for the NameForm based on the dataset type
+ */
+function changeNameFormType() {
+	document.getElementById('fileName').style.display = (document.getElementById('type').value == 'file' ? 'inline' : 'none');
+	if (document.getElementById('type').value == 'blank') {
+		document.getElementById('namedDataset').style.display = 'none';
+		document.getElementById('datasetName').value = '';
+	} else {
+		document.getElementById('namedDataset').style.display = 'block';
+	}
+}
+
+/**
  * Validate and make html transformations for the NameForm
  * Return True in case of success and False otherwise
  */
 function validateNameForm() {
-	var res = checkInput('datasetName', 'name of the dataset');
-	if (!res) {
+	if (document.getElementById('type').value != 'blank' && !checkInput('datasetName', 'name of the dataset')) {
 		return false;
 	}
 	var type = document.getElementById('type').value;
@@ -541,7 +553,9 @@ function validateNameForm() {
 	}
 	var data_id = document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, "");
 	var action = document.NameForm.getAttribute('action');
-	action += 'name=' + encodeURIComponent(data_id);
+	if (data_id.length > 0) {
+		action += 'name=' + encodeURIComponent(data_id);
+	}
 	var prefix = '?';
 	if (document.getElementById('read users').value == '*') {
 		action += '?read%20users=*';
