@@ -1,4 +1,4 @@
-$def with (suffix)
+$def with (datapred, file)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -14,16 +14,25 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + datapred + suffix}" method="post" >
-Select a type of dataset: 
-<select name="type">
+$ suffix = "%s" % file.id
+<form id="NameForm${suffix}"  name="NameForm" enctype="application/x-www-form-urlencoded" action="${home + "/file/" + datapred}" method="post" onsubmit="return validateNameForm('replace', '${suffix}')" >
+<div id="NameForm_div${suffix}">
+<input type="hidden" name="action" value="put" />
+Replace with: 
+<select name="type" id="type${suffix}" onchange="changeNameFormType('replace', '${suffix}');">
 	$ types = typesdict['dtype']['typedef values'].keys()
 	$ types.sort()
 	$for type in types:
 		$ value = type
 		$ desc = typesdict['dtype']['typedef values'][type]
-  		<option value="${value}">${value} (${desc})</option>
-</select><br />
-<input type="submit" value="Register" />
-<input type="hidden" name="action" value="putdq" />
+		$ selected = ''
+		$if value == 'file':
+			$ selected = 'selected="selected"'
+  		<option value="${value} ${selected}">${value} (${desc})</option>
+</select>
+<input name="myfile${suffix}" type="file" id="fileName${suffix}" style="display:inline;"/>
+<input type="submit" id="submit${suffix}" value="Replace" />
+</div>
 </form>
+<div id="Copy${suffix}">
+</div>

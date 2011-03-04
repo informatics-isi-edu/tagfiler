@@ -52,9 +52,11 @@ $else:
 			</form>
 			</td>
 			</tr>
+			</table>
+			<table>
 			<tr>
 			<td colspan="2">
-			Replace with: <a href="${home}/file/${datapred}?action=define&amp;type=file">file</a>, <a href="${home}/file/${datapred}?action=define&amp;type=url">url</a>, <a href="${home}/file/${datapred}?action=define&amp;type=dataset">dataset</a>
+				$:{render.DatasetForm(datapred, filerecord)}
 			</td>
 		</tr>
 		</table>

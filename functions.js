@@ -525,13 +525,15 @@ var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
 /**
  * Make html transformations for the NameForm based on the dataset type
  */
-function changeNameFormType() {
-	document.getElementById('fileName').style.display = (document.getElementById('type').value == 'file' ? 'inline' : 'none');
-	if (document.getElementById('type').value == 'blank') {
-		document.getElementById('namedDataset').style.display = 'none';
-		document.getElementById('datasetName').value = '';
-	} else {
-		document.getElementById('namedDataset').style.display = 'block';
+function changeNameFormType(op, suffix) {
+	document.getElementById('fileName'+suffix).style.display = (document.getElementById('type'+suffix).value == 'file' ? 'inline' : 'none');
+	if (op == 'create') {
+		if (document.getElementById('type'+suffix).value == 'blank') {
+			document.getElementById('namedDataset'+suffix).style.display = 'none';
+			document.getElementById('datasetName'+suffix).value = '';
+		} else {
+			document.getElementById('namedDataset'+suffix).style.display = 'block';
+		}
 	}
 }
 
@@ -539,61 +541,66 @@ function changeNameFormType() {
  * Validate and make html transformations for the NameForm
  * Return True in case of success and False otherwise
  */
-function validateNameForm() {
-	if (document.getElementById('type').value != 'blank' && !checkInput('datasetName', 'name of the dataset')) {
+function validateNameForm(op, suffix) {
+	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName', 'name of the dataset')) {
 		return false;
 	}
-	var type = document.getElementById('type').value;
+	var type = document.getElementById('type'+suffix).value;
 	var fileInput = null;
 	if (type == 'file') {
 		if (!checkInput('fileName', 'file to be uploaded')) {
 			return false;
 		}
-		fileInput = document.getElementById('fileName');
+		fileInput = document.getElementById('fileName'+suffix);
 	}
-	var data_id = document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, "");
-	var action = document.NameForm.getAttribute('action');
-	if (data_id.length > 0) {
-		action += 'name=' + encodeURIComponent(data_id);
+	var data_id = '';
+	if (op == 'create') {
+		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
+		var action = document.NameForm.getAttribute('action');
+		if (data_id.length > 0) {
+			action += 'name=' + encodeURIComponent(data_id);
+		}
+		var prefix = '?';
+		if (document.getElementById('read users'+suffix).value == '*') {
+			action += '?read%20users=*';
+			prefix = '&'
+		}
+		if (document.getElementById('write users'+suffix).value == '*') {
+			action += prefix + 'write%20users=*';
+		}
+		document.NameForm.setAttribute('action', action);
 	}
-	var prefix = '?';
-	if (document.getElementById('read users').value == '*') {
-		action += '?read%20users=*';
-		prefix = '&'
-	}
-	if (document.getElementById('write users').value == '*') {
-		action += prefix + 'write%20users=*';
-	}
-	document.NameForm.setAttribute('action', action);
+	var NameForm = document.getElementById('NameForm'+suffix);
 	if (type == 'file') {
-		document.NameForm.enctype = 'multipart/form-data';
+		NameForm.setAttribute('enctype', 'multipart/form-data');
 	} else {
-		document.NameForm.enctype = 'application/x-www-form-urlencoded';
+		NameForm.setAttribute('enctype', 'application/x-www-form-urlencoded');
 	}
-	var form = document.getElementById('NameForm');
-	orig_form = document.getElementById('NameForm_div');
+	var form = document.getElementById('NameForm'+suffix);
+	orig_form = document.getElementById('NameForm_div'+suffix);
 	form.removeChild(orig_form);
-	input = document.createElement('input');
-	input.setAttribute('type', 'submit');		
-	input.setAttribute('value', 'Proceed');		
 	var statusValue = datasetStatusPrefix;
 	if (type == 'file') {
 		form.appendChild(fileInput);
 		fileInput.style.display = 'none';
 		statusValue += 'Uploading file "' + fileInput.value + '"';
 	} else {
-		input = document.createElement('input');
+		var input = document.createElement('input');
 		input.setAttribute('type', 'hidden');		
 		input.setAttribute('name', 'action');		
-		input.setAttribute('id', 'action');		
+		input.setAttribute('id', 'action'+suffix);		
 		input.setAttribute('value', 'post');		
 		form.appendChild(input);
-		statusValue += 'Registering "' + data_id + '" dataset';
+		if (op == 'create') {
+			statusValue += 'Registering ' + (data_id.length > 0 ? '"'+data_id+'" dataset' : 'the blank node');
+		} else {
+			statusValue += 'Replacing the dataset';
+		}
 	}
 	
-	document.getElementById('submit').style.display = 'none';
+	document.getElementById('submit'+suffix).style.display = 'none';
 	statusValue += datasetStatusSuffix;
-	document.getElementById('Copy').innerHTML = statusValue;
+	document.getElementById('Copy'+suffix).innerHTML = statusValue;
 	
 	return true;
 }
