@@ -518,6 +518,7 @@ class FileIO (Application):
             # we are updating an existing (unique) object rather than inserting a new one
             newfile = web.Storage(self.subject)
             newfile.bytes = self.bytes
+            newfile.dtype = self.dtype
         
         self.updateFileTags(newfile, self.subject)
 
