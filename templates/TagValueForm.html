@@ -73,7 +73,7 @@ $else:
 		$ parts = val.split('@')
 		$ version = parts[-1]
 		$ base = '@'.join(parts[0:-1])
-		<a href="${home}/file/${urlquote(base)+'@'+version}">${base+'@'+version}</a>
+		<a href="${home}/file/name=${urlquote(base)};${version}">${base+'@'+version}</a>
 	$else:
 		${val}
 </td>
