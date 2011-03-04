@@ -571,7 +571,10 @@ class FileIO (Application):
         # try to apply tags provided by user as PUT/POST queryopts in URL
         # as well as tags constrained in predlist
         # they all must work to complete transaction
-        for tagname, values in [ (k, [v]) for k, v in self.queryopts.items() ] + [ (pred['tag'], pred['vals']) for pred in self.predlist ]:
+        for tagname, values in \
+                [ (k, [v]) for k, v in self.queryopts.items() ] \
+                + [ (pred['tag'], pred['vals']) for pred in self.predlist
+                    if self.globals['tagdefsdict'][pred['tag']].writepolicy != 'system' ]:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
                 raise NotFound('tagdef="%s"' % tagname)
