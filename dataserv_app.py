@@ -877,7 +877,7 @@ class Application:
                 raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred['tag'])
 
             if restrictSchema:
-                if tagdef.writeok == False:
+                if tagdef.tagname not in [ 'name', 'version' ] and tagdef.writeok == False:
                     raise Conflict('Subject predicate sets restricted tag "%s".' % tagdef.tagname)
                 if tagdef.typestr == 'empty' and pred['op'] != '' or \
                        tagdef.typestr != 'empty' and pred['op'] != '=':

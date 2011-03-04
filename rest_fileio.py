@@ -427,7 +427,7 @@ class FileIO (Application):
         self.mergePredlistTags = False
         status = web.ctx.status
         try:
-            self.populate_subject(allow_blank=allow_blank, restrict_schema=True)
+            self.populate_subject(allow_blank=allow_blank)
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % predlist_linearize(self.predlist))
             self.newMatch = True
@@ -573,7 +573,7 @@ class FileIO (Application):
         tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
 
         if self.mergePredlistTags:
-            tagvals = tagvals + [ (pred['tag'], pred['vals']) for pred in self.predlist ]
+            tagvals = tagvals + [ (pred['tag'], pred['vals']) for pred in self.predlist if pred['tag'] not in [ 'name', 'version' ] ]
 
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
@@ -731,7 +731,7 @@ class FileIO (Application):
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of datasets')
             # raise exception if predlist invalid for creating objects
-            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True)
+            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=True, restrictSchema=True)
             self.mergePredlistTags = True
 
         return None
