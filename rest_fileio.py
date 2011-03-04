@@ -424,7 +424,6 @@ class FileIO (Application):
         junk_files = []
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
-        saved_subject = self.subject
         self.mergePredlistTags = False
         status = web.ctx.status
         try:
@@ -485,9 +484,12 @@ class FileIO (Application):
                 # this is the case where we update an existing uniquely tagged file in place
                 self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
                 self.id = None
-                if self.file and self.subject.file:
+                if self.subject.file:
                     junk_files.append(self.subject.file)
+                if self.file:
                     self.set_tag(self.subject, self.globals['tagdefsdict']['file'], self.file)
+                elif self.subject.file:
+                    self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
             else:
                 # this is the case where we create a new blank node similar to an existing blank node
                 self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
