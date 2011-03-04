@@ -225,7 +225,7 @@ class FileIO (Application):
             if count > limit:
                 # we failed after too many tries, just give up
                 # if this happens in practice, need to investigate or redesign...
-                raise web.internallerror('Could not access local copy of ' + predlist_linearize(self.predlist))
+                raise web.internalerror('Could not access local copy of ' + predlist_linearize(self.predlist))
 
             # we do this in a loop to compensate for race conditions noted above
             f, content_type = preRead()
