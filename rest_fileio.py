@@ -938,6 +938,7 @@ class FileIO (Application):
             self.populate_subject()
             if not self.subject.writeok:
                 raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.predlist))
+            self.enforce_file_authz_special('write', self.subject)
             
             if self.subject.dtype == 'url':
                 if self.subject['Image Set']:

@@ -913,7 +913,7 @@ class Application:
                 # rewrite dtype for immutable files test
                 dtype = 'file'
 
-        if dtype == 'file' and self.localFilesImmutable or dtype == 'url' and self.remoteFilesImmutable:
+        if dtype == 'file' and self.config['local files immutable'] or dtype == 'url' and self.config['remote files immutable']:
             raise Forbidden(data='modification of immutable dataset "%s"' % self.subject2identifiers(subject)[0])
     
     def test_file_authz(self, mode, subject):
