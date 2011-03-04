@@ -513,12 +513,13 @@ class FileIO (Application):
                                   writeok=True,
                                   url=self.url)
 
-            newfile['content-type'] = content_type
         else:
             # we are updating an existing (unique) object rather than inserting a new one
             newfile = web.Storage(self.subject)
             newfile.bytes = self.bytes
             newfile.dtype = self.dtype
+        
+        newfile['content-type'] = content_type
         
         self.updateFileTags(newfile, self.subject)
 
