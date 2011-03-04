@@ -423,6 +423,7 @@ class FileList (Node):
                      predlist=predlist,
                      url=url,
                      dtype=dtype,
+                     queryopts=self.queryopts,
                      storage=storage)
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
