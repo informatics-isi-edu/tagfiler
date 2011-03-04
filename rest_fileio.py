@@ -703,8 +703,7 @@ class FileIO (Application):
             
     def deletePrevious(self, files):
         for file in files:
-            if file.dtype == 'file' and file.file != None:
-                self.deleteFile(self.config['store path'] + '/' + file.file)
+            self.deleteFile(self.config['store path'] + '/' + file)
 
     def putPreWriteBody(self):
         status = web.ctx.status
