@@ -883,23 +883,24 @@ class Application:
                        tagdef.typestr != 'empty' and pred['op'] != '=':
                     raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred['op'], tagdef.tagname))
                     
-            if tagdef.get('unique', False) and pred['op'] == '=' and len(pred['vals']) > 0:
+            if tagdef.get('unique', False) and pred['op'] == '=' and pred['vals']:
                 unique = True
-            elif tagdef.tagname == 'name' and pred['op'] == '=' and len(pred['vals']) > 0:
+            elif tagdef.tagname == 'name' and pred['op'] == '=' and pred['vals']:
                 got_name = True
-            elif tagdef.tagname == 'version' and pred['op'] == '=' and len(pred['vals']) > 0:
+            elif tagdef.tagname == 'version' and pred['op'] == '=' and pred['vals']:
                 got_version = True
                 
         if got_name and got_version:
             unique = True
 
-        if not unique:
-            if got_name and acceptName:
-                return False
-            elif acceptBlank:
-                return None
-            else:
-                raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
+        if unique:
+            return True
+        elif got_name and acceptName:
+            return False
+        elif acceptBlank:
+            return None
+        else:
+            raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
 
     def enforce_file_authz_special(self, mode, subject):
         if mode == 'read':
