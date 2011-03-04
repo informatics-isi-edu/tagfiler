@@ -122,8 +122,8 @@ class FileIO (Application):
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
 
-    def populate_subject(self, enforce_read_authz=True, allow_blank=False, restrict_schema=False):
-        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=restrict_schema)
+    def populate_subject(self, enforce_read_authz=True, allow_blank=False):
+        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank)
 
         if self.unique == None:
             # this happens only with allow_blank=True when there is no uniqueness and no name
@@ -424,7 +424,7 @@ class FileIO (Application):
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         saved_subject = self.subject
-        
+        self.mergePredlistTags = False
         status = web.ctx.status
         try:
             self.populate_subject(allow_blank=allow_blank, restrict_schema=True)
@@ -436,6 +436,12 @@ class FileIO (Application):
             web.ctx.status = status
             self.subject = None
             self.update = False
+            # this is a new dataset independent of others
+            if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                raise Forbidden('creation of datasets')
+            # raise exception if predlist invalid for creating objects
+            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True)
+            self.mergePredlistTags = True
 
         if self.unique == False:
             # this is the case where we are using name/version semantics for files
@@ -445,14 +451,7 @@ class FileIO (Application):
             else:
                 self.version = 1
                 self.name = reduce(reduce_name_pred, self.predlist + [ dict(tag='', op='', vals=[]) ] )
-        elif self.unique:
-            # this is the case where we create some kind of uniquely keyed object
-            assert self.bytes == None
-            self.name = None
-            self.version = None
         else:
-            # this is the case where we create a blank node
-            assert self.bytes == None
             self.name = None
             self.version = None
 
@@ -569,12 +568,14 @@ class FileIO (Application):
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
-        # as well as tags constrained in predlist
+        #    and tags constrained in predlist (only if creating new independent object)
         # they all must work to complete transaction
-        for tagname, values in \
-                [ (k, [v]) for k, v in self.queryopts.items() ] \
-                + [ (pred['tag'], pred['vals']) for pred in self.predlist
-                    if self.globals['tagdefsdict'][pred['tag']].writepolicy != 'system' ]:
+        tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
+
+        if self.mergePredlistTags:
+            tagvals = tagvals + [ (pred['tag'], pred['vals']) for pred in self.predlist ]
+
+        for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
                 raise NotFound('tagdef="%s"' % tagname)
@@ -702,7 +703,7 @@ class FileIO (Application):
     def putPreWriteBody(self):
         status = web.ctx.status
         try:
-            self.populate_subject(enforce_read_authz=False, restrict_schema=True)
+            self.populate_subject(enforce_read_authz=False)
             if not self.subject.readok:
                 raise Forbidden('access to file "%s"' % predlist_linearize(self.predlist))
             if not self.subject.writeok:
@@ -729,6 +730,9 @@ class FileIO (Application):
             # not found and not unique, treat as new file put
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of datasets')
+            # raise exception if predlist invalid for creating objects
+            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True)
+            self.mergePredlistTags = True
 
         return None
 

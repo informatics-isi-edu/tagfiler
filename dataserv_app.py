@@ -851,6 +851,12 @@ class Application:
     def validate_predlist_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False):
         """Evaluate self.predlist for subject-identifying uniqueness.
 
+           Raises Conflict if restrictSchema=True and additional
+           criteria are not met:
+
+              1. no preds are ambiguous, e.g. can be used with set_tag
+              2. no preds involve writeok=False tagdefs
+
            Returns (in prioritized order):
 
               True if predlist is uniquely constraining
@@ -871,9 +877,11 @@ class Application:
                 raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred['tag'])
 
             if restrictSchema:
+                if tagdef.writeok == False:
+                    raise Conflict('Subject predicate sets restricted tag "%s"' % tagdef.tagname)
                 if tagdef.typestr == 'empty' and pred['op'] != '' or \
                        tagdef.typestr != 'empty' and pred['op'] != '=':
-                    raise Conflict('Subject-identifying predicate has inappropriate operator "%s" on tag "%s"' % (pred['op'], tagdef.tagname))
+                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s"' % (pred['op'], tagdef.tagname))
                     
             if tagdef.get('unique', False) and pred['op'] == '=' and len(pred['vals']) > 0:
                 unique = True
