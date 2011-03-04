@@ -28,7 +28,7 @@ Replace with:
 		$ selected = ''
 		$if value == 'file':
 			$ selected = 'selected="selected"'
-  		<option value="${value} ${selected}">${value} (${desc})</option>
+  		<option value="${value}" ${selected}>${value} (${desc})</option>
 </select>
 <input name="myfile${suffix}" type="file" id="fileName${suffix}" style="display:inline;"/>
 <input type="submit" id="submit${suffix}" value="Replace" />
