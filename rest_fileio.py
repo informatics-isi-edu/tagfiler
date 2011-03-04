@@ -543,7 +543,8 @@ class FileIO (Application):
             for result in self.select_filetags_noauthn(basefile):
                 if result.tagname not in [ 'bytes', 'content-type', 'key', 
                                            'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
-                                           'url', 'file', 'version created', 'version', 'vname' ]:
+                                           'url', 'file', 'version created', 'version', 'vname' ] \
+                                           and not self.globals['tagdefsdict'][result.tagname].unique:
                     tags = self.select_tag_noauthn(basefile, self.globals['tagdefsdict'][result.tagname])
                     for tag in tags:
                         if hasattr(tag, 'value'):
