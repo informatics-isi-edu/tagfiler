@@ -373,6 +373,7 @@ class FileIO (Application):
         self.populate_subject()
         if not self.subject.writeok:
             raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.predlist))
+        self.enforce_file_authz_special('write', self.subject)
         self.delete_file(self.subject)
         self.txlog('DELETE', dataset=predlist_linearize(self.predlist))
         return (self.subject)
@@ -430,6 +431,7 @@ class FileIO (Application):
             self.populate_subject(allow_blank=allow_blank)
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % predlist_linearize(self.predlist))
+            self.enforce_file_authz_special('write', self.subject)
             self.newMatch = True
                 
         except NotFound:
@@ -481,7 +483,6 @@ class FileIO (Application):
                 self.id = self.insert_file(self.name, self.version, self.file)
             elif self.unique:
                 # this is the case where we update an existing uniquely tagged file in place
-                self.enforce_file_authz('write', self.subject)
                 self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
                 self.id = None
                 if self.file and self.subject.file:
@@ -708,6 +709,7 @@ class FileIO (Application):
                 raise Forbidden('access to file "%s"' % predlist_linearize(self.predlist))
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
+            self.enforce_file_authz_special('write', self.subject)
             if self.update:
                 if self.unique:
                     if self.subject.dtype == 'file' and self.subject.file:
