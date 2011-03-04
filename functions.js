@@ -542,13 +542,13 @@ function changeNameFormType(op, suffix) {
  * Return True in case of success and False otherwise
  */
 function validateNameForm(op, suffix) {
-	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName', 'name of the dataset')) {
+	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName'+suffix, 'name of the dataset')) {
 		return false;
 	}
 	var type = document.getElementById('type'+suffix).value;
 	var fileInput = null;
 	if (type == 'file') {
-		if (!checkInput('fileName', 'file to be uploaded')) {
+		if (op == 'create' && !checkInput('fileName', 'file to be uploaded')) {
 			return false;
 		}
 		fileInput = document.getElementById('fileName'+suffix);
