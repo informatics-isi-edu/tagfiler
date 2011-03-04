@@ -23,7 +23,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -869,7 +869,14 @@ class FileTags (Node):
             self.listtags = [ tagdef.tagname for tagdef in all ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags + extratags, versions='any')  ]
+        unique = self.validate_predlist_unique(acceptName=True, acceptBlank=True)
+        if unique == False:
+            versions = 'latest'
+        else:
+            # unique is True or None
+            versions = 'any'
+
+        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags + extratags, versions=versions)  ]
         if len(files) == 0:
             raise NotFound('subject matching "%s"' % self.predlist)
         elif len(files) == 1:
@@ -987,11 +994,16 @@ class FileTags (Node):
             return self.GETall(uri)
 
     def put_body(self):
-        self.validate_predlist_unique()
+        unique = self.validate_predlist_unique(acceptName=True)
+        if unique:
+            versions = 'any'
+        else:
+            versions = 'latest'
+        
         list_additional =  ['owner', 'write users', 'Image Set']
         if self.tag_id:
             list_additional.append(self.tag_id)
-        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] + list_additional)
+        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] + list_additional, versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.predlist)
         self.subject = results[0]
@@ -1059,29 +1071,42 @@ class FileTags (Node):
                 
         return self.dbtransact(self.put_body, self.put_postCommit)
 
-    def delete_body(self):
-        self.validate_predlist_unique()
+    def delete_body(self, previewOnly=False):
+        unique = self.validate_predlist_unique(acceptName=True, acceptBlank=True)
+        if unique == False:
+            versions = 'latest'
+        else:
+            # unique is True or None
+            versions = 'any'
+         
         results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist]
-                                                + [self.tag_id, 'owner', 'write users', 'Image Set'])
+                                                + [self.tag_id, 'owner', 'write users', 'Image Set'],
+                                                versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.predlist)
-        self.subject = results[0]
-        self.id = self.subject.id
+        self.subjects = results
 
         # custom DEI EIU hack
         if self.subject['Image Set']:
-            path = [ ( [ { 'tag' : 'id', 'op' : '=', 'vals' : [self.id] } ], ['vcontains'], [] ),
+            # find subfiles of all subjects which are tagged Image Set
+            path = [ ( self.predlist + dict(tag='Image Set', op='', vals=[]), ['vcontains'], [] ),
                      ( [], [], [] ) ]
-            subfiles = self.select_files_by_predlist_path(path=path)
+            self.subfiles = self.select_files_by_predlist_path(path=path)
         else:
-            subfiles = []
+            self.subfiles = []
 
         tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
         if tagdef == None:
             raise NotFound('tagdef="%s"' % self.tag_id)
-        self.enforce_tag_authz('write', self.subject, tagdef)
-        self.txlog('DELETE', dataset=self.subject2identifiers(self.subject)[0], tag=self.tag_id, value=self.value)
-        self.delete_tag(self.subject, tagdef, self.value)
+
+        if previewOnly:
+            return None
+
+        for subject in self.subjects:
+            self.enforce_tag_authz('write', subject, tagdef)
+            self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=self.tag_id, value=self.value)
+            self.delete_tag(subject, tagdef, self.value)
+            
         if self.tag_id in [ 'read users', 'write users' ]:
             for subfile in subfiles:
                 self.enforce_tag_authz('write', subfile, tagdef)
@@ -1089,8 +1114,8 @@ class FileTags (Node):
                 self.delete_tag(subfile, tagdef, self.value)
 
         if not self.referer:
-            # set updated referer based on updated subject, unless client provided a referer
-            self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
+            # set updated referer based on original predlist, unless client provided a referer
+            self.referer = '/tags/' + predlist_linearize(self.predlist)
             
         return None
 
@@ -1098,7 +1123,7 @@ class FileTags (Node):
         return ''
 
     def DELETE(self, uri):
-        # RESTful delete of exactly one tag on one file...
+        # RESTful delete of exactly one tag on 1 or more files...
         keys = self.tagvals.keys()
         if len(keys) == 1:
             self.tag_id = keys[0]
