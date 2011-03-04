@@ -558,7 +558,7 @@ function validateNameForm(op, suffix) {
 		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
 		var action = document.NameForm.getAttribute('action');
 		if (data_id.length > 0) {
-			action += 'name=' + encodeURIComponent(data_id);
+			action += '/name=' + encodeURIComponent(data_id);
 		}
 		var prefix = '?';
 		if (document.getElementById('read users'+suffix).value == '*') {
