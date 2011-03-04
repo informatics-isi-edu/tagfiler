@@ -415,7 +415,7 @@ class FileList (Node):
             raise BadRequest('Expected action form field.')
         predlist = []
         storage=dict([(k, urlquote(v)) for k, v in storage.items()])
-        if storage.action == 'define':
+        if storage['action'] == 'define':
             if name:
                 predlist.append( dict(tag='name', op='=', vals=[name]) )
             storage.action = 'post'
