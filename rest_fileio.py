@@ -516,7 +516,8 @@ class FileIO (Application):
             newfile['content-type'] = content_type
         else:
             # we are updating an existing (unique) object rather than inserting a new one
-            newfile = self.subject
+            newfile = web.Storage(self.subject)
+            newfile.bytes = self.bytes
         
         self.updateFileTags(newfile, self.subject)
 
