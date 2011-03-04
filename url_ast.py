@@ -860,7 +860,7 @@ class FileTags (Node):
             self.listtags = self.listtags.split(',')
 
         predtags = [ pred['tag'] for pred in self.predlist ]
-        extratags = [ 'name', 'version', 'tagdef', 'typedef', 'write users' ]
+        extratags = [ 'name', 'version', 'tagdef', 'typedef', 'write users', 'file', 'url' ]
 
         all = self.globals['tagdefsdict'].values()
         if len(self.listtags) > 0:
@@ -896,10 +896,7 @@ class FileTags (Node):
         return (files, all, length)
     
     def get_title_one(self):
-        return 'Tags for subject matching "%s"' % (';'.join(['%s%s%s' % (pred['tag'],
-                                                                         pred['op'],
-                                                                         ','.join(pred['vals']))
-                                                             for pred in self.predlist]))
+        return 'Tags for subject matching "%s"' % (self.dataname)
 
     def get_title_all(self):
         return 'Tags for subjects matching "%s"' % (';'.join(['%s%s%s' % (pred['tag'],
@@ -910,15 +907,12 @@ class FileTags (Node):
     def get_all_html_render(self, results):
         files, all, length = results
         #web.debug(system, userdefined, all)
-        status = web.ctx.status
-        try:
-            self.validate_predlist_unique(acceptName=True)
+        if len(files) == 1:
             self.globals['version'] = None
             return self.renderlist(self.get_title_one(),
                                    [self.render.FileTagExisting('', files[0], all)])
 
-        except:
-            web.ctx.status = status
+        else:
             return self.renderlist(self.get_title_all(),
                                    [self.render.FileTagValExisting('', files, all)])
  
@@ -1298,6 +1292,7 @@ class Query (Node):
             predlist, listtags, ordertags = self.path[-1]
             self.path[-1] = predlist, list(self.globals['filelisttags']), ordertags
             # we always want these for subject psuedo-column
+            self.path[-1][1].append('file')
             self.path[-1][1].append('name')
             self.path[-1][1].append('version')
             self.path[-1][1].append('tagdef')
