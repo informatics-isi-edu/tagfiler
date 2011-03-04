@@ -878,10 +878,10 @@ class Application:
 
             if restrictSchema:
                 if tagdef.writeok == False:
-                    raise Conflict('Subject predicate sets restricted tag "%s"' % tagdef.tagname)
+                    raise Conflict('Subject predicate sets restricted tag "%s".' % tagdef.tagname)
                 if tagdef.typestr == 'empty' and pred['op'] != '' or \
                        tagdef.typestr != 'empty' and pred['op'] != '=':
-                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s"' % (pred['op'], tagdef.tagname))
+                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred['op'], tagdef.tagname))
                     
             if tagdef.get('unique', False) and pred['op'] == '=' and len(pred['vals']) > 0:
                 unique = True
