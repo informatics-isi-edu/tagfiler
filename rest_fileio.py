@@ -240,17 +240,20 @@ class FileIO (Application):
 
         # fix up some ugliness in CentOS 'file -i -b' outputs
         content_type = re.sub('application/x-zip', 'application/zip', content_type)
-        
-        mime_type = content_type.split(';')[0]
-        m = re.match(r'^.+\.[^.]{1,4}', self.subject.name)
-        if m:
-            disposition_name = self.subject.name
-        else:
-            try:
-                suffix = mime_types_suffixes[mime_type]
-                disposition_name = self.subject.name + '.' + suffix
-            except:
+
+        if self.subject.name:
+            mime_type = content_type.split(';')[0]
+            m = re.match(r'^.+\.[^.]{1,4}', self.subject.name)
+            if m:
                 disposition_name = self.subject.name
+            else:
+                try:
+                    suffix = mime_types_suffixes[mime_type]
+                    disposition_name = self.subject.name + '.' + suffix
+                except:
+                    disposition_name = self.subject.name
+        else:
+            disposition_name = self.dataname
         
         # SEEK_END attribute not supported by Python 2.4
         # f.seek(0, os.SEEK_END)
