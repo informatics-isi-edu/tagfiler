@@ -1110,7 +1110,7 @@ class Application:
     def delete_file(self, subject):
         wheres = []
 
-        if subject.has_key('name') and subject.has_key('version'):
+        if subject.name and subject.version:
             versions = [ file for file in self.select_file_versions(subject.name) ]
             versions.sort(key=lambda res: res.version, reverse=True)
 
