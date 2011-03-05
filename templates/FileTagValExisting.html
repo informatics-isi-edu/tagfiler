@@ -25,9 +25,9 @@ $for file in files:
 	$ datapred, dataid, dataname, dtype = subject2identifiers(file)
 	$for tagdef in tagdefs:
 		$if odd:
-			<tr class="file odd"><td class="file-name"><a href="${home}/file/${datapred}">${dataid}</a></td><td>${tagdef.tagname}</td>
+			<tr class="file odd"><td class="file-name"><a href="${home}/file/${datapred}">${dataname}</a></td><td>${tagdef.tagname}</td>
 		$else:
-			<tr class="file even"><td class="file-name"><a href="${home}/file/${datapred}">${dataid}</a></td><td>${tagdef.tagname}</td>
+			<tr class="file even"><td class="file-name"><a href="${home}/file/${datapred}">${dataname}</a></td><td>${tagdef.tagname}</td>
 		$ odd = not odd
 		<td class="file-tag">$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}</td>
 		</tr>

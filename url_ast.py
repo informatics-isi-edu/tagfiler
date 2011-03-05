@@ -917,10 +917,7 @@ class FileTags (Node):
         return 'Tags for subject matching "%s"' % (self.dataname)
 
     def get_title_all(self):
-        return 'Tags for subjects matching "%s"' % (';'.join(['%s%s%s' % (pred['tag'],
-                                                                          pred['op'],
-                                                                          ','.join(pred['vals']))
-                                                              for pred in self.predlist]))
+        return 'Tags for subjects matching "%s"' % (predlist_linearize(self.predlist))
 
     def get_all_html_render(self, results):
         files, all, length = results
