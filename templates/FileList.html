@@ -21,7 +21,10 @@ $else:
 	$ querystr = ''
 $if len(files) > 0:
 	$if limit and limit == len(files):
-		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}?limit=none">View all results.</a></p>
+		$ suffix = '?limit=none'
+		$if showversions:
+			$ suffix = '%s&versions=any' % suffix
+		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}${suffix}">View all results.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
 	$for tag in filelisttags:
