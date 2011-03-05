@@ -739,7 +739,10 @@ class FileTags (Node):
 
     def __init__(self, appname, predlist=None, tag_id='', value=None, tagvals=None, queryopts={}):
         Node.__init__(self, appname)
-        self.predlist = predlist
+        if predlist:
+            self.predlist = predlist
+        else:
+            self.predlist = []
         self.tag_id = tag_id
         self.value = value
         self.typestr = None
