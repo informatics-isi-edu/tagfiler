@@ -925,6 +925,9 @@ class FileTags (Node):
     def get_all_html_render(self, results):
         files, all, length = results
         #web.debug(system, userdefined, all)
+        if self.queryopts.get('values', None) == 'basic':
+            self.globals['smartTagValues'] = False
+            
         if len(files) == 1:
             self.globals['version'] = None
             return self.renderlist(self.get_title_one(),
