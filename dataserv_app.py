@@ -100,7 +100,10 @@ def predlist_linearize(predlist):
         vals = [ urlquote(val) for val in pred['vals'] ]
         vals.sort()
         vals = ','.join(vals)
-        return '%s%s%s' % (urlquote(pred['tag']), pred['op'], vals)
+        if pred['op']:
+            return '%s%s%s' % (urlquote(pred['tag']), pred['op'], vals)
+        else:
+            return '%s' % (urlquote(pred['tag']))
     predlist = [ pred_linearize(pred) for pred in predlist ]
     predlist.sort()
     return ';'.join(predlist)
