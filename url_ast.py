@@ -753,8 +753,6 @@ class FileTags (Node):
         self.globals['predlist'] = predlist
 
     def get_tag_body(self):
-        unique = self.validate_predlist_unique(acceptName=True)
-
         tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
         if tagdef == None:
             raise NotFound(data='tag definition "%s"' % self.tag_id)
@@ -784,35 +782,49 @@ class FileTags (Node):
 
         if self.contentType == None:
             self.contentType = 'text/html'
-        
+
+        if self.contentType == 'text/html':
+            unique = self.validate_predlist_unique(acceptName=True, acceptBlank=True)
+        else:
+            unique = self.validate_predlist_unique(acceptName=True)
+        if unique in [ True, None ]:
+            versions = 'any'
+        else:
+            versions = 'latest'
+
         results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] 
-                                                + [self.tag_id, 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'])
+                                                + [self.tag_id, 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'],
+                                                versions=versions)
         if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % self.predlist)
-        self.subject = results[0]
-        
-        results = self.select_tag(self.subject, tagdef, self.value)
-        if len(results) == 0 and self.contentType not in ['text/uri-list', 'text/html']:
+            raise NotFound(data='subject matching "%s"' % predlist_linearize(self.predlist))
+        self.subjects = [ res for res in results ]
+
+        if len(self.subjects) == 1 \
+           and self.subjects[0][self.tag_id] == None \
+           and self.contentType not in ['text/uri-list', 'text/html']:
             if self.value == None:
-                raise NotFound(data='tag "%s" on subject matching "%s"' % (self.tag_id, self.predlist))
+                raise NotFound(data='tag "%s" on subject matching "%s"' % (self.tag_id, predlist_linearize(self.predlist)))
             elif self.value == '':
-                raise NotFound(data='tag "%s" = "" on subject matching "%s"' % (self.tag_id, self.predlist))
+                raise NotFound(data='tag "%s" = "" on subject matching "%s"' % (self.tag_id, predlist_linearize(self.predlist)))
             else:
-                raise NotFound(data='tag "%s" = "%s" on subject matching "%s"' % (self.tag_id, self.value, self.predlist))
-        values = []
-        for res in results:
-            try:
-                value = res.value
-                if value == None:
-                    value = ''
-                values.append(value)
-            except:
-                pass
-        self.txlog('GET', dataset=self.subject2identifiers(self.subject)[0], tag=self.tag_id)
-        return values
+                raise NotFound(data='tag "%s" = "%s" on subject matching "%s"' % (self.tag_id, self.value, predlist_linearize(self.predlist)))
+
+        for subject in self.subjects:
+            self.txlog('GET', dataset=self.subject2identifiers(subject)[0], tag=self.tag_id)
+            
+        return None
 
     def get_tag_postCommit(self, values):
         web.header('Content-Type', self.contentType)
+
+        subject = self.subjects[0]
+        if self.tagdef.multivalue:
+            values = subject[self.tag_id]
+            if values == None:
+                values = []
+        else:
+            values = [ subject[self.tag_id] ]
+            
         if self.contentType == 'application/x-www-form-urlencoded':
             if len(values) > 0:
                 return "&".join([(urlquote(self.tag_id) + '=' + urlquote(mystr(val))) for val in values])
@@ -827,16 +839,12 @@ class FileTags (Node):
             return '\n'.join(values) + '\n'
         else:
             # 'text/html'
-            file = self.subject
-            return self.renderlist('Dataset "%s" Tag "%s" Values' % (';'.join(['%s%s%s' % (pred['tag'],
-                                                                                           pred['op'],
-                                                                                           ','.join(pred['vals']))
-                                                                               for pred in self.predlist]),
-                                                                     self.tag_id),
-                                   [self.render.FileTagValBlock(file,
-                                                                self.tagdef,
-                                                                [self.tag_id],
-                                                                self.version)])
+            if len(self.subjects) == 1:
+                return self.renderlist('Tag "%s" for subject matching "%s"' % (self.tag_id, redlist_linearize(self.predlist)),
+                                       [self.render.FileTagExisting('', self.subjects[0], [self.tagdef])])
+            else:
+                return self.renderlist('Tag "%s" for subjects matching "%s"' % (self.tag_id, redlist_linearize(self.predlist)),
+                                       [self.render.FileTagValExisting('', self.subjects, [self.tagdef])])
 
     def GETtag(self, uri):
         # RESTful get of exactly one tag on one file...
