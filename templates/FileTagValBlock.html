@@ -62,12 +62,12 @@ $if tagdef.typestr != 'empty':
 			$ params['val'] = val
 			$if smartTagValues:
 				$:{render.TagValueForm(params)}
+				<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
+				$if tagdef.tagname in writetags and writeok:
+					$:{render.RemoveTagValueForm(params)}
+				</td>
 			$else:
-				${val}
-			<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
-			$if tagdef.tagname in writetags and writeok:
-				$:{render.RemoveTagValueForm(params)}
-			</td>
+				<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${val}</td>
 			</tr>
 	$if tagdef.tagname in writetags and writeok:
 		$:{render.SetTagValueForm(params)}

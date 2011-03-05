@@ -128,6 +128,10 @@ def p_tagsvalrest(p):
     """tags : slash string slash TAGS slash predlist_nonempty slash tagvals"""
     p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8])
 
+def p_tagsvalrest_opts(p):
+    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8], queryopts=p[9])
+
 def p_tagvals(p):
     """tagvals : tagval"""
     p[0] = dict()
