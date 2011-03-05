@@ -69,7 +69,7 @@ $if tagdef.typestr != 'empty':
 			$else:
 				<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${val}</td>
 			</tr>
-	$if tagdef.tagname in writetags and writeok:
+	$if smartTagValues and tagdef.tagname in writetags and writeok:
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:
