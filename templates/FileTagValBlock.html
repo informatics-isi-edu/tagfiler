@@ -73,4 +73,7 @@ $if tagdef.typestr != 'empty':
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:
-	$:{render.SetTagForm(params)}
+	$if smartTagValues:
+		$:{render.SetTagForm(params)}
+	$else:
+		${vals}
