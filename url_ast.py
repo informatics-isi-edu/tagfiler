@@ -840,10 +840,10 @@ class FileTags (Node):
         else:
             # 'text/html'
             if len(self.subjects) == 1:
-                return self.renderlist('Tag "%s" for subject matching "%s"' % (self.tag_id, redlist_linearize(self.predlist)),
+                return self.renderlist('Tag "%s" for subject matching "%s"' % (self.tag_id, predlist_linearize(self.predlist)),
                                        [self.render.FileTagExisting('', self.subjects[0], [self.tagdef])])
             else:
-                return self.renderlist('Tag "%s" for subjects matching "%s"' % (self.tag_id, redlist_linearize(self.predlist)),
+                return self.renderlist('Tag "%s" for subjects matching "%s"' % (self.tag_id, predlist_linearize(self.predlist)),
                                        [self.render.FileTagValExisting('', self.subjects, [self.tagdef])])
 
     def GETtag(self, uri):
