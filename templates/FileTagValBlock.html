@@ -60,7 +60,10 @@ $if tagdef.typestr != 'empty':
 		$for val in itervals:
 			<tr>
 			$ params['val'] = val
-			$:{render.TagValueForm(params)}
+			$if smartTagValues:
+				$:{render.TagValueForm(params)}
+			$else:
+				${val}
 			<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
 			$if tagdef.tagname in writetags and writeok:
 				$:{render.RemoveTagValueForm(params)}

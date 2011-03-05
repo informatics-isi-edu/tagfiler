@@ -438,6 +438,7 @@ class Application:
         render = self.render # HACK: make this available to exception classes too
         
         # 'globals' are local to this Application instance and also used by its templates
+        self.globals['smartTagValues'] = True
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote

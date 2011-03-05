@@ -842,6 +842,9 @@ class FileTags (Node):
             return '\n'.join(values) + '\n'
         else:
             # 'text/html'
+            if self.queryopts.get('values', None) == 'basic':
+                self.globals['smartTagValues'] = False
+            
             if len(self.subjects) == 1:
                 return self.renderlist('Tag "%s" for subject matching "%s"' % (self.tag_id, predlist_linearize(self.predlist)),
                                        [self.render.FileTagExisting('', self.subjects[0], [self.tagdef])])
