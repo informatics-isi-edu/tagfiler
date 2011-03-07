@@ -789,14 +789,16 @@ class Application:
                         t.rollback()
                         self.logException('programming error in transaction body')
                         raise RuntimeError(data=str(te))
+                    except (psycopg2.IntegrityError), te:
+                        t.rollback()
+                        if count > limit:
+                            self.logException('too many retries during transaction body')
+                            raise te
                     except (psycopg2.IntegrityError, IOError), te:
                         t.rollback()
                         if count > limit:
                             self.logException('too many retries during transaction body')
-                            if te.__class__.__name__ == 'IntegrityError':
-                                raise IntegrityError(data=str(te))
-                            else:
-                                raise RuntimeError(data=str(te))
+                            raise RuntimeError(data=str(te))
                         # else fall through to retry...
                     except:
                         t.rollback()
