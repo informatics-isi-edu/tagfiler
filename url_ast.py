@@ -1110,7 +1110,7 @@ class FileTags (Node):
         # find subfiles of all subjects which are tagged Image Set
         path = [ ( self.predlist + [ dict(tag='Image Set', op='', vals=[]) ], ['vcontains'], [] ),
                  ( [], [], [] ) ]
-        self.subfiles = self.subjfiles + self.select_files_by_predlist_path(path=path)
+        self.subfiles = self.select_files_by_predlist_path(path=path)
 
         for subject in self.subjects:
             self.enforce_tag_authz('write', subject, tagdef)
