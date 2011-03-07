@@ -793,7 +793,10 @@ class Application:
                         t.rollback()
                         if count > limit:
                             self.logException('too many retries during transaction body')
-                            raise RuntimeError(data=str(te))
+                            if te.__class__.__name__ == 'IntegrityError':
+                                raise IntegrityError(data=str(te))
+                            else:
+                                raise RuntimeError(data=str(te))
                         # else fall through to retry...
                     except:
                         t.rollback()
