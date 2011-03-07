@@ -791,8 +791,12 @@ class Application:
                         raise RuntimeError(data=str(te))
                     except (psycopg2.IntegrityError), te:
                         t.rollback()
-                        self.logException('integrity error during transaction body')
-                        raise IntegrityError(data=str(te))
+                        error = str(te)
+                        m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
+                        if not m or count > limit:
+                            # retry on version key violation, can happen under concurrent uploads
+                            self.logException('integrity error during transaction body')
+                            raise IntegrityError(data=error)
                     except (IOError), te:
                         t.rollback()
                         if count > limit:
