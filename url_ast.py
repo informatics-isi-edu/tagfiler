@@ -1107,14 +1107,12 @@ class FileTags (Node):
         if previewOnly:
             return None
 
-        self.subfiles = []
-        for subject in self.subjects:
-            if self.subject['Image Set']:
-                # find subfiles of all subjects which are tagged Image Set
-                path = [ ( self.predlist + dict(tag='Image Set', op='', vals=[]), ['vcontains'], [] ),
-                         ( [], [], [] ) ]
-                self.subfiles = self.subjfiles + self.select_files_by_predlist_path(path=path)
+        # find subfiles of all subjects which are tagged Image Set
+        path = [ ( self.predlist + dict(tag='Image Set', op='', vals=[]), ['vcontains'], [] ),
+                 ( [], [], [] ) ]
+        self.subfiles = self.subjfiles + self.select_files_by_predlist_path(path=path)
 
+        for subject in self.subjects:
             self.enforce_tag_authz('write', subject, tagdef)
             self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=self.tag_id, value=self.value)
             self.delete_tag(subject, tagdef, self.value)
