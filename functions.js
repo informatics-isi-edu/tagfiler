@@ -548,7 +548,7 @@ function validateNameForm(op, suffix) {
 	var type = document.getElementById('type'+suffix).value;
 	var fileInput = null;
 	if (type == 'file') {
-		if (op == 'create' && !checkInput('fileName', 'file to be uploaded')) {
+		if (!checkInput('fileName'+suffix, 'file to be uploaded')) {
 			return false;
 		}
 		fileInput = document.getElementById('fileName'+suffix);
