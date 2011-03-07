@@ -930,7 +930,9 @@ class FileIO (Application):
         def putPostCommit(junk_files):
             if junk_files:
                 self.deletePrevious(junk_files)
-            view = '?view=%s' % urlquote('%s' % self.dtype)
+            view = ''
+            if self.dtype:
+                view = '?view=%s' % urlquote('%s' % self.dtype)
             raise web.seeother('/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view))
 
         def deleteBody():
