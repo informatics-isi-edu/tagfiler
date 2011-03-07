@@ -1124,7 +1124,7 @@ class FileTags (Node):
                 self.delete_tag(subfile, tagdef, self.value)
 
         if not self.referer:
-            if len(self.subfiles) == 1:
+            if len(self.subjects) == 1:
                 # set updated referer based on single match
                 self.referer = '/tags/' + self.subject2identifiers(self.subjects[0])[0]
             else:
