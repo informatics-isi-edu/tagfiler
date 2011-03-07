@@ -794,7 +794,7 @@ class Application:
                         if count > limit:
                             self.logException('too many retries during transaction body')
                             raise te
-                    except (psycopg2.IntegrityError, IOError), te:
+                    except (IOError), te:
                         t.rollback()
                         if count > limit:
                             self.logException('too many retries during transaction body')
