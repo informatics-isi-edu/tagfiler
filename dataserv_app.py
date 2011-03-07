@@ -793,7 +793,7 @@ class Application:
                         t.rollback()
                         if count > limit:
                             self.logException('too many retries during transaction body')
-                            raise te
+                            raise RuntimeError(data=str(te))
                         # else fall through to retry...
                     except:
                         t.rollback()
