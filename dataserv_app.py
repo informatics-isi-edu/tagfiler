@@ -791,9 +791,8 @@ class Application:
                         raise RuntimeError(data=str(te))
                     except (psycopg2.IntegrityError), te:
                         t.rollback()
-                        if count > limit:
-                            self.logException('too many retries during transaction body')
-                            raise te
+                        self.logException('integrity error during transaction body')
+                        raise IntegrityError(data=str(te))
                     except (IOError), te:
                         t.rollback()
                         if count > limit:
