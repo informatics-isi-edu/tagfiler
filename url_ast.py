@@ -1098,7 +1098,7 @@ class FileTags (Node):
                                                 versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.predlist)
-        self.subjects = results
+        self.subjects = [ res for res in results ]
 
         tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
         if tagdef == None:
@@ -1124,8 +1124,12 @@ class FileTags (Node):
                 self.delete_tag(subfile, tagdef, self.value)
 
         if not self.referer:
-            # set updated referer based on original predlist, unless client provided a referer
-            self.referer = '/tags/' + predlist_linearize(self.predlist)
+            if len(self.subfiles) == 1:
+                # set updated referer based on single match
+                self.referer = '/tags/' + self.subject2identifiers(self.subjects[0])[0]
+            else:
+                # for multi-subject results, redirect to predlist, which may no longer work but never happens in GUI
+                self.referer = '/tags/' + predlist_linearize(self.predlist)
             
         return None
 
