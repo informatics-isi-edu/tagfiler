@@ -121,6 +121,7 @@ class FileIO (Application):
         self.newMatch = None
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
+        self.mergePredlistTags = False
 
     def populate_subject(self, enforce_read_authz=True, allow_blank=False):
         self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank)
