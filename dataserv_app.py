@@ -709,7 +709,7 @@ class Application:
 
         try:
             count = 0
-            limit = 3
+            limit = 10
             while True:
                 try:
                     t = self.db.transaction()
@@ -792,8 +792,10 @@ class Application:
                     except (psycopg2.IntegrityError), te:
                         t.rollback()
                         error = str(te)
-                        m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
-                        if not m or count > limit:
+                        #m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
+                        #if not m or count > limit:
+                        web.debug('IntegrityError', te)
+                        if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
                             self.logException('integrity error during transaction body')
                             raise IntegrityError(data=error)

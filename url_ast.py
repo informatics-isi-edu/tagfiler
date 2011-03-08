@@ -321,7 +321,7 @@ class FileList (Node):
             self.globals['filelisttagswrite'] = writetags
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
-                self.predlist = [ { 'tag' : 'list on homepage', 'op' : None, 'vals' : [] } ]
+                self.predlist = [ web.Storage(tag='list on homepage', op=None, vals=[]) ]
                 self.homepage = True
             else:
                 self.predlist=[]
@@ -1039,7 +1039,7 @@ class FileTags (Node):
 
         # custom DEI EIU hack, proxy tag ops on Image Set to all member files
         if self.subject['Image Set']:
-            path = [ ( [ { 'tag' : 'id', 'op' : '=', 'vals' : [self.id] } ], ['vcontains'], [] ),
+            path = [ ( [ web.Storage(tag='id', op='=', vals=[self.id]) ], ['vcontains'], [] ),
                      ( [], [], [] ) ]
             subfiles = self.select_files_by_predlist_path(path=path)
         else:
