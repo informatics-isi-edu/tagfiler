@@ -97,22 +97,22 @@ def parseBoolString(theString):
               
 def predlist_linearize(predlist):
     def pred_linearize(pred):
-        vals = [ urlquote(val) for val in pred['vals'] ]
+        vals = [ urlquote(val) for val in pred.vals ]
         vals.sort()
         vals = ','.join(vals)
-        if pred['op']:
-            return '%s%s%s' % (urlquote(pred['tag']), pred['op'], vals)
+        if pred.op:
+            return '%s%s%s' % (urlquote(pred.tag), pred.op, vals)
         else:
-            return '%s' % (urlquote(pred['tag']))
+            return '%s' % (urlquote(pred.tag))
     predlist = [ pred_linearize(pred) for pred in predlist ]
     predlist.sort()
     return ';'.join(predlist)
 
 def reduce_name_pred(x, y):
-    if x['tag'] == 'name' and x['op'] == '=' and len(x['vals']) > 0:
-        return x['vals'][0]
-    elif y['tag'] == 'name' and y['op'] == '=' and len(y['vals']) > 0:
-        return y['vals'][0]
+    if x.tag == 'name' and x.op == '=' and len(x.vals) > 0:
+        return x.vals[0]
+    elif y.tag == 'name' and y.op == '=' and len(y.vals) > 0:
+        return y.vals[0]
     else:
         return None
             
@@ -258,7 +258,7 @@ class Application:
                                         ('webauthn require', 'False') ]
 
         results = self.select_files_by_predlist(predlist=[pred],
-                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred['tag'] ],
+                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag ],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
             config = results[0]
@@ -884,22 +884,22 @@ class Application:
         got_version = False
         unique = None
         for pred in self.predlist:
-            tagdef = self.globals['tagdefsdict'].get(pred['tag'], None)
+            tagdef = self.globals['tagdefsdict'].get(pred.tag, None)
             if tagdef == None:
-                raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred['tag'])
+                raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
 
             if restrictSchema:
                 if tagdef.tagname not in [ 'name', 'version' ] and tagdef.writeok == False:
                     raise Conflict('Subject predicate sets restricted tag "%s".' % tagdef.tagname)
-                if tagdef.typestr == 'empty' and pred['op'] != '' or \
-                       tagdef.typestr != 'empty' and pred['op'] != '=':
-                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred['op'], tagdef.tagname))
+                if tagdef.typestr == 'empty' and pred.op != '' or \
+                       tagdef.typestr != 'empty' and pred.op != '=':
+                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred.op, tagdef.tagname))
                     
-            if tagdef.get('unique', False) and pred['op'] == '=' and pred['vals']:
+            if tagdef.get('unique', False) and pred.op == '=' and pred.vals:
                 unique = True
-            elif tagdef.tagname == 'name' and pred['op'] == '=' and pred['vals']:
+            elif tagdef.tagname == 'name' and pred.op == '=' and pred.vals:
                 got_name = True
-            elif tagdef.tagname == 'version' and pred['op'] == '=' and pred['vals']:
+            elif tagdef.tagname == 'version' and pred.op == '=' and pred.vals:
                 got_version = True
                 
         if got_name and got_version:
@@ -1481,7 +1481,7 @@ class Application:
         if tagdefs == None:
             tagdefs = self.globals['tagdefsdict']
 
-        tags_needed = set([ pred['tag'] for pred in predlist ])
+        tags_needed = set([ pred.tag for pred in predlist ])
         tags_needed = tags_needed.union(set([ tagname for tagname in listtags ]))
         tagdefs_needed = []
         for tagname in tags_needed:
@@ -1506,9 +1506,9 @@ class Application:
 
         for p in range(0, len(predlist)):
             pred = predlist[p]
-            tag = pred['tag']
-            op = pred['op']
-            vals = pred['vals']
+            tag = pred.tag
+            op = pred.op
+            vals = pred.vals
             tagdef = tagdefs[tag]
 
             if op == ':not:':

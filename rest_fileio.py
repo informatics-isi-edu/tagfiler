@@ -584,7 +584,7 @@ class FileIO (Application):
         tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
 
         if self.mergePredlistTags:
-            tagvals = tagvals + [ (pred['tag'], pred['vals']) for pred in self.predlist if pred['tag'] not in [ 'name', 'version' ] ]
+            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.predlist if pred.tag not in [ 'name', 'version' ] ]
 
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)

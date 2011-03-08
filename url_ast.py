@@ -762,10 +762,10 @@ class FileTags (Node):
         qpath = ''
         terms = []
         for pred in self.predlist:
-            if pred['op']:
-                terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
+            if pred.op:
+                terms.append(urlquote(pred.tag) + pred.op + ",".join([ urlquote(val) for val in pred.vals ]))
             else:
-                terms.append(urlquote(pred['tag']))
+                terms.append(urlquote(pred.tag))
         qpath = ';'.join(terms)
         return self.config['home'] + web.ctx.homepath + '/tags/' + qpath
 
@@ -809,7 +809,7 @@ class FileTags (Node):
         else:
             versions = 'latest'
 
-        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] 
+        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.predlist] 
                                                 + [self.tag_id, 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'],
                                                 versions=versions)
         if len(results) == 0:
@@ -887,7 +887,7 @@ class FileTags (Node):
         if type(self.listtags) == type('text'):
             self.listtags = self.listtags.split(',')
 
-        predtags = [ pred['tag'] for pred in self.predlist ]
+        predtags = [ pred.tag for pred in self.predlist ]
         extratags = [ 'name', 'version', 'tagdef', 'typedef', 'write users', 'file', 'url' ]
 
         all = self.globals['tagdefsdict'].values()
@@ -1031,7 +1031,7 @@ class FileTags (Node):
         list_additional =  ['owner', 'write users', 'Image Set']
         if self.tag_id:
             list_additional.append(self.tag_id)
-        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist] + list_additional, versions=versions)
+        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.predlist] + list_additional, versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.predlist)
         self.subject = results[0]
@@ -1107,7 +1107,7 @@ class FileTags (Node):
             # unique is True or None
             versions = 'any'
          
-        results = self.select_files_by_predlist(listtags=[ pred['tag'] for pred in self.predlist]
+        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.predlist]
                                                 + [self.tag_id, 'owner', 'write users', 'Image Set'],
                                                 versions=versions)
         if len(results) == 0:
@@ -1235,10 +1235,10 @@ class Query (Node):
             predlist, listtags, ordertags = elem
             terms = []
             for pred in predlist:
-                if pred['op']:
-                    terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
+                if pred.op:
+                    terms.append(urlquote(pred.tag) + pred.op + ",".join([ urlquote(val) for val in pred.vals ]))
                 else:
-                    terms.append(urlquote(pred['tag']))
+                    terms.append(urlquote(pred.tag))
             if not listtags or len(listtags) == 1 and listtags[0] in [ 'contains', 'vcontains' ]:
                 listpart = ''
             else:
@@ -1251,22 +1251,22 @@ class Query (Node):
         
         # test if user predicate equals a predicate from predlist
         def equals(pred, userpred):
-            return ({'tag' : pred['tag'], 'op' : pred['op'], 'vals' : str(pred['vals'])} == userpred)
+            return ({'tag' : pred.tag, 'op' : pred.op, 'vals' : str(pred.vals)} == userpred)
 
         tagname = None
         op = None
         value = []
         try:
             self.action = self.queryopts['action']
-            tagname = self.queryopts['tag']
-            op = self.queryopts['op']
+            tagname = self.queryopts.tag
+            op = self.queryopts.op
             if self.action == 'add':
                 for i in range(0,10):
                     val = self.queryopts['val' + str(i)]
                     if val != None:
                         value.append(val)
             elif self.action == 'delete':
-                value = self.queryopts['vals']
+                value = self.queryopts.vals
         except:
             pass
 
