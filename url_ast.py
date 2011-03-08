@@ -154,10 +154,10 @@ class Study (Node):
             self.globals['appletTagnamesRequire'] = config['applet tags require']
             
             if self.action == 'get' and self.name:
-                predlist = [ dict(tag='name', op='=', vals=[self.name]) ]
+                predlist = [ web.Storage(tag='name', op='=', vals=[self.name]) ]
                 versions = 'latest'
                 if self.version:
-                    predlist.append( dict(tag='version', op='=', vals=[self.version]) )
+                    predlist.append( web.Storage(tag='version', op='=', vals=[self.version]) )
                     versions = 'any'
                 
                 results = self.select_files_by_predlist(predlist,
@@ -417,7 +417,7 @@ class FileList (Node):
         storage=dict([(k, urlquote(v)) for k, v in storage.items()])
         if storage['action'] == 'define':
             if name:
-                predlist.append( dict(tag='name', op='=', vals=[name]) )
+                predlist.append( web.Storage(tag='name', op='=', vals=[name]) )
             storage.action = 'post'
         ast = FileId(appname=self.appname,
                      predlist=predlist,
@@ -534,8 +534,8 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=':not:', vals=[])], order='tagdef') ]
-            userdefined = [ tagdef for tagdef in self.select_tagdef(predlist=[dict(tag='owner', op=None, vals=[])], order='tagdef') ]
+            predefined = [ tagdef for tagdef in self.select_tagdef(predlist=[web.Storage(tag='owner', op=':not:', vals=[])], order='tagdef') ]
+            userdefined = [ tagdef for tagdef in self.select_tagdef(predlist=[web.Storage(tag='owner', op=None, vals=[])], order='tagdef') ]
             types = self.get_type()
             
             return (predefined, userdefined, types)
@@ -1122,7 +1122,7 @@ class FileTags (Node):
             return None
 
         # find subfiles of all subjects which are tagged Image Set
-        path = [ ( self.predlist + [ dict(tag='Image Set', op='', vals=[]) ], ['vcontains'], [] ),
+        path = [ ( self.predlist + [ web.Storage(tag='Image Set', op='', vals=[]) ], ['vcontains'], [] ),
                  ( [], [], [] ) ]
         self.subfiles = self.select_files_by_predlist_path(path=path)
 

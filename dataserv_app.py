@@ -226,7 +226,7 @@ class Application:
     def select_config(self, pred=None, params_and_defaults=None, fake_missing=True):
         
         if pred == None:
-            pred = dict(tag='config', op='=', vals=['tagfiler'])
+            pred = web.Storage(tag='config', op='=', vals=['tagfiler'])
             if params_and_defaults == None:
                 params_and_defaults = [ ('applet custom properties', []),
                                         ('applet test properties', []),
@@ -282,7 +282,7 @@ class Application:
         if viewname == None:
             return None
 
-        view = self.select_config(dict(tag='view', op='=', vals=[viewname]),
+        view = self.select_config(web.Storage(tag='view', op='=', vals=[viewname]),
                                   [ ('file list tags', []),
                                     ('file list tags write', []),
                                     ('tag list tags', []) ],
@@ -496,7 +496,7 @@ class Application:
                                    'vfile' : self.validateVersionedFilename }
 
     def validateFilename(self, file, tagname='', subject=None):        
-        results = self.select_files_by_predlist(predlist=[dict(tag='name', op='=', vals=[file])],
+        results = self.select_files_by_predlist(predlist=[web.Storage(tag='name', op='=', vals=[file])],
                                                 listtags=['id'])
         if len(results) == 0:
             raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
@@ -514,8 +514,8 @@ class Application:
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
             if g['data_id'] == '':
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
-            results = self.select_files_by_predlist(predlist=[dict(tag='vname', op='=', vals=[vfile]),
-                                                              dict(tag='version', op='=', vals=[version])],
+            results = self.select_files_by_predlist(predlist=[web.Storage(tag='vname', op='=', vals=[vfile]),
+                                                              web.Storage(tag='version', op='=', vals=[version])],
                                                     listtags=['id'],
                                                     versions='any')
             if len(results) == 0:
@@ -1066,9 +1066,9 @@ class Application:
                 res['typedef values'] = dict(vals)
             return res
         if typename != None:
-            predlist = [ dict(tag='typedef', op='=', vals=[typename]) ]
+            predlist = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
         else:
-            predlist = [ dict(tag='typedef', op=None, vals=[]) ]
+            predlist = [ web.Storage(tag='typedef', op=None, vals=[]) ]
         listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
 
@@ -1078,7 +1078,7 @@ class Application:
             versions = 'latest'
         else:
             versions = 'any'
-        return self.select_files_by_predlist_path([ ([ dict(tag='id', op='=', vals=[subject.id]) ], [ membertag ], [ ]),
+        return self.select_files_by_predlist_path([ ([ web.Storage(tag='id', op='=', vals=[subject.id]) ], [ membertag ], [ ]),
                                                     ( [], [], [] ) ],
                                                   versions=versions)
 
@@ -1090,7 +1090,7 @@ class Application:
 
     def select_dataset_size(self, key, membertag='vcontains'):
         # return statistics aout the children of the dataset as referenced by its membertag
-        query, values = self.build_files_by_predlist_path([ ([dict(tag='key', op='=', vals=[key])], [membertag], []),
+        query, values = self.build_files_by_predlist_path([ ([web.Storage(tag='key', op='=', vals=[key])], [membertag], []),
                                                             ([], ['name', 'bytes'], []) ])
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
         return self.db.query(query, values)
@@ -1178,9 +1178,9 @@ class Application:
             return tagdef
             
         if tagname:
-            predlist = predlist + [ dict(tag='tagdef', op='=', vals=[tagname]) ]
+            predlist = predlist + [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
         else:
-            predlist = predlist + [ dict(tag='tagdef', op=None, vals=[]) ]
+            predlist = predlist + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
         results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
@@ -1749,7 +1749,7 @@ class Application:
                 cq = build_query_recursive(cstack, qd + 1, limit=None)
                 cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
                 
-                predlist.append( dict(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
+                predlist.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
                 q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
                 values.update(v)
                 return q

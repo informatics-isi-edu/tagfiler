@@ -455,7 +455,7 @@ class FileIO (Application):
                 self.name = self.subject.name
             else:
                 self.version = 1
-                self.name = reduce(reduce_name_pred, self.predlist + [ dict(tag='', op='', vals=[]) ] )
+                self.name = reduce(reduce_name_pred, self.predlist + [ web.Storage(tag='', op='', vals=[]) ] )
         else:
             self.name = None
             self.version = None

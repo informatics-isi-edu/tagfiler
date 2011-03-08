@@ -259,15 +259,15 @@ def p_predlist_grow(p):
 
 def p_pred_tag_val_comp(p):
     """pred : string compare vallist"""
-    p[0] = dict([ ('tag', p[1]), ('op', p[2]), ('vals', p[3]) ])
+    p[0] = web.Storage([ ('tag', p[1]), ('op', p[2]), ('vals', p[3]) ])
 
 def p_pred_tag(p):
     """pred : string"""
-    p[0] = dict([ ('tag', p[1]), ('op', None), ('vals', []) ])
+    p[0] = web.Storage([ ('tag', p[1]), ('op', None), ('vals', []) ])
 
 def p_pred_not_tag(p):
     """pred : string ':' NOT ':'"""
-    p[0] = dict([ ('tag', p[1]), ('op', ':not:'), ('vals', []) ])
+    p[0] = web.Storage([ ('tag', p[1]), ('op', ':not:'), ('vals', []) ])
 
 def p_pred_vallist(p):
     """vallist : string"""
