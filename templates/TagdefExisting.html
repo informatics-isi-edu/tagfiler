@@ -1,4 +1,4 @@
-$def with (title, test_tagdef_authz)
+$def with (title, tagdefs)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -15,7 +15,7 @@ $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
 $ target = home + '/tagdef'
-$ typenames = [ (type['typedef'], type['_type_description']) for type in typeinfo ]
+$ typenames = [ (type['typedef'], type['typedef description']) for type in typeinfo ]
 $ typenames.sort(key=lambda x: x[1])
 $ typedict = dict(typenames)
 <h2>${title}</h2>
@@ -29,39 +29,42 @@ $ typedict = dict(typenames)
 <th name="readpolicy">readpolicy</th>
 <th name="writepolicy">writepolicy</th>
 </tr>
-$if title == 'User':
-    <tr class="tagdefcreate">
-    <form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
-    <td><input name="tag-1" type="text" /></td>
-    <td><select name="type-1">
-    $ deftypestr = ''
-    <option value="${deftypestr}">${typedict[deftypestr]}</option>
-    $for type in [ type for type in typenames if type[0] != deftypestr ]:
-        $ typestr = type[0]
-        <option value="${typestr}">${typedict[typestr]}</option>
-    </select></td>
-    <td><select name="multivalue-1">
-    <option value="false">0 or 1</option>
-    <option value="true">0 or more</option>
-    </select></td>
-    <td>N/A</td>
-    $ policies = dict(anonymous='anyone', users='only authenticated users', file='only clients who can access file', fowner='only owner of file', tag='only clients in tagdef ACL')
-    <td><select name="readpolicy-1">
-    $for pol in ['anonymous', 'users', 'file', 'fowner', 'tag']:
-            <option value="${pol}">${policies[pol]}</option>
-    </select></td>
-    <td><select name="writepolicy-1">
-    $for pol in ['users', 'anonymous', 'file', 'fowner', 'tag']:
-            <option value="${pol}">${policies[pol]}</option>
-    </select>
-    <input type="hidden" name="action" value="add" />
-    </td>
-    </tr>
-    <tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></form></tr>
-$ tagdefs = tagdefsdict.values()
+$if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config['tagdef write users']))) > 0:
+	<tr class="tagdefcreate">
+	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+	<td><input name="tag-1" type="text" /></td>
+	<td><select name="type-1">
+	$ deftypestr = 'empty'
+	<option value="${deftypestr}">${typedict[deftypestr]}</option>
+	$for type in [ type for type in typenames if type[0] != deftypestr ]:
+	    $ typestr = type[0]
+	    <option value="${typestr}">${typedict[typestr]}</option>
+	</select></td>
+	<td><select name="multivalue-1">
+	<option value="false">0 or 1</option>
+	<option value="true">0 or more</option>
+	</select></td>
+	<td>N/A</td>
+	$ policies = dict(anonymous='anyone', users='only authenticated users', file='only clients who can access file', fowner='only owner of file', tag='only clients in tagdef ACL')
+	<td><select name="readpolicy-1">
+	$for pol in ['anonymous', 'users', 'file', 'fowner', 'tag']:
+		<option value="${pol}">${policies[pol]}</option>
+	</select></td>
+	<td><select name="writepolicy-1">
+	$for pol in ['users', 'anonymous', 'file', 'fowner', 'tag']:
+		<option value="${pol}">${policies[pol]}</option>
+	</select>
+	<input type="hidden" name="action" value="add" />
+	</td>
+	</tr>
+	<tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></form></tr>
 $ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 $for tagdef in tagdefs:
-	<tr class="tagdef"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
+	$if tagdef.owner in authn.roles:
+		$ writeclass = 'writeok'
+	$else:
+		$ writeclass = 'readonly'
+	<tr class="tagdef ${writeclass}"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
 </table>
 <script type="text/javascript">
 renderTagdefs(document.getElementById("${idquote(title) + '_tagdefs'}"));

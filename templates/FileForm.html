@@ -14,7 +14,7 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-<form enctype="multipart/form-data" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post" onsubmit="return checkInput('fileName', 'file to be uploaded')" >
+<form enctype="multipart/form-data" action="${home + "/file/" + datapred + suffix}" method="post" onsubmit="return checkInput('fileName', 'file to be uploaded')" >
 <input name="myfile" type="file" id="fileName" />
 <input type="submit" value="Upload" />
 </form>

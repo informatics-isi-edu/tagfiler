@@ -16,31 +16,19 @@ $# limitations under the License.
 $# 
 $if title:
 	<h2>${title}</h2>
-$if title == 'System' and data_id:
-	<a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a>
+$if title == 'System' and datapred:
+	<a href="${home + '/file/' + datapred}">Link to ${dataname}</a>
 $ odd = True
 <table class="file-list">
-$if tagspace == 'tagdefacl':
-	<tr class="file-heading"><th class="file-name">Tag</th><th class="file-tag">ACL</th><th class="file-tag">Member(s)</th></tr>
-$else:
-	<tr class="file-heading"><th class="file-name">File</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
+<tr class="file-heading"><th class="file-name">Subject</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
 $for file in files:
+	$ datapred, dataid, dataname, dtype = subject2identifiers(file)
 	$for tagdef in tagdefs:
-		$if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
-			<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
+		$if odd:
+			<tr class="file odd"><td class="file-name"><a href="${home}/file/${datapred}">${dataname}</a></td><td>${tagdef.tagname}</td>
 		$else:
-			$if odd:
-				<tr class="file odd"><td class="file-name">${file.file}</td><td>${tagdef.tagname}</td>
-			$else:
-				<tr class="file even"><td class="file-name">${file.file}</td><td>${tagdef.tagname}</td>
-			$ odd = not odd
-			$if tagdef.typestr != '':
-				<td class="file-tag"><table>
-				$if tagdef.multivalue:
-					$for val in file[tagdef.tagname]:
-						<tr><td class="file-tag multivalue">${val}</td></tr>
-				$else:
-					<tr><td class="file-tag multivalue">${file[tagdef.tagname]}</td></tr>
-				</table></td>
-			</tr>
+			<tr class="file even"><td class="file-name"><a href="${home}/file/${datapred}">${dataname}</a></td><td>${tagdef.tagname}</td>
+		$ odd = not odd
+		<td class="file-tag">$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}</td>
+		</tr>
 </table>

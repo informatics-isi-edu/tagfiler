@@ -14,6 +14,7 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
+$ filerecord = args.get('filerecord')
 $ tagname = args.get('tagname')
 $ typestr = args.get('typestr')
 $ typevals = args.get('typevals')
@@ -23,6 +24,7 @@ $ id = args.get('id')
 $ name = args.get('name')
 $ disabled = args.get('disabled')
 $ readonly = args.get('readonly', '')
+$ showversions = args.get('showversions', False)
 $if type:
 	<td>
 	<input id="${id}" type="${type}" value="${val}" ${readonly} 
@@ -33,7 +35,37 @@ $if type:
 	/>
 $else:
 	<td class="file-tag ${idquote(tagname)} multivalue">
-	$if typevals:
+	$if tagname == 'id':
+		$ putpred, dataid, dataname, dtype =  subject2identifiers(filerecord, False)
+		$ datapred, dataid, dataname, dtype = subject2identifiers(filerecord, showversions)
+		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}?view=default">(tags)</a>
+		$if filerecord.get('Image Set', False):
+			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
+		</td>
+		$if filerecord.writeok:
+			<td>
+			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
+			    <div>
+			    <input type="hidden" name="action" value="delete" />
+			    <input type="hidden" name="referer" value="${referer}" />
+			    <input type="submit" value="Delete" />
+			    </div>
+			</form>
+			</td>
+			</tr>
+			</table>
+			<table>
+			<tr>
+			<td colspan="2">
+				$:{render.DatasetForm(putpred, filerecord)}
+			</td>
+		</tr>
+		</table>
+	$elif tagname == 'tagdef' or typestr in ['tagname', 'tagdef']:
+		<a href="${home}/tags/tagdef=${urlquote(val)}?view=tagdef">${val}</a>
+	$elif typestr == 'type':
+		<a href="${home}/tags/typedef=${urlquote(val)}?view=typedef">${val}</a>
+	$elif typevals:
 		$# this lambda is to simulate ternary operator in Python 2.4
 		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
 	$elif typestr == 'url':
@@ -44,7 +76,7 @@ $else:
 		$ parts = val.split('@')
 		$ version = parts[-1]
 		$ base = '@'.join(parts[0:-1])
-		<a href="${home}/file/${urlquote(base)+'@'+version}">${base+'@'+version}</a>
+		<a href="${home}/file/name=${urlquote(base)};${version}">${base+'@'+version}</a>
 	$else:
 		${val}
 </td>

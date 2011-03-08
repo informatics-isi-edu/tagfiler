@@ -22,7 +22,7 @@ import sys
 import traceback
 
 # Uncomment the below line in case of a RPM installation
-from tagfiler import url_lex, url_parse, url_parse_func
+from tagfiler import url_lex, url_parse, url_parse_func, dataserv_app
 
 # need to find our other local modules
 
@@ -76,9 +76,17 @@ class Dispatcher:
             raise web.NoMethod()
         ast.preDispatch(uri)
         astmethod = getattr(ast, methodname)
-        result = astmethod(uri)
+
+        try:
+            result = astmethod(uri)
+            return result
+        except dataserv_app.WebException, e:
+            if hasattr(e, 'detail'):
+                web.header('X-Error-Description', e.detail)
+            raise e
+
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
-        return result
+        # return result
 
     def HEAD(self):
         return self.METHOD('HEAD')

@@ -523,69 +523,84 @@ var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green"
 var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
 
 /**
+ * Make html transformations for the NameForm based on the dataset type
+ */
+function changeNameFormType(op, suffix) {
+	document.getElementById('fileName'+suffix).style.display = (document.getElementById('type'+suffix).value == 'file' ? 'inline' : 'none');
+	if (op == 'create') {
+		if (document.getElementById('type'+suffix).value == 'blank') {
+			document.getElementById('namedDataset'+suffix).style.display = 'none';
+			document.getElementById('datasetName'+suffix).value = '';
+		} else {
+			document.getElementById('namedDataset'+suffix).style.display = 'block';
+		}
+	}
+}
+
+/**
  * Validate and make html transformations for the NameForm
  * Return True in case of success and False otherwise
  */
-function validateNameForm() {
-	var res = checkInput('datasetName', 'name of the dataset');
-	if (!res) {
+function validateNameForm(op, suffix) {
+	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName'+suffix, 'name of the dataset')) {
 		return false;
 	}
-	var type = document.getElementById('type').value;
+	var type = document.getElementById('type'+suffix).value;
 	var fileInput = null;
 	if (type == 'file') {
-		if (!checkInput('fileName', 'file to be uploaded')) {
+		if (!checkInput('fileName'+suffix, 'file to be uploaded')) {
 			return false;
 		}
-		fileInput = document.getElementById('fileName');
+		fileInput = document.getElementById('fileName'+suffix);
 	}
-	var data_id = document.getElementById('datasetName').value.replace(/^\s*/, "").replace(/\s*$/, "");
-	var action = document.NameForm.getAttribute('action');
-	action += encodeURIComponent(data_id);
-	var prefix = '?';
-	if (document.getElementById('read users').value == '*') {
-		action += '?read%20users=*';
-		prefix = '&'
+	var data_id = '';
+	if (op == 'create') {
+		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
+		var action = document.NameForm.getAttribute('action');
+		if (data_id.length > 0) {
+			action += '/name=' + encodeURIComponent(data_id);
+		}
+		var prefix = '?';
+		if (document.getElementById('read users'+suffix).value == '*') {
+			action += '?read%20users=*';
+			prefix = '&'
+		}
+		if (document.getElementById('write users'+suffix).value == '*') {
+			action += prefix + 'write%20users=*';
+		}
+		document.NameForm.setAttribute('action', action);
 	}
-	if (document.getElementById('write users').value == '*') {
-		action += prefix + 'write%20users=*';
-	}
-	document.NameForm.setAttribute('action', action);
+	var NameForm = document.getElementById('NameForm'+suffix);
 	if (type == 'file') {
-		document.NameForm.enctype = 'multipart/form-data';
+		NameForm.setAttribute('enctype', 'multipart/form-data');
 	} else {
-		document.NameForm.enctype = 'application/x-www-form-urlencoded';
+		NameForm.setAttribute('enctype', 'application/x-www-form-urlencoded');
 	}
-	var form = document.getElementById('NameForm');
-	orig_form = document.getElementById('NameForm_div');
+	var form = document.getElementById('NameForm'+suffix);
+	orig_form = document.getElementById('NameForm_div'+suffix);
 	form.removeChild(orig_form);
-	input = document.createElement('input');
-	input.setAttribute('type', 'submit');		
-	input.setAttribute('value', 'Proceed');		
 	var statusValue = datasetStatusPrefix;
 	if (type == 'file') {
 		form.appendChild(fileInput);
 		fileInput.style.display = 'none';
 		statusValue += 'Uploading file "' + fileInput.value + '"';
 	} else {
-		input = document.createElement('input');
+		var input = document.createElement('input');
 		input.setAttribute('type', 'hidden');		
 		input.setAttribute('name', 'action');		
-		input.setAttribute('id', 'action');		
-		input.setAttribute('value', 'put');		
+		input.setAttribute('id', 'action'+suffix);		
+		input.setAttribute('value', 'post');		
 		form.appendChild(input);
-		input = document.createElement('input');
-		input.setAttribute('type', 'hidden');		
-		input.setAttribute('name', 'type');		
-		input.setAttribute('id', 'type');		
-		input.setAttribute('value', type);		
-		form.appendChild(input);
-		statusValue += 'Registering "' + data_id + '" dataset';
+		if (op == 'create') {
+			statusValue += 'Registering ' + (data_id.length > 0 ? '"'+data_id+'" dataset' : 'the blank node');
+		} else {
+			statusValue += 'Replacing the dataset';
+		}
 	}
 	
-	document.getElementById('submit').style.display = 'none';
+	document.getElementById('submit'+suffix).style.display = 'none';
 	statusValue += datasetStatusSuffix;
-	document.getElementById('Copy').innerHTML = statusValue;
+	document.getElementById('Copy'+suffix).innerHTML = statusValue;
 	
 	return true;
 }
@@ -648,13 +663,7 @@ function renderTagdefs(table) {
     }
 
     for (i=1; i<rows.length; i++) {
-	if (rows[i].getAttribute("class") == "tagdef") {
-	    if ( i % 2 == 1 ) {
-		rows[i].className = "tagdef odd";
-	    }
-	    else {
-		rows[i].className = "tagdef even";
-	    }
+	if ( (rows[i].getAttribute("class") == "tagdef writeok") || (rows[i].getAttribute("class") == "tagdef readonly") ) {
 	    var cells = rows[i].children;
 	    var namecell = cells[columnmap["tagname"]];
 	    var tagname = namecell.innerHTML;
@@ -678,13 +687,21 @@ function renderTagdefs(table) {
 	    var writepolcell = cells[columnmap["writepolicy"]];
 	    writepolcell.innerHTML = policy[writepolcell.innerHTML];
 
-	    namecell.innerHTML = "<form "
-		+ "encoding=\"application/x-www-url-encoded\" "
-		+ "action=\"/tagfiler/tagdef\" method=\"post\">"
-		+ "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
-		+ "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
-		+ "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
-		+ tagname + "</form>";
+	    if ( rows[i].getAttribute("class") == "tagdef writeok" ) {
+		namecell.innerHTML = "<form "
+		    + "encoding=\"application/x-www-url-encoded\" "
+		    + "action=\"/tagfiler/tagdef\" method=\"post\">"
+		    + "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
+		    + "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
+		    + "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
+		    + tagname + "</form>";
+	    }
+	    if ( i % 2 == 1 ) {
+		rows[i].className = "tagdef odd";
+	    }
+	    else {
+		rows[i].className = "tagdef even";
+	    }
 	}
     }
 }

@@ -14,7 +14,7 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + urlquote(data_id) + suffix}" method="post" onsubmit="return checkInput('url', 'URL of the remote dataset')" >
+<form enctype="application/x-www-form-urlencoded" action="${home + "/file/" + datapred + suffix}" method="post" onsubmit="return checkInput('url', 'URL of the remote dataset')" >
 Enter the URL of the remote dataset: 
 <input name="url" type="text" id="url" /> <br />
 <input type="hidden" name="action" value="put" />

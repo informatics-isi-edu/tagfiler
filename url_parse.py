@@ -34,7 +34,6 @@ def p_start(p):
     """start : filelist
              | file
              | tagdef
-             | tagdefacl
              | tags
              | query
              | transmitnumber
@@ -71,20 +70,20 @@ def p_filelist_opts2(p):
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 
 def p_file(p):
-    """file : slash string slash FILE slash filename"""
-    p[0] = url_ast.FileId(appname=p[2], data_id=p[6])
+    """file : slash string slash FILE slash predlist_nonempty"""
+    p[0] = url_ast.FileId(appname=p[2], predlist=p[6])
 
 def p_log(p):
     """log : slash string slash LOG slash string"""
-    p[0] = url_ast.LogId(appname=p[2], data_id=p[6])
+    p[0] = url_ast.LogId(appname=p[2], name=p[6])
 
 def p_log_opts(p):
-    """file : slash string slash LOG slash string queryopts"""
-    p[0] = url_ast.LogId(appname=p[2], data_id=p[6], queryopts=p[7])
+    """log : slash string slash LOG slash string queryopts"""
+    p[0] = url_ast.LogId(appname=p[2], name=p[6], queryopts=p[7])
 
 def p_file_opts(p):
-    """file : slash string slash FILE slash filename queryopts"""
-    p[0] = url_ast.FileId(appname=p[2], data_id=p[6], queryopts=p[7])
+    """file : slash string slash FILE slash predlist_nonempty queryopts"""
+    p[0] = url_ast.FileId(appname=p[2], predlist=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
@@ -103,27 +102,6 @@ def p_tagdef_rest_put(p):
     #  where pol is in [ anonymous, users, file, fowner, tag, system ]
     p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
 
-def p_tagdefacl_all(p):
-    """tagdefacl : slash string slash TAGDEFACL
-            | slash string slash TAGDEFACL slash"""
-    # note: this class hijacks FileTags
-    p[0] = url_ast.TagdefACL(appname=p[2])
-
-def p_tagdefacl(p):
-    """tagdefacl : slash string slash TAGDEFACL slash string 
-            | slash string slash TAGDEFACL slash string slash"""
-    # note: this class hijacks FileTags so arg naming is weird
-    # data_id --> tag_id
-    p[0] = url_ast.TagdefACL(appname=p[2], data_id=p[6])
-
-def p_tagdefaclvalrest(p):
-    """tagdefacl : slash string slash TAGDEFACL slash string slash tagvals"""
-    # note: this class hijacks FileTags so arg naming is weird
-    # data_id --> tag_id
-    # tag_id --> [ readers, writers ]
-    # values --> usernames
-    p[0] = url_ast.TagdefACL(appname=p[2], data_id=p[6], tagvals=p[8])
-
 def p_tags_all(p):
     """tags : slash string slash TAGS
             | slash string slash TAGS slash"""
@@ -138,17 +116,21 @@ def p_tags_all_slash_opts(p):
     p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
 
 def p_tags(p):
-    """tags : slash string slash TAGS slash filename 
-            | slash string slash TAGS slash filename slash"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6])
+    """tags : slash string slash TAGS slash predlist_nonempty 
+            | slash string slash TAGS slash predlist_nonempty slash"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6])
 
 def p_tags_opts(p):
-    """tags : slash string slash TAGS slash filename queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], queryopts=p[7])
+    """tags : slash string slash TAGS slash predlist_nonempty queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], queryopts=p[7])
 
 def p_tagsvalrest(p):
-    """tags : slash string slash TAGS slash filename slash tagvals"""
-    p[0] = url_ast.FileTags(appname=p[2], data_id=p[6], tagvals=p[8])
+    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8])
+
+def p_tagsvalrest_opts(p):
+    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8], queryopts=p[9])
 
 def p_tagvals(p):
     """tagvals : tagval"""
@@ -198,42 +180,80 @@ def p_query4(p):
     """query : slash string slash QUERY slash querypath queryopts"""
     p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=p[7])
 
-def p_querypath_listonly(p):
-    """querypath : listtags"""
-    p[0] = [ ( [], p[1], [] ) ]
+def p_querypath_general(p):
+    """querypath_elem : predlist listtags_nonepsilon ordertags"""
+    p[0] = ( p[1], p[2], p[3] )
 
-def p_querypath(p):
-    """querypath : predlist listtags"""
-    p[0] = [ ( p[1], p[2], [] ) ]
+def p_querypath_nopred(p):
+    """querypath_elem : listtags_nonepsilon ordertags"""
+    p[0] = ( [], p[1], p[2] )
+
+def p_querypath_noorder(p):
+    """querypath_elem : predlist listtags"""
+    p[0] = ( p[1], p[2], [] )
+
+def p_querypath_listonly(p):
+    """querypath_elem : listtags"""
+    p[0] = ( [], p[1], [] )
+
+def p_querypath_base(p):
+    """querypath : querypath_elem"""
+    p[0] = [ p[1] ]
 
 def p_querypath_extend(p):
-    """querypath : querypath slash predlist listtags"""
+    """querypath : querypath slash querypath_elem"""
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
     if len(plisttags) == 0:
         # the parent path element has no listtags, default to 'vcontains'
         p[0][-1] = ( ppreds, [ 'vcontains' ], pordertags )
-    p[0].append( ( p[3], p[4], [] ) )
-
-def p_listtags_empty(p):
-    """listtags :
-                | '(' ')'"""
-    p[0] = []
+    p[0].append( p[3] )
 
 def p_listtags(p):
-    """listtags : '(' vallist ')'"""
+    """listtags : listtags_epsilon
+                | listtags_empty
+                | listtags_nonempty"""
+    p[0] = p[1]
+
+def p_listtags_nonepsilon(p):
+    """listtags_nonepsilon : listtags_empty
+                           | listtags_nonempty"""
+    p[0] = p[1]
+
+def p_listtags_epsilon(p):
+    """listtags_epsilon : """
+    p[0] = []
+
+def p_listtags_empty(p):
+    """listtags_empty : '(' ')'"""
+    p[0] = []
+
+def p_listtags_nonempty(p):
+    """listtags_nonempty : '(' vallist ')'"""
     p[0] = p[2]
+
+def p_ordertags_empty(p):
+    """ordertags : """
+    p[0] = []
+
+def p_ordertags_nonempty(p):
+    """ordertags : vallist"""
+    p[0] = p[1]
 
 def p_predlist_empty(p):
     """predlist : """
     p[0] = []
 
+def p_predlist_nonempty(p):
+    """predlist : predlist_nonempty"""
+    p[0] = p[1]
+
 def p_predlist(p):
-    """predlist : pred"""
+    """predlist_nonempty : pred"""
     p[0] = list([ p[1] ])
 
 def p_predlist_grow(p):
-    """predlist : predlist ';' pred"""
+    """predlist_nonempty : predlist_nonempty ';' pred"""
     p[0] = p[1]
     p[0].append(p[3])
 
@@ -360,11 +380,11 @@ def p_study(p):
 
 def p_study_num(p):
     """study : slash string slash STUDY slash filename"""
-    p[0] = url_ast.Study(appname=p[2], data_id=p[6])
+    p[0] = url_ast.Study(appname=p[2], name=p[6])
 
 def p_study_num_opts(p):
     """study : slash string slash STUDY slash filename queryopts"""
-    p[0] = url_ast.Study(appname=p[2], data_id=p[6], queryopts=p[7])
+    p[0] = url_ast.Study(appname=p[2], name=p[6], queryopts=p[7])
 
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
@@ -386,7 +406,7 @@ def p_slash(p):
 
 def p_filename(p):
     """filename : string"""
-    p[0] = web.storage(data_id=p[1], version=None)
+    p[0] = web.storage(name=p[1], version=None)
 
 def p_filename_version(p):
     """filename : string '@' string"""
@@ -394,7 +414,7 @@ def p_filename_version(p):
         x = int(p[3])
     except:
         raise ParseError(p[3], 'Filename part of URL has invalid version number:')
-    p[0] = web.storage(data_id=p[1], version=p[3])
+    p[0] = web.storage(name=p[1], version=p[3])
 
 def p_spacestring(p):
     """spacestring : '+'"""

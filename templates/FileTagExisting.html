@@ -1,7 +1,4 @@
 $def with (title, file, tagdefs)
-$ odd = True
-$if title == 'User' and data_id:
-	<p><a href="${home + '/file/' + urlquote(data_id)}">Link to ${data_id}</a></p>
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -17,17 +14,16 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
+$ odd = True
+$if title == 'User' and datapred:
+	<p><a href="${home + '/file/' + datapred}">Link to ${dataname}</a></p>
 $if title != '':
 	<h2>${title}</h2>
 $if len(tagdefs) > 0:
 	<table class="file-list">
 	<tr class="file-heading">
-	$if tagspace == 'tagdefacl':
-		<th class="tag-name">ACL name</th>
-		<th class="file-tags">Current Member(s)</th>
-	$else:
-		<th class="tag-name">Tag name</th>
-		<th class="file-tags">Current Value(s)</th>
+	<th class="tag-name">Tag name</th>
+	<th class="file-tags">Current Value(s)</th>
 	</tr>
 	$for tagdef in tagdefs:
 		$if odd:
@@ -37,9 +33,9 @@ $if len(tagdefs) > 0:
 		$ odd = not odd
 		<td class="tag name">${tagdef.tagname}</td>
 		<td class="file-tag ${idquote(tagdef.tagname)}">
-		$:{render.FileTagValBlock(file, tagdef, tagdefsdict.iterkeys(), version)}
+		$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}
 		</td>
 		</tr>
 	</table>
 $else:
-	There are no applicable ${dict(tags="tag", tagdefacl="tagdefacl")[tagspace]}s.
+	There are no applicable tags.

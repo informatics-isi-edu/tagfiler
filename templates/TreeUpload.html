@@ -14,14 +14,6 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-$for type in types:
-	$ values = type['_type_values']
-	$if values:
-		$ values = dict(values)
-	$else:
-		$ values = None
-	$ type['_type_values'] = values
-$ typesdict = dict ( [ (type['typedef'], type) for type in types ] )
 <div>
 	<h3>Status</h3>
 	<table>
@@ -122,8 +114,8 @@ $ typesdict = dict ( [ (type['typedef'], type) for type in types ] )
 	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 	$for tagdef in tagdefs:
 		$ type = typesdict[tagdef.typestr]
-		$ typedesc = type['_type_description']
-		$ typevals = type['_type_values']		
+		$ typedesc = type['typedef description']
+		$ typevals = type['typedef values']		
 		<tr>
 		<td class="tag-name">${tagdef.tagname} (${typedesc})</td>
 		$ options = tagOptions(tagdef.tagname)

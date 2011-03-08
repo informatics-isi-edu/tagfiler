@@ -36,7 +36,6 @@ literals = [ '(', ')', ':', ';', ',', '=', '@', '&', '$',
 keywords = {
     'file' : 'FILE',
     'tagdef' : 'TAGDEF',
-    'tagdefacl' : 'TAGDEFACL',
     'tags' : 'TAGS',
     'query' : 'QUERY',
     'lt' : 'LT',

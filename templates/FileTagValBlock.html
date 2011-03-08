@@ -1,4 +1,4 @@
-$def with (file, tagdef, writetags, version)
+$def with (file, tagdef, writetags, version, showversions=False)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -14,13 +14,15 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
-$ writetags = [ tag for tag in writetags ]
+$if writetags:
+	$ writetags = [ tag for tag in writetags ]
+$else:
+	$ writetags = []
 $ tagnames = tagdefsdict.iterkeys()
 $ typesdict = dict( [ (type['typedef'], type) for type in typeinfo ] )
 $ type = typesdict[tagdef.typestr]
-$ typename = type['_type_description']
-$ typevals = type['_type_values']
-$ writeok = tagdef.get('writeok', True)
+$ typename = type['typedef description']
+$ typevals = type['typedef values']
 $ vals = file[tagdef.tagname]
 $ vsuffix = ''
 $if version:
@@ -32,8 +34,16 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
+$ writeok = tagdef.writeok
+$if file['write users'] == None:
+	$ file['write users'] = []
+$if writeok == None:
+	$if tagdef.writepolicy == 'fowner':
+		$ writeok = file.owner in authn.roles
+	$elif tagdef.writepolicy == 'file':
+		$ writeok = file.owner in authn.roles or len( set(authn.roles).intersection(set(file['write users'])) ) > 0
 $ options = tagOptions(tagdef.tagname, itervals)
-$ params = dict( file=file.file, 
+$ params = dict( filerecord=file,
 $				 tagname=tagdef.tagname, 
 $				 typestr=tagdef.typestr, 
 $				 typename=typename, 
@@ -42,22 +52,28 @@ $				 vsuffix=vsuffix,
 $				 vals=vals, 
 $				 options=options,
 $				 name='%s%s' % ('val-', urlquote(tagdef.tagname)),
-$				 writeok=writeok)
-$if tagdef.typestr and tagspace=='tagdefacl' and ((tagdef.tagname=='readers' and file.readpolicy!='tag') or (tagdef.tagname=='writers' and file.writepolicy!='tag')):
-	<!-- tagdef ${file.file} does not have ${tagdef.tagname} ACL. -->
-$elif tagdef.typestr:
+$				 writeok=writeok,
+$				 showversions=showversions)
+$if tagdef.typestr != 'empty':
 	<table class="file-tag-list">
-	$for val in itervals:
-		<tr>
-		$ params['val'] = val
-		$:{render.TagValueForm(params)}
-		<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
-		$if tagdef.tagname in writetags and writeok:
-			$:{render.RemoveTagValueForm(params)}
-		</td>
-		</tr>
-	$if tagdef.tagname in writetags and writeok:
+	$if len(itervals) > 0:
+		$for val in itervals:
+			<tr>
+			$ params['val'] = val
+			$if smartTagValues:
+				$:{render.TagValueForm(params)}
+				<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
+				$if tagdef.tagname in writetags and writeok:
+					$:{render.RemoveTagValueForm(params)}
+				</td>
+			$else:
+				<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${val}</td>
+			</tr>
+	$if smartTagValues and tagdef.tagname in writetags and writeok:
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:
-	$:{render.SetTagForm(params)}
+	$if smartTagValues:
+		$:{render.SetTagForm(params)}
+	$else:
+		${vals}

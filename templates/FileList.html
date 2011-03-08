@@ -1,9 +1,4 @@
-$def with (files, showversions=False)
-$ odd = True
-$if view:
-	$ querystr = '?view=%s' % urlquote(view)
-$else:
-	$ querystr = ''
+$def with (files, showversions=False, limit=None)
 $# 
 $# Copyright 2010 University of Southern California
 $# 
@@ -19,14 +14,24 @@ $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 $# See the License for the specific language governing permissions and
 $# limitations under the License.
 $#
+$ odd = True
+$if view:
+	$ querystr = '?view=%s' % urlquote(view)
+$else:
+	$ querystr = ''
 $if len(files) > 0:
+	$if limit and limit == len(files):
+		$ suffix = '?limit=none'
+		$if showversions:
+			$ suffix = '%s&versions=any' % suffix
+		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}${suffix}">View all results.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
-	<th class="file-name">Dataset</th>
-	<th class="file-tags">Tags</th>
-	<th class="file-update">Update</th>
 	$for tag in filelisttags:
-		<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
+		$if tag == 'id':
+			<th class="file-tag subject">subject</th>
+		$else:
+			<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
 	</tr>
 	$for file in files:
 		$if odd:
@@ -34,40 +39,10 @@ $if len(files) > 0:
 		$else:
 			<tr class="file even">
 		$ odd = not odd
-		<td class="file-name">
-		$if showversions:
-			$ version = '@%d' % file.version
-			$ vsuffix = '@%d' % file.version
-		$else:
-			$ version = ''
-			$ vsuffix = ''
-		<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}">${file.file}${version}</a>
-		$if file['Image Set']:
-			<a href="${homepath}/study/${urlquote(file.file)}${vsuffix}?action=download">all&nbsp;parts</a>
-		$if file.writeok:
-			<form enctype="application/x-www-form-urlencoded" action="${homepath}/file/${urlquote(file.file)}${vsuffix}" method="post">
-			    <div>
-			    <input type="hidden" name="action" value="delete" />
-			    <input type="hidden" name="referer" value="${referer}" />
-			    <input type="submit" value="Delete" />
-			    </div>
-			</form>
-		</td>
-		<td class="file-tags">
-			<a href="${homepath}/tags/${urlquote(file.file)}${vsuffix}">All Tags</a>
-			$if 'Modality' in filelisttags and file['Modality'] == 'fundus' and not file['Image Set']:
-				<br /><a href="${homepath}/tags/${urlquote(file.file)}${vsuffix}?view=fundus+tags">Fundus Grade</a>
-		</td>
-		<td class="file-update">
-		$if file.writeok:
-			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=file">Replace&nbsp;with&nbsp;file</a><br />
-			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=url">Replace&nbsp;with&nbsp;url</a><br />
-			<a href="${homepath}/file/${urlquote(file.file)}${vsuffix}?action=define&amp;type=dataset">Replace&nbsp;with&nbsp;dataset</a>
-		</td>
 		$for tag in filelisttags:
 			$if tagdefsdict.has_key(tag):
 				<td class="file-tag ${idquote(tag)}">
-				$:{render.FileTagValBlock(file, tagdefsdict[tag], filelisttagswrite, version)}
+				$:{render.FileTagValBlock(file, tagdefsdict[tag], filelisttagswrite, file.version, showversions)}
 				</td>
 		</tr>
 	</table>

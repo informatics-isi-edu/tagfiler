@@ -40,6 +40,7 @@ WEBSTATICFILES=logo.png \
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
 	FileList.html FileUriList.txt ConfirmForm.html \
+	Homepage.html \
 	FileTagValBlock.html \
 	TagdefExisting.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
