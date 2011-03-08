@@ -20,6 +20,8 @@ $if title == 'User' and datapred:
 $if title != '':
 	<h2>${title}</h2>
 $if len(tagdefs) > 0:
+	$if queryTarget:
+		<p><a href="${queryTarget}?view=default">View all tags.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
 	<th class="tag-name">Tag name</th>

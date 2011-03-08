@@ -754,6 +754,20 @@ class FileTags (Node):
             self.tagvals = dict()
         self.queryopts = queryopts
         self.globals['predlist'] = predlist
+        self.globals['queryTarget'] = self.qtarget()
+
+    def qtarget(self):
+        if self.queryopts.get('view') == 'default':
+            return None
+        qpath = ''
+        terms = []
+        for pred in self.predlist:
+            if pred['op']:
+                terms.append(urlquote(pred['tag']) + pred['op'] + ",".join([ urlquote(val) for val in pred['vals'] ]))
+            else:
+                terms.append(urlquote(pred['tag']))
+        qpath = ';'.join(terms)
+        return self.config['home'] + web.ctx.homepath + '/tags/' + qpath
 
     def get_tag_body(self):
         tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
