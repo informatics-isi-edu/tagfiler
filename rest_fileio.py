@@ -94,7 +94,7 @@ def choose_content_type(clientval, guessedval, taggedval):
             return clientval
     return guessedval
 
-file_cache = dict()  # cache[(user, predlist)] = (ctime, fileresult)
+file_cache = dict()  # cache[(user, subjpreds)] = (ctime, fileresult)
 file_cache_time = 5 # maximum cache time in seconds
 
 class FileIO (Application):
@@ -121,10 +121,10 @@ class FileIO (Application):
         self.newMatch = None
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.cachekey = None
-        self.mergePredlistTags = False
+        self.mergeSubjpredsTags = False
 
     def populate_subject(self, enforce_read_authz=True, allow_blank=False):
-        self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank)
+        self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank)
 
         if self.unique == None:
             # this happens only with allow_blank=True when there is no uniqueness and no name
@@ -136,14 +136,14 @@ class FileIO (Application):
             # this happens when we accept a name w/o version in lieu of unique predicate(s)
             self.versions = 'latest'
         # 'read' authz is implicit in this query
-        results = self.select_files_by_predlist(predlist=self.predlist,
+        results = self.select_files_by_predlist(subjpreds=self.subjpreds,
                                                 listtags=['content-type', 'bytes', 'url',
                                                           'modified', 'modified by', 'name', 'version', 'Image Set',
                                                           'tagdef', 'typedef', 'config', 'view'],
                                                 versions=self.versions,
                                                 enforce_read_authz=enforce_read_authz)
         if len(results) == 0:
-            raise NotFound('dataset matching "%s"' % predlist_linearize(self.predlist))
+            raise NotFound('dataset matching "%s"' % predlist_linearize(self.subjpreds))
         self.subject = results[0]
        
         # get file tag which is 'system' authz model so not included already
@@ -200,7 +200,7 @@ class FileIO (Application):
             f = None
             content_type = None
             self.subject = None
-            cachekey = (self.authn.role, predlist_linearize(self.predlist))
+            cachekey = (self.authn.role, predlist_linearize(self.subjpreds))
             cached = file_cache.get((self.authn.role, cachekey), None)
             if cached:
                 ctime, subject = cached
@@ -226,13 +226,13 @@ class FileIO (Application):
             if count > limit:
                 # we failed after too many tries, just give up
                 # if this happens in practice, need to investigate or redesign...
-                raise web.internalerror('Could not access local copy of ' + predlist_linearize(self.predlist))
+                raise web.internalerror('Could not access local copy of ' + predlist_linearize(self.subjpreds))
 
             # we do this in a loop to compensate for race conditions noted above
             f, content_type = preRead()
 
         if self.newMatch:
-            cachekey = (self.authn.role, predlist_linearize(self.predlist))
+            cachekey = (self.authn.role, predlist_linearize(self.subjpreds))
             file_cache[(self.authn.role, cachekey)] = (now, self.subject)
 
         # we only get here if we were able to both:
@@ -314,7 +314,7 @@ class FileIO (Application):
             except:
                 rangeset = None
 
-            self.log('GET', dataset=predlist_linearize(self.predlist))
+            self.log('GET', dataset=predlist_linearize(self.subjpreds))
             if rangeset != None:
 
                 if len(rangeset) == 0:
@@ -376,10 +376,10 @@ class FileIO (Application):
     def delete_body(self):
         self.populate_subject()
         if not self.subject.writeok:
-            raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.predlist))
+            raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.subjpreds))
         self.enforce_file_authz_special('write', self.subject)
         self.delete_file(self.subject)
-        self.txlog('DELETE', dataset=predlist_linearize(self.predlist))
+        self.txlog('DELETE', dataset=predlist_linearize(self.subjpreds))
         return (self.subject)
 
     def delete_postCommit(self, result, set_status=True):
@@ -428,12 +428,12 @@ class FileIO (Application):
         junk_files = []
 
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
-        self.mergePredlistTags = False
+        self.mergeSubjpredsTags = False
         status = web.ctx.status
         try:
             self.populate_subject(allow_blank=allow_blank)
             if not self.subject.writeok:
-                raise Forbidden('write to file "%s"' % predlist_linearize(self.predlist))
+                raise Forbidden('write to file "%s"' % predlist_linearize(self.subjpreds))
             self.enforce_file_authz_special('write', self.subject)
             self.newMatch = True
                 
@@ -444,9 +444,9 @@ class FileIO (Application):
             # this is a new dataset independent of others
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of datasets')
-            # raise exception if predlist invalid for creating objects
-            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True)
-            self.mergePredlistTags = True
+            # raise exception if subjpreds invalid for creating objects
+            self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True)
+            self.mergeSubjpredsTags = True
 
         if self.unique == False:
             # this is the case where we are using name/version semantics for files
@@ -455,7 +455,7 @@ class FileIO (Application):
                 self.name = self.subject.name
             else:
                 self.version = 1
-                self.name = reduce(reduce_name_pred, self.predlist + [ web.Storage(tag='', op='', vals=[]) ] )
+                self.name = reduce(reduce_name_pred, self.subjpreds + [ web.Storage(tag='', op='', vals=[]) ] )
         else:
             self.name = None
             self.version = None
@@ -482,11 +482,11 @@ class FileIO (Application):
         if self.subject:
             if self.unique == False:
                 # this is the case where we create a new version of an existing named file
-                self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
+                self.txlog('UPDATE', dataset=predlist_linearize(self.subjpreds))
                 self.id = self.insert_file(self.name, self.version, self.file)
             elif self.unique:
                 # this is the case where we update an existing uniquely tagged file in place
-                self.txlog('UPDATE', dataset=predlist_linearize(self.predlist))
+                self.txlog('UPDATE', dataset=predlist_linearize(self.subjpreds))
                 self.id = None
                 if self.subject.file:
                     junk_files.append(self.subject.file)
@@ -496,11 +496,11 @@ class FileIO (Application):
                     self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
             else:
                 # this is the case where we create a new blank node similar to an existing blank node
-                self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
+                self.txlog('CREATE', dataset=predlist_linearize(self.subjpreds))
                 self.id = self.insert_file(self.name, self.version, self.file)
         else:
             # anybody is free to insert new uniquely named file
-            self.txlog('CREATE', dataset=predlist_linearize(self.predlist))
+            self.txlog('CREATE', dataset=predlist_linearize(self.subjpreds))
             self.id = self.insert_file(self.name, self.version, self.file)
 
         if self.id != None:
@@ -579,12 +579,12 @@ class FileIO (Application):
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
-        #    and tags constrained in predlist (only if creating new independent object)
+        #    and tags constrained in subjpreds (only if creating new independent object)
         # they all must work to complete transaction
         tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
 
-        if self.mergePredlistTags:
-            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.predlist if pred.tag not in [ 'name', 'version' ] ]
+        if self.mergeSubjpredsTags:
+            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.subjpreds if pred.tag not in [ 'name', 'version' ] ]
 
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
@@ -675,7 +675,7 @@ class FileIO (Application):
         else:
             prefix = 'anonymous-'
             
-        dir = self.config['store path'] + '/' + predlist_linearize(self.predlist)
+        dir = self.config['store path'] + '/' + predlist_linearize(self.subjpreds)
 
         """posible race condition in mkdir and rmdir"""
         count = 0
@@ -715,7 +715,7 @@ class FileIO (Application):
         try:
             self.populate_subject(enforce_read_authz=False)
             if not self.subject.readok:
-                raise Forbidden('access to file "%s"' % predlist_linearize(self.predlist))
+                raise Forbidden('access to file "%s"' % predlist_linearize(self.subjpreds))
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
             self.enforce_file_authz_special('write', self.subject)
@@ -728,22 +728,22 @@ class FileIO (Application):
                         f = open(filename, 'r+b', 0)
                         return f
                     else:
-                        raise Conflict(data='The resource "%s" does not support byte-range update.' % predlist_linearize(self.predlist))
+                        raise Conflict(data='The resource "%s" does not support byte-range update.' % predlist_linearize(self.subjpreds))
                 else:
-                    raise Conflict(data='The resource "%s" is not unique, so byte-range update is unsafe.' % predlist_linearize(self.predlist))
+                    raise Conflict(data='The resource "%s" is not unique, so byte-range update is unsafe.' % predlist_linearize(self.subjpreds))
                 
         except NotFound:
             web.ctx.status = status
             self.subject = None
             if self.unique:
-                # not found w/ unique predlist is not to be confused with creating new files
+                # not found w/ unique subjpreds is not to be confused with creating new files
                 raise
             # not found and not unique, treat as new file put
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of datasets')
-            # raise exception if predlist invalid for creating objects
-            self.unique = self.validate_predlist_unique(acceptName=True, acceptBlank=True, restrictSchema=True)
-            self.mergePredlistTags = True
+            # raise exception if subjpreds invalid for creating objects
+            self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, restrictSchema=True)
+            self.mergeSubjpredsTags = True
 
         return None
 
@@ -803,7 +803,7 @@ class FileIO (Application):
         now = datetime.datetime.now(pytz.timezone('UTC'))
         def preWriteCached():
             f = None
-            cachekey = (self.authn.role, predlist_linearize(self.predlist))
+            cachekey = (self.authn.role, predlist_linearize(self.subjpreds))
             cached = file_cache.get((self.authn.role, cachekey), None)
             if cached:
                 ctime, subject = cached
@@ -882,7 +882,7 @@ class FileIO (Application):
 
         if self.newMatch:
             # cache newly obtained results
-            cachekey = (self.authn.role, predlist_linearize(self.predlist))
+            cachekey = (self.authn.role, predlist_linearize(self.subjpreds))
             file_cache[cachekey] = (now, self.subject)
         if not self.mustInsert \
                 and self.subject.dtype == 'file' \
@@ -907,7 +907,7 @@ class FileIO (Application):
 
     def POST(self, uri):
         """emulate a PUT for browser users with simple form POST"""
-        # return same result page as for GET app/tags/predlist for convenience
+        # return same result page as for GET app/tags/subjpreds for convenience
 
         def keyBody():
             return self.select_next_key_number()
@@ -925,7 +925,7 @@ class FileIO (Application):
             return None
         
         def putBody():
-            # we can accept a non-unique predlist only for blank nodes
+            # we can accept a non-unique subjpreds only for blank nodes
             return self.insertForStore(allow_blank=(self.dtype==None and self.action=='post'))
 
         def putPostCommit(junk_files):
@@ -946,7 +946,7 @@ class FileIO (Application):
         def preDeleteBody():
             self.populate_subject()
             if not self.subject.writeok:
-                raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.predlist))
+                raise Forbidden('delete of dataset "%s"' % predlist_linearize(self.subjpreds))
             self.enforce_file_authz_special('write', self.subject)
             
             if self.subject.dtype == 'url':

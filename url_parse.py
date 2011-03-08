@@ -71,7 +71,7 @@ def p_filelist_opts2(p):
 
 def p_file(p):
     """file : slash string slash FILE slash predlist_nonempty"""
-    p[0] = url_ast.FileId(appname=p[2], predlist=p[6])
+    p[0] = url_ast.FileId(appname=p[2], subjpreds=p[6])
 
 def p_log(p):
     """log : slash string slash LOG slash string"""
@@ -83,7 +83,7 @@ def p_log_opts(p):
 
 def p_file_opts(p):
     """file : slash string slash FILE slash predlist_nonempty queryopts"""
-    p[0] = url_ast.FileId(appname=p[2], predlist=p[6], queryopts=p[7])
+    p[0] = url_ast.FileId(appname=p[2], subjpreds=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
@@ -118,19 +118,19 @@ def p_tags_all_slash_opts(p):
 def p_tags(p):
     """tags : slash string slash TAGS slash predlist_nonempty 
             | slash string slash TAGS slash predlist_nonempty slash"""
-    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6])
+    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6])
 
 def p_tags_opts(p):
     """tags : slash string slash TAGS slash predlist_nonempty queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], queryopts=p[7])
+    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], queryopts=p[7])
 
 def p_tagsvalrest(p):
     """tags : slash string slash TAGS slash predlist_nonempty slash tagvals"""
-    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8])
+    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], tagvals=p[8])
 
 def p_tagsvalrest_opts(p):
     """tags : slash string slash TAGS slash predlist_nonempty slash tagvals queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], predlist=p[6], tagvals=p[8], queryopts=p[9])
+    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], tagvals=p[8], queryopts=p[9])
 
 def p_tagvals(p):
     """tagvals : tagval"""

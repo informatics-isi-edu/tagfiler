@@ -257,7 +257,7 @@ class Application:
                                         ('webauthn home', None),
                                         ('webauthn require', 'False') ]
 
-        results = self.select_files_by_predlist(predlist=[pred],
+        results = self.select_files_by_predlist(subjpreds=[pred],
                                                 listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag ],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
@@ -299,7 +299,7 @@ class Application:
         self.skip_preDispatch = False
 
         self.version = None
-        self.predlist = []
+        self.subjpreds = []
         self.globals = dict()
 
         self.ops = [ ('', 'Tagged'),
@@ -496,7 +496,7 @@ class Application:
                                    'vfile' : self.validateVersionedFilename }
 
     def validateFilename(self, file, tagname='', subject=None):        
-        results = self.select_files_by_predlist(predlist=[web.Storage(tag='name', op='=', vals=[file])],
+        results = self.select_files_by_predlist(subjpreds=[web.Storage(tag='name', op='=', vals=[file])],
                                                 listtags=['id'])
         if len(results) == 0:
             raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
@@ -514,7 +514,7 @@ class Application:
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
             if g['data_id'] == '':
                 raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
-            results = self.select_files_by_predlist(predlist=[web.Storage(tag='vname', op='=', vals=[vfile]),
+            results = self.select_files_by_predlist(subjpreds=[web.Storage(tag='vname', op='=', vals=[vfile]),
                                                               web.Storage(tag='version', op='=', vals=[version])],
                                                     listtags=['id'],
                                                     versions='any')
@@ -862,8 +862,8 @@ class Application:
             except NotImplemented, AttributeError:
                 return None
 
-    def validate_predlist_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False):
-        """Evaluate self.predlist for subject-identifying uniqueness.
+    def validate_subjpreds_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False):
+        """Evaluate self.subjpreds for subject-identifying uniqueness.
 
            Raises Conflict if restrictSchema=True and additional
            criteria are not met:
@@ -873,11 +873,11 @@ class Application:
 
            Returns (in prioritized order):
 
-              True if predlist is uniquely constraining
+              True if subjpreds is uniquely constraining
 
-              False if predlist is weakly constraining AND acceptName==True
+              False if subjpreds is weakly constraining AND acceptName==True
 
-              None if predlist is not constraining AND acceptBlank==True
+              None if subjpreds is not constraining AND acceptBlank==True
 
            Else raises Conflict
 
@@ -885,7 +885,7 @@ class Application:
         got_name = False
         got_version = False
         unique = None
-        for pred in self.predlist:
+        for pred in self.subjpreds:
             tagdef = self.globals['tagdefsdict'].get(pred.tag, None)
             if tagdef == None:
                 raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
@@ -1068,11 +1068,11 @@ class Application:
                 res['typedef values'] = dict(vals)
             return res
         if typename != None:
-            predlist = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
+            subjpreds = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
         else:
-            predlist = [ web.Storage(tag='typedef', op=None, vals=[]) ]
+            subjpreds = [ web.Storage(tag='typedef', op=None, vals=[]) ]
         listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
-        return [ valexpand(res) for res in self.select_files_by_predlist(predlist=predlist, listtags=listtags) ]
+        return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags) ]
 
     def select_file_members(self, subject, membertag='vcontains'):
         # return the children of the dataset as referenced by its membertag, e.g. vcontains or contains
@@ -1147,7 +1147,7 @@ class Application:
                        'tag read users': 'tagreaders',
                        'tag write users': 'tagwriters' }
 
-    def select_tagdef(self, tagname=None, predlist=[], order=None, enforce_read_authz=True):
+    def select_tagdef(self, tagname=None, subjpreds=[], order=None, enforce_read_authz=True):
         listtags = [ 'owner' ]
         listtags = listtags + Application.tagdef_listas.keys()
 
@@ -1180,11 +1180,11 @@ class Application:
             return tagdef
             
         if tagname:
-            predlist = predlist + [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
+            subjpreds = subjpreds + [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
         else:
-            predlist = predlist + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
+            subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(predlist, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
 
@@ -1446,9 +1446,9 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
+    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
 
-        #web.debug(predlist, listtags, ordertags, listas)
+        #web.debug(subjpreds, listtags, ordertags, listas)
 
         if listas == None:
             listas = dict()
@@ -1456,8 +1456,8 @@ class Application:
         def dbquote(s):
             return s.replace("'", "''")
         
-        if predlist == None:
-            predlist = self.predlist
+        if subjpreds == None:
+            subjpreds = self.subjpreds
 
         if listtags == None:
             listtags = [ x for x in self.globals['filelisttags'] ]
@@ -1483,7 +1483,7 @@ class Application:
         if tagdefs == None:
             tagdefs = self.globals['tagdefsdict']
 
-        tags_needed = set([ pred.tag for pred in predlist ])
+        tags_needed = set([ pred.tag for pred in subjpreds ])
         tags_needed = tags_needed.union(set([ tagname for tagname in listtags ]))
         tagdefs_needed = []
         for tagname in tags_needed:
@@ -1506,8 +1506,8 @@ class Application:
         with_prefix = 'WITH rawroles (role) AS ( VALUES %s )' % ','.join(["('%s')" % dbquote(role) for role in roles] + [ '( NULL )'])
         with_prefix += ', roles (role) AS ( SELECT role FROM rawroles WHERE role IS NOT NULL ) '
 
-        for p in range(0, len(predlist)):
-            pred = predlist[p]
+        for p in range(0, len(subjpreds)):
+            pred = subjpreds[p]
             tag = pred.tag
             op = pred.op
             vals = pred.vals
@@ -1704,9 +1704,9 @@ class Application:
         #web.debug(value_query)
         return (value_query, values)
 
-    def select_files_by_predlist(self, predlist=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
+    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
 
-        query, values = self.build_select_files_by_predlist(predlist, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
+        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -1723,17 +1723,17 @@ class Application:
         tagdefs = self.globals['tagdefsdict']
         
         def build_query_recursive(stack, qd, limit):
-            predlist, listtags, ordertags = stack[0]
-            predlist = [ p for p in predlist ]
+            subjpreds, listtags, ordertags = stack[0]
+            subjpreds = [ p for p in subjpreds ]
             if len(stack) == 1:
                 # this query element is not contextualized
-                q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
                 values.update(v)
                 return q
             else:
                 # this query element is contextualized
                 cstack = stack[1:]
-                cpredlist, clisttags, cordertags = cstack[0]
+                csubjpreds, clisttags, cordertags = cstack[0]
                 
                 if len(clisttags) != 1:
                     raise BadRequest("Path context %d has ambiguous projection with %d list-tags." % (len(cstack)-1, len(clisttags)))
@@ -1747,12 +1747,12 @@ class Application:
                 else:
                     projectclause = '"%s"' % projection
                     
-                cstack[0] = cpredlist, clisttags, None # don't bother sorting context more than necessary
+                cstack[0] = csubjpreds, clisttags, None # don't bother sorting context more than necessary
                 cq = build_query_recursive(cstack, qd + 1, limit=None)
                 cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
                 
-                predlist.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
-                q, v = self.build_select_files_by_predlist(predlist, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                subjpreds.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
+                q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
                 values.update(v)
                 return q
         
