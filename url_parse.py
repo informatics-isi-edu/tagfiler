@@ -162,7 +162,7 @@ def p_tag(p):
 def p_query1(p):
     """query : slash string slash QUERY
              | slash string slash QUERY slash"""
-    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts={})
+    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=web.storage())
 
 def p_query2a(p):
     """query : slash string slash QUERY queryopts"""
@@ -174,7 +174,7 @@ def p_query2b(p):
 
 def p_query3(p):
     """query : slash string slash QUERY slash querypath"""
-    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts={})
+    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=web.storage())
 
 def p_query4(p):
     """query : slash string slash QUERY slash querypath queryopts"""
@@ -319,16 +319,16 @@ def p_stringset_grow(p):
 
 def p_queryopts(p):
     """queryopts : '?' string '=' string"""
-    p[0] = { p[2] : p[4] }
+    p[0] = web.storage([(p[2], p[4])])
 
 def p_queryopts_set(p):
     """queryopts : '?' string '=' stringset"""
-    p[0] = { p[2] : p[4] }
+    p[0] = web.storage([(p[2], p[4])])
 
 def p_queryopts_short(p):
     """queryopts : '?' string
                  | '?' string '='"""
-    p[0] = { p[2] : None }
+    p[0] = web.storage([(p[2], None)])
 
 def p_queryopts_grow(p):
     """queryopts : queryopts '&' string '=' string

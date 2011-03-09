@@ -1295,7 +1295,7 @@ class Query (Node):
         if op == None and self.action == 'delete':
             value = str([])
 
-        userpred = { 'tag' : tagname, 'op' : op, 'vals' : value }
+        userpred = web.Storage(tag=tagname, op=op, vals=value)
 
         if self.action == 'add':
             if userpred not in self.subjpreds:
