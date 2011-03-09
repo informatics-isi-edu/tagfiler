@@ -794,7 +794,7 @@ class Application:
                         error = str(te)
                         #m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
                         #if not m or count > limit:
-                        web.debug('IntegrityError', te)
+                        web.debug('IntegrityError', error)
                         if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
                             self.logException('integrity error during transaction body')
