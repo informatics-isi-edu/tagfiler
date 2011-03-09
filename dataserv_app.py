@@ -1466,13 +1466,7 @@ class Application:
 
         # make sure we have no repeats in listtags before embedding in query
         listtags = set(listtags)
-        listtags_extra = listtags.union( set(['read users',
-                                              'write users',
-                                              'owner',
-                                              'name',
-                                              'version',
-                                              'latest with name',
-                                              'modified']) )
+
         if ordertags:
             listtags = listtags.union( set(ordertags) )
         listtags = [ t for t in listtags ]
