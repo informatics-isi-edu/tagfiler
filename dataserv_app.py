@@ -1446,7 +1446,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False):
+    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False, listpreds=None):
 
         #web.debug(subjpreds, listtags, ordertags, listas)
 
@@ -1459,17 +1459,21 @@ class Application:
         if subjpreds == None:
             subjpreds = self.subjpreds
 
-        if listtags == None:
-            listtags = [ x for x in self.globals['filelisttags'] ]
-        else:
-            listtags = [ x for x in listtags ]
+        if listpreds == None:
+            if listtags == None:
+                listtags = [ x for x in self.globals['filelisttags'] ]
+            else:
+                listtags = [ x for x in listtags ]
 
-        # make sure we have no repeats in listtags before embedding in query
-        listtags = set(listtags)
+            listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
 
         if ordertags:
-            listtags = listtags.union( set(ordertags) )
-        listtags = [ t for t in listtags ]
+            listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in ordertags ]
+
+        listpredsdict = dict()
+        for pred in listpreds:
+            preds = listpredsdict.get(pred.tag, [])
+            listpredsdict[pred.tag] = preds + [ pred ]
 
         roles = [ r for r in self.authn.roles ]
         roles.append('*')
@@ -1478,7 +1482,7 @@ class Application:
             tagdefs = self.globals['tagdefsdict']
 
         tags_needed = set([ pred.tag for pred in subjpreds ])
-        tags_needed = tags_needed.union(set([ tagname for tagname in listtags ]))
+        tags_needed = tags_needed.union(set(listpredsdict.iterkeys()))
         tagdefs_needed = []
         for tagname in tags_needed:
             try:
@@ -1636,8 +1640,28 @@ class Application:
 
         jointags = set(['subject', 'id', 'owner', 'writeok', 'readok'])
 
+        def make_listwhere(preds):
+            listwheres = []
+            for p in range(0, len(preds)):
+                pred = preds[p]
+                if pred.op == ':not:':
+                    # non-sensical listpred cannot ever select a triple
+                    listwheres.append( 'False' )
+                elif pred.op == 'IN':
+                    # don't support this yet (or ever?)
+                    raise ValueError
+                elif pred.op and pred.vals:
+                    valpreds = []
+                    for v in range(0, len(pred.vals)):
+                        valpreds.append( '%s.value %s $listval_%d_%d' % (self.wraptag(pred.tag), self.opsDB[pred.op], p, v) )
+                        values['listval_%d_%d' % (p, v)] = pred.vals[v]
+                    listwheres.append( ' OR '.join([ '(%s)' % valpred for valpred in valpreds ]) )
+                        
+            return ' AND '.join([ '(%s)' % listwhere for listwhere in listwheres])
+           
+
         # add custom per-file single-val tags to results
-        singlevaltags = [ tagname for tagname in listtags
+        singlevaltags = [ tagname for tagname in listpredsdict.iterkeys()
                           if not tagdefs[tagname].multivalue and tagname not in jointags ]
         for tagname in singlevaltags:
             jointags.add(tagname)
@@ -1646,18 +1670,25 @@ class Application:
                 expr = '%s.subject IS NOT NULL' % self.wraptag(tagname)
                 groupbys.append('%s.subject' % self.wraptag(tagname))
             else:
-                expr = '%s.value' % self.wraptag(tagname)
+                listwhere = make_listwhere(listpredsdict[tagname])
+                if listwhere:
+                    expr = 'CASE WHEN %s THEN %s.value ELSE NULL END' % (listwhere, self.wraptag(tagname))
+                else:
+                    expr = '%s.value' % self.wraptag(tagname)
                 groupbys.append('%s.value' % self.wraptag(tagname))
             if tagdefs[tagname].readpolicy == 'fowner':
                 expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
             selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tagname, tagname), prefix='')))
 
         # add custom per-file multi-val tags to results
-        multivaltags = [ tagname for tagname in listtags
+        multivaltags = [ tagname for tagname in listpredsdict.iterkeys()
                          if tagdefs[tagname].multivalue and tagname not in jointags ]
         for tagname in multivaltags:
             jointags.add(tagname)
-            outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s GROUP BY subject)' % self.wraptag(tagname), self.wraptag(tagname)))
+            listwhere = make_listwhere(listpredsdict[tagname])
+            if listwhere:
+                listwhere = 'WHERE ' + listwhere
+            outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s %s GROUP BY subject)' % (self.wraptag(tagname), listwhere), self.wraptag(tagname)))
             groupbys.append('%s.value' % self.wraptag(tagname))
             expr = '%s.value' % self.wraptag(tagname)
             if tagdefs[tagname].readpolicy == 'fowner':
@@ -1679,7 +1710,7 @@ class Application:
         # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
         order_suffix = []
         for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef']:
-            if tagname in listtags:
+            if tagname in listpredsdict:
                 orderstmt = self.wraptag(listas.get(tagname, tagname), prefix='')
                 if tagname in [ 'modified' ]:
                     orderstmt += ' DESC'
@@ -1698,9 +1729,9 @@ class Application:
         #web.debug(value_query)
         return (value_query, values)
 
-    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None):
+    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, listpreds=None):
 
-        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit)
+        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit, listpreds=None)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -1721,7 +1752,10 @@ class Application:
             subjpreds = [ p for p in subjpreds ]
             if len(stack) == 1:
                 # this query element is not contextualized
-                q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                if listtags and len(listtags) > 0 and type(listtags[0]) == type('text'):
+                    q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                else:
+                    q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listtags)
                 values.update(v)
                 return q
             else:

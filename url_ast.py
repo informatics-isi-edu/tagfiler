@@ -1356,6 +1356,9 @@ class Query (Node):
             self.path[-1][1].append('write users')
             self.path[-1][1].append('modified')
 
+            for i in range(0, len(self.path[-1][1])):
+                self.path[-1][1][i] = web.Storage(tag=self.path[-1][1][i], op=None, vals=[])
+
             return self.select_files_by_predlist_path(path=self.path, versions=versions, limit=self.limit)
 
         def postCommit(files):
