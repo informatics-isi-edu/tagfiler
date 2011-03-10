@@ -1093,7 +1093,7 @@ class Application:
 
     def select_dataset_size(self, key, membertag='vcontains'):
         # return statistics aout the children of the dataset as referenced by its membertag
-        query, values = self.build_files_by_predlist_path([ ([web.Storage(tag='key', op='=', vals=[key])], [membertag], []),
+        query, values = self.build_files_by_predlist_path([ ([web.Storage(tag='key', op='=', vals=[key])], [web.Storage(tag=membertag,op=None,vals=[])], []),
                                                             ([], [ web.Storage(tag=tag,op=None,vals=[]) for tag in 'name', 'bytes' ], []) ])
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
         return self.db.query(query, values)
