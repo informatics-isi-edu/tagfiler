@@ -1471,6 +1471,9 @@ class Application:
         if ordertags:
             listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in ordertags ]
 
+        for tag in [ 'id', 'owner' ]:
+            listpreds.append( web.Storage(tag=tag, op=None, vals=[]) )
+
         listpredsdict = dict()
         for pred in listpreds:
             preds = listpredsdict.get(pred.tag, [])
