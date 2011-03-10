@@ -137,7 +137,7 @@ class FileIO (Application):
             self.versions = 'latest'
         # 'read' authz is implicit in this query
         results = self.select_files_by_predlist(subjpreds=self.subjpreds,
-                                                listtags=['content-type', 'bytes', 'url',
+                                                listtags=['id', 'content-type', 'bytes', 'url',
                                                           'modified', 'modified by', 'name', 'version', 'Image Set',
                                                           'tagdef', 'typedef', 'config', 'view'],
                                                 versions=self.versions,

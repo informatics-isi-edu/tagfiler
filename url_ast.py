@@ -161,7 +161,7 @@ class Study (Node):
                     versions = 'any'
                 
                 results = self.select_files_by_predlist(subjpreds,
-                                                        listtags=['vcontains'] + [ tagname for tagname in self.globals['appletTagnames']],
+                                                        listtags=['vcontains', 'id'] + [ tagname for tagname in self.globals['appletTagnames']],
                                                         versions=versions)
                 if len(results) == 0:
                     if not self.status:
@@ -332,7 +332,7 @@ class FileList (Node):
             else:
                 ordertags = []
 
-            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set',
+            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'id',
                                                                                                        'name', 'version',
                                                                                                        'tagdef', 'typedef',
                                                                                                        'config', 'view'])),
@@ -810,7 +810,7 @@ class FileTags (Node):
             versions = 'latest'
 
         results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds] 
-                                                + [self.tag_id, 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'],
+                                                + [self.tag_id, 'id', 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'],
                                                 versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % predlist_linearize(self.subjpreds))
@@ -888,7 +888,7 @@ class FileTags (Node):
             self.listtags = self.listtags.split(',')
 
         predtags = [ pred.tag for pred in self.subjpreds ]
-        extratags = [ 'name', 'version', 'tagdef', 'typedef', 'write users', 'file', 'url' ]
+        extratags = [ 'id', 'name', 'version', 'tagdef', 'typedef', 'write users', 'file', 'url' ]
 
         all = self.globals['tagdefsdict'].values()
         if len(self.listtags) > 0:
@@ -1028,7 +1028,7 @@ class FileTags (Node):
         else:
             versions = 'latest'
         
-        list_additional =  ['owner', 'write users', 'Image Set']
+        list_additional =  ['id', 'owner', 'write users', 'Image Set']
         if self.tag_id:
             list_additional.append(self.tag_id)
         results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds] + list_additional, versions=versions)
@@ -1108,7 +1108,7 @@ class FileTags (Node):
             versions = 'any'
          
         results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds]
-                                                + [self.tag_id, 'owner', 'write users', 'Image Set'],
+                                                + [self.tag_id, 'id', 'owner', 'write users', 'Image Set'],
                                                 versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % self.subjpreds)
@@ -1123,7 +1123,7 @@ class FileTags (Node):
 
         # find subfiles of all subjects which are tagged Image Set
         path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
-                 ( [], [], [] ) ]
+                 ( [], [web.Storage(tag='id',op=None,vals=[])], [] ) ]
         self.subfiles = self.select_files_by_predlist_path(path=path)
 
         for subject in self.subjects:
