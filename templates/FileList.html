@@ -22,6 +22,8 @@ $else:
 $if len(files) > 0:
 	$if limit and limit == len(files):
 		$ suffix = '?limit=none'
+		$if view:
+			$ suffix = suffix + '&view=%s' % view
 		$if showversions:
 			$ suffix = '%s&versions=any' % suffix
 		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}${suffix}">View all results.</a></p>
