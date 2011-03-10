@@ -205,8 +205,8 @@ def p_querypath_extend(p):
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
     if len(plisttags) == 0:
-        # the parent path element has no listtags, default to 'vcontains'
-        p[0][-1] = ( ppreds, [ 'vcontains' ], pordertags )
+        # the parent path element has no listpreds, default to 'vcontains'
+        p[0][-1] = ( ppreds, [ web.Storage(tag='vcontains',op=None,vals=[]) ], pordertags )
     p[0].append( p[3] )
 
 def p_listtags(p):
@@ -229,7 +229,7 @@ def p_listtags_empty(p):
     p[0] = []
 
 def p_listtags_nonempty(p):
-    """listtags_nonempty : '(' vallist ')'"""
+    """listtags_nonempty : '(' predlist ')'"""
     p[0] = p[2]
 
 def p_ordertags_empty(p):

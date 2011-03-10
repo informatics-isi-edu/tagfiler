@@ -1039,7 +1039,7 @@ class FileTags (Node):
 
         # custom DEI EIU hack, proxy tag ops on Image Set to all member files
         if self.subject['Image Set']:
-            path = [ ( [ web.Storage(tag='id', op='=', vals=[self.id]) ], ['vcontains'], [] ),
+            path = [ ( [ web.Storage(tag='id', op='=', vals=[self.id]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
                      ( [], [], [] ) ]
             subfiles = self.select_files_by_predlist_path(path=path)
         else:
@@ -1122,7 +1122,7 @@ class FileTags (Node):
             return None
 
         # find subfiles of all subjects which are tagged Image Set
-        path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], ['vcontains'], [] ),
+        path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
                  ( [], [], [] ) ]
         self.subfiles = self.select_files_by_predlist_path(path=path)
 
@@ -1232,18 +1232,17 @@ class Query (Node):
     def qtarget(self):
         qpath = []
         for elem in self.path:
-            subjpreds, listtags, ordertags = elem
-            terms = []
-            for pred in subjpreds:
-                if pred.op:
-                    terms.append(urlquote(pred.tag) + pred.op + ",".join([ urlquote(val) for val in pred.vals ]))
+            subjpreds, listpreds, ordertags = elem
+            web.debug(listpreds)
+            if listpreds:
+                if len(listpreds) == 1 and listpreds[0].tag in [ 'contains', 'vcontains' ] and listpreds[0].op == None:
+                    listpart = ''
                 else:
-                    terms.append(urlquote(pred.tag))
-            if not listtags or len(listtags) == 1 and listtags[0] in [ 'contains', 'vcontains' ]:
-                listpart = ''
+                    listpart = '(%s)' % predlist_linearize(listpreds)
             else:
-                listpart = '(' + ','.join([ urlquote(tag) for tag in listtags ]) + ')'
-            qpath.append( ';'.join(terms) + listpart )
+                listpart = ''
+
+            qpath.append( predlist_linearize(subjpreds) + listpart )
         return self.config['home'] + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
@@ -1318,14 +1317,44 @@ class Query (Node):
         self.globals['showVersions'] = self.showversions
             
         def body():
-            listtags = self.queryopts.get('list', self.path[-1][1])
             writetags = None
-            if type(listtags) == type('text'):
-                listtags = listtags.split(',')
-            if len(listtags) == 0:
-                view = self.select_view(self.globals['view'])
-                listtags = view['file list tags']
-                writetags = view['file list tags write']
+
+            builtinlist = [ 'id',
+                            'file',
+                            'name',
+                            'version',
+                            'tagdef',
+                            'typedef',
+                            'config',
+                            'view',
+                            'Image Set',
+                            'write users',
+                            'modified' ]
+            
+            subjpreds, listpreds, ordertags = self.path[-1]
+
+            if not listpreds:
+                listtags = self.queryopts.get('list', [])
+            
+                if type(listtags) == type('text'):
+                    listtags = [ x for x in listtags.split(',') if x ]
+                    
+                if len(listtags) == 0:
+                    view = self.select_view(self.globals['view'])
+                    listtags = view['file list tags']
+                    writetags = view['file list tags write']
+
+                listtags = [ 'id' ] + [ x for x in listtags if x != 'id' ]
+                listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
+            else:
+                listtags = [ 'id' ] + [ x for x in set([ pred.tag for pred in listpreds ]) if x != 'id' ]
+
+            listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in builtinlist ]
+
+            self.globals['filelisttags'] = listtags
+            self.globals['filelisttagswrite'] = writetags
+
+            self.path[-1] = subjpreds, listpreds, ordertags
 
             self.limit = self.queryopts.get('limit', 25)
             if self.limit == 'none':
@@ -1335,29 +1364,6 @@ class Query (Node):
                     self.limit = int(self.limit)
                 except:
                     self.limit = 25
-
-            listtags = [ t for t in listtags ]
-            builtinlist = [ 'id' ] 
-            listtags = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
-            self.globals['filelisttags'] = listtags
-            self.globals['filelisttagswrite'] = writetags
-
-            subjpreds, listtags, ordertags = self.path[-1]
-            self.path[-1] = subjpreds, list(self.globals['filelisttags']), ordertags
-            # we always want these for subject psuedo-column
-            self.path[-1][1].append('file')
-            self.path[-1][1].append('name')
-            self.path[-1][1].append('version')
-            self.path[-1][1].append('tagdef')
-            self.path[-1][1].append('typedef')
-            self.path[-1][1].append('config')
-            self.path[-1][1].append('view')
-            self.path[-1][1].append('Image Set')
-            self.path[-1][1].append('write users')
-            self.path[-1][1].append('modified')
-
-            for i in range(0, len(self.path[-1][1])):
-                self.path[-1][1][i] = web.Storage(tag=self.path[-1][1][i], op=None, vals=[])
 
             return self.select_files_by_predlist_path(path=self.path, versions=versions, limit=self.limit)
 

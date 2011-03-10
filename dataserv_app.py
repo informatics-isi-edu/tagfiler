@@ -262,6 +262,7 @@ class Application:
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
             config = results[0]
+            #web.debug(config)
         else:
             #len(results) > 1:
             #web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
@@ -1093,7 +1094,7 @@ class Application:
     def select_dataset_size(self, key, membertag='vcontains'):
         # return statistics aout the children of the dataset as referenced by its membertag
         query, values = self.build_files_by_predlist_path([ ([web.Storage(tag='key', op='=', vals=[key])], [membertag], []),
-                                                            ([], ['name', 'bytes'], []) ])
+                                                            ([], [ web.Storage(tag=tag,op=None,vals=[]) for tag in 'name', 'bytes' ], []) ])
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
         return self.db.query(query, values)
 
@@ -1633,14 +1634,15 @@ class Application:
                         + ' GROUP BY subject, owner'
 
         # now build the outer query that attaches listtags metadata to results
-        selects = ['subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.owner AS owner', 'subjects.subject AS id']
+        core_tags = dict(owner='subjects.owner',
+                         id='subjects.subject')
+        
+        selects = [ 'subjects.readok AS readok', 'subjects.writeok AS writeok' ]
         innertables = [('(%s)' % subject_query, 'subjects')]
         outertables = []
-        groupbys = ['subjects.subject', 'subjects.owner', 'subjects.readok', 'subjects.writeok']
+        groupbys = [ 'subjects.readok', 'subjects.writeok' ]
 
-        jointags = set(['subject', 'id', 'owner', 'writeok', 'readok'])
-
-        def make_listwhere(preds):
+        def make_listwhere(t, vref, preds, tagdef):
             listwheres = []
             for p in range(0, len(preds)):
                 pred = preds[p]
@@ -1651,50 +1653,51 @@ class Application:
                     # don't support this yet (or ever?)
                     raise ValueError
                 elif pred.op and pred.vals:
+                    if tagdef.typestr == 'empty':
+                        raise BadRequest('Inappropriate operator "%s" for tag "%s".' % (pred.op, pred.tag))
                     valpreds = []
                     for v in range(0, len(pred.vals)):
-                        valpreds.append( '%s.value %s $listval_%d_%d' % (self.wraptag(pred.tag), self.opsDB[pred.op], p, v) )
-                        values['listval_%d_%d' % (p, v)] = pred.vals[v]
+                        valpreds.append( '%s %s $listval_%s_%d_%d' % (vref, self.opsDB[pred.op], t, p, v) )
+                        values['listval_%s_%d_%d' % (t, p, v)] = pred.vals[v]
                     listwheres.append( ' OR '.join([ '(%s)' % valpred for valpred in valpreds ]) )
                         
             return ' AND '.join([ '(%s)' % listwhere for listwhere in listwheres])
            
+        # build custom projection of matching subjects
+        listtags = [ t for t in listpredsdict.iterkeys() if t not in ['readok', 'writeok'] ]
+        for t in range(0, len(listtags)):
+            tag = listtags[t]
+            tagdef = tagdefs[tag]
+            preds = listpredsdict[tag]
 
-        # add custom per-file single-val tags to results
-        singlevaltags = [ tagname for tagname in listpredsdict.iterkeys()
-                          if not tagdefs[tagname].multivalue and tagname not in jointags ]
-        for tagname in singlevaltags:
-            jointags.add(tagname)
-            outertables.append((self.wraptag(tagname), None))
-            if tagdefs[tagname].typestr == 'empty':
-                expr = '%s.subject IS NOT NULL' % self.wraptag(tagname)
-                groupbys.append('%s.subject' % self.wraptag(tagname))
-            else:
-                listwhere = make_listwhere(listpredsdict[tagname])
+            if tagdef.multivalue:
+                listwhere = make_listwhere(t, '%s.value' % self.wraptag(tag), preds, tagdef)
                 if listwhere:
-                    expr = 'CASE WHEN %s THEN %s.value ELSE NULL END' % (listwhere, self.wraptag(tagname))
+                    listwhere = 'WHERE ' + listwhere
+
+                outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s %s GROUP BY subject)' % (self.wraptag(tag), listwhere), self.wraptag(tag)))
+                expr = '%s.value' % self.wraptag(tag)
+                groupbys.append(expr)
+            else:
+                if tag not in core_tags:
+                    outertables.append((self.wraptag(tag), None))
+                if tagdef.typestr == 'empty':
+                    expr = '%s.subject' % self.wraptag(tag)
+                    groupbys.append(expr)
+                    expr += ' IS NOT NULL'
+                    listwhere = make_listwhere(t, None, preds, tagdef)
                 else:
-                    expr = '%s.value' % self.wraptag(tagname)
-                groupbys.append('%s.value' % self.wraptag(tagname))
-            if tagdefs[tagname].readpolicy == 'fowner':
-                expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
-            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tagname, tagname), prefix='')))
+                    expr = core_tags.get(tag, '%s.value' % self.wraptag(tag))
+                    groupbys.append(expr)
+                    listwhere = make_listwhere(t, expr, preds, tagdef)
 
-        # add custom per-file multi-val tags to results
-        multivaltags = [ tagname for tagname in listpredsdict.iterkeys()
-                         if tagdefs[tagname].multivalue and tagname not in jointags ]
-        for tagname in multivaltags:
-            jointags.add(tagname)
-            listwhere = make_listwhere(listpredsdict[tagname])
-            if listwhere:
-                listwhere = 'WHERE ' + listwhere
-            outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s %s GROUP BY subject)' % (self.wraptag(tagname), listwhere), self.wraptag(tagname)))
-            groupbys.append('%s.value' % self.wraptag(tagname))
-            expr = '%s.value' % self.wraptag(tagname)
-            if tagdefs[tagname].readpolicy == 'fowner':
+                if listwhere:
+                    expr = 'CASE WHEN %s THEN %s ELSE NULL END' % (listwhere, expr)
+            
+            if tagdef.readpolicy == 'fowner':
                 expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
-            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tagname, tagname), prefix='')))
-
+            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tag, tag), prefix='')))
+                
         innertables2 = [ rewrite_tablepair(innertables[0]) ] \
                        + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables[1:] ]
         outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables ]
@@ -1709,7 +1712,7 @@ class Application:
 
         # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
         order_suffix = []
-        for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef']:
+        for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
             if tagname in listpredsdict:
                 orderstmt = self.wraptag(listas.get(tagname, tagname), prefix='')
                 if tagname in [ 'modified' ]:
@@ -1718,9 +1721,8 @@ class Application:
                     orderstmt += ' ASC'
                 orderstmt += ' NULLS LAST'
                 order_suffix.append(orderstmt)
-        order_suffix.append( 'id' )
 
-        if ordertags != None:
+        if ordertags != None and (len(ordertags) > 0 or len(order_suffix) > 0):
             value_query += " ORDER BY " + ", ".join([self.wraptag(listas.get(tag, tag), prefix='') for tag in ordertags] + order_suffix)
 
         if limit:
@@ -1748,24 +1750,21 @@ class Application:
         tagdefs = self.globals['tagdefsdict']
         
         def build_query_recursive(stack, qd, limit):
-            subjpreds, listtags, ordertags = stack[0]
+            subjpreds, listpreds, ordertags = stack[0]
             subjpreds = [ p for p in subjpreds ]
             if len(stack) == 1:
                 # this query element is not contextualized
-                if listtags and len(listtags) > 0 and type(listtags[0]) == type('text'):
-                    q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
-                else:
-                    q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listtags)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds)
                 values.update(v)
                 return q
             else:
                 # this query element is contextualized
                 cstack = stack[1:]
-                csubjpreds, clisttags, cordertags = cstack[0]
+                csubjpreds, clistpreds, cordertags = cstack[0]
                 
-                if len(clisttags) != 1:
-                    raise BadRequest("Path context %d has ambiguous projection with %d list-tags." % (len(cstack)-1, len(clisttags)))
-                projection = clisttags[0]
+                if len(clistpreds) != 1:
+                    raise BadRequest("Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
+                projection = clistpreds[0].tag
                 if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id', 'tagname', 'viewname' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 
@@ -1775,12 +1774,12 @@ class Application:
                 else:
                     projectclause = '"%s"' % projection
                     
-                cstack[0] = csubjpreds, clisttags, None # don't bother sorting context more than necessary
+                cstack[0] = csubjpreds, clistpreds, None # don't bother sorting context more than necessary
                 cq = build_query_recursive(cstack, qd + 1, limit=None)
                 cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
                 
                 subjpreds.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
-                q, v = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds)
                 values.update(v)
                 return q
         
