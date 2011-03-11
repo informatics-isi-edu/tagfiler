@@ -110,7 +110,7 @@ class Study (Node):
 
     __slots__ = []
 
-    def __init__(self, appname, name=None, queryopts={}):
+    def __init__(self, appname, subjpreds=[], queryopts={}):
         Node.__init__(self, appname)
         self.action = 'get'
         self.study_type = None
@@ -118,12 +118,7 @@ class Study (Node):
         self.count = None
         self.status = None
         self.direction = 'upload'
-        if type(name) == web.utils.Storage:
-            self.name = name.name
-            self.version = name.version
-        else:
-            self.name = name
-            self.version = None
+        self.subjpreds = subjpreds
 
     def GET(self, uri):
         try:
@@ -153,21 +148,24 @@ class Study (Node):
             self.globals['appletTagnames'] = config['applet tags']
             self.globals['appletTagnamesRequire'] = config['applet tags require']
             
-            if self.action == 'get' and self.name:
-                subjpreds = [ web.Storage(tag='name', op='=', vals=[self.name]) ]
-                versions = 'latest'
-                if self.version:
-                    subjpreds.append( web.Storage(tag='version', op='=', vals=[self.version]) )
-                    versions = 'any'
+            if self.action == 'get' and self.subjpreds:
+                self.unique = self.validate_subjpreds_unique()
                 
-                results = self.select_files_by_predlist(subjpreds,
+                if unique:
+                    versions = 'any'
+                else:
+                    versions = 'latest'
+                
+                results = self.select_files_by_predlist(self.subjpreds,
                                                         listtags=['vcontains', 'id'] + [ tagname for tagname in self.globals['appletTagnames']],
                                                         versions=versions)
                 if len(results) == 0:
                     if not self.status:
                         raise NotFound('study "%s@%s"' % (self.name, self.version))
                 else:
-                    files = results[0].vcontains
+                    self.subject = results[0]
+                    self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
+                    files = self.subject.vcontains
                     if not files:
                         files = []
     

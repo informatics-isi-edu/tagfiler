@@ -379,12 +379,12 @@ def p_study(p):
     p[0] = url_ast.Study(appname=p[2])
 
 def p_study_num(p):
-    """study : slash string slash STUDY slash filename"""
-    p[0] = url_ast.Study(appname=p[2], name=p[6])
+    """study : slash string slash STUDY slash predlist_nonempty"""
+    p[0] = url_ast.Study(appname=p[2], subjpreds=p[6])
 
 def p_study_num_opts(p):
-    """study : slash string slash STUDY slash filename queryopts"""
-    p[0] = url_ast.Study(appname=p[2], name=p[6], queryopts=p[7])
+    """study : slash string slash STUDY slash predlist_nonempty queryopts"""
+    p[0] = url_ast.Study(appname=p[2], subjpreds=p[6], queryopts=p[7])
 
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
