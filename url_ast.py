@@ -119,7 +119,12 @@ class Study (Node):
         self.status = None
         self.direction = 'upload'
         self.subjpreds = subjpreds
-        self.study = ';'.join([res.tag + (((res.op) and str(res.op)) or '') + ','.join([str(val) for val in  res.vals]) for res in self.subjpreds])
+        self.name = ''.join([ ''.join(res.vals) for res in self.subjpreds if res.tag == 'name' and res.op == '='] )
+        if len(self.name) == 0:
+            self.name = None
+        self.version = ''.join([ ''.join(res.vals) for res in self.subjpreds if res.tag == 'version' and res.op == '='] )
+        if len(self.version) == 0:
+            self.version = None
 
     def GET(self, uri):
         try:
@@ -162,7 +167,7 @@ class Study (Node):
                                                         versions=versions)
                 if len(results) == 0:
                     if not self.status:
-                        raise NotFound('study "%s"' % self.study)
+                        raise NotFound('study "%s@%s"' % (self.name, self.version))
                 else:
                     self.subject = results[0]
                     self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
@@ -184,9 +189,9 @@ class Study (Node):
                 return self.renderlist("Study Upload",
                                        [self.render.TreeUpload()])
             elif self.action == 'download':
-                self.globals['version'] = None
+                self.globals['version'] = self.version
                 return self.renderlist("Study Download",
-                                       [self.render.TreeDownload(self.study)])
+                                       [self.render.TreeDownload(self.name)])
             elif self.action == 'get':
                 success = None
                 error = None
@@ -197,10 +202,10 @@ class Study (Node):
                 else:
                     error = self.status
     
-                if self.study:
-                    self.globals['version'] = None
+                if self.name:
+                    self.globals['version'] = self.version
                     return self.renderlist(None,
-                                           [self.render.TreeStatus(self.study, self.direction, success, error, files)])
+                                           [self.render.TreeStatus(self.name, self.direction, success, error, files)])
                 else:
                     url = '/appleterror'
                     if self.status:
@@ -246,14 +251,14 @@ class Study (Node):
                     self.status = 'conflict'
                     result = None
             if self.status == 'success':
-                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.study)
+                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.name)
             else:
-                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.study)
+                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.name)
             return result
 
         def postCommit(result):
             if not result:
-                raise Conflict('The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.study))
+                raise Conflict('The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.name))
 
         return self.dbtransact(body, postCommit)
 
