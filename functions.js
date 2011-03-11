@@ -13,6 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+var expiration_warning = true;
+
+function enableExpirationWarning() {
+	expiration_warning = true;
+}
+
+function disableExpirationWarning() {
+	expiration_warning = false;
+}
+
 function setDatasetLink(div_id, datasetLink) {
   html_link = "<a target='_blank' href='" + datasetLink +
         "'>" + datasetLink + "</a>";
@@ -66,6 +77,15 @@ function clearSessionTimer() {
 function startSessionTimer(t) {
     clearSessionTimer();
     timer = setTimeout("runSessionRequest()", t);
+    timerset = 1;
+}
+
+/**
+ * Starts the extend request with a given delay time (millis)
+ */
+function startExtendSessionTimer(t) {
+    clearSessionTimer();
+    timer = setTimeout("runExtendRequest()", t);
     timerset = 1;
 }
 
@@ -219,6 +239,10 @@ function processSessionRequest() {
       }	
 	      
       if ( secsremain < expiration_warn_mins * 60) {
+	  if (!expiration_warning) {
+	  	startExtendSessionTimer(1000);
+	  	return;
+	  }
 	  if (!warn_window || warn_window.closed) {
 	      log("processSessionRequest: raising warning window");
 	      warn_window = (window.open(expiration_warn_url,
