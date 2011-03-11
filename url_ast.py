@@ -155,7 +155,7 @@ class Study (Node):
             self.globals['appletTagnamesRequire'] = config['applet tags require']
             
             if self.action == 'get' and self.subjpreds:
-                self.unique = self.validate_subjpreds_unique()
+                self.unique = self.validate_subjpreds_unique(acceptName=True)
                 
                 if self.unique:
                     versions = 'any'
