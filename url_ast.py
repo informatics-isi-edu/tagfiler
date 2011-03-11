@@ -152,7 +152,7 @@ class Study (Node):
             if self.action == 'get' and self.subjpreds:
                 self.unique = self.validate_subjpreds_unique()
                 
-                if unique:
+                if self.unique:
                     versions = 'any'
                 else:
                     versions = 'latest'
