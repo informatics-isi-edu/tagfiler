@@ -70,8 +70,12 @@ def p_filelist_opts2(p):
     p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
 
 def p_file(p):
-    """file : slash string slash FILE slash predlist_nonempty"""
-    p[0] = url_ast.FileId(appname=p[2], subjpreds=p[6])
+    """file : slash string slash FILE slash querypath"""
+    p[0] = url_ast.FileId(appname=p[2], path=p[6])
+
+def p_file_opts(p):
+    """file : slash string slash FILE slash querypath queryopts"""
+    p[0] = url_ast.FileId(appname=p[2], path=p[6], queryopts=p[7])
 
 def p_log(p):
     """log : slash string slash LOG slash string"""
@@ -80,10 +84,6 @@ def p_log(p):
 def p_log_opts(p):
     """log : slash string slash LOG slash string queryopts"""
     p[0] = url_ast.LogId(appname=p[2], name=p[6], queryopts=p[7])
-
-def p_file_opts(p):
-    """file : slash string slash FILE slash predlist_nonempty queryopts"""
-    p[0] = url_ast.FileId(appname=p[2], subjpreds=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF

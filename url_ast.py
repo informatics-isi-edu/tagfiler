@@ -419,8 +419,12 @@ class FileList (Node):
             if name:
                 subjpreds.append( web.Storage(tag='name', op='=', vals=[name]) )
             storage.action = 'post'
+        if subjpreds:
+            path = [ ( subjpreds, [], [] ) ]
+        else:
+            path = []
         ast = FileId(appname=self.appname,
-                     subjpreds=subjpreds,
+                     path=path,
                      url=url,
                      dtype=dtype,
                      queryopts=self.queryopts,
@@ -480,10 +484,10 @@ class FileId(Node, FileIO):
 
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
-    def __init__(self, appname, subjpreds, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
+    def __init__(self, appname, path, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
         Node.__init__(self, appname)
         FileIO.__init__(self)
-        self.subjpreds = subjpreds
+        self.path = [ ( e[0], e[1], [] ) for e in path ]
         self.file = file
         self.dtype = dtype
         self.url = url

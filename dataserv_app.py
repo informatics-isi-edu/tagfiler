@@ -108,6 +108,16 @@ def predlist_linearize(predlist):
     predlist.sort()
     return ';'.join(predlist)
 
+def path_linearize(path):
+    def elem_linearize(elem):
+        linear = predlist_linearize(elem[0])
+        if elem[1]:
+            linear += '(%s)' % predlist_linearize(elem[1])
+            if elem[2]:
+                linear += ','.join(urlquote(elem[2]))
+        return linear
+    return '/' + '/'.join([ elem_linearize(elem) for elem in path ])
+
 def reduce_name_pred(x, y):
     if x.tag == 'name' and x.op == '=' and len(x.vals) > 0:
         return x.vals[0]
@@ -864,8 +874,8 @@ class Application:
             except NotImplemented, AttributeError:
                 return None
 
-    def validate_subjpreds_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False):
-        """Evaluate self.subjpreds for subject-identifying uniqueness.
+    def validate_subjpreds_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False, subjpreds=None):
+        """Evaluate subjpreds (default self.subjpreds) for subject-identifying uniqueness.
 
            Raises Conflict if restrictSchema=True and additional
            criteria are not met:
@@ -884,10 +894,12 @@ class Application:
            Else raises Conflict
 
         """
+        if subjpreds == None:
+            subjpreds = self.subjpreds
         got_name = False
         got_version = False
         unique = None
-        for pred in self.subjpreds:
+        for pred in subjpreds:
             tagdef = self.globals['tagdefsdict'].get(pred.tag, None)
             if tagdef == None:
                 raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
@@ -895,7 +907,7 @@ class Application:
             if restrictSchema:
                 if tagdef.tagname not in [ 'name', 'version' ] and tagdef.writeok == False:
                     raise Conflict('Subject predicate sets restricted tag "%s".' % tagdef.tagname)
-                if tagdef.typestr == 'empty' and pred.op != '' or \
+                if tagdef.typestr == 'empty' and pred.op or \
                        tagdef.typestr != 'empty' and pred.op != '=':
                     raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred.op, tagdef.tagname))
                     
@@ -1043,12 +1055,12 @@ class Application:
             version = subject.get('version', None)
             if name != None:
                 if version != None and showversions:
-                    dataid = '%s@%s' % (urlquote(name), version)
                     datapred = 'name=%s;version=%s' % (urlquote(name), version) 
-                    dataname = '%s@%s' % (name, version)
+                    dataid = datapred
+                    dataname = '%s;version=%s' % (name, version)
                 else:
-                    dataid = urlquote(name)
-                    datapred = 'name=%s' % urlquote(name) 
+                    datapred = 'name=%s' % urlquote(name)
+                    dataid = datapred
                     dataname = name
             else:
                 datapred = 'id=%s' % subject.id
@@ -1468,6 +1480,8 @@ class Application:
                 listtags = [ x for x in listtags ]
 
             listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
+        else:
+            listpreds = [ x for x in listpreds ]
 
         if ordertags:
             listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in ordertags ]
@@ -1749,7 +1763,7 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         values = dict()
         tagdefs = self.globals['tagdefsdict']
         
@@ -1758,7 +1772,7 @@ class Application:
             subjpreds = [ p for p in subjpreds ]
             if len(stack) == 1:
                 # this query element is not contextualized
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz)
                 values.update(v)
                 return q
             else:
@@ -1783,7 +1797,7 @@ class Application:
                 cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
                 
                 subjpreds.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz)
                 values.update(v)
                 return q
         
@@ -1799,8 +1813,8 @@ class Application:
         #web.debug(query, values)
         return (query, values)
 
-    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None):
-        query, values = self.build_files_by_predlist_path(path, versions, limit=limit)
+    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
+        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
         return self.db.query(query, values)
 
     
