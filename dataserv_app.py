@@ -682,9 +682,10 @@ class Application:
         self.dbtransact(body, postCommit)
 
     def midDispatch(self):
-        now = datetime.datetime.now()
-        if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
-            self.preDispatchCore(web.ctx.homepath, setcookie=False)
+        return
+        #now = datetime.datetime.now()
+        #if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
+        #    self.preDispatchCore(web.ctx.homepath, setcookie=False)
 
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))
@@ -795,7 +796,7 @@ class Application:
                         error = str(te)
                         #m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
                         #if not m or count > limit:
-                        web.debug('IntegrityError', error)
+                        #web.debug('IntegrityError', error)
                         if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
                             self.logException('integrity error during transaction body')

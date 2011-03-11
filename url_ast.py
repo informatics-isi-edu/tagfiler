@@ -1233,7 +1233,7 @@ class Query (Node):
         qpath = []
         for elem in self.path:
             subjpreds, listpreds, ordertags = elem
-            web.debug(listpreds)
+            #web.debug(listpreds)
             if listpreds:
                 if len(listpreds) == 1 and listpreds[0].tag in [ 'contains', 'vcontains' ] and listpreds[0].op == None:
                     listpart = ''
