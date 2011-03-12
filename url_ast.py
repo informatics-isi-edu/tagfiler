@@ -941,10 +941,6 @@ class FileTags (Node):
         return ''
 
     def PUT(self, uri):
-        keys = self.tagvals.keys()
-        if len(keys) == 1:
-            self.tag_id = keys[0]
-            
         try:
             content_type = web.ctx.env['CONTENT_TYPE'].lower()
         except:
@@ -954,6 +950,7 @@ class FileTags (Node):
         if content_type == 'application/x-www-form-urlencoded':
             # handle same entity body format we output in GETtag()
             #  tag=val&tag=val...
+            tagvals = dict()
             for tagval in content.strip().split('&'):
                 tag, val = tagval.split('=')
                 tag = urlunquote(tag)
@@ -963,12 +960,15 @@ class FileTags (Node):
                     raise BadRequest(data="A non-empty tag name is required.")
 
                 try:
-                    vals = self.tagvals[tag]
+                    vals = tagvals[tag]
                 except:
-                    self.tagvals[tag] = []
-                    vals = self.tagvals[tag]
+                    tagvals[tag] = []
+                    vals = tagvals[tag]
                 vals.append(val)
-                
+
+            subjpreds, listpreds, ordertags = self.path[-1]
+            for tag, vals in tagvals.items():
+                listpreds.append( web.Storage(tag=tag,op='=', vals=vals) )
         return self.dbtransact(self.put_body, self.put_postCommit)
 
     def delete_body(self, previewOnly=False):
