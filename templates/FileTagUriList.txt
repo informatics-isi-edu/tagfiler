@@ -23,11 +23,10 @@ $code
 			for tagdef in tagdefs:
 				if file[tagdef.tagname]:
 					if tagdef.typestr == 'empty':
-						s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "\n"
+						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + ")\n"
 					elif tagdef.multivalue:
-						for val in file[tagdef.tagname]:
-							s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "=" + urlquote(val) + "\n"
+						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + ','join([urlquote(val) for val in file[tagdef.tagname]] + ")\n"
 					else:
-						s += home + "/tags/" + urlquote(file.file) + "/" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname])
+						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname]) + ")\n"
 		return s
 ${rendertagvals(taginfo[4])[:-1]}
