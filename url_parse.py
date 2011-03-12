@@ -116,48 +116,12 @@ def p_tags_all_slash_opts(p):
     p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
 
 def p_tags(p):
-    """tags : slash string slash TAGS slash predlist_nonempty 
-            | slash string slash TAGS slash predlist_nonempty slash"""
-    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6])
+    """tags : slash string slash TAGS slash querypath"""
+    p[0] = url_ast.FileTags(appname=p[2], path=p[6])
 
 def p_tags_opts(p):
-    """tags : slash string slash TAGS slash predlist_nonempty queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], queryopts=p[7])
-
-def p_tagsvalrest(p):
-    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals"""
-    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], tagvals=p[8])
-
-def p_tagsvalrest_opts(p):
-    """tags : slash string slash TAGS slash predlist_nonempty slash tagvals queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], subjpreds=p[6], tagvals=p[8], queryopts=p[9])
-
-def p_tagvals(p):
-    """tagvals : tagval"""
-    p[0] = dict()
-    tag = p[1][0]
-    vallist = p[1][1]
-    p[0][tag] = list(vallist)
-
-def p_tagvallist_grow(p):
-    """tagvals : tagvals ';' tagval"""
-    p[0] = p[1]
-    tag = p[3][0]
-    vallist = p[3][1]
-    try:
-        vals = p[0][tag]
-        for val in vallist:
-            vals.append(val)
-    except:
-        p[0][tag] = list(vallist)
-
-def p_tagval(p):
-    """tagval : string '=' vallist"""
-    p[0] = ( p[1], p[3] )
-
-def p_tag(p):
-    """tagval : string"""
-    p[0] = ( p[1], list() )
+    """tags : slash string slash TAGS slash querypath queryopts"""
+    p[0] = url_ast.FileTags(appname=p[2], path=p[6], queryopts=p[7])
 
 def p_query1(p):
     """query : slash string slash QUERY
@@ -180,21 +144,13 @@ def p_query4(p):
     """query : slash string slash QUERY slash querypath queryopts"""
     p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=p[7])
 
-def p_querypath_general(p):
-    """querypath_elem : predlist listtags_nonepsilon ordertags"""
-    p[0] = ( p[1], p[2], p[3] )
+def p_querypath_elem_general(p):
+    """querypath_elem : predlist '(' predlist ')' ordertags"""
+    p[0] = ( p[1], p[3], p[5] )
 
-def p_querypath_nopred(p):
-    """querypath_elem : listtags_nonepsilon ordertags"""
-    p[0] = ( [], p[1], p[2] )
-
-def p_querypath_noorder(p):
-    """querypath_elem : predlist listtags"""
-    p[0] = ( p[1], p[2], [] )
-
-def p_querypath_listonly(p):
-    """querypath_elem : listtags"""
-    p[0] = ( [], p[1], [] )
+def p_querypath_elem_brief(p):
+    """querypath_elem : predlist"""
+    p[0] = ( p[1], [], [] )
 
 def p_querypath_base(p):
     """querypath : querypath_elem"""
@@ -208,29 +164,6 @@ def p_querypath_extend(p):
         # the parent path element has no listpreds, default to 'vcontains'
         p[0][-1] = ( ppreds, [ web.Storage(tag='vcontains',op=None,vals=[]) ], pordertags )
     p[0].append( p[3] )
-
-def p_listtags(p):
-    """listtags : listtags_epsilon
-                | listtags_empty
-                | listtags_nonempty"""
-    p[0] = p[1]
-
-def p_listtags_nonepsilon(p):
-    """listtags_nonepsilon : listtags_empty
-                           | listtags_nonempty"""
-    p[0] = p[1]
-
-def p_listtags_epsilon(p):
-    """listtags_epsilon : """
-    p[0] = []
-
-def p_listtags_empty(p):
-    """listtags_empty : '(' ')'"""
-    p[0] = []
-
-def p_listtags_nonempty(p):
-    """listtags_nonempty : '(' predlist ')'"""
-    p[0] = p[2]
 
 def p_ordertags_empty(p):
     """ordertags : """
@@ -403,18 +336,6 @@ def p_slash(p):
     """slash : '/'
              | slash '/'"""
     pass
-
-def p_filename(p):
-    """filename : string"""
-    p[0] = web.storage(name=p[1], version=None)
-
-def p_filename_version(p):
-    """filename : string '@' string"""
-    try:
-        x = int(p[3])
-    except:
-        raise ParseError(p[3], 'Filename part of URL has invalid version number:')
-    p[0] = web.storage(name=p[1], version=p[3])
 
 def p_spacestring(p):
     """spacestring : '+'"""

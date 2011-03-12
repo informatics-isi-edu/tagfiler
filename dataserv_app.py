@@ -1818,3 +1818,89 @@ class Application:
         return self.db.query(query, values)
 
     
+    def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'default'], list_prefix=None, extra_tags=[]):
+        """Prepare (path, listtags, writetags, limit, versions) from input path, web environment, and input policies.
+
+           list_priority  -- chooses first successful source of listtags
+
+                'path' : use listpreds from path[-1]
+                'list' : use 'list' queryopt
+                'view' : use view named by 'view' queryopt
+                'default' : use 'default' view
+                'all' : use all defined tags
+
+           view_list_prefix -- enables consultation of view tags
+
+                '%s list tags' % prefix : for listtags
+                '%s list tags write' % prefix : for writetags
+
+
+           extra_tags  -- tags to add to listpreds of path[-1] without adding to listtags or writetags."""
+
+        if not path:
+            path = [ ( [], [], [] ) ]
+        else:
+            # shallow copy
+            path = [ x for x in path ]
+
+        writetags = []
+        listtags = []
+        
+        subjpreds, listpreds, ordertags = path[-1]
+        save_listpreds = []
+        
+        for source in list_priority:
+            
+            listopt = self.queryopts.get('list')
+            viewopt = self.queryopts.get('view')
+            view = self.select_view(viewopt)
+            default = self.select_view()
+            listname = '%s list tags' % list_prefix
+            writename = '%s list tags write' % list_prefix
+                
+            if source == 'path' and listpreds:
+                listtags = [ pred.tag for pred in listpreds ]
+                save_listpreds = listpreds
+                break
+            elif source == 'list' and listopt:
+                listtags = [ x for x in listtags.split(',') if x ]
+                break
+            elif source == 'view' and viewopt and view and view.get(listname, []):
+                listtags = view.get(listname, [])
+                writetags = view.get(writename, [])
+                break
+            elif source == 'default' and default and view.get(listname, []):
+                listtags = default.get(listname, [])
+                writetags = view.get(writename, [])
+                break
+            elif source == 'all':
+                listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
+                break
+
+        listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
+
+        path[-1] = ( subjpreds, listpreds, ordertags )
+
+        limit = self.queryopts.get('limit', 'default')
+        if limit == 'none':
+            limit = None
+        elif type(limit) == type('text'):
+            try:
+                limit = int(limit)
+            except:
+                limit = 25
+                
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True)
+        if unique == False:
+            versions = 'latest'
+        else:
+            # unique is True or None
+            versions = 'any'
+
+        versions = self.queryopts.get('versions', versions)
+        if versions not in [ 'latest', 'any' ]:
+            versions = 'latest'
+
+        return (path, listtags, writetags, limit, versions)
+
+    

@@ -23,7 +23,7 @@ import urllib
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize
 from rest_fileio import FileIO, LogFileIO
 import json
 
@@ -745,191 +745,57 @@ class FileTags (Node):
 
     __slots__ = [ 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, subjpreds=None, tag_id='', value=None, tagvals=None, queryopts={}):
+    def __init__(self, appname, path=None, queryopts={}):
         Node.__init__(self, appname)
-        if subjpreds:
-            self.subjpreds = subjpreds
+        if path:
+            self.path = path
         else:
-            self.subjpreds = []
-        self.tag_id = tag_id
-        self.value = value
-        self.typestr = None
-        self.view_type = None
+            self.path = [ ([], [], []) ]
         self.referer = None
-        if tagvals:
-            self.tagvals = tagvals
-        else:
-            self.tagvals = dict()
         self.queryopts = queryopts
-        self.globals['subjpreds'] = subjpreds
         self.globals['queryTarget'] = self.qtarget()
 
     def qtarget(self):
         if self.queryopts.get('view') == 'default':
             return None
-        qpath = ''
-        terms = []
-        for pred in self.subjpreds:
-            if pred.op:
-                terms.append(urlquote(pred.tag) + pred.op + ",".join([ urlquote(val) for val in pred.vals ]))
-            else:
-                terms.append(urlquote(pred.tag))
-        qpath = ';'.join(terms)
-        return self.config['home'] + web.ctx.homepath + '/tags/' + qpath
 
-    def get_tag_body(self):
-        tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
-        if tagdef == None:
-            raise NotFound(data='tag definition "%s"' % self.tag_id)
-        self.tagdef = tagdef
-        self.typestr = tagdef.typestr
-        self.contentType = None
-        self.urlFallback = False
+        url = self.config['home'] + web.ctx.homepath + '/tags/' + path_linearize(self.path)
+        opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() ])
+        if opts:
+            url += '?' + opts
+        return url
+
+    def get_body(self):
+
+        self.path, self.listtags, writetags, self.limit, self.versions = \
+              self.prepare_path_query(self.path,
+                                      list_priority=['path', 'list', 'view', 'all'],
+                                      list_prefix='tag',
+                                      extra_tags=[ 'id', 'file','name', 'version','Image Set',
+                                                   'tagdef', 'typedef', 'config', 'view',
+                                                   'write users', 'modified' ])
+
+        self.txlog('GET TAGS', dataset=path_linearize(self.path))
         
-        for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType in set([ 'application/x-www-form-urlencoded',
-                                   'text/plain' ]):
-                self.contentType = acceptType
-                break
-            if acceptType == 'text/uri-list':
-                if self.typestr == 'url':
-                    # only prefer uri-list for URLs
-                    self.contentType = acceptType
-                else:
-                    # but use it as last resort for other types
-                    self.urlFallback = True
-                break
-            if acceptType == 'text/html':
-                break
-
-        if self.contentType == None and self.urlFallback:
-            self.contentType = 'text/uri-list'
-
-        if self.contentType == None:
-            self.contentType = 'text/html'
-
-        if self.contentType == 'text/html':
-            unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True)
-        else:
-            unique = self.validate_subjpreds_unique(acceptName=True)
-        if unique in [ True, None ]:
-            versions = 'any'
-        else:
-            versions = 'latest'
-
-        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds] 
-                                                + [self.tag_id, 'id', 'owner', 'write users', 'name', 'version', 'tagdef', 'typedef'],
-                                                versions=versions)
-        if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % predlist_linearize(self.subjpreds))
-        self.subjects = [ res for res in results ]
-
-        if len(self.subjects) == 1 \
-           and self.subjects[0][self.tag_id] == None \
-           and self.contentType not in ['text/uri-list', 'text/html']:
-            if self.value == None:
-                raise NotFound(data='tag "%s" on subject matching "%s"' % (self.tag_id, predlist_linearize(self.subjpreds)))
-            elif self.value == '':
-                raise NotFound(data='tag "%s" = "" on subject matching "%s"' % (self.tag_id, predlist_linearize(self.subjpreds)))
-            else:
-                raise NotFound(data='tag "%s" = "%s" on subject matching "%s"' % (self.tag_id, self.value, predlist_linearize(self.subjpreds)))
-
-        for subject in self.subjects:
-            self.txlog('GET', dataset=self.subject2identifiers(subject)[0], tag=self.tag_id)
-            
-        return None
-
-    def get_tag_postCommit(self, values):
-        web.header('Content-Type', self.contentType)
-
-        subject = self.subjects[0]
-        if self.tagdef.multivalue:
-            values = subject[self.tag_id]
-            if values == None:
-                values = []
-        else:
-            values = [ subject[self.tag_id] ]
-            
-        if self.contentType == 'application/x-www-form-urlencoded':
-            if len(values) > 0:
-                return "&".join([(urlquote(self.tag_id) + '=' + urlquote(mystr(val))) for val in values])
-            else:
-                return urlquote(self.tag_id)
-        elif self.contentType == 'text/uri-list':
-            if self.typestr == 'url':
-                return '\n'.join(values + [''])
-            else:
-                raise Conflict('Content-Type text/uri-list not appropriate for tag type "%s".' % self.typestr)
-        elif self.contentType == 'text/plain':
-            return '\n'.join(values) + '\n'
-        else:
-            # 'text/html'
-            if self.queryopts.get('values', None) == 'basic':
-                self.globals['smartTagValues'] = False
-            
-            if len(self.subjects) == 1:
-                return self.renderlist('Tag "%s" for subject matching "%s"' % (self.tag_id, predlist_linearize(self.subjpreds)),
-                                       [self.render.FileTagExisting('', self.subjects[0], [self.tagdef])])
-            else:
-                return self.renderlist('Tag "%s" for subjects matching "%s"' % (self.tag_id, predlist_linearize(self.subjpreds)),
-                                       [self.render.FileTagValExisting('', self.subjects, [self.tagdef])])
-
-    def GETtag(self, uri):
-        # RESTful get of exactly one tag on one file...
-        return self.dbtransact(self.get_tag_body, self.get_tag_postCommit)
-
-    def get_all_body(self):
-        self.txlog('GET ALL TAGS', dataset=self.subjpreds)
-
-        
-        try_default_view = True
-        self.listtags = self.queryopts.get('list', [])
-        if not self.listtags:
-            view = self.select_view(self.queryopts.get('view', None), None)
-            if view:
-                self.listtags = view['tag list tags']
-                try_default_view = False
+        if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
+            try_default_view = True
         else:
             try_default_view = False
-
-        if type(self.listtags) == type('text'):
-            self.listtags = self.listtags.split(',')
-
-        predtags = [ pred.tag for pred in self.subjpreds ]
-        extratags = [ 'id', 'name', 'version', 'tagdef', 'typedef', 'write users', 'file', 'url' ]
-
-        all = self.globals['tagdefsdict'].values()
-        if len(self.listtags) > 0:
-            all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags or tagdef.tagname in predtags ]
-        else:
-            self.listtags = [ tagdef.tagname for tagdef in all ]
+            
+        all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True)
-        if unique == False:
-            versions = 'latest'
-        else:
-            # unique is True or None
-            versions = 'any'
-
-        files = [ file for file in self.select_files_by_predlist(listtags=self.listtags + predtags + extratags, versions=versions)  ]
+        files = [ file for file in self.select_files_by_predlist_path(self.path, versions=self.versions, limit=self.limit)  ]
         if len(files) == 0:
-            raise NotFound('subject matching "%s"' % self.subjpreds)
+            raise NotFound('subject matching "%s"' % predlist_linearize(self.path[-1][0]))
         elif len(files) == 1:
-            self.subject = files[0]
-            self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
+            subject = files[0]
+            datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
 
-            if try_default_view and self.subject.dtype:
-                view = self.select_view(self.subject.dtype)
+            if try_default_view and subject.dtype:
+                view = self.select_view(subject.dtype)
                 if view['tag list tags']:
                     self.listtags = view['tag list tags']
-        else:
-            if try_default_view:
-                view = self.select_view('default')
-                if view['tag list tags']:
-                    self.listtags = view['tag list tags']
-
-        all = [ tagdef for tagdef in all if tagdef.tagname in self.listtags or tagdef.tagname in predtags ]
 
         length = 0
         for file in files:
@@ -937,42 +803,14 @@ class FileTags (Node):
                 length = listOrStringMax(file[tagname], length)
 
         return (files, all, length)
-    
-    def get_title_one(self):
-        return 'Tags for subject matching "%s"' % (self.dataname)
 
-    def get_title_all(self):
-        return 'Tags for subjects matching "%s"' % (predlist_linearize(self.subjpreds))
-
-    def get_all_html_render(self, results):
+    def get_postCommit(self, results):
         files, all, length = results
-        #web.debug(system, userdefined, all)
-        if self.queryopts.get('values', None) == 'basic':
-            self.globals['smartTagValues'] = False
-            
-        if len(files) == 1:
-            self.globals['version'] = None
-            return self.renderlist(self.get_title_one(),
-                                   [self.render.FileTagExisting('', files[0], all)])
-
-        else:
-            return self.renderlist(self.get_title_all(),
-                                   [self.render.FileTagValExisting('', files, all)])
- 
-    def get_all_postCommit(self, results):
-        files, all, length = results
-
-        if 'name' not in self.listtags:
-            addName = True
-        else:
-            addName = False
 
         jsonMungeTags = set( [ tagdef.tagname for tagdef in all if tagdef.typestr in jsonMungeTypes ] )
 
         def dictFile(file):
             tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
-            if addName:
-                tagvals.append( ( 'name', file.file ) )
             tagvals = dict(tagvals)
             for tagname in jsonMungeTags:
                 tagvals[tagname] = str(tagvals[tagname])
@@ -981,31 +819,44 @@ class FileTags (Node):
         self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
+                web.header('Content-Type', 'text/uri-list')
                 return self.render.FileTagUriList(files, all)
-            elif acceptType == 'application/x-www-form-urlencoded':
+            elif acceptType == 'application/x-www-form-urlencoded' and len(files) == 1:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 body = []
-                for file in files:
-                    for tagdef in tagdefs:
-                        if file[tagdef.tagname]:
-                            if tagdef.typestr == 'empty':
-                                body.append(urlquote(tagdef.tagname))
-                            elif tagdef.multivalue:
-                                for val in file[tagdef.tagname]:
-                                    body.append(urlquote(tagdef.tagname) + '=' + urlquote(val))
-                            else:
-                                body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
+                file = files[0]
+                for tagdef in all:
+                    if file[tagdef.tagname]:
+                        if tagdef.typestr == 'empty':
+                            body.append(urlquote(tagdef.tagname))
+                        elif tagdef.multivalue:
+                            for val in file[tagdef.tagname]:
+                                body.append(urlquote(tagdef.tagname) + '=' + urlquote(val))
+                        else:
+                            body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 return '&'.join(body)
             elif acceptType == 'application/json':
+                web.header('Content-Type', 'application/json')
                 return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
+            elif acceptType == 'text/plain' and len(files) == 1:
+                web.header('Content-Type', 'text/plain')
+                return '\n'.join(values) + '\n'
             elif acceptType == 'text/html':
                 break
+                
         # render HTML result
-        return self.get_all_html_render(results)
-        
-    def GETall(self, uri):
-        # HTML get of all tags on one file...
-        return self.dbtransact(self.get_all_body, self.get_all_postCommit)
+        if self.queryopts.get('values', None) == 'basic':
+            self.globals['smartTagValues'] = False
+
+        simplepath = [ x for x in self.path ]
+        simplepath[-1] = simplepath[-1][0], [], []
+            
+        if len(files) == 1:
+            return self.renderlist('Tag(s) for subject matching "%s"' % path_linearize(simplepath),
+                                   [self.render.FileTagExisting('', files[0], all)])
+        else:
+            return self.renderlist('Tag(s) for subjects matching "%s"' % path_linearize(simplepath),
+                                   [self.render.FileTagValExisting('', files, all)])
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
@@ -1014,34 +865,39 @@ class FileTags (Node):
             self.view_type = urllib.unquote_plus(self.storage.view)
         except:
             pass
-        
-        keys = self.tagvals.keys()
-        if len(keys) == 1:
-            self.tag_id = keys[0]
-            vals = self.tagvals[self.tag_id]
-            if len(vals) == 1:
-                self.value = vals[0]
-            elif len(vals) > 1:
-                raise BadRequest(data="GET does not support multiple values in the URI.")
-            return self.GETtag(uri)
-        elif len(keys) > 1:
-            raise BadRequest(data="GET does not support multiple tag names in the URI.")
-        else:
-            return self.GETall(uri)
+
+        return self.dbtransact(self.get_body, self.get_postCommit)
 
     def put_body(self):
-        unique = self.validate_subjpreds_unique(acceptName=True)
-        if unique:
-            versions = 'any'
-        else:
-            versions = 'latest'
+        subjpreds, listpreds, ordertags = self.path[-1]
         
-        list_additional =  ['id', 'owner', 'write users', 'Image Set']
-        if self.tag_id:
-            list_additional.append(self.tag_id)
-        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds] + list_additional, versions=versions)
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
+        if unique == False:
+            versions = 'latest'
+        else:
+            versions = 'any'
+
+        self.tagvals = dict()
+        for pred in listpreds:
+            if pred.op and pred.op != '=':
+                raise BadRequest('Invalid operation "%s" for tag binding in PUT.' % pred.op)
+            if self.tagvals.has_key(pred.tag):
+                raise BadRequest('Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
+            self.tagvals[pred.tag] = pred.vals
+        
+        listpreds =  subjpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'owner', 'write users', 'Image Set'] ]
+
+        simplepath = [ x for x in self.path ]
+        simplepath[-1] = ( simplepath[-1][0], [], [] )
+        
+        self.path[-1] = (subjpreds, listpreds, ordertags)
+        
+        results = self.select_files_by_predlist_path(self.path, versions=versions)
         if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % self.subjpreds)
+            raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
+        elif len(results) > 1:
+            raise Conflict('PUT tags to more than one subject is not supported.')
+
         self.subject = results[0]
         self.id = self.subject.id
 
@@ -1059,13 +915,21 @@ class FileTags (Node):
                 raise NotFound(data='tag definition "%s"' % tag_id)
             self.enforce_tag_authz('write', self.subject, tagdef)
             self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
-            for value in self.tagvals[tag_id]:
-                self.set_tag(self.subject, tagdef, value)
+            if self.tagvals[tag_id]:
+                for value in self.tagvals[tag_id]:
+                    self.set_tag(self.subject, tagdef, value)
+                    if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage' ]:
+                        for subfile in subfiles:
+                            self.enforce_tag_authz('write', subfile, tagdef)
+                            self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
+                            self.set_tag(subfile, tagdef, value)
+            else:
+                self.set_tag(self.subject, tagdef)
                 if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', subfile, tagdef)
-                        self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
-                        self.set_tag(subfile, tagdef, value)
+                        self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)
+                        self.set_tag(subfile, tagdef)
 
         if not self.referer:
             # set updated referer based on updated subject, unless client provided a referer
@@ -1108,50 +972,63 @@ class FileTags (Node):
         return self.dbtransact(self.put_body, self.put_postCommit)
 
     def delete_body(self, previewOnly=False):
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True)
+        subjpreds, origlistpreds, ordertags = self.path[-1]
+        
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
         if unique == False:
             versions = 'latest'
         else:
             # unique is True or None
             versions = 'any'
+
+        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set'] ] + origlistpreds
+
+        simplepath = [ x for x in self.path ]
+        simplepath[-1] = ( simplepath[-1][0], [], [] )
+        
+        self.path[-1] = (subjpreds, listpreds, ordertags)
          
-        results = self.select_files_by_predlist(listtags=[ pred.tag for pred in self.subjpreds]
-                                                + [self.tag_id, 'id', 'owner', 'write users', 'Image Set'],
-                                                versions=versions)
+        results = self.select_files_by_predlist_path(path, versions=versions)
         if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % self.subjpreds)
+            raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
         self.subjects = [ res for res in results ]
-
-        tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
-        if tagdef == None:
-            raise NotFound('tagdef="%s"' % self.tag_id)
-
-        if previewOnly:
-            return None
 
         # find subfiles of all subjects which are tagged Image Set
         path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
                  ( [], [web.Storage(tag='id',op=None,vals=[])], [] ) ]
-        self.subfiles = self.select_files_by_predlist_path(path=path)
+        self.subfiles = dict([ (res.id, res) for res in self.select_files_by_predlist_path(path=path) ])
 
-        for subject in self.subjects:
-            self.enforce_tag_authz('write', subject, tagdef)
-            self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=self.tag_id, value=self.value)
-            self.delete_tag(subject, tagdef, self.value)
+        for tag in set([pred.tag for pred in origlistpreds ]):
+            tagdef = self.globals['tagdefsdict'].get(tag, None)
+            if tagdef == None:
+                raise NotFound('tagdef="%s"' % tag)
+
+            if not previewOnly:
+                for subject in self.subjects:
+                    if tagdef.typestr == 'empty' or not subject[tag]:
+                        vals = [None]
+                    else:
+                        vals = subject[tag]
+
+                    self.enforce_tag_authz('write', subject, tagdef)
+                    self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=','.join(vals))
+                    for val in vals:
+                        self.delete_tag(subject, tagdef, val)
             
-        if self.tag_id in [ 'read users', 'write users' ]:
-            for subfile in subfiles:
-                self.enforce_tag_authz('write', subfile, tagdef)
-                self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=self.tag_id, value=self.value)
-                self.delete_tag(subfile, tagdef, self.value)
+                    if tag in [ 'read users', 'write users' ]:
+                        for subfile in subfiles:
+                            self.enforce_tag_authz('write', subfile, tagdef)
+                            self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=self.tag_id, value=','.join(vals))
+                            for val in vals:
+                                self.delete_tag(subfile, tagdef, val)
 
-        if not self.referer:
+        if not previewOnly and not self.referer:
             if len(self.subjects) == 1:
                 # set updated referer based on single match
                 self.referer = '/tags/' + self.subject2identifiers(self.subjects[0])[0]
             else:
                 # for multi-subject results, redirect to subjpreds, which may no longer work but never happens in GUI
-                self.referer = '/tags/' + predlist_linearize(self.subjpreds)
+                self.referer = '/tags/' + path_linearize(simplepath)
             
         return None
 
@@ -1160,25 +1037,7 @@ class FileTags (Node):
 
     def DELETE(self, uri):
         # RESTful delete of exactly one tag on 1 or more files...
-        keys = self.tagvals.keys()
-        if len(keys) == 1:
-            self.tag_id = keys[0]
-            vals = self.tagvals[self.tag_id]
-            if len(vals) == 1:
-                self.value = vals[0]
-            elif len(vals) > 1:
-                raise BadRequest(data="DELETE does not support multiple values in the URI.")
-        elif len(keys) > 1:
-            raise BadRequest(data="DELETE does not support multiple tag names in the URI.")
-
-        if self.tag_id == '':
-            raise BadRequest(data="A non-empty tag name is required.")
-        
         return self.dbtransact(self.delete_body, self.delete_postCommit)
-
-    def post_nullBody(self):
-        #web.debug('post_nullBody')
-        return None
 
     def post_postCommit(self, results):
         raise web.seeother(self.referer)
@@ -1186,8 +1045,13 @@ class FileTags (Node):
     def POST(self, uri):
         # simulate RESTful actions and provide helpful web pages to browsers
         storage = web.input()
+
+        subjpreds, listpreds, ordertags = self.path[-1]
+        listpreds = [ x for x in listpreds ]
+        
         try:
             action = storage.action
+            tagvals = dict()
             for key in storage.keys():
                 if key[0:4] == 'set-':
                     tag_id = key[4:]
@@ -1195,18 +1059,10 @@ class FileTags (Node):
                         value = storage['val-%s' % (tag_id)]
                     except:
                         value = None
-                    self.tagvals[urlunquote(tag_id)] = [ value ]
-            try:
-                # look for single tag/value for backwards compatibility
-                self.tag_id = storage.tag
-                try:
-                    self.value = storage.value
-                except:
-                    pass
-                if self.tag_id:
-                    self.tagvals[self.tag_id] = [ self.value ]
-            except:
-                pass
+                    tagvals[urlunquote(tag_id)] = [ value ]
+
+            for tag, vals in tagvals.items():
+                listpreds.append( web.Storage(tag=tag, op='=', vals=vals) )
             try:
                 self.referer = storage.referer
             except:
@@ -1214,12 +1070,10 @@ class FileTags (Node):
         except:
             raise BadRequest(data="Error extracting form data.")
 
+        self.path[-1] = (subjpreds, listpreds, ordertags)
+
         if action == 'put':
-            if len(self.tagvals) > 0:
-                #web.debug(self.tagvals)
-                return self.dbtransact(self.put_body, self.post_postCommit)
-            else:
-                return self.dbtransact(self.post_nullBody, self.post_postCommit)
+            return self.dbtransact(self.put_body, self.post_postCommit)
         elif action == 'delete':
             return self.dbtransact(self.delete_body, self.post_postCommit)
         else:
@@ -1287,15 +1141,6 @@ class Query (Node):
         except:
             pass
 
-        versions = self.queryopts.get('versions')
-        if versions not in [ 'latest', 'any' ]:
-            versions = 'latest'
-
-        if versions == 'any':
-            self.showversions = True
-        else:
-            self.showversions = False
-                
         if op == '':
             op = None
 
@@ -1321,74 +1166,35 @@ class Query (Node):
             subjpreds, listtags, ordertags = self.path[-1]
             self.path[-1] = (self.subjpreds, listtags, ordertags)
 
-        self.globals['queryTarget'] = self.qtarget()
-        self.globals['showVersions'] = self.showversions
-            
         def body():
-            writetags = None
 
-            builtinlist = [ 'id',
-                            'file',
-                            'name',
-                            'version',
-                            'tagdef',
-                            'typedef',
-                            'config',
-                            'view',
-                            'Image Set',
-                            'write users',
-                            'modified' ]
-            
-            subjpreds, listpreds, ordertags = self.path[-1]
-
-            if not listpreds:
-                listtags = self.queryopts.get('list', [])
-            
-                if type(listtags) == type('text'):
-                    listtags = [ x for x in listtags.split(',') if x ]
-                    
-                if len(listtags) == 0:
-                    view = self.select_view(self.globals['view'])
-                    listtags = view['file list tags']
-                    writetags = view['file list tags write']
-
-                listtags = [ 'id' ] + [ x for x in listtags if x != 'id' ]
-                listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
-            else:
-                listtags = [ 'id' ] + [ x for x in set([ pred.tag for pred in listpreds ]) if x != 'id' ]
-
-            listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in builtinlist ]
+            path, listtags, writetags, self.limit, self.versions = \
+                  self.prepare_path_query(self.path,
+                                          list_priority=['path', 'list', 'view', 'default'],
+                                          list_prefix='file',
+                                          extra_tags=[ 'id', 'file','name', 'version','Image Set',
+                                                       'tagdef', 'typedef', 'config', 'view',
+                                                       'write users', 'modified' ])
 
             self.globals['filelisttags'] = listtags
             self.globals['filelisttagswrite'] = writetags
 
-            self.path[-1] = subjpreds, listpreds, ordertags
-
-            self.limit = self.queryopts.get('limit', 25)
-            if self.limit == 'none':
-                self.limit = None
-            elif type(self.limit) == type('text'):
-                try:
-                    self.limit = int(self.limit)
-                except:
-                    self.limit = 25
-
-            return self.select_files_by_predlist_path(path=self.path, versions=versions, limit=self.limit)
+            return self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit)
 
         def postCommit(files):
-            listtags = self.globals['filelisttags']
-            if 'name' not in listtags:
-                addName = True
+            if self.versions == 'any':
+                self.showversions = True
             else:
-                addName = False
-
-            jsonMungeTags = set( [ tagname for tagname in listtags
+                self.showversions = False
+            
+            self.globals['showVersions'] = self.showversions
+            self.globals['queryTarget'] = self.qtarget()
+                
+            jsonMungeTags = set( [ tagname for tagname in self.globals['filelisttags']
                                    if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
 
             def jsonFile(file):
                 tagvals = [ ( tag, file[tag] ) for tag in listtags ]
-                if addName:
-                    tagvals.append( ( 'name', file.name ) )
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
                     tagvals[tagname] = str(tagvals[tagname])
