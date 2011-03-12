@@ -283,7 +283,7 @@ def p_queryopts_grow_set(p):
     if p[0].has_key(p[3]):
         v = p[0][p[3]]
         if type(v) != set:
-            p[0][p[3]] = v
+            p[0][p[3]] = set([ v ])
         v.update(p[5])
     else:
         p[0][p[3]] = p[5]

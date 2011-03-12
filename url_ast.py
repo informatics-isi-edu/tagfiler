@@ -1176,7 +1176,7 @@ class Query (Node):
                                                        'tagdef', 'typedef', 'config', 'view',
                                                        'write users', 'modified' ])
 
-            self.globals['filelisttags'] = self.listtags
+            self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
             self.globals['filelisttagswrite'] = writetags
 
             return self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit)
