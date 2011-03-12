@@ -1293,7 +1293,7 @@ class Application:
     def select_tag(self, subject, tagdef, value=None):
         # subject would not be found if read of subject is not OK
         if tagdef.readok == False or (tagdef.readok == None and subject.owner not in self.authn.roles):
-            raise Forbidden('read access to /tags/"%s"/%s' % (self.subject2identifiers(subject)[0], tagdef.tagname))
+            raise Forbidden('read access to /tags/%s(%s)' % (self.subject2identifiers(subject)[0], tagdef.tagname))
         return self.select_tag_noauthn(subject, tagdef, value)
 
     def gettagvals(self, subject, tagdef):
