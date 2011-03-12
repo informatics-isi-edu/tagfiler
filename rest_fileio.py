@@ -999,9 +999,9 @@ class FileIO (Application):
 
         def preDeletePostCommit(ftype):
             self.globals['datapred'] = path_linearize(self.path)[1:]
-            names = [ '"%s"' % self.subject2identifiers(s)[2] for s in self.subjects ]
+            names = [ '%s' % self.subject2identifiers(s)[2] for s in self.subjects ]
             if len(names) > 1:
-                self.globals['dataname'] = ', '.join(names[0:-1]) + ' and ' + names[-1]
+                self.globals['dataname'] = '<br/>'.join(names)
             else:
                 self.globals['dataname'] = names[0]
             return self.renderlist("Delete Confirmation",
