@@ -1168,7 +1168,7 @@ class Query (Node):
 
         def body():
 
-            path, listtags, writetags, self.limit, self.versions = \
+            path, self.listtags, writetags, self.limit, self.versions = \
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
@@ -1176,7 +1176,7 @@ class Query (Node):
                                                        'tagdef', 'typedef', 'config', 'view',
                                                        'write users', 'modified' ])
 
-            self.globals['filelisttags'] = listtags
+            self.globals['filelisttags'] = self.listtags
             self.globals['filelisttagswrite'] = writetags
 
             return self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit)
@@ -1194,7 +1194,7 @@ class Query (Node):
                                    if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
 
             def jsonFile(file):
-                tagvals = [ ( tag, file[tag] ) for tag in listtags ]
+                tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
                     tagvals[tagname] = str(tagvals[tagname])
