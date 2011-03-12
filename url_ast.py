@@ -1219,7 +1219,7 @@ class Query (Node):
                         return
                     elif acceptType == 'application/json':
                         yield '['
-                        if files:
+                        if len(files) > 0:
                             yield jsonFile(files[0]) + '\n'
                         if len(files) > 1:
                             for i in range(1,len(files)):
