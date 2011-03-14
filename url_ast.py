@@ -806,7 +806,7 @@ class FileTags (Node):
 
             if try_default_view and subject.dtype:
                 view = self.select_view(subject.dtype)
-                if view['tag list tags']:
+                if view and view['tag list tags']:
                     self.listtags = view['tag list tags']
 
         length = 0
@@ -862,13 +862,15 @@ class FileTags (Node):
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = simplepath[-1][0], [], []
+
+        tagdefs = [ x for x in all if x.tagname in self.listtags ]
             
         if len(files) == 1:
             return self.renderlist('Tag(s) for subject matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
-                                   [self.render.FileTagExisting('', files[0], all)])
+                                   [self.render.FileTagExisting('', files[0], tagdefs)])
         else:
             return self.renderlist('Tag(s) for subjects matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
-                                   [self.render.FileTagValExisting('', files, all)])
+                                   [self.render.FileTagValExisting('', files, tagdefs)])
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
