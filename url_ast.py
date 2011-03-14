@@ -1215,7 +1215,7 @@ class Query (Node):
             self.setNoCache()
 
             if self.action in set(['add', 'delete']):
-                raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % versions )
+                raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )
 
             if self.title == None:
                 if self.action == 'query':
