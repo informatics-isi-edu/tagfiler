@@ -754,6 +754,18 @@ class FileTags (Node):
         self.referer = None
         self.queryopts = queryopts
         self.globals['queryTarget'] = self.qtarget()
+        self.globals['queryAllTags'] = self.qAllTags()
+
+    def qAllTags(self):
+        if self.queryopts.get('view') == 'default':
+            return None
+
+        url = self.config['home'] + web.ctx.homepath + '/tags' + path_linearize(self.path)
+        opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() if k != 'view' ])
+        url += '?view=default'
+        if opts:
+            url += opts
+        return url
 
     def qtarget(self):
         if self.queryopts.get('view') == 'default':
@@ -852,10 +864,10 @@ class FileTags (Node):
         simplepath[-1] = simplepath[-1][0], [], []
             
         if len(files) == 1:
-            return self.renderlist('Tag(s) for subject matching "%s"' % path_linearize(simplepath),
+            return self.renderlist('Tag(s) for subject matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
                                    [self.render.FileTagExisting('', files[0], all)])
         else:
-            return self.renderlist('Tag(s) for subjects matching "%s"' % path_linearize(simplepath),
+            return self.renderlist('Tag(s) for subjects matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
                                    [self.render.FileTagValExisting('', files, all)])
 
     def GET(self, uri=None):
