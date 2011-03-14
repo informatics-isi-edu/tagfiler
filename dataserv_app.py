@@ -237,35 +237,36 @@ class Application:
         
         if pred == None:
             pred = web.Storage(tag='config', op='=', vals=['tagfiler'])
-            if params_and_defaults == None:
-                params_and_defaults = [ ('applet custom properties', []),
-                                        ('applet test properties', []),
-                                        ('applet test log', None),
-                                        ('bugs', None),
-                                        ('chunk bytes', 64 * 1024),
-                                        ('client chunk bytes', 4194304),
-                                        ('client connections', 2),
-                                        ('client download chunks', False),
-                                        ('client socket buffer size', 8192),
-                                        ('client upload chunks', False),
-                                        ('contact', None),
-                                        ('file list tags', []),
-                                        ('file list tags write', []),
-                                        ('file write users', []),
-                                        ('help', None),
-                                        ('home', 'https://%s' % self.hostname),
-                                        ('local files immutable', False),
-                                        ('log path', '/var/www/%s-logs' % self.daemonuser),
-                                        ('policy remappings', []),
-                                        ('remote files immutable', False),
-                                        ('store path', '/var/www/%s-data' % self.daemonuser),
-                                        ('subtitle', ''),
-                                        ('logo', ''),
-                                        ('tag list tags', []),
-                                        ('tagdef write users', []),
-                                        ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
-                                        ('webauthn home', None),
-                                        ('webauthn require', 'False') ]
+
+        if params_and_defaults == None:
+            params_and_defaults = [ ('applet custom properties', []),
+                                    ('applet test properties', []),
+                                    ('applet test log', None),
+                                    ('bugs', None),
+                                    ('chunk bytes', 64 * 1024),
+                                    ('client chunk bytes', 4194304),
+                                    ('client connections', 2),
+                                    ('client download chunks', False),
+                                    ('client socket buffer size', 8192),
+                                    ('client upload chunks', False),
+                                    ('contact', None),
+                                    ('file list tags', []),
+                                    ('file list tags write', []),
+                                    ('file write users', []),
+                                    ('help', None),
+                                    ('home', 'https://%s' % self.hostname),
+                                    ('local files immutable', False),
+                                    ('log path', '/var/www/%s-logs' % self.daemonuser),
+                                    ('policy remappings', []),
+                                    ('remote files immutable', False),
+                                    ('store path', '/var/www/%s-data' % self.daemonuser),
+                                    ('subtitle', ''),
+                                    ('logo', ''),
+                                    ('tag list tags', []),
+                                    ('tagdef write users', []),
+                                    ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
+                                    ('webauthn home', None),
+                                    ('webauthn require', 'False') ]
 
         results = self.select_files_by_predlist(subjpreds=[pred],
                                                 listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag ],
@@ -273,12 +274,9 @@ class Application:
         if len(results) == 1:
             config = results[0]
             #web.debug(config)
+        elif not fake_missing:
+            return None
         else:
-            #len(results) > 1:
-            #web.debug('select_config("%s", "%s"): returning default due to %d subject matches' % (pred, params_and_defaults, len(results)))
-
-            if not fake_missing:
-                return None
             config = web.Storage(params_and_defaults)
 
         for key, default in params_and_defaults:
