@@ -995,6 +995,9 @@ class FileIO (Application):
             else:
                 ftype = self.subject.dtype
                 
+            if not ftype:
+                ftype = 'blank'
+                
             return ftype
 
         def preDeletePostCommit(ftype):
