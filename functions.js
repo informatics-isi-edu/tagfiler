@@ -519,6 +519,44 @@ function resetDatasetName() {
 }
 
 /**
+ * Delete a dataset and all its contains
+ * dataname = the dataset name (predicate)
+ * url = the URL to POST the request
+ */
+function deleteAll(dataname, url) {
+	var answer = confirm ('Do you want to delete the dataset "' + dataname + '" with all its content?');
+	if (!answer) {
+		return;
+	}
+	ajax_client.open("POST", url+'/', true);
+	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
+	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
+	var params = 'action=ConfirmDelete&referer='+window.location;
+	ajax_client.onreadystatechange = function() {
+		if(ajax_client.readyState == 4) {
+			ajax_client.open("POST", url, true);
+			ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
+			ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
+			ajax_client.onreadystatechange = processDeleteAll;
+			ajax_client.send(params);
+			return;
+		}
+	}
+	ajax_client.send(params);
+}
+
+function processDeleteAll() {
+	if(ajax_client.readyState == 4) {
+		if(ajax_client.status == 200) {
+			window.location.reload(true);
+		} else {
+			var err = ajax_client.getResponseHeader('X-Error-Description');
+			alert(err != null ? unescape(err) : ajax_client.responseText);
+		}
+	}
+}
+
+/**
  * Method "contains" for the Array object
  * returns true if an element is in the array, and false otherwise
  */
@@ -642,12 +680,15 @@ var warn_window = null;
 var until = null;
 var width = 0;
 var hasSize = false;
+var ajax_client = null;
 
 if(window.ActiveXObject) {
   ajax_request = new ActiveXObject("Microsoft.XMLHTTP");
+  ajax_client = new ActiveXObject("Microsoft.XMLHTTP");
 }
 else if(window.XMLHttpRequest) {
   ajax_request = new XMLHttpRequest();
+  ajax_client = new XMLHttpRequest();
 }
 
 if(ajax_request) {
