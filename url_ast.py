@@ -779,7 +779,7 @@ class FileTags (Node):
 
     def get_body(self):
 
-        self.path, self.listtags, writetags, self.limit, self.versions = \
+        self.path_modified, self.listtags, writetags, self.limit, self.versions = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'all'],
                                       list_prefix='tag',
@@ -787,7 +787,7 @@ class FileTags (Node):
                                                    'tagdef', 'typedef', 'config', 'view',
                                                    'write users', 'modified' ])
 
-        self.txlog('GET TAGS', dataset=path_linearize(self.path))
+        self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
         
         if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
             try_default_view = True
@@ -797,9 +797,9 @@ class FileTags (Node):
         all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        files = [ file for file in self.select_files_by_predlist_path(self.path, versions=self.versions, limit=self.limit)  ]
+        files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
         if len(files) == 0:
-            raise NotFound('subject matching "%s"' % predlist_linearize(self.path[-1][0]))
+            raise NotFound('subject matching "%s"' % predlist_linearize(self.path_modified[-1][0]))
         elif len(files) == 1:
             subject = files[0]
             datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
@@ -903,10 +903,11 @@ class FileTags (Node):
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
+
+        self.path_modified = [ x for x in self.path ]
+        self.path_modified[-1] = (subjpreds, listpreds, ordertags)
         
-        self.path[-1] = (subjpreds, listpreds, ordertags)
-        
-        results = self.select_files_by_predlist_path(self.path, versions=versions)
+        results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
         elif len(results) > 1:
@@ -999,10 +1000,11 @@ class FileTags (Node):
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
-        
-        self.path[-1] = (subjpreds, listpreds, ordertags)
+
+        self.path_modified = [ x for x in self.path ]
+        self.path_modified[-1] = (subjpreds, listpreds, ordertags)
          
-        results = self.select_files_by_predlist_path(self.path, versions=versions)
+        results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
         self.subjects = [ res for res in results ]
