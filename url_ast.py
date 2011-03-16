@@ -1026,7 +1026,7 @@ class FileTags (Node):
                     elif tagdef.multivalue:
                         vals = subject[tag]
                     else:
-                        vals = [subject.tag]
+                        vals = [subject[tag]]
                     web.debug('subject',subject,'vals',vals)
                     self.enforce_tag_authz('write', subject, tagdef)
                     self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=','.join(vals))
@@ -1077,13 +1077,13 @@ class FileTags (Node):
                         vals = [ storage['val-%s' % (tag_id)] ]
                     except:
                         vals = []
-                    tagvals[urlunquote(tag_id)] = [ value ]
+                    tagvals[urlunquote(tag_id)] = vals
                 elif key == 'tag':
                     try:
                         vals = [ storage.val ]
                     except:
                         vals = []
-                    tagvals[storage.tag] = [ vals ]
+                    tagvals[storage.tag] = vals
                     
             for tag, vals in tagvals.items():
                 listpreds.append( web.Storage(tag=tag, op='=', vals=vals) )
@@ -1092,6 +1092,9 @@ class FileTags (Node):
             except:
                 self.referer = None
         except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception during filetags form post parsing',
+                      traceback.format_exception(et, ev, tb))
             raise BadRequest(data="Error extracting form data.")
 
         self.path[-1] = (subjpreds, listpreds, ordertags)
