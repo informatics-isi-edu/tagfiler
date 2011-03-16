@@ -1002,16 +1002,18 @@ class FileTags (Node):
         
         self.path[-1] = (subjpreds, listpreds, ordertags)
          
-        results = self.select_files_by_predlist_path(path, versions=versions)
+        results = self.select_files_by_predlist_path(self.path, versions=versions)
         if len(results) == 0:
             raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
         self.subjects = [ res for res in results ]
+        web.debug('self.subjects',self.subjects)
 
         # find subfiles of all subjects which are tagged Image Set
         path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
                  ( [], [web.Storage(tag='id',op=None,vals=[])], [] ) ]
         self.subfiles = dict([ (res.id, res) for res in self.select_files_by_predlist_path(path=path) ])
 
+        web.debug('origlistpreds',origlistpreds)
         for tag in set([pred.tag for pred in origlistpreds ]):
             tagdef = self.globals['tagdefsdict'].get(tag, None)
             if tagdef == None:
@@ -1021,9 +1023,11 @@ class FileTags (Node):
                 for subject in self.subjects:
                     if tagdef.typestr == 'empty' or not subject[tag]:
                         vals = [None]
-                    else:
+                    elif tagdef.multivalue:
                         vals = subject[tag]
-
+                    else:
+                        vals = [subject.tag]
+                    web.debug('subject',subject,'vals',vals)
                     self.enforce_tag_authz('write', subject, tagdef)
                     self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=','.join(vals))
                     for val in vals:
@@ -1070,11 +1074,17 @@ class FileTags (Node):
                 if key[0:4] == 'set-':
                     tag_id = key[4:]
                     try:
-                        value = storage['val-%s' % (tag_id)]
+                        vals = [ storage['val-%s' % (tag_id)] ]
                     except:
-                        value = None
+                        vals = []
                     tagvals[urlunquote(tag_id)] = [ value ]
-
+                elif key == 'tag':
+                    try:
+                        vals = [ storage.val ]
+                    except:
+                        vals = []
+                    tagvals[storage.tag] = [ vals ]
+                    
             for tag, vals in tagvals.items():
                 listpreds.append( web.Storage(tag=tag, op='=', vals=vals) )
             try:
