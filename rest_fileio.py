@@ -614,6 +614,8 @@ class FileIO (Application):
             if newfile.url:
                 self.set_tag(newfile, self.globals['tagdefsdict']['url'], newfile.url)
             if self.key:
+                if basefile:
+                    self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
