@@ -811,9 +811,10 @@ class Application:
                             raise IntegrityError(data=error)
                     except (IOError), te:
                         t.rollback()
+                        error = str(te)
                         if count > limit:
                             self.logException('too many retries during transaction body')
-                            raise RuntimeError(data=str(te))
+                            raise RuntimeError(data=error)
                         # else fall through to retry...
                     except:
                         t.rollback()
