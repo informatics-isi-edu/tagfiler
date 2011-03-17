@@ -249,7 +249,6 @@ class Application:
                                     ('client download chunks', False),
                                     ('client socket buffer size', 8192),
                                     ('client retry count', 10),
-                                    ('client retry interval', 10),
                                     ('client upload chunks', False),
                                     ('contact', None),
                                     ('file list tags', []),
@@ -402,7 +401,6 @@ class Application:
                            ('_cfg_client download chunks', 'empty', False, 'file', False),
                            ('_cfg_client socket buffer size', 'int8', False, 'file', False),
                            ('_cfg_client retry count', 'int8', False, 'file', False),
-                           ('_cfg_client retry interval', 'int8', False, 'file', False),
                            ('_cfg_client upload chunks', 'empty', False, 'file', False),
                            ('_cfg_contact', 'text', False, 'file', False),
                            ('_cfg_file list tags', 'tagname', True, 'file', False),
@@ -481,7 +479,6 @@ class Application:
         self.globals['clientDownloadChunks'] = self.config['client download chunks']
         self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
         self.globals['clientRetryCount'] = self.config['client retry count']
-        self.globals['clientRetryInterval'] = self.config['client retry interval']
         
         # END: get runtime parameters from database
 
