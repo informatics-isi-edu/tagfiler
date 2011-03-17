@@ -525,6 +525,8 @@ cfgtagdef 'client connections' int8 ""      file        file       false
 cfgtagdef 'client upload chunks' empty ""   file        file       false
 cfgtagdef 'client download chunks' empty "" file        file       false
 cfgtagdef 'client socket buffer size' int8 "" file      file       false
+cfgtagdef 'client retry count' int8 "" file      file       false
+cfgtagdef 'client retry interval' int8 "" file      file       false
 cfgtagdef 'client chunk bytes' int8 ""      file        file       false
 cfgtagdef 'applet tags' text        ""      file        file       true       tagname
 cfgtagdef 'applet tags require' text ""     file        file       true       tagname
@@ -552,6 +554,8 @@ cfgtag "client connections" int8 '4'
 cfgtag "client upload chunks"
 cfgtag "client download chunks"
 cfgtag "client socket buffer size" int8 '8192'
+cfgtag "client retry count" int8 '10'
+cfgtag "client retry interval" int8 '10'
 cfgtag "client chunk bytes" int8 '4194304'
 
 cfgtag "file write users" text "*" "admin"

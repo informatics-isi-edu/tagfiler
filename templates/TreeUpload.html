@@ -39,6 +39,10 @@ $#
 					<PARAM name="tagfiler.socket.buffer.size" value="${clientSocketBufferSize}"/>
 				$if clientChunkbytes:
 					<PARAM name="tagfiler.chunkbytes" value="${clientChunkbytes}"/>
+				$if clientRetryCount:
+					<PARAM name="tagfiler.retries" value="${clientRetryCount}"/>
+				$if clientRetryInterval:
+					<PARAM name="tagfiler.sleep.time" value="${clientRetryInterval}"/>
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
 				  Download JRE 1.5 for your system from the following link:</b><br/>
 				<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
