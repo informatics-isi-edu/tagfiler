@@ -667,6 +667,10 @@ function validateNameForm(op, suffix) {
 	return true;
 }
 
+function notifyFailure(err) {
+	alert(err);
+}
+
 var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;
