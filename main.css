@@ -35,6 +35,7 @@ table.file-tag-list {
 }
 .file-list, .file-heading, .file, .file-tag, .file-name, .file-update, .file-tags, .file-tag, .file-delete, .file-tag-list, .heading, table.tagdefs, tr.tagdef, tr.tagdef td, tr.heading th, tr.role td {
   border: 1px solid black;
+  white-space:nowrap;
 }
 .file-tag.multivalue {
   border-style: hidden;
