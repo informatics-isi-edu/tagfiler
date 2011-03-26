@@ -933,14 +933,14 @@ class FileTags (Node):
             if self.tagvals[tag_id]:
                 for value in self.tagvals[tag_id]:
                     self.set_tag(self.subject, tagdef, value)
-                    if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'slots' ]:
+                    if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ]:
                         for subfile in subfiles:
                             self.enforce_tag_authz('write', subfile, tagdef)
                             self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
                             self.set_tag(subfile, tagdef, value)
             else:
                 self.set_tag(self.subject, tagdef)
-                if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'slots' ]:
+                if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ]:
                     for subfile in subfiles:
                         self.enforce_tag_authz('write', subfile, tagdef)
                         self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)

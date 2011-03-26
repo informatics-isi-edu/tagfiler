@@ -65,7 +65,7 @@ $else:
 							<table class="table-border">
 								<tr>
 									<td id="ProgressBar">
-									$for i in 'Click "Update" to fill the form':
+									$for i in 'Click a "Submit" button to begin file download':
 										&nbsp;
 									</td>
 								</tr>
@@ -110,7 +110,7 @@ $else:
 					&nbsp;
 			</td>
 			<td>
-				<button type="button" name="Browse" id="Browse" disabled="disabled" onclick="downloadBrowse()" >Browse</button>
+				<button type="button" name="Browse" id="Browse" value="" disabled="disabled" onclick="downloadBrowse()" >Browse</button>
 			</td>
 		</tr>
 	</table>
@@ -121,7 +121,8 @@ $else:
 </div>
 <div>
 	<h3>Submit</h3>
-	<button type="button" name="Download Files" id="Download Files" disabled="disabled" onclick="downloadFiles()" >Download Files</button>
+	<button type="button" name="Download Files" id="Download Files" disabled="disabled" onclick="downloadFiles('all')" >Download Files</button>
+	<button type="button" name="Resume" id="Resume" disabled="disabled" onclick="downloadFiles('resume')" >Resume</button>
 </div>
 <div>
 	<h3>Study Tags</h3>

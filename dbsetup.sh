@@ -405,7 +405,7 @@ tagdef sha256sum      text        ""      anonymous   file       false
 tagdef contains       text        ""      file        file       true       file
 tagdef vcontains      text        ""      file        file       true       vfile
 tagdef key            text        ""      anonymous   file       false      ""         true
-tagdef slots          int8        ""      anonymous   file       true
+tagdef "check point offset" int8  ""      anonymous   file       false
 
 tagdef "list on homepage" empty   "${admin}"      anonymous   tag        false
 tagdef "homepage order" int8      "${admin}"      anonymous   tag        false

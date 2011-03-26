@@ -580,7 +580,7 @@ class FileIO (Application):
             self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
 
             for result in self.select_filetags_noauthn(basefile):
-                if result.tagname not in [ 'bytes', 'content-type', 'key', 'slots',
+                if result.tagname not in [ 'bytes', 'content-type', 'key', 'check point offset',
                                            'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
                                            'url', 'file', 'version created', 'version', 'vname' ] \
                                            and not self.globals['tagdefsdict'][result.tagname].unique:
