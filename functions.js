@@ -476,6 +476,13 @@ function setEnabled(id) {
 }
 
 /**
+ * Makes visible a button
+ */
+function setVisibility(id, value) {
+    document.getElementById(id).style.visibility = value;
+}
+
+/**
  * Select directory for upload
  */
 function uploadBrowse() {
