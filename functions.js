@@ -515,7 +515,7 @@ function getDatasetName() {
  */
 function enableUploadResume() {
 	if (document.getElementById('DatasetName Set').checked) {
-		document.getElementById('Resume').disabled = false;
+		document.getElementById('Resume').style.visibility = "visible";
 	}
 }
 
@@ -525,7 +525,7 @@ function enableUploadResume() {
 function setDatasetName() {
 	document.getElementById('TransmissionNumber').disabled = false;
 	if (document.getElementById("Browse").value.replace(/^\s*/, "").replace(/\s*$/, "").length > 0) {
-		document.getElementById('Resume').disabled = false;
+		document.getElementById('Resume').style.visibility = "visible";
 	}
 }
 
@@ -536,7 +536,7 @@ function resetDatasetName() {
 	var elem = document.getElementById('TransmissionNumber');
 	elem.disabled = true;
 	elem.value = "";
-	document.getElementById('Resume').disabled = true;
+	document.getElementById('Resume').style.visibility = "hidden";
 }
 
 /**
