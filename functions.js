@@ -549,6 +549,7 @@ function deleteAll(dataname, url) {
 	if (!answer) {
 		return;
 	}
+	document.body.style.cursor = "wait";
 	ajax_client.open("POST", url+'/', true);
 	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
@@ -574,6 +575,7 @@ function processDeleteAll() {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
 			alert(err != null ? unescape(err) : ajax_client.responseText);
 		}
+		document.body.style.cursor = "default";
 	}
 }
 
