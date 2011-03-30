@@ -1280,16 +1280,29 @@ class Application:
         self.db.query('DROP TABLE %s' % (self.wraptag(tagdef.tagname)))
 
     def select_tag_noauthn(self, subject, tagdef, value=None):
-        query = 'SELECT tag.* FROM %s AS tag' % self.wraptag(tagdef.tagname) \
-                + ' WHERE subject = $subject'
+        wheres = []
+        vars = dict()
+        if subject:
+            # subject can be set to None by caller to search all subjects
+            vars['subject'] = subject.id
+            wheres.append('subject = $subject')
+            
         if tagdef.typestr != 'empty' and value != None:
             if value == '':
-                query += ' AND tag.value IS NULL'
+                wheres.append('tag.value IS NULL')
             else:
-                query += ' AND tag.value = $value'
+                vars['value'] = value
+                wheres.append('tag.value = $value')
+
+        query = 'SELECT tag.* FROM %s AS tag' % self.wraptag(tagdef.tagname)
+
+        if wheres:
+            query += ' WHERE ' + ' AND '.join(wheres)
+
+        if tagdef.typestr != 'empty':
             query += '  ORDER BY value'
-        vars = dict(subject=subject.id, value=value)
-        #web.debug(query, vars)
+
+        web.debug(query, vars)
         return self.db.query(query, vars=vars)
 
     def select_tag(self, subject, tagdef, value=None):
@@ -1397,6 +1410,14 @@ class Application:
                 value = self.downcast_value(dbtype, value)
         except:
             raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
+
+        if tagdef.unique:
+            results = self.select_tag_noauthn(None, tagdef, value)
+            if len(results) > 0 and results[0].subject != subject.id:
+                if tagdef.typestr != 'empty':
+                    raise Conflict('Tag "%s" is defined as unique and value "%s" is already bound to another subject.' % (tagdef.tagname, value))
+                else:
+                    raise Conflict('Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
 
         if not tagdef.multivalue:
             results = self.select_tag_noauthn(subject, tagdef)
