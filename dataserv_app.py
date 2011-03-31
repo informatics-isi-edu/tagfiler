@@ -1305,7 +1305,7 @@ class Application:
         if tagdef.typestr != 'empty':
             query += '  ORDER BY value'
 
-        web.debug(query, vars)
+        #web.debug(query, vars)
         return self.db.query(query, vars=vars)
 
     def select_tag(self, subject, tagdef, value=None):
