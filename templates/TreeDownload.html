@@ -48,6 +48,8 @@ $else:
 					<PARAM name="tagfiler.socket.buffer.size" value="${clientSocketBufferSize}"/>
 				$if clientChunkbytes:
 					<PARAM name="tagfiler.chunkbytes" value="${clientChunkbytes}"/>
+				$if clientSocketTimeout:
+					<PARAM name="tagfiler.client.socket.timeout" value="${clientSocketTimeout}"/>
 				$if clientRetryCount:
 					<PARAM name="tagfiler.retries" value="${clientRetryCount}"/>
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.

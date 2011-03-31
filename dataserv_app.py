@@ -245,6 +245,7 @@ class Application:
                                     ('bugs', None),
                                     ('chunk bytes', 64 * 1024),
                                     ('client chunk bytes', 4194304),
+                                    ('client socket timeout', 120),
                                     ('client connections', 2),
                                     ('client download chunks', False),
                                     ('client socket buffer size', 8192),
@@ -397,6 +398,7 @@ class Application:
                            ('_cfg_bugs', 'text', False, 'file', False),
                            ('_cfg_chunk bytes', 'text', False, 'file', False),
                            ('_cfg_client chunk bytes', 'int8', False, 'file', False),
+                           ('_cfg_client socket timeout', 'int8', False, 'file', False),
                            ('_cfg_client connections', 'int8', False, 'file', False),
                            ('_cfg_client download chunks', 'empty', False, 'file', False),
                            ('_cfg_client socket buffer size', 'int8', False, 'file', False),
@@ -474,6 +476,7 @@ class Application:
         self.globals['appletLogfile'] = self.config['applet test log']
         self.globals['appletCustomProperties'] = self.config['applet custom properties']
         self.globals['clientChunkbytes'] = self.config['client chunk bytes']
+        self.globals['clientSocketTimeout'] = self.config['client socket timeout']
         self.globals['clientConnections'] = self.config['client connections']
         self.globals['clientUploadChunks'] = self.config['client upload chunks']
         self.globals['clientDownloadChunks'] = self.config['client download chunks']

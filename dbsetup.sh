@@ -528,6 +528,7 @@ cfgtagdef 'client download chunks' empty "" file        file       false
 cfgtagdef 'client socket buffer size' int8 "" file      file       false
 cfgtagdef 'client retry count' int8 "" file      file       false
 cfgtagdef 'client chunk bytes' int8 ""      file        file       false
+cfgtagdef 'client socket timeout' int8 ""      file        file       false
 cfgtagdef 'applet tags' text        ""      file        file       true       tagname
 cfgtagdef 'applet tags require' text ""     file        file       true       tagname
 cfgtagdef 'applet custom properties' text "" file       file       true
@@ -556,6 +557,7 @@ cfgtag "client download chunks"
 cfgtag "client socket buffer size" int8 '8192'
 cfgtag "client retry count" int8 '10'
 cfgtag "client chunk bytes" int8 '4194304'
+cfgtag "client socket timeout" int8 '120'
 
 cfgtag "file write users" text "*" "admin"
 cfgtag "tagdef write users" text "*" "admin"
