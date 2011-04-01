@@ -1277,6 +1277,8 @@ class Application:
 
     def delete_tagdef(self, tagdef):
         self.undeploy_tagdef(tagdef)
+        tagdef.name = None
+        tagdef.version = None
         self.delete_file( tagdef )
 
     def undeploy_tagdef(self, tagdef):
