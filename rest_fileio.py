@@ -150,7 +150,7 @@ class FileIO (Application):
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'content-type', 'bytes', 'url',
                                                                        'modified', 'modified by', 'name', 'version', 'Image Set',
-                                                                       'tagdef', 'typedef', 'config', 'view'] ]
+                                                                       'tagdef', 'typedef', 'config', 'view', 'immutable exempt'] ]
 
         querypath = [ x for x in self.path ]
 
@@ -758,7 +758,8 @@ class FileIO (Application):
                 raise Forbidden('access to file "%s"' % path_linearize(self.path))
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
-            self.enforce_file_authz_special('write', self.subject)
+            if not self.subject['immutable exempt']:
+                self.enforce_file_authz_special('write', self.subject)
             if self.update:
                 if self.unique:
                     if self.subject.dtype == 'file' and self.subject.file:
