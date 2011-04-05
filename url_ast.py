@@ -338,7 +338,7 @@ class FileList (Node):
             return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'id',
                                                                                                        'name', 'version',
                                                                                                        'tagdef', 'typedef',
-                                                                                                       'config', 'view'])),
+                                                                                                       'config', 'view', 'url'])),
                                                  ordertags=ordertags)
 
         def postCommit(files):
@@ -1199,7 +1199,7 @@ class Query (Node):
                                           list_prefix='file',
                                           extra_tags=[ 'id', 'file','name', 'version','Image Set',
                                                        'tagdef', 'typedef', 'config', 'view',
-                                                       'write users', 'modified' ])
+                                                       'write users', 'modified', 'url' ])
 
             self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
             self.globals['filelisttagswrite'] = writetags
