@@ -1078,7 +1078,7 @@ class FileTags (Node):
                     tagvals[urlunquote(tag_id)] = vals
                 elif key == 'tag':
                     try:
-                        vals = [ storage.val ]
+                        vals = [ storage.value ]
                     except:
                         vals = []
                     tagvals[storage.tag] = vals
