@@ -1097,13 +1097,16 @@ class FileIO (Application):
             elif self.action in [ 'put', 'putsq' , 'post' ]:
                 # we only support non-file PUT and POST simulation this way
                 self.url = get_param('url')
+                name = get_param('name')
+                if name:
+                    self.path.append( ( [web.Storage(tag='name', op='=', vals=[name])], [], [] ) )
                 self.dtype = None
                 if self.action in ['put', 'post']:
                     if self.url != None:
                         self.dtype = 'url'
                 elif self.action == 'putsq':
                     # add title=name queryopt for stored queries
-                    self.url = get_param('url', '/query') + '?title=%s' % get_param('name')
+                    self.url = get_param('url', '/query') + '?title=%s' % name
                        
                 return self.dbtransact(putBody, putPostCommit)
 
