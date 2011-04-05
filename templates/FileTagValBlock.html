@@ -61,7 +61,7 @@ $if tagdef.typestr != 'empty':
 		$for val in itervals:
 			<tr>
 			$ params['val'] = val
-			$if smartTagValues:
+			$if smartTagValues and tagdef.tagname not in browsersImmutableTags:
 				$:{render.TagValueForm(params)}
 				<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
 				$if tagdef.tagname in writetags and writeok:
@@ -70,11 +70,11 @@ $if tagdef.typestr != 'empty':
 			$else:
 				<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${val}</td>
 			</tr>
-	$if smartTagValues and tagdef.tagname in writetags and writeok:
+	$if smartTagValues and tagdef.tagname in writetags and writeok and tagdef.tagname not in browsersImmutableTags:
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:
-	$if smartTagValues:
+	$if smartTagValues and tagdef.tagname not in browsersImmutableTags:
 		$:{render.SetTagForm(params)}
 	$else:
-		${vals}
+		is ${not vals and "not" or ""} set
