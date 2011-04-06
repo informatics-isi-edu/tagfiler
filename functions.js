@@ -15,6 +15,11 @@
  */
 
 var expiration_warning = true;
+var extend_time = 0;
+
+function setExtendTime() {
+	extend_time = (new Date()).getTime();
+}
 
 function enableExpirationWarning() {
 	expiration_warning = true;
@@ -243,7 +248,7 @@ function processSessionRequest() {
 	  	startExtendSessionTimer(1000);
 	  	return;
 	  }
-	  if (!warn_window || warn_window.closed) {
+	  if (((new Date()).getTime() - extend_time) > (expiration_warn_mins * 60 * 1000) && (!warn_window || warn_window.closed)) {
 	      log("processSessionRequest: raising warning window");
 	      warn_window = (window.open(expiration_warn_url,
 					 warn_window_name,
