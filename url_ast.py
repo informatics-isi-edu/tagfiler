@@ -995,7 +995,7 @@ class FileTags (Node):
             # unique is True or None
             versions = 'any'
 
-        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'view'] ] + origlistpreds
+        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'view', 'name', 'version'] ] + origlistpreds
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
