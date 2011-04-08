@@ -1041,6 +1041,14 @@ class Application:
                 if len(val) > 0:
                     raise Forbidden(data='modification of the immutable url of the dataset "%s"' % self.subject2identifiers(subject)[0])
 
+    def test_one_shot_immutable_tag_authz(self, subject, tagdef):
+        """Check whether a single assignment is allowed."""
+        try:
+            self.enforce_one_shot_immutable_tag_authz(subject, tagdef)
+            return False
+        except:
+            return True
+
     def enforce_tagdef_authz(self, mode, tagdef):
         """Check whether access is allowed and throw web exception if not."""
         allow = self.test_tagdef_authz(mode, tagdef)
