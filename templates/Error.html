@@ -21,11 +21,14 @@ rict.dtd">
 <head>
   <meta content="text/html;charset=ISO-8859-1" http-equiv="Content-Type">
   <title>${status}</title>
+  <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
 </head>
 <body>
 <h1>${status}</h1>
 $if not data:
 	$ data = 'entity'
+<div class="error">
 <p>${desc % data}</p>
+</div>
 </body>
 </html>
