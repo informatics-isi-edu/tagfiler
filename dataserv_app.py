@@ -1026,6 +1026,20 @@ class Application:
             raise Forbidden(data=data)
         elif allow == None:
             raise Unauthorized(data=data)
+        self.enforce_one_shot_immutable_tag_authz(subject, tagdef)
+
+    def enforce_one_shot_immutable_tag_authz(self, subject, tagdef):
+        """Check whether a single assignment is allowed and throw web exception if not."""
+        if self.config['remote files immutable'] and tagdef.tagname == 'url':
+            dtype = self.classify_subject(subject)
+            if dtype == 'url':
+                if subject['Image Set']:
+                    # rewrite dtype for immutable files test
+                    dtype = 'file'
+            if dtype == 'url':
+                val = self.select_tag(subject, tagdef)
+                if len(val) > 0:
+                    raise Forbidden(data='modification of the immutable url of the dataset "%s"' % self.subject2identifiers(subject)[0])
 
     def enforce_tagdef_authz(self, mode, tagdef):
         """Check whether access is allowed and throw web exception if not."""
