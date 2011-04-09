@@ -610,12 +610,14 @@ class Application:
                 dstrole, readusers, writeusers = self.config['policy remappings'][srcrole]
                 #web.debug(self.remap)
                 #web.debug('remap:', self.remap[srcrole])
+                self.delete_tag(newfile, self.globals['tagdefsdict']['read users'])
                 for readuser in readusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
-                    self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=readuser)
+                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readuser))
+                self.delete_tag(newfile, self.globals['tagdefsdict']['write users'])
                 for writeuser in writeusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
-                    self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=writeuser)
+                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=','.join(writeuser))
                 if dstrole:
                     self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
