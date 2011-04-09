@@ -624,26 +624,6 @@ class FileIO (Application):
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
-        # try to apply tags provided by user as PUT/POST queryopts in URL
-        #    and tags constrained in subjpreds (only if creating new independent object)
-        # they all must work to complete transaction
-        tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
-
-        if self.mergeSubjpredsTags:
-            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.tag not in [ 'name', 'version' ] and pred.op == '=' ]
-
-        for tagname, values in tagvals:
-            tagdef = self.globals['tagdefsdict'].get(tagname, None)
-            if tagdef == None:
-                raise NotFound('tagdef="%s"' % tagname)
-            self.enforce_tag_authz('write', newfile, tagdef)
-            if tagdef.typestr == 'empty':
-                self.set_tag(newfile, tagdef)
-            else:
-                for value in values:
-                    self.set_tag(newfile, tagdef, value)
-            self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=values)
-
         if not basefile:
             # only remap on newly created files
             srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
@@ -672,6 +652,26 @@ class FileIO (Application):
                     raise
             elif len(srcroles) > 1:
                 raise Conflict("Ambiguous remap rules encountered.")
+
+        # try to apply tags provided by user as PUT/POST queryopts in URL
+        #    and tags constrained in subjpreds (only if creating new independent object)
+        # they all must work to complete transaction
+        tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
+
+        if self.mergeSubjpredsTags:
+            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.tag not in [ 'name', 'version' ] and pred.op == '=' ]
+
+        for tagname, values in tagvals:
+            tagdef = self.globals['tagdefsdict'].get(tagname, None)
+            if tagdef == None:
+                raise NotFound('tagdef="%s"' % tagname)
+            self.enforce_tag_authz('write', newfile, tagdef)
+            if tagdef.typestr == 'empty':
+                self.set_tag(newfile, tagdef)
+            else:
+                for value in values:
+                    self.set_tag(newfile, tagdef, value)
+            self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=values)
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
