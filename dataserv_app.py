@@ -601,6 +601,36 @@ class Application:
         if self.config['policy remappings'].has_key(srcrole):
             raise BadRequest('Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
+    def doPolicyRule(self, newfile):
+        srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
+        if len(srcroles) == 1 and newfile.owner == self.authn.role:
+            try:
+                t = self.db.transaction()
+                srcrole = srcroles.pop()
+                dstrole, readusers, writeusers = self.config['policy remappings'][srcrole]
+                #web.debug(self.remap)
+                #web.debug('remap:', self.remap[srcrole])
+                for readuser in readusers:
+                    self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
+                    self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=readuser)
+                for writeuser in writeusers:
+                    self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
+                    self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=writeuser)
+                if dstrole:
+                    self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
+                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
+                t.commit()
+            except:
+                et, ev, tb = sys.exc_info()
+                web.debug('got exception "%s" during owner remap attempt' % str(ev),
+                          traceback.format_exception(et, ev, tb))
+                t.rollback()
+                raise
+        elif len(srcroles) > 1:
+            raise Conflict("Ambiguous remap rules encountered.")
+        elif newfile.owner != self.authn.role:
+            raise Conflict('Unhandled policy mapping scenario: client "%s" != owner "%s".' % (self.authn.role, newfile.owner))
+
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
         if dataset:
@@ -1384,6 +1414,13 @@ class Application:
         else:
             wheres = ''
 
+        # special handling only if ending period of deferred policy remapping
+        fire_doPolicyRule = False
+        if tagdef.tagname == 'immutable exempt':
+            results = self.select_tag_noauthn(subject, tagdef)
+            if len(results) > 0:
+                fire_doPolicyRule = True
+
         query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres
         vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
         self.db.query(query, vars=vars)
@@ -1404,6 +1441,9 @@ class Application:
                 subject[tagdef.tagname] = None
         else:
             subject[tagdef.tagname ] = False
+
+        if fire_doPolicyRule:
+            self.doPolicyRule(subject)
             
     def downcast_value(self, dbtype, value):
         if dbtype == 'int8':

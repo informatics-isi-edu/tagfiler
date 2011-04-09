@@ -624,34 +624,9 @@ class FileIO (Application):
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
-        if not basefile:
-            # only remap on newly created files
-            srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
-            if len(srcroles) == 1:
-                try:
-                    t = self.db.transaction()
-                    srcrole = srcroles.pop()
-                    dstrole, readusers, writeusers = self.config['policy remappings'][srcrole]
-                    #web.debug(self.remap)
-                    #web.debug('remap:', self.remap[srcrole])
-                    for readuser in readusers:
-                        self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
-                        self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=readuser)
-                    for writeuser in writeusers:
-                        self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
-                        self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=writeuser)
-                    if dstrole:
-                        self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
-                    self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
-                    t.commit()
-                except:
-                    et, ev, tb = sys.exc_info()
-                    web.debug('got exception "%s" during owner remap attempt' % str(ev),
-                              traceback.format_exception(et, ev, tb))
-                    t.rollback()
-                    raise
-            elif len(srcroles) > 1:
-                raise Conflict("Ambiguous remap rules encountered.")
+        if not basefile and not self.queryopts.has_key('immutable exempt'):
+            # only remap on newly created files, when the user has not guarded for chunked upload
+            self.doPolicyRule(newfile)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         #    and tags constrained in subjpreds (only if creating new independent object)

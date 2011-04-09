@@ -385,7 +385,7 @@ tagdef 'typedef description' text   ""      anonymous   file       false
 tagdef 'typedef dbtype' text        ""      anonymous   file       false
 tagdef 'typedef values' text        ""      anonymous   file       true
 
-tagdef owner          text        ""      anonymous   fowner     false      role
+tagdef owner          text        ""      anonymous   tag        false      role
 tagdef created        timestamptz ""      anonymous   system     false
 tagdef "version created" timestamptz ""   anonymous   system     false
 tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
@@ -435,6 +435,8 @@ EOF
 
 tagacl "list on homepage" read "*"
 tagacl "list on homepage" write "${admin}"
+
+tagacl "owner" write "${admin}"
 
 tagacl "homepage order" read "*"
 tagacl "homepage order" write "${admin}"
