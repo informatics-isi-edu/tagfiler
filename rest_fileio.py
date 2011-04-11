@@ -95,7 +95,7 @@ def choose_content_type(clientval, guessedval, taggedval):
     return guessedval
 
 file_cache = dict()  # cache[(user, subjpreds)] = (ctime, fileresult)
-file_cache_time = 5 # maximum cache time in seconds
+file_cache_time = -1 # maximum cache time in seconds
 
 class FileIO (Application):
     """Basic bulk file I/O
