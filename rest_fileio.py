@@ -556,7 +556,8 @@ class FileIO (Application):
                                   file=self.file,
                                   owner=self.authn.role,
                                   writeok=True,
-                                  url=self.url)
+                                  url=self.url,
+                                  incomplete=False)
 
         else:
             # we are updating an existing (unique) object rather than inserting a new one
@@ -624,7 +625,7 @@ class FileIO (Application):
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
-        if not basefile and (not self.subject or not self.subject['incomplete']) and not self.queryopts.has_key('incomplete'):
+        if not basefile and not newfile['incomplete'] and not self.queryopts.has_key('incomplete'):
             # only remap on newly created files, when the user has not guarded for chunked upload
             self.doPolicyRule(newfile)
 
