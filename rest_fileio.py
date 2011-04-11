@@ -625,8 +625,10 @@ class FileIO (Application):
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
         if not basefile and not self.queryopts.has_key('incomplete'):
-            # only remap on newly created files, when the user has not guarded for chunked upload
-            self.doPolicyRule(newfile)
+            results = self.select_tag_noauthn(newfile, self.globals['tagdefsdict']['incomplete'])
+            if len(results) == 0:
+                # only remap on newly created files, when the user has not guarded for chunked upload
+                self.doPolicyRule(newfile)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         #    and tags constrained in subjpreds (only if creating new independent object)

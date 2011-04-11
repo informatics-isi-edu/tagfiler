@@ -603,7 +603,7 @@ class Application:
 
     def doPolicyRule(self, newfile):
         srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
-        if len(srcroles) == 1 and newfile.owner == self.authn.role:
+        if len(srcroles) == 1:
             try:
                 t = self.db.transaction()
                 srcrole = srcroles.pop()
@@ -630,8 +630,6 @@ class Application:
                 raise
         elif len(srcroles) > 1:
             raise Conflict("Ambiguous remap rules encountered.")
-        elif newfile.owner != self.authn.role:
-            raise Conflict('Unhandled policy mapping scenario: client "%s" != owner "%s".' % (self.authn.role, newfile.owner))
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
