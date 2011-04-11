@@ -482,7 +482,7 @@ class Application:
         self.globals['clientDownloadChunks'] = self.config['client download chunks']
         self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
         self.globals['clientRetryCount'] = self.config['client retry count']
-        self.globals['browsersImmutableTags'] = [ 'check point offset', 'immutable exempt', 'key', 'sha256sum' ]
+        self.globals['browsersImmutableTags'] = [ 'check point offset', 'incomplete', 'key', 'sha256sum' ]
         
         # END: get runtime parameters from database
 
@@ -1418,7 +1418,7 @@ class Application:
 
         # special handling only if ending period of deferred policy remapping
         fire_doPolicyRule = False
-        if tagdef.tagname == 'immutable exempt':
+        if tagdef.tagname == 'incomplete':
             results = self.select_tag_noauthn(subject, tagdef)
             if len(results) > 0:
                 fire_doPolicyRule = True

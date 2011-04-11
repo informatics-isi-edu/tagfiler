@@ -150,7 +150,7 @@ class FileIO (Application):
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'content-type', 'bytes', 'url',
                                                                        'modified', 'modified by', 'name', 'version', 'Image Set',
-                                                                       'tagdef', 'typedef', 'config', 'view', 'immutable exempt'] ]
+                                                                       'tagdef', 'typedef', 'config', 'view', 'incomplete'] ]
 
         querypath = [ x for x in self.path ]
 
@@ -473,11 +473,11 @@ class FileIO (Application):
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % path_linearize(self.path))
             # To allow upload in chunks and new versions in an immutable configuration:
-            # 1. We set in the first chunk the 'immutable exempt' tag.
-            # 2. We delete the 'immutable exempt' tag at the end of the upload.
-            # 3. We check in the queryopts for the presence of the 'immutable exempt' tag for files uploaded in a single chunk.
+            # 1. We set in the first chunk the 'incomplete' tag.
+            # 2. We delete the 'incomplete' tag at the end of the upload.
+            # 3. We check in the queryopts for the presence of the 'incomplete' tag for files uploaded in a single chunk.
             # 4. For new versions of a study, we check in the queryopts for the presence of the 'Image Set' tag.
-            if not self.subject['immutable exempt'] and 'immutable exempt' not in self.queryopts.keys() and 'Image Set' not in self.queryopts.keys():
+            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys() and 'Image Set' not in self.queryopts.keys():
                 self.enforce_file_authz_special('write', self.subject)
             self.newMatch = True
                 
@@ -624,7 +624,7 @@ class FileIO (Application):
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
-        if not basefile and not self.queryopts.has_key('immutable exempt'):
+        if not basefile and not self.queryopts.has_key('incomplete'):
             # only remap on newly created files, when the user has not guarded for chunked upload
             self.doPolicyRule(newfile)
 
@@ -740,10 +740,10 @@ class FileIO (Application):
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
             # To allow upload in chunks and new versions in an immutable configuration:
-            # 1. We set in the first chunk the 'immutable exempt' tag.
-            # 2. We delete the 'immutable exempt' tag at the end of the upload.
-            # 3. We check in the queryopts for the presence of the 'immutable exempt' tag for files uploaded in a single chunk.
-            if not self.subject['immutable exempt'] and 'immutable exempt' not in self.queryopts.keys():
+            # 1. We set in the first chunk the 'incomplete' tag.
+            # 2. We delete the 'incomplete' tag at the end of the upload.
+            # 3. We check in the queryopts for the presence of the 'incomplete' tag for files uploaded in a single chunk.
+            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys():
                 self.enforce_file_authz_special('write', self.subject)
             if self.update:
                 if self.unique:
