@@ -899,7 +899,7 @@ class FileTags (Node):
                 raise BadRequest('Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
             self.tagvals[pred.tag] = pred.vals
         
-        listpreds =  subjpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'owner', 'write users', 'Image Set', 'url'] ]
+        listpreds =  subjpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'owner', 'write users', 'Image Set', 'url', 'incomplete'] ]
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
@@ -928,7 +928,8 @@ class FileTags (Node):
             tagdef = self.globals['tagdefsdict'].get(tag_id, None)
             if tagdef == None:
                 raise NotFound(data='tag definition "%s"' % tag_id)
-            self.enforce_tag_authz('write', self.subject, tagdef)
+            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys():
+                self.enforce_tag_authz('write', self.subject, tagdef)
             self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
             if self.tagvals[tag_id]:
                 for value in self.tagvals[tag_id]:
@@ -996,7 +997,7 @@ class FileTags (Node):
             # unique is True or None
             versions = 'any'
 
-        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'view', 'name', 'version'] ] + origlistpreds
+        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'view', 'name', 'version', 'incomplete'] ] + origlistpreds
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
@@ -1027,7 +1028,8 @@ class FileTags (Node):
                         vals = subject[tag]
                     else:
                         vals = [subject[tag]]
-                    self.enforce_tag_authz('write', subject, tagdef)
+                    if not subject['incomplete'] and 'incomplete' not in self.queryopts.keys():
+                        self.enforce_tag_authz('write', subject, tagdef)
                     self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
                     for val in vals:
                         self.delete_tag(subject, tagdef, val)
