@@ -657,6 +657,10 @@ function validateNameForm(op, suffix) {
 		}
 		if (document.getElementById('write users'+suffix).value == '*') {
 			action += prefix + 'write%20users=*';
+			prefix = '&'
+		}
+		if (document.getElementById('incomplete'+suffix).checked) {
+			action += prefix + 'incomplete';
 		}
 		document.NameForm.setAttribute('action', action);
 	}

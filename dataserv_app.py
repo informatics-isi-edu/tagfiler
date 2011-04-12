@@ -482,7 +482,7 @@ class Application:
         self.globals['clientDownloadChunks'] = self.config['client download chunks']
         self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
         self.globals['clientRetryCount'] = self.config['client retry count']
-        self.globals['browsersImmutableTags'] = [ 'check point offset', 'incomplete', 'key', 'sha256sum' ]
+        self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
         
         # END: get runtime parameters from database
 
