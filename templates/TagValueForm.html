@@ -45,7 +45,7 @@ $else:
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
 		</td>
-		$if filerecord.writeok and (dtype == 'file' and not config['local files immutable'] or dtype != 'file' and not config['remote files immutable']):
+		$if filerecord.writeok:
 			<td>
 			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
 			    <div>

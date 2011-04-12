@@ -257,10 +257,8 @@ class Application:
                                     ('file write users', []),
                                     ('help', None),
                                     ('home', 'https://%s' % self.hostname),
-                                    ('local files immutable', False),
                                     ('log path', '/var/www/%s-logs' % self.daemonuser),
                                     ('policy remappings', []),
-                                    ('remote files immutable', False),
                                     ('store path', '/var/www/%s-data' % self.daemonuser),
                                     ('subtitle', ''),
                                     ('logo', ''),
@@ -410,11 +408,9 @@ class Application:
                            ('_cfg_file write users', 'rolepat', True, 'file', False),
                            ('_cfg_help', 'text', False, 'file', False),
                            ('_cfg_home', 'text', False, 'file', False),
-                           ('_cfg_local files immutable', 'empty', False, 'file', False),
                            ('_cfg_log path', 'text', False, 'file', False),
                            ('_cfg_logo', 'text', False, 'file', False),
                            ('_cfg_policy remappings', 'text', True, 'file', False),
-                           ('_cfg_remote files immutable', 'empty', False, 'file', False),
                            ('_cfg_store path', 'text', False, 'file', False),
                            ('_cfg_subtitle', 'text', False, 'file', False),
                            ('_cfg_tag list tags', 'tagname', True, 'file', False),
@@ -966,20 +962,6 @@ class Application:
         else:
             raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
 
-    def enforce_file_authz_special(self, mode, subject):
-        if mode == 'read':
-            # special rules only affect write mode
-            return
-
-        dtype = self.classify_subject(subject)
-        if dtype == 'url':
-            if subject['Image Set']:
-                # rewrite dtype for immutable files test
-                dtype = 'file'
-
-        if dtype == 'file' and self.config['local files immutable'] or dtype == 'url' and self.config['remote files immutable']:
-            raise Forbidden(data='modification of immutable dataset "%s"' % self.subject2identifiers(subject)[0])
-    
     def test_file_authz(self, mode, subject):
         """Check whether access is allowed to user given mode and owner.
 
@@ -987,12 +969,6 @@ class Application:
            False: access forbidden
            None: user needs to authenticate to be sure"""
         status = web.ctx.status
-        try:
-            self.enforce_file_authz_special(mode, subject)
-        except:
-            # if special rules are violated, treat like unauthorized
-            web.ctx.status = status
-            return False
 
         # read is authorized or subject would not be found
         if subject['write users'] == None:
@@ -1038,9 +1014,6 @@ class Application:
 
     def enforce_file_authz(self, mode, subject):
         """Check whether access is allowed and throw web exception if not."""
-        # enforce these early, so they can throw more specific exceptions
-        self.enforce_file_authz_special(mode, subject)
-            
         allow = self.test_file_authz(mode, subject)
         data = '%s of dataset "%s"' % self.subject2identifiers(subject)[0]
         if allow == False:
@@ -1056,28 +1029,6 @@ class Application:
             raise Forbidden(data=data)
         elif allow == None:
             raise Unauthorized(data=data)
-        self.enforce_one_shot_immutable_tag_authz(subject, tagdef)
-
-    def enforce_one_shot_immutable_tag_authz(self, subject, tagdef):
-        """Check whether a single assignment is allowed and throw web exception if not."""
-        if self.config['remote files immutable'] and tagdef.tagname == 'url':
-            dtype = self.classify_subject(subject)
-            if dtype == 'url':
-                if subject['Image Set']:
-                    # rewrite dtype for immutable files test
-                    dtype = 'file'
-            if dtype == 'url':
-                val = self.select_tag(subject, tagdef)
-                if len(val) > 0:
-                    raise Forbidden(data='modification of the immutable url of the dataset "%s"' % self.subject2identifiers(subject)[0])
-
-    def test_one_shot_immutable_tag_authz(self, subject, tagdef):
-        """Check whether a single assignment is allowed."""
-        try:
-            self.enforce_one_shot_immutable_tag_authz(subject, tagdef)
-            return False
-        except:
-            return True
 
     def enforce_tagdef_authz(self, mode, tagdef):
         """Check whether access is allowed and throw web exception if not."""

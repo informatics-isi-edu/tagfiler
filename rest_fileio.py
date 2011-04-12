@@ -414,7 +414,6 @@ class FileIO (Application):
         for subject in self.subjects:
             if not subject.writeok:
                 raise Forbidden('delete of dataset "%s"' % self.subject2identifiers(subject)[2])
-            self.enforce_file_authz_special('write', subject)
             self.delete_file(subject)
             self.txlog('DELETE', dataset=self.subject2identifiers(subject)[2])
         return (self.subjects)
@@ -472,13 +471,6 @@ class FileIO (Application):
             self.populate_subject(allow_blank=allow_blank, enforce_parent=True, post_method=post_method)
             if not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % path_linearize(self.path))
-            # To allow upload in chunks and new versions in an immutable configuration:
-            # 1. We set in the first chunk the 'incomplete' tag.
-            # 2. We delete the 'incomplete' tag at the end of the upload.
-            # 3. We check in the queryopts for the presence of the 'incomplete' tag for files uploaded in a single chunk.
-            # 4. For new versions of a study, we check in the queryopts for the presence of the 'Image Set' tag.
-            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys() and 'Image Set' not in self.queryopts.keys():
-                self.enforce_file_authz_special('write', self.subject)
             self.newMatch = True
                 
         except NotFound:
@@ -740,12 +732,6 @@ class FileIO (Application):
                 raise Forbidden('access to file "%s"' % path_linearize(self.path))
             if not self.subject.writeok: 
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
-            # To allow upload in chunks and new versions in an immutable configuration:
-            # 1. We set in the first chunk the 'incomplete' tag.
-            # 2. We delete the 'incomplete' tag at the end of the upload.
-            # 3. We check in the queryopts for the presence of the 'incomplete' tag for files uploaded in a single chunk.
-            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys():
-                self.enforce_file_authz_special('write', self.subject)
             if self.update:
                 if self.unique:
                     if self.subject.dtype == 'file' and self.subject.file:
@@ -974,7 +960,6 @@ class FileIO (Application):
             self.populate_subject(allow_blank=True, allow_multiple=True)
             if not self.subject.writeok:
                 raise Forbidden('delete of dataset "%s"' % path_linearize(self.path))
-            self.enforce_file_authz_special('write', self.subject)
             
             if self.subject.dtype == 'url':
                 if self.subject['Image Set']:

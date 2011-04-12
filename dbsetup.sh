@@ -517,8 +517,6 @@ cfgtagdef 'store path'  text        ""      file        file       false
 cfgtagdef 'log path'    text        ""      file        file       false
 cfgtagdef 'template path' text      ""      file        file       false
 cfgtagdef 'chunk bytes' int8        ""      file        file       false
-cfgtagdef 'local files immutable' empty ""  file        file       false
-cfgtagdef 'remote files immutable' empty "" file        file       false
 cfgtagdef 'policy remappings' text  ""      file        file       true
 cfgtagdef subtitle      text        ""      file        file       false
 cfgtagdef logo          text        ""      file        file       false
@@ -571,9 +569,6 @@ cfgtag "file list tags" text bytes owner 'read users' 'write users'
 #cfgtag "applet tags" text ...
 #cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'
-
-#cfgtag "local files immutable"
-#cfgtag "remote files immutable"
 
 tagdeftags=$(dataset "tagdef" view "${admin}" "*")
 for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"

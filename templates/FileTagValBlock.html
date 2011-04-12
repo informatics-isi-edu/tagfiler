@@ -57,12 +57,11 @@ $				 writeok=writeok,
 $				 showversions=showversions)
 $if tagdef.typestr != 'empty':
 	<table class="file-tag-list">
-	$ oneShot = queryOneShotTags(file, tagdef)
 	$if len(itervals) > 0:
 		$for val in itervals:
 			<tr>
 			$ params['val'] = val
-			$if smartTagValues and tagdef.tagname not in browsersImmutableTags and not oneShot:
+			$if smartTagValues and tagdef.tagname not in browsersImmutableTags:
 				$:{render.TagValueForm(params)}
 				<td class="file-tag ${idquote(tagdef.tagname)} multivalue delete">
 				$if tagdef.tagname in writetags and writeok:
@@ -74,7 +73,7 @@ $if tagdef.typestr != 'empty':
 				$else:
 					<td class="file-tag ${idquote(tagdef.tagname)} multivalue">${val}</td>
 			</tr>
-	$if smartTagValues and tagdef.tagname in writetags and writeok and tagdef.tagname not in browsersImmutableTags and not oneShot:
+	$if smartTagValues and tagdef.tagname in writetags and writeok and tagdef.tagname not in browsersImmutableTags:
 		$:{render.SetTagValueForm(params)}
 	</table>
 $else:

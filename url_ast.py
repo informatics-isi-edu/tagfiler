@@ -754,7 +754,6 @@ class FileTags (Node):
         self.queryopts = queryopts
         self.globals['queryTarget'] = self.qtarget()
         self.globals['queryAllTags'] = self.qAllTags()
-        self.globals['queryOneShotTags'] = self.test_one_shot_immutable_tag_authz
 
     def qAllTags(self):
         if self.queryopts.get('view') == 'default':
@@ -1116,7 +1115,6 @@ class Query (Node):
         self.queryopts = queryopts
         self.action = 'query'
         self.globals['view'] = None
-        self.globals['queryOneShotTags'] = self.test_one_shot_immutable_tag_authz
 
     def qtarget(self):
         qpath = []
