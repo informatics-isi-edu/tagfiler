@@ -39,6 +39,8 @@ $else:
 	$if tagname == 'id':
 		$ putpred, dataid, dataname, dtype =  subject2identifiers(filerecord, False)
 		$ datapred, dataid, dataname, dtype = subject2identifiers(filerecord, showversions)
+		$if filerecord.get('Image Set', False):
+			$ dtype = 'file'
 		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
