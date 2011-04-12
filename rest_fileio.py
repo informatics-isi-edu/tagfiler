@@ -470,7 +470,7 @@ class FileIO (Application):
         status = web.ctx.status
         try:
             self.populate_subject(allow_blank=allow_blank, enforce_parent=True, post_method=post_method)
-            if not self.subject.writeok:
+            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys() and not self.subject.writeok:
                 raise Forbidden('write to file "%s"' % path_linearize(self.path))
             # To allow upload in chunks and new versions in an immutable configuration:
             # 1. We set in the first chunk the 'incomplete' tag.
@@ -641,7 +641,8 @@ class FileIO (Application):
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
                 raise NotFound('tagdef="%s"' % tagname)
-            self.enforce_tag_authz('write', newfile, tagdef)
+            if not newfile['incomplete'] and not self.queryopts.has_key('incomplete'):
+                self.enforce_tag_authz('write', newfile, tagdef)
             if tagdef.typestr == 'empty':
                 self.set_tag(newfile, tagdef)
             else:
@@ -738,7 +739,7 @@ class FileIO (Application):
             self.populate_subject(enforce_read_authz=False)
             if not self.subject.readok:
                 raise Forbidden('access to file "%s"' % path_linearize(self.path))
-            if not self.subject.writeok:
+            if not self.subject['incomplete'] and 'incomplete' not in self.queryopts.keys() and not self.subject.writeok: 
                 raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
             # To allow upload in chunks and new versions in an immutable configuration:
             # 1. We set in the first chunk the 'incomplete' tag.
