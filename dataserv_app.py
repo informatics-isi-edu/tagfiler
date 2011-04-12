@@ -613,11 +613,11 @@ class Application:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['read users'])
                 for readuser in readusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
-                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readuser))
+                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readusers))
                 self.delete_tag(newfile, self.globals['tagdefsdict']['write users'])
                 for writeuser in writeusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
-                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=','.join(writeuser))
+                self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=','.join(writeusers))
                 if dstrole:
                     self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
