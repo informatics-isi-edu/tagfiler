@@ -225,7 +225,7 @@ tagdef_tags()
    # policy is one of:
    #   anonymous  -- any client can access
    #   users  -- any authenticated user can access
-   #   file  -- file access rule is observed for tag access
+   #   subject  -- subject access rule is observed for tag access
    #   fowner  -- only file owner can access
    #   tag -- tag access rule is observed for tag access
    #   system  -- no client can access
@@ -364,11 +364,11 @@ typedef()
 
 tagdef 'id'           int8        ""      anonymous   system     false      ""         true
 tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
-tagdef 'typedef'      text        ""      anonymous   file       false      ""         true
-tagdef 'config'       text        ""      anonymous   file       false      ""         true
-tagdef 'view'         text        ""      anonymous   file       false      ""         true
+tagdef 'typedef'      text        ""      anonymous   subject       false      ""         true
+tagdef 'config'       text        ""      anonymous   subject       false      ""         true
+tagdef 'view'         text        ""      anonymous   subject       false      ""         true
 
-tagdef 'default view' text        ""      file        file       false      viewname
+tagdef 'default view' text        ""      subject        subject       false      viewname
 
 tagdef 'tagdef type'  text        ""      anonymous   system     false      type
 tagdef 'tagdef unique' empty      ""      anonymous   system     false      ""
@@ -381,9 +381,9 @@ tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagp
 tagdef 'tag read users'      text ""      anonymous   fowner     true       rolepat
 tagdef 'tag write users'     text ""      anonymous   fowner     true       rolepat
 
-tagdef 'typedef description' text   ""      anonymous   file       false
-tagdef 'typedef dbtype' text        ""      anonymous   file       false
-tagdef 'typedef values' text        ""      anonymous   file       true
+tagdef 'typedef description' text   ""      anonymous   subject       false
+tagdef 'typedef dbtype' text        ""      anonymous   subject       false
+tagdef 'typedef values' text        ""      anonymous   subject       true
 
 tagdef owner          text        ""      anonymous   tag        false      role
 tagdef created        timestamptz ""      anonymous   system     false
@@ -398,19 +398,19 @@ tagdef name           text        ""      anonymous   system     false
 tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
 tagdef vname          text        ""      anonymous   system     false      ""         true
 tagdef file           text        ""      system      system     false      ""         true
-tagdef url            text        ""      file        file     false      url
-tagdef content-type   text        ""      anonymous   file       false
-tagdef sha256sum      text        ""      anonymous   file       false
+tagdef url            text        ""      subject        subject     false      url
+tagdef content-type   text        ""      anonymous   subject       false
+tagdef sha256sum      text        ""      anonymous   subject       false
 
-tagdef contains       text        ""      file        file       true       file
-tagdef vcontains      text        ""      file        file       true       vfile
-tagdef key            text        ""      anonymous   file       false      ""         true
-tagdef "check point offset" int8  ""      anonymous   file       false
-tagdef "incomplete" empty  ""      anonymous   file       false
+tagdef contains       text        ""      subject        subject       true       file
+tagdef vcontains      text        ""      subject        subject       true       vfile
+tagdef key            text        ""      anonymous   subject       false      ""         true
+tagdef "check point offset" int8  ""      anonymous   subject       false
+tagdef "incomplete" empty  ""      anonymous   subject       false
 
 tagdef "list on homepage" empty   "${admin}"      anonymous   tag        false
 tagdef "homepage order" int8      "${admin}"      anonymous   tag        false
-tagdef "Image Set"    empty       "${admin}"   file   file       false
+tagdef "Image Set"    empty       "${admin}"   subject   subject       false
 
 psql -q -t <<EOF
 CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
@@ -482,7 +482,7 @@ typedef id           int8          'Dataset ID'
 typedef file         text          'Dataset name'
 typedef vfile        text          'Dataset name with version number'
 
-typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'file Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
+typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
 
 typedef type         text          'Scalar value type'
 typedef viewname     text          'View name'
@@ -501,40 +501,40 @@ cfgtagdef()
 #      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
 
 # file list tags MUST BE DEFINED FIRST
-cfgtagdef 'file list tags' text     ""      file        file       true       tagname
+cfgtagdef 'file list tags' text     ""      subject        subject       true       tagname
 # tag list tags MUST BE DEFINED NEXT...
-cfgtagdef 'tag list tags' text      ""      file        file       true       tagname
+cfgtagdef 'tag list tags' text      ""      subject        subject       true       tagname
 # THEN, need to do this manually to break dependency loop
 tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
-cfgtagdef 'file list tags write' text ""    file        file       true       tagname
-cfgtagdef 'tagdef write users' text ""      file        file       true       rolepat
-cfgtagdef 'file write users' text   ""      file        file       true       rolepat
-cfgtagdef home          text        ""      file        file       false
-cfgtagdef 'webauthn home' text      ""      file        file       false
-cfgtagdef 'webauthn require' empty  ""      file        file       false
-cfgtagdef 'store path'  text        ""      file        file       false
-cfgtagdef 'log path'    text        ""      file        file       false
-cfgtagdef 'template path' text      ""      file        file       false
-cfgtagdef 'chunk bytes' int8        ""      file        file       false
-cfgtagdef 'policy remappings' text  ""      file        file       true
-cfgtagdef subtitle      text        ""      file        file       false
-cfgtagdef logo          text        ""      file        file       false
-cfgtagdef contact       text        ""      file        file       false
-cfgtagdef help          text        ""      file        file       false
-cfgtagdef bugs          text        ""      file        file       false
-cfgtagdef 'client connections' int8 ""      file        file       false
-cfgtagdef 'client upload chunks' empty ""   file        file       false
-cfgtagdef 'client download chunks' empty "" file        file       false
-cfgtagdef 'client socket buffer size' int8 "" file      file       false
-cfgtagdef 'client retry count' int8 "" file      file       false
-cfgtagdef 'client chunk bytes' int8 ""      file        file       false
-cfgtagdef 'client socket timeout' int8 ""      file        file       false
-cfgtagdef 'applet tags' text        ""      file        file       true       tagname
-cfgtagdef 'applet tags require' text ""     file        file       true       tagname
-cfgtagdef 'applet custom properties' text "" file       file       true
-cfgtagdef 'applet test log' text    ""      file        file       false
-cfgtagdef 'applet test properties' text ""  file        file       true
+cfgtagdef 'file list tags write' text ""    subject        subject       true       tagname
+cfgtagdef 'tagdef write users' text ""      subject        subject       true       rolepat
+cfgtagdef 'file write users' text   ""      subject        subject       true       rolepat
+cfgtagdef home          text        ""      subject        subject       false
+cfgtagdef 'webauthn home' text      ""      subject        subject       false
+cfgtagdef 'webauthn require' empty  ""      subject        subject       false
+cfgtagdef 'store path'  text        ""      subject        subject       false
+cfgtagdef 'log path'    text        ""      subject        subject       false
+cfgtagdef 'template path' text      ""      subject        subject       false
+cfgtagdef 'chunk bytes' int8        ""      subject        subject       false
+cfgtagdef 'policy remappings' text  ""      subject        subject       true
+cfgtagdef subtitle      text        ""      subject        subject       false
+cfgtagdef logo          text        ""      subject        subject       false
+cfgtagdef contact       text        ""      subject        subject       false
+cfgtagdef help          text        ""      subject        subject       false
+cfgtagdef bugs          text        ""      subject        subject       false
+cfgtagdef 'client connections' int8 ""      subject        subject       false
+cfgtagdef 'client upload chunks' empty ""   subject        subject       false
+cfgtagdef 'client download chunks' empty "" subject        subject       false
+cfgtagdef 'client socket buffer size' int8 "" subject      subject       false
+cfgtagdef 'client retry count' int8 "" subject      subject       false
+cfgtagdef 'client chunk bytes' int8 ""      subject        subject       false
+cfgtagdef 'client socket timeout' int8 ""      subject        subject       false
+cfgtagdef 'applet tags' text        ""      subject        subject       true       tagname
+cfgtagdef 'applet tags require' text ""     subject        subject       true       tagname
+cfgtagdef 'applet custom properties' text "" subject       subject       true
+cfgtagdef 'applet test log' text    ""      subject        subject       false
+cfgtagdef 'applet test properties' text ""  subject        subject       true
 
 cfgtag()
 {

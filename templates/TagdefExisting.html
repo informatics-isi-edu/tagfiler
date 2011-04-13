@@ -46,13 +46,13 @@ $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config[
 	<option value="true">0 or more</option>
 	</select></td>
 	<td>N/A</td>
-	$ policies = dict(anonymous='anyone', users='only authenticated users', file='only clients who can access file', fowner='only owner of file', tag='only clients in tagdef ACL')
+	$ policies = dict(anonymous='anyone', users='only authenticated users', subject='only clients who can access subject', fowner='only owner of file', tag='only clients in tagdef ACL')
 	<td><select name="readpolicy-1">
-	$for pol in ['anonymous', 'users', 'file', 'fowner', 'tag']:
+	$for pol in ['anonymous', 'users', 'subject', 'fowner', 'tag']:
 		<option value="${pol}">${policies[pol]}</option>
 	</select></td>
 	<td><select name="writepolicy-1">
-	$for pol in ['users', 'anonymous', 'file', 'fowner', 'tag']:
+	$for pol in ['users', 'anonymous', 'subject', 'fowner', 'tag']:
 		<option value="${pol}">${policies[pol]}</option>
 	</select>
 	<input type="hidden" name="action" value="add" />

@@ -366,7 +366,7 @@ class Application:
         # static representation of important tagdefs
         self.static_tagdefs = []
         # -- the system tagdefs needed by the select_files_by_predlist call we make below
-        for prototype in [ ('config', 'text', False, 'file', True),
+        for prototype in [ ('config', 'text', False, 'subject', True),
                            ('id', 'int8', False, 'system', True),
                            ('tagdef', 'text', False, 'system', True),
                            ('tagdef type', 'type', False, 'system', False),
@@ -377,10 +377,10 @@ class Application:
                            ('tagdef unique', 'empty', False, 'system', False),
                            ('tag read users', 'rolepat', True, 'fowner', False),
                            ('tag write users', 'rolepat', True, 'fowner', False),
-                           ('typedef', 'text', False, 'file', True),
-                           ('typedef description', 'text', False, 'file', False),
-                           ('typedef dbtype', 'text', False, 'file', False),
-                           ('typedef values', 'text', True, 'file', False),
+                           ('typedef', 'text', False, 'subject', True),
+                           ('typedef description', 'text', False, 'subject', False),
+                           ('typedef dbtype', 'text', False, 'subject', False),
+                           ('typedef values', 'text', True, 'subject', False),
                            ('read users', 'rolepat', True, 'fowner', False),
                            ('write users', 'rolepat', True, 'fowner', False),
                            ('owner', 'role', False, 'fowner', False),
@@ -388,36 +388,36 @@ class Application:
                            ('name', 'text', False, 'system', False),
                            ('version', 'int8', False, 'system', False),
                            ('latest with name', 'text', False, 'system', True),
-                           ('_cfg_applet custom properties', 'text', True, 'file', False),
-                           ('_cfg_applet tags', 'tagname', True, 'file', False),
-                           ('_cfg_applet tags require', 'tagname', True, 'file', False),
-                           ('_cfg_applet test log', 'text', False, 'file', False),
-                           ('_cfg_applet test properties', 'text', True, 'file', False),
-                           ('_cfg_bugs', 'text', False, 'file', False),
-                           ('_cfg_chunk bytes', 'text', False, 'file', False),
-                           ('_cfg_client chunk bytes', 'int8', False, 'file', False),
-                           ('_cfg_client socket timeout', 'int8', False, 'file', False),
-                           ('_cfg_client connections', 'int8', False, 'file', False),
-                           ('_cfg_client download chunks', 'empty', False, 'file', False),
-                           ('_cfg_client socket buffer size', 'int8', False, 'file', False),
-                           ('_cfg_client retry count', 'int8', False, 'file', False),
-                           ('_cfg_client upload chunks', 'empty', False, 'file', False),
-                           ('_cfg_contact', 'text', False, 'file', False),
-                           ('_cfg_file list tags', 'tagname', True, 'file', False),
-                           ('_cfg_file list tags write', 'tagname', True, 'file', False),
-                           ('_cfg_file write users', 'rolepat', True, 'file', False),
-                           ('_cfg_help', 'text', False, 'file', False),
-                           ('_cfg_home', 'text', False, 'file', False),
-                           ('_cfg_log path', 'text', False, 'file', False),
-                           ('_cfg_logo', 'text', False, 'file', False),
-                           ('_cfg_policy remappings', 'text', True, 'file', False),
-                           ('_cfg_store path', 'text', False, 'file', False),
-                           ('_cfg_subtitle', 'text', False, 'file', False),
-                           ('_cfg_tag list tags', 'tagname', True, 'file', False),
-                           ('_cfg_tagdef write users', 'rolepat', True, 'file', False),
-                           ('_cfg_template path', 'text', False, 'file', False),
-                           ('_cfg_webauthn home', 'text', False, 'file', False),
-                           ('_cfg_webauthn require', 'empty', False, 'file', False) ]:
+                           ('_cfg_applet custom properties', 'text', True, 'subject', False),
+                           ('_cfg_applet tags', 'tagname', True, 'subject', False),
+                           ('_cfg_applet tags require', 'tagname', True, 'subject', False),
+                           ('_cfg_applet test log', 'text', False, 'subject', False),
+                           ('_cfg_applet test properties', 'text', True, 'subject', False),
+                           ('_cfg_bugs', 'text', False, 'subject', False),
+                           ('_cfg_chunk bytes', 'text', False, 'subject', False),
+                           ('_cfg_client chunk bytes', 'int8', False, 'subject', False),
+                           ('_cfg_client socket timeout', 'int8', False, 'subject', False),
+                           ('_cfg_client connections', 'int8', False, 'subject', False),
+                           ('_cfg_client download chunks', 'empty', False, 'subject', False),
+                           ('_cfg_client socket buffer size', 'int8', False, 'subject', False),
+                           ('_cfg_client retry count', 'int8', False, 'subject', False),
+                           ('_cfg_client upload chunks', 'empty', False, 'subject', False),
+                           ('_cfg_contact', 'text', False, 'subject', False),
+                           ('_cfg_file list tags', 'tagname', True, 'subject', False),
+                           ('_cfg_file list tags write', 'tagname', True, 'subject', False),
+                           ('_cfg_file write users', 'rolepat', True, 'subject', False),
+                           ('_cfg_help', 'text', False, 'subject', False),
+                           ('_cfg_home', 'text', False, 'subject', False),
+                           ('_cfg_log path', 'text', False, 'subject', False),
+                           ('_cfg_logo', 'text', False, 'subject', False),
+                           ('_cfg_policy remappings', 'text', True, 'subject', False),
+                           ('_cfg_store path', 'text', False, 'subject', False),
+                           ('_cfg_subtitle', 'text', False, 'subject', False),
+                           ('_cfg_tag list tags', 'tagname', True, 'subject', False),
+                           ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
+                           ('_cfg_template path', 'text', False, 'subject', False),
+                           ('_cfg_webauthn home', 'text', False, 'subject', False),
+                           ('_cfg_webauthn require', 'empty', False, 'subject', False) ]:
             deftagname, typestr, multivalue, writepolicy, unique = prototype
             self.static_tagdefs.append(web.Storage(tagname=deftagname,
                                                    owner=None,
@@ -994,7 +994,7 @@ class Application:
         if tagdef[mode + 'ok']:
             return True
         elif tagdef[mode + 'ok'] == None:
-            if tagdef[mode + 'policy'] == 'file' and dict(read=True, write=subject.writeok)[mode]:
+            if tagdef[mode + 'policy'] == 'subject' and dict(read=True, write=subject.writeok)[mode]:
                 return True
             elif tagdef[mode + 'policy']  == 'fowner' and subject.owner in self.authn.roles:
                 return True
@@ -1184,7 +1184,7 @@ class Application:
                 policy = tagdef['%spolicy' % mode]
                 if policy == 'system':
                     return False
-                elif policy in [ 'fowner', 'file' ]:
+                elif policy in [ 'fowner', 'subject' ]:
                     return None
                 elif policy == 'tag':
                     return tagdef.owner in self.authn.roles \

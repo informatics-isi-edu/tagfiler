@@ -41,7 +41,7 @@ $if file['write users'] == None:
 $if writeok == None:
 	$if tagdef.writepolicy == 'fowner':
 		$ writeok = file.owner in authn.roles
-	$elif tagdef.writepolicy == 'file':
+	$elif tagdef.writepolicy == 'subject':
 		$ writeok = file.owner in authn.roles or len( set(authn.roles).intersection(set(file['write users'])) ) > 0
 $ options = tagOptions(tagdef.tagname, itervals)
 $ params = dict( filerecord=file,
