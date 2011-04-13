@@ -622,13 +622,13 @@ class Tagdef (Node):
             try:
                 self.readpolicy = self.queryopts['readpolicy'].lower()
             except:
-                self.readpolicy = 'fowner'
+                self.readpolicy = 'subjectowner'
 
         if self.writepolicy == None:
             try:
                 self.writepolicy = self.queryopts['writepolicy'].lower()
             except:
-                self.writepolicy = 'fowner'
+                self.writepolicy = 'subjectowner'
 
         if self.multivalue == None:
             try:

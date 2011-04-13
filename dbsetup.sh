@@ -226,7 +226,7 @@ tagdef_tags()
    #   anonymous  -- any client can access
    #   users  -- any authenticated user can access
    #   subject  -- subject access rule is observed for tag access
-   #   fowner  -- only file owner can access
+   #   subjectowner  -- only subject owner can access
    #   tag -- tag access rule is observed for tag access
    #   system  -- no client can access
 
@@ -378,8 +378,8 @@ tagdef 'tagdef active'      empty ""      anonymous   system     false
 tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
 tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
 
-tagdef 'tag read users'      text ""      anonymous   fowner     true       rolepat
-tagdef 'tag write users'     text ""      anonymous   fowner     true       rolepat
+tagdef 'tag read users'      text ""      anonymous   subjectowner     true       rolepat
+tagdef 'tag write users'     text ""      anonymous   subjectowner     true       rolepat
 
 tagdef 'typedef description' text   ""      anonymous   subject       false
 tagdef 'typedef dbtype' text        ""      anonymous   subject       false
@@ -388,8 +388,8 @@ tagdef 'typedef values' text        ""      anonymous   subject       true
 tagdef owner          text        ""      anonymous   tag        false      role
 tagdef created        timestamptz ""      anonymous   system     false
 tagdef "version created" timestamptz ""   anonymous   system     false
-tagdef "read users"   text        ""      anonymous   fowner     true       rolepat
-tagdef "write users"  text        ""      anonymous   fowner     true       rolepat
+tagdef "read users"   text        ""      anonymous   subjectowner     true       rolepat
+tagdef "write users"  text        ""      anonymous   subjectowner     true       rolepat
 tagdef "modified by"  text        ""      anonymous   system     false      role
 tagdef modified       timestamptz ""      anonymous   system     false
 tagdef bytes          int8        ""      anonymous   system     false
@@ -482,7 +482,7 @@ typedef id           int8          'Dataset ID'
 typedef file         text          'Dataset name'
 typedef vfile        text          'Dataset name with version number'
 
-typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'fowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
+typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
 
 typedef type         text          'Scalar value type'
 typedef viewname     text          'View name'

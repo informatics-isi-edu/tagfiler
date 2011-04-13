@@ -375,15 +375,15 @@ class Application:
                            ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
                            ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
                            ('tagdef unique', 'empty', False, 'system', False),
-                           ('tag read users', 'rolepat', True, 'fowner', False),
-                           ('tag write users', 'rolepat', True, 'fowner', False),
+                           ('tag read users', 'rolepat', True, 'subjectowner', False),
+                           ('tag write users', 'rolepat', True, 'subjectowner', False),
                            ('typedef', 'text', False, 'subject', True),
                            ('typedef description', 'text', False, 'subject', False),
                            ('typedef dbtype', 'text', False, 'subject', False),
                            ('typedef values', 'text', True, 'subject', False),
-                           ('read users', 'rolepat', True, 'fowner', False),
-                           ('write users', 'rolepat', True, 'fowner', False),
-                           ('owner', 'role', False, 'fowner', False),
+                           ('read users', 'rolepat', True, 'subjectowner', False),
+                           ('write users', 'rolepat', True, 'subjectowner', False),
+                           ('owner', 'role', False, 'subjectowner', False),
                            ('modified', 'timestamptz', False, 'system', False),
                            ('name', 'text', False, 'system', False),
                            ('version', 'int8', False, 'system', False),
@@ -996,7 +996,7 @@ class Application:
         elif tagdef[mode + 'ok'] == None:
             if tagdef[mode + 'policy'] == 'subject' and dict(read=True, write=subject.writeok)[mode]:
                 return True
-            elif tagdef[mode + 'policy']  == 'fowner' and subject.owner in self.authn.roles:
+            elif tagdef[mode + 'policy']  == 'subjectowner' and subject.owner in self.authn.roles:
                 return True
         if self.authn == None:
             return None
@@ -1184,7 +1184,7 @@ class Application:
                 policy = tagdef['%spolicy' % mode]
                 if policy == 'system':
                     return False
-                elif policy in [ 'fowner', 'subject' ]:
+                elif policy in [ 'subjectowner', 'subject' ]:
                     return None
                 elif policy == 'tag':
                     return tagdef.owner in self.authn.roles \
@@ -1560,7 +1560,7 @@ class Application:
         wheres = []
         values = dict()
 
-        need_fowner_test = False
+        need_subjectowner_test = False
 
         with_prefix = 'WITH rawroles (role) AS ( VALUES %s )' % ','.join(["('%s')" % dbquote(role) for role in roles] + [ '( NULL )'])
         with_prefix += ', roles (role) AS ( SELECT role FROM rawroles WHERE role IS NOT NULL ) '
@@ -1580,7 +1580,7 @@ class Application:
                 if tagdef.readok == False and enforce_read_authz:
                     # this tag cannot be read so act like it is absent
                     wheres.append('True')
-                elif tagdef.readpolicy == 'fowner' and enforce_read_authz:
+                elif tagdef.readpolicy == 'subjectowner' and enforce_read_authz:
                     # this tag rule is more restrictive than file or static checks already done
                     # act like it is NULL if user isn't allowed to read this tag
                     outertables_special.append( 'roles AS ownerrole_%d ON (_owner.value = ownerrole_%d.role)' % (p, p) )
@@ -1602,9 +1602,9 @@ class Application:
                     # this predicate is conjunctive with access denial
                     wheres.append('False')
                 else:
-                    if tagdef.readpolicy == 'fowner' and enforce_read_authz:
+                    if tagdef.readpolicy == 'subjectowner' and enforce_read_authz:
                         # this predicate is conjunctive with more restrictive access check, which we only need to add once
-                        need_fowner_test = True
+                        need_subjectowner_test = True
                                     
                     if tag != 'id':
                         innertables.append((self.wraptag(tag), 't%s' % p))
@@ -1622,8 +1622,8 @@ class Application:
 
         outertables_special.append( 'roles AS readerrole ON ("_read users".value = readerrole.role)' )
         if enforce_read_authz:
-            if need_fowner_test:
-                # at least one predicate test requires fowner-based read access rights
+            if need_subjectowner_test:
+                # at least one predicate test requires subjectowner-based read access rights
                 innertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
             else:
                 outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
@@ -1754,7 +1754,7 @@ class Application:
                 if listwhere:
                     expr = 'CASE WHEN %s THEN %s ELSE NULL END' % (listwhere, expr)
             
-            if tagdef.readpolicy == 'fowner':
+            if tagdef.readpolicy == 'subjectowner':
                 expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
             selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tag, tag), prefix='')))
                 

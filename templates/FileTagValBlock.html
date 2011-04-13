@@ -39,7 +39,7 @@ $ writeok = tagdef.writeok
 $if file['write users'] == None:
 	$ file['write users'] = []
 $if writeok == None:
-	$if tagdef.writepolicy == 'fowner':
+	$if tagdef.writepolicy == 'subjectowner':
 		$ writeok = file.owner in authn.roles
 	$elif tagdef.writepolicy == 'subject':
 		$ writeok = file.owner in authn.roles or len( set(authn.roles).intersection(set(file['write users'])) ) > 0

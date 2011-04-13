@@ -781,7 +781,7 @@ function renderTagdefs(table) {
 	    var policy = { "anonymous" : "anyone", 
 			   "users" : "authenticated users", 
 			   "subject" : "users who can access the subject", 
-			   "fowner" : "user who owns the file",
+			   "subjectowner" : "user who owns the subject",
 			   "tag" : (ownerand + "users in ACL"),
 			   "system" : "internal service" };
 	    var readpolcell = cells[columnmap["readpolicy"]];
