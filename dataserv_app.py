@@ -1753,9 +1753,23 @@ class Application:
 
                 if listwhere:
                     expr = 'CASE WHEN %s THEN %s ELSE NULL END' % (listwhere, expr)
-            
-            if tagdef.readpolicy == 'subjectowner':
-                expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
+
+            if enforce_read_authz:
+                if tagdef.readok == False:
+                    expr = 'NULL'
+                elif tagdef.readok:
+                    # we can read this tag for any subject we can find
+                    pass
+                elif tagdef.readpolicy == 'subject':
+                    # we can read this tag for any subject we can read
+                    # which is all subjects being read, when we are enforcing
+                    pass
+                elif tagdef.readpolicy == 'subjectowner':
+                    # need to condition read on subjectowner test
+                    expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
+                else:
+                    raise RuntimeError('Unimplemented list-tags authorization scenario in query by predlist for tag "%s".', tagdef.tagname)
+                
             selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tag, tag), prefix='')))
                 
         innertables2 = [ rewrite_tablepair(innertables[0]) ] \
