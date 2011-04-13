@@ -821,7 +821,7 @@ class FileTags (Node):
         jsonMungeTags = set( [ tagdef.tagname for tagdef in all if tagdef.typestr in jsonMungeTypes ] )
 
         def dictFile(file):
-            tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
+            tagvals = [ ( tag, file[tag] ) for tag in self.listtags  if self.globals['tagdefsdict'][tag].readok != False ]
             tagvals = dict(tagvals)
             for tagname in jsonMungeTags:
                 tagvals[tagname] = str(tagvals[tagname])
@@ -1219,7 +1219,7 @@ class Query (Node):
                                    if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
 
             def jsonFile(file):
-                tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
+                tagvals = [ ( tag, file[tag] ) for tag in self.listtags if self.globals['tagdefsdict'][tag].readok != False ]
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
                     tagvals[tagname] = str(tagvals[tagname])

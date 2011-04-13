@@ -43,7 +43,7 @@ $if len(files) > 0:
 			<tr class="file even">
 		$ odd = not odd
 		$for tag in filelisttags:
-			$if tagdefsdict.has_key(tag):
+			$if tagdefsdict.has_key(tag) and tagdefsdict[tag].readok != False:
 				<td class="file-tag ${idquote(tag)}">
 				$:{render.FileTagValBlock(file, tagdefsdict[tag], filelisttagswrite, file.version, showversions)}
 				</td>
