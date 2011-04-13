@@ -29,17 +29,16 @@ $if len(tagdefs) > 0:
 	<th class="file-tags">Current Value(s)</th>
 	</tr>
 	$for tagdef in tagdefs:
-		$if tagdef.readok != False:
-			$if odd:
-				<tr class="file odd">
-			$else:
-				<tr class="file even">
-			$ odd = not odd
-			<td class="tag name">${tagdef.tagname}</td>
-			<td class="file-tag ${idquote(tagdef.tagname)}">
-			$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}
-			</td>
-			</tr>
+		$if odd:
+			<tr class="file odd">
+		$else:
+			<tr class="file even">
+		$ odd = not odd
+		<td class="tag name">${tagdef.tagname}</td>
+		<td class="file-tag ${idquote(tagdef.tagname)}">
+		$:{render.FileTagValBlock(file, tagdef, [tagdef.tagname], None)}
+		</td>
+		</tr>
 	</table>
 $else:
 	There are no applicable tags.

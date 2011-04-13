@@ -24,7 +24,7 @@ $ odd = True
 <tr class="file-heading"><th class="file-name">Subject</th><th class="file-tag">Tag</th><th class="file-tag">Value(s)</th></tr>
 $for file in files:
 	$ datapred, dataid, dataname, dtype = subject2identifiers(file)
-	$for tagdef in tagdefs if tagdefsdict[tagdef.tagname].readok != False:
+	$for tagdef in tagdefs:
 		$if odd:
 			<tr class="file odd"><td class="file-name"><a href="${home}/file/${datapred}">${dataname}</a></td><td>${tagdef.tagname}</td>
 		$else:

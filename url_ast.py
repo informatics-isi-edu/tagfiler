@@ -793,7 +793,7 @@ class FileTags (Node):
         else:
             try_default_view = False
             
-        all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
+        all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags and tagdef.readok != False ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
         files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
