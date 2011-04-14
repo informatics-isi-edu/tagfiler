@@ -80,4 +80,7 @@ $else:
 	$if smartTagValues and tagdef.tagname not in browsersImmutableTags:
 		$:{render.SetTagForm(params)}
 	$else:
-		is ${not vals and "not" or ""} set
+		$if vals:
+			${tagdef.tagname} is set
+		$else:
+			not set

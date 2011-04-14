@@ -35,6 +35,11 @@ $if writeok:
 		<td class="file-tag ${idquote(tagname)} multivalue">not set</td>
 		<input type="hidden" name="action" value="put" />
 		<td class="file-tag ${idquote(tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
+$else:
+	$if vals:
+		${tagname} is set
+	$else:
+		not set
 </form>
 </tr>
 </table>
