@@ -26,7 +26,7 @@ $code
 					if tagdef.typestr == 'empty':
 						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + ")\n"
 					elif tagdef.multivalue:
-						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + ','join([urlquote(val) for val in file[tagdef.tagname]] + ")\n"
+						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + ','.join([urlquote(val) for val in file[tagdef.tagname]] + ")\n"
 					else:
 						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname]) + ")\n"
 		return s
