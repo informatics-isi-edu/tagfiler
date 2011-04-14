@@ -1190,7 +1190,7 @@ class Application:
                     return tagdef.owner in self.authn.roles \
                            or len(set(self.authn.roles)
                                   .union(set(['*']))
-                                  .intersection(set(tagdef['tag' + mode[0:4] + 'ers']))) > 0
+                                  .intersection(set(tagdef['tag' + mode[0:4] + 'ers'] or []))) > 0
                 elif policy == 'users':
                     return self.authn.role != None
                 else:
