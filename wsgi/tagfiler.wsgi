@@ -79,12 +79,7 @@ class Dispatcher:
 
         try:
             result = astmethod(uri)
-            # yield the result in order to catch WebException
-            # yield the first iteration and then the rest of the result
-            for res in result:
-            	yield res
-            	break
-            yield result
+            return result
         except dataserv_app.WebException, e:
             if hasattr(e, 'detail'):
                 web.header('X-Error-Description', e.detail)
