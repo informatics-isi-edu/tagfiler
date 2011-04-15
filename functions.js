@@ -733,7 +733,7 @@ if(ajax_request) {
 
 var redirectToLogin = false;
 
-function renderTagdefs(table) {
+function renderTagdefs(home, table) {
     var columns = [];
     var columnmap = {};
     var typedescs = null;
@@ -768,6 +768,7 @@ function renderTagdefs(table) {
 	    var cells = rows[i].children;
 	    var namecell = cells[columnmap["tagname"]];
 	    var tagname = namecell.innerHTML;
+	    namecell.innerHTML = '<a href="' + home + '/file/tagdef=' + encodeURIComponent(tagname) + '">' + tagname + '</a>';
 	    var typecell = cells[columnmap["typestr"]];
 	    typecell.innerHTML = typedescs[typecell.innerHTML];
 	    var cardcell = cells[columnmap["multivalue"]];
@@ -796,7 +797,7 @@ function renderTagdefs(table) {
 		    + "<input type=\"hidden\" name=\"tag\" value=\"" + tagname + "\" />"
 		    + "<input type=\"hidden\" name=\"action\" value=\"delete\" />"
 		    + "<input type=\"submit\" value=\"[X]\" title=\"delete " + tagname + "\" />"
-		    + tagname + "</form>";
+		    + namecell.innerHTML + "</form>";
 	    }
 	    if ( i % 2 == 1 ) {
 		rows[i].className = "tagdef odd";
