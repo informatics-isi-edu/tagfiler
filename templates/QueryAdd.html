@@ -24,7 +24,8 @@ $if None:
   	$ tagnames = tagdefsdict.keys()
 	$ tagnames.sort()
 	$for tagname in tagnames:
-		<option value="${tagname}">${tagname}</option>
+		$if tagdefsdict[tagname].readok != False:
+			<option value="${tagname}">${tagname}</option>
   </select></td>
   <td><select name="op">
   	$for op, desc in ops:
