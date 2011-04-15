@@ -20,6 +20,7 @@ import sys
 import os
 import sys
 import traceback
+import itertools
 
 # Uncomment the below line in case of a RPM installation
 from tagfiler import url_lex, url_parse, url_parse_func, dataserv_app
@@ -79,7 +80,11 @@ class Dispatcher:
 
         try:
             result = astmethod(uri)
-            return result
+            if hasattr(result, 'next'):
+            	first = result.next()
+            	return itertools.chain([first], result)
+            else:
+            	return result
         except dataserv_app.WebException, e:
             if hasattr(e, 'detail'):
                 web.header('X-Error-Description', e.detail)
