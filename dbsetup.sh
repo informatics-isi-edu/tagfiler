@@ -571,7 +571,7 @@ cfgtag "file list tags" text bytes owner 'read users' 'write users'
 #cfgtag "applet properties" text 'tagfiler.properties'
 
 tagdeftags=$(dataset "tagdef" view "${admin}" "*")
-for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users"
+for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 do
    tag "$tagdeftags" "_cfg_file list tags" "tagname" "$tagname"
    tag "$tagdeftags" "_cfg_tag list tags" "tagname" "$tagname"
