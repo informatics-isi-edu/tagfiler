@@ -1,4 +1,4 @@
-$def with (ops)
+$def with (ops, opsTagged)
 $if None:
 	$# 
 	$# Copyright 2010 University of Southern California
@@ -20,15 +20,21 @@ $if None:
 </p>
 <form enctype="application/x-www-form-urlencoded" action="${queryTarget}" method="get">
   <table class="query-add"><tr>
-  <td><select name="tag">
+  <td><select id="tag" name="tag" onchange='selectTagOperators();'>
   	$ tagnames = tagdefsdict.keys()
 	$ tagnames.sort()
+	$ tagops = None
 	$for tagname in tagnames:
 		$if tagdefsdict[tagname].readok != False:
-			<option value="${tagname}">${tagname}</option>
+			<option typestr="${tagdefsdict[tagname].typestr}" value="${tagname}">${tagname}</option>
+			$if not tagops:
+				$if tagdefsdict[tagname].typestr == 'empty':
+					$ tagops = opsTagged
+				$else:
+					$ tagops = ops
   </select></td>
-  <td><select name="op">
-  	$for op, desc in ops:
+  <td id="op"><select name="op">
+  	$for op, desc in tagops:
 		<option value="${op}">${desc}</option>
   </select></td>
   <td><table>
@@ -46,3 +52,15 @@ $if None:
   </tr></table>
   <input type="hidden" name="action" value="add" />
 </form>
+<div style="display:none;" id="alloperators">
+	<select name="all">
+	  	$for op, desc in ops:
+			<option value="${op}">${desc}</option>
+	</select>
+</div>
+<div style="display:none;" id="taggedoperators">
+	<select name="taggged">
+	  	$for op, desc in opsTagged:
+			<option value="${op}">${desc}</option>
+	</select>
+</div>

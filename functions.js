@@ -609,6 +609,22 @@ function checkInput(id, message) {
 	}
 }
 
+/**
+ * Set the dropdown list with the available operators for the selected tag
+ */
+function selectTagOperators() {
+	var select_list_field = document.getElementById("tag");
+	var select_list_selected_index = select_list_field.selectedIndex;
+	var ops = document.getElementById("alloperators").innerHTML;
+	
+	if (select_list_field.options[select_list_selected_index].getAttribute("typestr") == 'empty') {
+		ops = document.getElementById("taggedoperators").innerHTML;
+	}
+	
+	document.getElementById("op").innerHTML = ops;
+	document.getElementById("op").children[0].name = 'op';
+}
+
 var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green">';
 var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
 

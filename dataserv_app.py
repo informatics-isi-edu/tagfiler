@@ -326,6 +326,9 @@ class Application:
                      (':ciregexp:', 'Regular expression (case insensitive)'),
                      (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
+        self.opsTagged = [ ('', 'Tagged'),
+                           (':not:', 'Not tagged')]
+
         self.opsDB = dict([ ('=', '='),
                             ('!=', '!='),
                             (':lt:', '<'),
