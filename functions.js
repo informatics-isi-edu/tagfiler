@@ -623,6 +623,24 @@ function selectTagOperators() {
 	
 	document.getElementById("op").innerHTML = ops;
 	document.getElementById("op").children[0].name = 'op';
+	document.getElementById("op").children[0].id = 'opform';
+	selectOperatorForm();
+}
+
+/**
+ * Select the form for the tag values
+ */
+function selectOperatorForm() {
+	var display_value = 'block';
+	var select_list_field = document.getElementById("opform");
+	var select_list_selected_index = select_list_field.selectedIndex;
+	var typestr = select_list_field.options[select_list_selected_index].getAttribute("typestr");
+
+	if (typestr == 'tagged') {
+		display_value = 'none';
+	}
+	
+	document.getElementById("tagvalues").style.display = display_value;
 }
 
 var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green">';

@@ -30,14 +30,20 @@ $if None:
 			$if not tagops:
 				$if tagdefsdict[tagname].typestr == 'empty':
 					$ tagops = opsTagged
+					$ display = 'none'
 				$else:
 					$ tagops = ops
+					$ display = 'block'
   </select></td>
-  <td id="op"><select name="op">
+  <td id="op"><select id="opform" name="op" onchange="selectOperatorForm()" >
   	$for op, desc in tagops:
-		<option value="${op}">${desc}</option>
+  		$if (op, desc) not in opsTagged:
+  			$ typestr = 'values'
+  		$else:
+  			$ typestr = 'tagged'
+		<option typestr="${typestr}" value="${op}">${desc}</option>
   </select></td>
-  <td><table>
+  <td><table id="tagvalues" style="display:${display};">
 	  <tr><td></td><td><input type="text" name="val0" /></td></tr>
 	  $for i in range(1,10):
 	  	<tr><td>OR</td><td><input type="text" name="val${i}" /></td></tr>
@@ -53,14 +59,18 @@ $if None:
   <input type="hidden" name="action" value="add" />
 </form>
 <div style="display:none;" id="alloperators">
-	<select name="all">
+	<select id="all" name="all" onchange="selectOperatorForm()">
 	  	$for op, desc in ops:
-			<option value="${op}">${desc}</option>
+	  		$if (op, desc) not in opsTagged:
+	  			$ typestr = 'values'
+	  		$else:
+	  			$ typestr = 'tagged'
+			<option typestr="${typestr}" value="${op}">${desc}</option>
 	</select>
 </div>
 <div style="display:none;" id="taggedoperators">
-	<select name="taggged">
+	<select id="tagged" name="taggged"  onchange="selectOperatorForm()">
 	  	$for op, desc in opsTagged:
-			<option value="${op}">${desc}</option>
+			<option typestr="tagged" value="${op}">${desc}</option>
 	</select>
 </div>
