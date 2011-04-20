@@ -326,8 +326,20 @@ class Application:
                      (':ciregexp:', 'Regular expression (case insensitive)'),
                      (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
-        self.opsTagged = [ ('', 'Tagged'),
-                           (':not:', 'Not tagged')]
+        self.opsExcludeTypes = dict([ ('', []),
+                                      (':not:', []),
+                                      ('=', ['empty']),
+                                      ('!=', ['empty']),
+                                      (':lt:', ['empty']),
+                                      (':leq:', ['empty']),
+                                      (':gt:', ['empty']),
+                                      (':geq:', ['empty']),
+                                      (':like:', ['empty', 'int8', 'timestamptz']),
+                                      (':simto:', ['empty', 'int8', 'timestamptz']),
+                                      (':regexp:', ['empty', 'int8', 'timestamptz']),
+                                      (':!regexp:', ['empty', 'int8', 'timestamptz']),
+                                      (':ciregexp:', ['empty', 'int8', 'timestamptz']),
+                                      (':!ciregexp:', ['empty', 'int8', 'timestamptz']) ])
 
         self.opsDB = dict([ ('=', '='),
                             ('!=', '!='),

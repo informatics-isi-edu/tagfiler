@@ -1,4 +1,4 @@
-$def with (ops, opsTagged)
+$def with (ops, opsExcludeTypes)
 $if None:
 	$# 
 	$# Copyright 2010 University of Southern California
@@ -18,35 +18,34 @@ $if None:
 <h3>Add a Query Term</h3>
 <p>Select an available tag and click 'Add' to build a query:
 </p>
-<form enctype="application/x-www-form-urlencoded" action="${queryTarget}" method="get">
+<form enctype="application/x-www-form-urlencoded" action="${queryTarget}" method="get" onsubmit="return checkQueryValues()">
   <table class="query-add"><tr>
   <td><select id="tag" name="tag" onchange='selectTagOperators();'>
   	$ tagnames = tagdefsdict.keys()
 	$ tagnames.sort()
-	$ tagops = None
+	$ display = None
+	$ typestr = None
 	$for tagname in tagnames:
 		$if tagdefsdict[tagname].readok != False:
 			<option typestr="${tagdefsdict[tagname].typestr}" value="${tagname}">${tagname}</option>
-			$if not tagops:
+			$if not display:
+				$ typestr = tagdefsdict[tagname].typestr
 				$if tagdefsdict[tagname].typestr == 'empty':
-					$ tagops = opsTagged
 					$ display = 'none'
 				$else:
-					$ tagops = ops
 					$ display = 'block'
   </select></td>
-  <td id="op"><select id="opform" name="op" onchange="selectOperatorForm()" >
-  	$for op, desc in tagops:
-  		$if (op, desc) not in opsTagged:
-  			$ typestr = 'values'
-  		$else:
-  			$ typestr = 'tagged'
-		<option typestr="${typestr}" value="${op}">${desc}</option>
+  <td><select id="op" name="op" onchange="selectOperatorForm()" >
+  	$for op, desc in ops:
+  		$ opdisplay = 'block'
+  		$if typestr in opsExcludeTypes[op]:
+  			$ opdisplay = 'none'
+		<option value="${op}" id="id_${op}" style="display:${opdisplay};">${desc}</option>
   </select></td>
   <td><table id="tagvalues" style="display:${display};">
-	  <tr><td></td><td><input type="text" name="val0" /></td></tr>
+	  <tr><td></td><td><input type="text" id="val0" name="val0" /></td></tr>
 	  $for i in range(1,10):
-	  	<tr><td>OR</td><td><input type="text" name="val${i}" /></td></tr>
+	  	<tr><td>OR</td><td><input type="text" id="val${i}" name="val${i}" /></td></tr>
   </table></td>
   <td><input type="submit" value="Add to query" />
   <td><select name="versions">
@@ -58,19 +57,11 @@ $if None:
   </tr></table>
   <input type="hidden" name="action" value="add" />
 </form>
-<div style="display:none;" id="alloperators">
-	<select id="all" name="all" onchange="selectOperatorForm()">
-	  	$for op, desc in ops:
-	  		$if (op, desc) not in opsTagged:
-	  			$ typestr = 'values'
-	  		$else:
-	  			$ typestr = 'tagged'
-			<option typestr="${typestr}" value="${op}">${desc}</option>
-	</select>
-</div>
-<div style="display:none;" id="taggedoperators">
-	<select id="tagged" name="taggged"  onchange="selectOperatorForm()">
-	  	$for op, desc in opsTagged:
-			<option typestr="tagged" value="${op}">${desc}</option>
-	</select>
-</div>
+<script type="text/javascript">
+var opArray = new Array();
+$for op in opsExcludeTypes.keys():
+	$ vals = ['"'+val+'"' for val in opsExcludeTypes[op]]
+	$ vals = ','.join(vals)
+	$ key = 'id_' + op
+	opArray["$:{key}"] = [$:{vals}];
+</script>

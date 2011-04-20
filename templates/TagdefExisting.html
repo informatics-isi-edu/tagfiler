@@ -31,8 +31,8 @@ $ typedict = dict(typenames)
 <th name="writepolicy">writepolicy</th>
 </tr>
 $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config['tagdef write users']))) > 0:
-	<tr class="tagdefcreate">
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
+	<tr class="tagdefcreate">
 	<td><input name="tag-1" type="text" /></td>
 	<td><select name="type-1">
 	$ deftypestr = 'empty'
@@ -58,7 +58,7 @@ $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config[
 	<input type="hidden" name="action" value="add" />
 	</td>
 	</tr>
-	<tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></form></tr>
+	<tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></tr></form>
 $ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
 $for tagdef in tagdefs:
 	$if tagdef.owner in authn.roles:

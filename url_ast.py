@@ -1258,7 +1258,7 @@ class Query (Node):
                                         self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
             else:
                 yield self.renderlist(self.title,
-                                       [self.render.QueryAdd(self.ops, self.opsTagged),
+                                       [self.render.QueryAdd(self.ops, self.opsExcludeTypes),
                                         self.render.QueryView(self.ops, self.subjpreds),
                                         self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
 

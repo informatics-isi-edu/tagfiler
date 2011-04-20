@@ -610,20 +610,45 @@ function checkInput(id, message) {
 }
 
 /**
+ * Check that the input form for tag values is not empty
+ * Return True if the input form is not empty and False otherwise
+ */
+function checkQueryValues() {
+	var ret = false;
+	if (document.getElementById("tagvalues").style.display == 'block') {
+		for (var i=0; i < 10; i++) {
+			if (document.getElementById('val'+i).value.replace(/^\s*/, "").replace(/\s*$/, "").length > 0) {
+				ret = true;
+				break;
+			}
+		}
+		if (!ret) {
+			alert('Please enter a value for the tag.');
+		}
+	} else {
+		ret = true;
+	}
+	return ret;
+}
+
+/**
  * Set the dropdown list with the available operators for the selected tag
  */
 function selectTagOperators() {
 	var select_list_field = document.getElementById("tag");
 	var select_list_selected_index = select_list_field.selectedIndex;
-	var ops = document.getElementById("alloperators").innerHTML;
+	var typestr = select_list_field.options[select_list_selected_index].getAttribute("typestr");
 	
-	if (select_list_field.options[select_list_selected_index].getAttribute("typestr") == 'empty') {
-		ops = document.getElementById("taggedoperators").innerHTML;
+	select_list_field = document.getElementById("op");
+	for (var i=0; i < select_list_field.options.length; i++) {
+		if (opArray['id_' + select_list_field.options[i].value].contains(typestr)) {
+			// typestr is in the exclude list
+			document.getElementById('id_' + select_list_field.options[i].value).style.display = 'none';
+		} else {
+			document.getElementById('id_' + select_list_field.options[i].value).style.display = 'block';
+		}
 	}
 	
-	document.getElementById("op").innerHTML = ops;
-	document.getElementById("op").children[0].name = 'op';
-	document.getElementById("op").children[0].id = 'opform';
 	selectOperatorForm();
 }
 
@@ -632,11 +657,11 @@ function selectTagOperators() {
  */
 function selectOperatorForm() {
 	var display_value = 'block';
-	var select_list_field = document.getElementById("opform");
+	var select_list_field = document.getElementById("op");
 	var select_list_selected_index = select_list_field.selectedIndex;
-	var typestr = select_list_field.options[select_list_selected_index].getAttribute("typestr");
-
-	if (typestr == 'tagged') {
+	var op = select_list_field.options[select_list_selected_index].value;
+	if (op == '' || op == ':not:') {
+		// tagged or not tagged
 		display_value = 'none';
 	}
 	
