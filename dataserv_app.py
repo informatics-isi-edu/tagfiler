@@ -1656,6 +1656,9 @@ class Application:
         outertables_special.append( 'roles AS writerrole ON ("_write users".value = writerrole.role)' )
         selects.append('bool_or(ownerrole.role IS NOT NULL OR writerrole.role IS NOT NULL) AS writeok')
 
+        # retain summary of ownership for later consumption by read-enforced tag projection
+        selects.append('bool_or(ownerrole.role IS NOT NULL) AS is_owner')
+
         if id:
             # special single-entry lookup
             values['id_%d' % qd] = id
@@ -1702,7 +1705,7 @@ class Application:
         outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ] \
                        + outertables_special
 
-        # this query produces a set of (subject, owner, readok, writeok) rows that match the query result set
+        # this query produces a set of (subject, owner, readok, writeok, is_owner) rows that match the query result set
         subject_query = 'SELECT %s' % ','.join(selects) \
                         + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
                         + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
@@ -1712,10 +1715,10 @@ class Application:
         core_tags = dict(owner='subjects.owner',
                          id='subjects.subject')
         
-        selects = [ 'subjects.readok AS readok', 'subjects.writeok AS writeok' ]
+        selects = [ 'subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.is_owner AS is_owner' ]
         innertables = [('(%s)' % subject_query, 'subjects')]
         outertables = []
-        groupbys = [ 'subjects.readok', 'subjects.writeok' ]
+        groupbys = [ 'subjects.readok', 'subjects.writeok', 'subjects.is_owner' ]
 
         def make_listwhere(t, vref, preds, tagdef):
             listwheres = []
@@ -1781,7 +1784,7 @@ class Application:
                     pass
                 elif tagdef.readpolicy == 'subjectowner':
                     # need to condition read on subjectowner test
-                    expr = 'CASE WHEN ownerrole.role IS NOT NULL THEN %s ELSE NULL END' % expr
+                    expr = 'CASE WHEN subjects.is_owner THEN %s ELSE NULL END' % expr
                 else:
                     raise RuntimeError('Unimplemented list-tags authorization scenario in query by predlist for tag "%s".', tagdef.tagname)
                 
