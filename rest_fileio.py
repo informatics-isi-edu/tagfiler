@@ -617,10 +617,6 @@ class FileIO (Application):
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
                 self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
 
-        if not basefile and not newfile['incomplete'] and not self.queryopts.has_key('incomplete'):
-            # only remap on newly created files, when the user has not guarded for chunked upload
-            self.doPolicyRule(newfile)
-
         # try to apply tags provided by user as PUT/POST queryopts in URL
         #    and tags constrained in subjpreds (only if creating new independent object)
         # they all must work to complete transaction
@@ -640,6 +636,10 @@ class FileIO (Application):
                 for value in values:
                     self.set_tag(newfile, tagdef, value)
             self.txlog('SET', dataset=self.subject2identifiers(newfile)[0], tag=tagname, value=values)
+
+        if not basefile and not newfile['incomplete']:
+            # only remap on newly created files, when the user has not guarded for chunked upload
+            self.doPolicyRule(newfile)
 
     def storeInput(self, inf, f, flen=None, cfirst=None, clen=None):
         """copy content stream"""
