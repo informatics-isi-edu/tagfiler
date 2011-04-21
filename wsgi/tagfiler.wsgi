@@ -79,6 +79,7 @@ class Dispatcher:
         astmethod = getattr(ast, methodname)
 
         try:
+            #web.debug((uri,astmethod))
             result = astmethod(uri)
             if hasattr(result, 'next'):
             	first = result.next()

@@ -166,6 +166,13 @@ def buildPolicyRules(rules, fatal=False):
         remap[srcrole] = (dstrole, readers, writers)
     return remap
 
+def traceInChunks(seq):
+    length = 5000
+    chunks = [seq[i:i+length] for i in range(0, len(seq), length)]
+    for chunk in chunks:
+        web.debug(chunk)
+
+
 class WebException (web.HTTPError):
     def __init__(self, status, data='', headers={}, desc='%s'):
         self.detail = urlquote(desc % data)
@@ -1885,6 +1892,8 @@ class Application:
         query = build_query_recursive(stack, qd=0, limit=limit)
 
         #web.debug(query, values)
+        #traceInChunks(query)
+        #web.debug('values', values)
         return (query, values)
 
     def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
