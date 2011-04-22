@@ -1576,7 +1576,8 @@ class Application:
 
         innertables = []  # (table, alias)
         innertables_special = []
-        outertables = [('_owner', None)]
+        outer_prepend_owner = True
+        outertables = []
         outertables_special = []
         selects = ['subject AS subject', '_owner.value AS owner']
         wheres = []
@@ -1646,6 +1647,8 @@ class Application:
         if enforce_read_authz:
             if need_subjectowner_test:
                 # at least one predicate test requires subjectowner-based read access rights
+                outer_prepend_owner = False # need to suppress normal placement of owner and get it before we use it
+                innertables.append( ( '_owner', None ) )
                 innertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
             else:
                 outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
@@ -1658,7 +1661,10 @@ class Application:
             # compute read access rights for later consumption
             outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
             selects.append('bool_or(ownerrole.role IS NOT NULL OR readerrole.role IS NOT NULL) AS readok')
-            
+
+        if outer_prepend_owner:
+            outertables = [ ( '_owner', None ) ] + outertables
+
         # compute file write access rights for later consumption
         outertables_special.append( 'roles AS writerrole ON ("_write users".value = writerrole.role)' )
         selects.append('bool_or(ownerrole.role IS NOT NULL OR writerrole.role IS NOT NULL) AS writeok')
@@ -1678,8 +1684,7 @@ class Application:
             wheres.append('"_name".value IS NULL OR "_latest with name".value IS NOT NULL')
 
         outertables = outertables \
-                      + [('_owner', None),
-                         ('"_read users"', None),
+                      + [('"_read users"', None),
                          ('"_write users"', None)]
 
         # idempotent insertion of (table, alias)
