@@ -16,4 +16,4 @@ $if None:
 	$# limitations under the License.
 	$#
 $# this lambda is to do a ternary operator in old Python 2.4
-$:{ (lambda s: s + ("", "\n")[len(s) > 0])("\n".join([ "%s/file/%s" % (home, urlquote(file.file)) for file in files]))}
+$:{ (lambda s: s + ("", "\n")[len(s) > 0])("\n".join([ "%s/file/%s" % (home, urlquote(file.name)) for file in files]))}

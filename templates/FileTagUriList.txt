@@ -18,7 +18,7 @@ $if None:
 $# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
 $for foo in [ 0 ]:
 $code
-	def rendertagvals(filetagvals):
+	def rendertagvals():
 		s = ""
 		for file in files:
 			for tagdef in tagdefs:
@@ -30,4 +30,4 @@ $code
 					else:
 						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname]) + ")\n"
 		return s
-${rendertagvals(taginfo[4])[:-1]}
+${rendertagvals()[:-1]}
