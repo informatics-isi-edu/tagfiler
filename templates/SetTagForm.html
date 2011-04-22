@@ -26,7 +26,7 @@ $ writeok = args.get('writeok')
 <input type="hidden" name="tag" value="${tagname}" />
 $if writeok:
 	$if vals:
-		<td class="file-tag ${idquote(tagname)} multivalue">${tagname} is set</td>
+		<td class="file-tag ${idquote(tagname)} multivalue">is set</td>
 		<input type="hidden" name="referer" value="${referer}" />
 		<input type="hidden" name="action" value="delete" />
 		<td class="file-tag ${idquote(tagname)} multivalue delete"><input type="submit" value="Remove Tag" /></td>
@@ -37,7 +37,7 @@ $if writeok:
 		<td class="file-tag ${idquote(tagname)} multivalue set"><input type="submit" value="Set Tag" /></td>
 $else:
 	$if vals:
-		${tagname} is set
+		is set
 	$else:
 		not set
 </form>
