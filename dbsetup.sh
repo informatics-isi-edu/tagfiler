@@ -360,57 +360,59 @@ typedef()
 }
 
 
-#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY
 
-tagdef 'id'           int8        ""      anonymous   system     false      ""         true
-tagdef 'tagdef'       text        ""      anonymous   system     false      ""         true
-tagdef 'typedef'      text        ""      anonymous   subject       false      ""         true
-tagdef 'config'       text        ""      anonymous   subject       false      ""         true
-tagdef 'view'         text        ""      anonymous   subject       false      ""         true
+tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
+tagdef 'tagdef'              text        ""         anonymous   system       false      ""         true
+tagdef 'typedef'             text        ""         anonymous   subject      false      ""         true
+tagdef 'config'              text        ""         anonymous   subject      false      ""         true
+tagdef 'view'                text        ""         anonymous   subject      false      ""         true
 
-tagdef 'default view' text        ""      subject        subject       false      viewname
+tagdef 'default view'        text        ""         subject     subject      false      viewname
 
-tagdef 'tagdef type'  text        ""      anonymous   system     false      type
-tagdef 'tagdef unique' empty      ""      anonymous   system     false      ""
+tagdef 'tagdef type'         text        ""         anonymous   system       false      type
+tagdef 'tagdef unique'       empty       ""         anonymous   system       false      ""
 
-tagdef 'tagdef multivalue'  empty ""      anonymous   system     false
-tagdef 'tagdef active'      empty ""      anonymous   system     false
-tagdef 'tagdef readpolicy'   text ""      anonymous   system     false      tagpolicy
-tagdef 'tagdef writepolicy'  text ""      anonymous   system     false      tagpolicy
+tagdef 'tagdef multivalue'   empty       ""         anonymous   system       false
+tagdef 'tagdef active'       empty       ""         anonymous   system       false
+tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false      tagpolicy
+tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false      tagpolicy
 
-tagdef 'tag read users'      text ""      anonymous   subjectowner     true       rolepat
-tagdef 'tag write users'     text ""      anonymous   subjectowner     true       rolepat
+tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
+tagdef 'tag write users'     text        ""         anonymous   subjectowner true       rolepat
 
-tagdef 'typedef description' text   ""      anonymous   subject       false
-tagdef 'typedef dbtype' text        ""      anonymous   subject       false
-tagdef 'typedef values' text        ""      anonymous   subject       true
+tagdef 'typedef description' text        ""         anonymous   subject      false
+tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
+tagdef 'typedef values'      text        ""         anonymous   subject      true
 
-tagdef owner          text        ""      anonymous   tag        false      role
-tagdef created        timestamptz ""      anonymous   system     false
-tagdef "version created" timestamptz ""   anonymous   system     false
-tagdef "read users"   text        ""      anonymous   subjectowner     true       rolepat
-tagdef "write users"  text        ""      anonymous   subjectowner     true       rolepat
-tagdef "modified by"  text        ""      anonymous   system     false      role
-tagdef modified       timestamptz ""      anonymous   system     false
-tagdef bytes          int8        ""      anonymous   system     false
-tagdef version        int8        ""      anonymous   system     false
-tagdef name           text        ""      anonymous   system     false
-tagdef 'latest with name' text    ""      anonymous   system     false      ""         true
-tagdef vname          text        ""      anonymous   system     false      ""         true
-tagdef file           text        ""      system      system     false      ""         true
-tagdef url            text        ""      subject        subject     false      url
-tagdef content-type   text        ""      anonymous   subject       false
-tagdef sha256sum      text        ""      anonymous   subject       false
+tagdef owner                 text        ""         anonymous   tag          false      role
+tagdef created               timestamptz ""         anonymous   system       false
+tagdef "version created"     timestamptz ""         anonymous   system       false
+tagdef "read users"          text        ""         anonymous   subjectowner true       rolepat
+tagdef "write users"         text        ""         anonymous   subjectowner true       rolepat
+tagdef "modified by"         text        ""         anonymous   system       false      role
+tagdef modified              timestamptz ""         anonymous   system       false
+tagdef bytes                 int8        ""         anonymous   system       false
+tagdef version               int8        ""         anonymous   system       false
+tagdef name                  text        ""         anonymous   system       false
+tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
+tagdef vname                 text        ""         anonymous   system       false      ""         true
+tagdef file                  text        ""         system      system       false      ""         true
+tagdef url                   text        ""         subject     subject      false      url
+tagdef content-type          text        ""         anonymous   subject      false
+tagdef sha256sum             text        ""         anonymous   subject      false
 
-tagdef contains       text        ""      subject        subject       true       file
-tagdef vcontains      text        ""      subject        subject       true       vfile
-tagdef key            text        ""      anonymous   subject       false      ""         true
-tagdef "check point offset" int8  ""      anonymous   subject       false
-tagdef "incomplete" empty  ""      anonymous   subject       false
+tagdef contains              text        ""         subject     subject      true       file
+tagdef vcontains             text        ""         subject     subject      true       vfile
+tagdef key                   text        ""         anonymous   subject      false      ""         true
+tagdef "check point offset"  int8        ""         anonymous   subject      false
+tagdef "incomplete"          empty       ""         anonymous   subject      false
 
-tagdef "list on homepage" empty   "${admin}"      anonymous   tag        false
-tagdef "homepage order" int8      "${admin}"      anonymous   tag        false
-tagdef "Image Set"    empty       "${admin}"   subject   subject       false
+tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
+tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
+tagdef "Image Set"           empty       "${admin}" subject     subject      false
+
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY
 
 psql -q -t <<EOF
 CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
@@ -498,43 +500,46 @@ cfgtagdef()
    [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagname "$tagname"
 }
 
-#      TAGNAME        TYPE        OWNER   READPOL     WRITEPOL   MULTIVAL   TYPESTR    PKEY
+#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
 
 # file list tags MUST BE DEFINED FIRST
-cfgtagdef 'file list tags' text     ""      subject        subject       true       tagname
+cfgtagdef 'file list tags'            text  ""      subject     subject       true       tagname
 # tag list tags MUST BE DEFINED NEXT...
-cfgtagdef 'tag list tags' text      ""      subject        subject       true       tagname
+cfgtagdef 'tag list tags'             text  ""      subject     subject       true       tagname
+
 # THEN, need to do this manually to break dependency loop
 tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
-cfgtagdef 'file list tags write' text ""    subject        subject       true       tagname
-cfgtagdef 'tagdef write users' text ""      subject        subject       true       rolepat
-cfgtagdef 'file write users' text   ""      subject        subject       true       rolepat
-cfgtagdef home          text        ""      subject        subject       false
-cfgtagdef 'webauthn home' text      ""      subject        subject       false
-cfgtagdef 'webauthn require' empty  ""      subject        subject       false
-cfgtagdef 'store path'  text        ""      subject        subject       false
-cfgtagdef 'log path'    text        ""      subject        subject       false
-cfgtagdef 'template path' text      ""      subject        subject       false
-cfgtagdef 'chunk bytes' int8        ""      subject        subject       false
-cfgtagdef 'policy remappings' text  ""      subject        subject       true
-cfgtagdef subtitle      text        ""      subject        subject       false
-cfgtagdef logo          text        ""      subject        subject       false
-cfgtagdef contact       text        ""      subject        subject       false
-cfgtagdef help          text        ""      subject        subject       false
-cfgtagdef bugs          text        ""      subject        subject       false
-cfgtagdef 'client connections' int8 ""      subject        subject       false
-cfgtagdef 'client upload chunks' empty ""   subject        subject       false
-cfgtagdef 'client download chunks' empty "" subject        subject       false
-cfgtagdef 'client socket buffer size' int8 "" subject      subject       false
-cfgtagdef 'client retry count' int8 "" subject      subject       false
-cfgtagdef 'client chunk bytes' int8 ""      subject        subject       false
-cfgtagdef 'client socket timeout' int8 ""      subject        subject       false
-cfgtagdef 'applet tags' text        ""      subject        subject       true       tagname
-cfgtagdef 'applet tags require' text ""     subject        subject       true       tagname
-cfgtagdef 'applet custom properties' text "" subject       subject       true
-cfgtagdef 'applet test log' text    ""      subject        subject       false
-cfgtagdef 'applet test properties' text ""  subject        subject       true
+cfgtagdef 'file list tags write'      text  ""      subject     subject       true       tagname
+cfgtagdef 'tagdef write users'        text  ""      subject     subject       true       rolepat
+cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
+cfgtagdef home                        text  ""      subject     subject       false
+cfgtagdef 'webauthn home'             text  ""      subject     subject       false
+cfgtagdef 'webauthn require'          empty ""      subject     subject       false
+cfgtagdef 'store path'                text  ""      subject     subject       false
+cfgtagdef 'log path'                  text  ""      subject     subject       false
+cfgtagdef 'template path'             text  ""      subject     subject       false
+cfgtagdef 'chunk bytes'               int8  ""      subject     subject       false
+cfgtagdef 'policy remappings'         text  ""      subject     subject       true
+cfgtagdef subtitle                    text  ""      subject     subject       false
+cfgtagdef logo                        text  ""      subject     subject       false
+cfgtagdef contact                     text  ""      subject     subject       false
+cfgtagdef help                        text  ""      subject     subject       false
+cfgtagdef bugs                        text  ""      subject     subject       false
+cfgtagdef 'client connections'        int8  ""      subject     subject       false
+cfgtagdef 'client upload chunks'      empty ""      subject     subject       false
+cfgtagdef 'client download chunks'    empty ""      subject     subject       false
+cfgtagdef 'client socket buffer size' int8  ""      subject     subject       false
+cfgtagdef 'client retry count'        int8  ""      subject     subject       false
+cfgtagdef 'client chunk bytes'        int8  ""      subject     subject       false
+cfgtagdef 'client socket timeout'     int8  ""      subject     subject       false
+cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagname
+cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagname
+cfgtagdef 'applet custom properties'  text  ""      subject     subject       true
+cfgtagdef 'applet test log'           text  ""      subject     subject       false
+cfgtagdef 'applet test properties'    text  ""      subject     subject       true
+
+#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
 
 cfgtag()
 {
