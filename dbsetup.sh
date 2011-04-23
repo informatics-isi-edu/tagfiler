@@ -404,6 +404,7 @@ tagdef sha256sum             text        ""         anonymous   subject      fal
 
 tagdef contains              text        ""         subject     subject      true       file
 tagdef vcontains             text        ""         subject     subject      true       vfile
+tagdef parentof              text        ""         subject     subject      true       id
 tagdef key                   text        ""         anonymous   subject      false      ""         true
 tagdef "check point offset"  int8        ""         anonymous   subject      false
 tagdef "incomplete"          empty       ""         anonymous   subject      false

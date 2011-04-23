@@ -54,15 +54,24 @@ keywords = {
     'contact' : 'CONTACT'
 }
 
-tokens = [ 'STRING' ] + list(keywords.values())
+tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())
 
 # unreserved characters in RFC 3986
 # plus PERCENT so we accept percent-encoded forms as string content
 # plus ASTERISK because mozilla doesn't quote it properly
 # (consuming code must unescape after parsing)
-def t_STRING(t):
-    r'[-*%_.~A-Za-z0-9]+'
+
+def t_ESCAPESTRING(t):
+    r'%[0-9]+'
     t.value = urllib.unquote_plus(t.value)
+    return t
+
+def t_NUMSTRING(t):
+    r'[0-9]+'
+    return t
+
+def t_STRING(t):
+    r'[-*_.~A-Za-z]+'
     t.type = keywords.get(t.value, 'STRING')
     return t
 

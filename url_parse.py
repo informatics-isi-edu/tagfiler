@@ -25,6 +25,8 @@ from url_lex import make_lexer, tokens, keywords
 # use ast module to build abstract syntax tree
 import url_ast
 
+url_parse_func = None
+
 ################################################
 # here's the grammar and ast production rules
 
@@ -42,107 +44,117 @@ def p_start(p):
              | loglist
              | log
              | contact
+             | querypathroot
+             | idroot
 """
     p[0] = p[1]
+
+def p_querypathroot(p):
+    """querypathroot : querypath"""
+    p[0] = url_ast.Subquery(path=p[1])
+
+def p_idroot(p):
+    """idroot : NUMSTRING"""
+    p[0] = int(p[1])
 
 def p_filelist(p):
     """filelist : slash string
                 | slash string slash
                 | slash string slash FILE
                 | slash string slash FILE slash"""
-    p[0] = url_ast.FileList(appname=p[2])
+    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2])
     
 def p_filelist_opts1(p):
     """filelist : slash string queryopts"""
-    p[0] = url_ast.FileList(appname=p[2], queryopts=p[3])
+    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[3])
     
 def p_loglist(p):
     """loglist : slash string slash LOG
                | slash string slash LOG slash"""
-    p[0] = url_ast.LogList(appname=p[2])
+    p[0] = url_ast.LogList(parser=url_parse_func, appname=p[2])
 
 def p_contact(p):
     """contact : slash string slash CONTACT"""
-    p[0] = url_ast.Contact(appname=p[2])
+    p[0] = url_ast.Contact(parser=url_parse_func, appname=p[2])
     
 def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
-    p[0] = url_ast.FileList(appname=p[2], queryopts=p[5])
+    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 def p_file(p):
     """file : slash string slash FILE slash querypath"""
-    p[0] = url_ast.FileId(appname=p[2], path=p[6])
+    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6])
 
 def p_file_opts(p):
     """file : slash string slash FILE slash querypath queryopts"""
-    p[0] = url_ast.FileId(appname=p[2], path=p[6], queryopts=p[7])
+    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
 def p_log(p):
     """log : slash string slash LOG slash string"""
-    p[0] = url_ast.LogId(appname=p[2], name=p[6])
+    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6])
 
 def p_log_opts(p):
     """log : slash string slash LOG slash string queryopts"""
-    p[0] = url_ast.LogId(appname=p[2], name=p[6], queryopts=p[7])
+    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
               | slash string slash TAGDEF slash"""
     # GET all definitions and a creation form (HTML)
-    p[0] = url_ast.Tagdef(appname=p[2])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2])
 
 def p_tagdef_rest_get(p):
     """tagdef : slash string slash TAGDEF slash string"""
     # GET a single definition (URL encoded)
-    p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], tag_id=p[6])
 
 def p_tagdef_rest_put(p):
     """tagdef : slash string slash TAGDEF slash string queryopts"""
     # PUT queryopts supports typestr=string&multivalue=boolean&readpolicy=pol&writepolicy=pol
     #  where pol is in [ anonymous, users, subject, subjectowner, tag, system ]
-    p[0] = url_ast.Tagdef(appname=p[2], tag_id=p[6], queryopts=p[7])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], tag_id=p[6], queryopts=p[7])
 
 def p_tags_all(p):
     """tags : slash string slash TAGS
             | slash string slash TAGS slash"""
-    p[0] = url_ast.FileTags(appname=p[2])
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2])
 
 def p_tags_all_opts(p):
     """tags : slash string slash TAGS queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[5])
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 def p_tags_all_slash_opts(p):
     """tags : slash string slash TAGS slash queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], queryopts=p[6])
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], queryopts=p[6])
 
 def p_tags(p):
     """tags : slash string slash TAGS slash querypath"""
-    p[0] = url_ast.FileTags(appname=p[2], path=p[6])
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], path=p[6])
 
 def p_tags_opts(p):
     """tags : slash string slash TAGS slash querypath queryopts"""
-    p[0] = url_ast.FileTags(appname=p[2], path=p[6], queryopts=p[7])
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
 def p_query1(p):
     """query : slash string slash QUERY
              | slash string slash QUERY slash"""
-    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=web.storage())
+    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=web.storage())
 
 def p_query2a(p):
     """query : slash string slash QUERY queryopts"""
-    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=p[5])
+    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=p[5])
 
 def p_query2b(p):
     """query : slash string slash QUERY slash queryopts"""
-    p[0] = url_ast.Query(appname=p[2], path=[([], [], [])], queryopts=p[6])
+    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=p[6])
 
 def p_query3(p):
     """query : slash string slash QUERY slash querypath"""
-    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=web.storage())
+    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=p[6], queryopts=web.storage())
 
 def p_query4(p):
     """query : slash string slash QUERY slash querypath queryopts"""
-    p[0] = url_ast.Query(appname=p[2], path=p[6], queryopts=p[7])
+    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
 def p_querypath_elem_general(p):
     """querypath_elem : predlist '(' predlist ')' ordertags"""
@@ -305,31 +317,31 @@ def p_queryopts_grow_short(p):
 
 def p_transmit_number(p):
     """transmitnumber : slash string slash TRANSMITNUMBER """
-    p[0] = url_ast.TransmitNumber(appname=p[2])
+    p[0] = url_ast.TransmitNumber(parser=url_parse_func, appname=p[2])
 
 def p_study(p):
     """study : slash string slash STUDY"""
-    p[0] = url_ast.Study(appname=p[2])
+    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2])
 
 def p_study_num(p):
     """study : slash string slash STUDY slash predlist_nonempty"""
-    p[0] = url_ast.Study(appname=p[2], subjpreds=p[6])
+    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6])
 
 def p_study_num_opts(p):
     """study : slash string slash STUDY slash predlist_nonempty queryopts"""
-    p[0] = url_ast.Study(appname=p[2], subjpreds=p[6], queryopts=p[7])
+    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6], queryopts=p[7])
 
 def p_study_opts(p):
     """study : slash string slash STUDY queryopts"""
-    p[0] = url_ast.Study(appname=p[2], queryopts=p[5])
+    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 def p_appleterror(p):
     """appleterror : slash string slash APPLETERROR"""
-    p[0] = url_ast.AppletError(appname=p[2])
+    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2])
 
 def p_appleterror_opts(p):
     """appleterror : slash string slash APPLETERROR queryopts"""
-    p[0] = url_ast.AppletError(appname=p[2], queryopts=p[5])
+    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):
@@ -351,7 +363,7 @@ def p_stringany(p):
     # this will fail if __doc__ cannot be mutated before yacc reads it
     p[0] = p[1]
 
-p_stringany.__doc__ =  "string : " + " \n| ".join(keywords.values()) + ' \n| STRING \n| spacestring'
+p_stringany.__doc__ =  "string : " + " \n| ".join(keywords.values()) + ' \n| ESCAPESTRING \n| STRING \n| NUMSTRING \n| spacestring'
 
 def p_string_concat(p):
     """string : string string"""
@@ -380,9 +392,14 @@ def make_parser():
 #    return yacc.yacc()
 
 def make_parse():
-    parser = make_parser()
-    lexer = make_lexer()
     lock = threading.Lock()
+    lock.acquire()
+    try:
+        parser = make_parser()
+        lexer = make_lexer()
+    finally:
+        lock.release()
+        
     def parse(s):
         lock.acquire()
         try:
@@ -390,4 +407,7 @@ def make_parse():
         finally:
             lock.release()
     return parse
+
+# provide a mutexed parser instance for all to use
+url_parse_func = make_parse()
 

@@ -23,7 +23,7 @@ import traceback
 import itertools
 
 # Uncomment the below line in case of a RPM installation
-from tagfiler import url_lex, url_parse, url_parse_func, dataserv_app
+from tagfiler import url_lex, url_parse, dataserv_app
 
 # need to find our other local modules
 
@@ -54,7 +54,7 @@ class Dispatcher:
         uri = web.ctx.env['REQUEST_URI']
 
         try:
-            ast = url_parse_func(uri)
+            ast = url_parse.url_parse_func(uri)
         except url_lex.LexicalError, te:
             web.debug('lex error on URI %s' % uri)
             ast = None

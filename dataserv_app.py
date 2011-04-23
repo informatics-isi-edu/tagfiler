@@ -308,9 +308,11 @@ class Application:
         else:
             return view
         
-    def __init__(self):
+    def __init__(self, parser=None):
         "store common configuration data for all service classes"
         global render
+
+        self.url_parse_func = parser
 
         self.skip_preDispatch = False
 
@@ -527,13 +529,27 @@ class Application:
         
         self.tagtypeValidators = { 'tagname' : self.validateTagname,
                                    'file' : self.validateFilename,
-                                   'vfile' : self.validateVersionedFilename }
+                                   'vfile' : self.validateVersionedFilename,
+                                   'id' : self.validateSubjectQuery }
 
-    def validateFilename(self, file, tagname='', subject=None):        
+    def validateSubjectQuery(self, query, tagdef=None, subject=None):
+        if type(query) in [ int, long ]:
+            return
+        if type(query) in [ type('string'), unicode ]:
+            ast = self.url_parse_func(query)
+            if hasattr(ast, 'is_subquery') and ast.is_subquery:
+                # this holds a subquery expression to evaluate
+                return [ subject.id for subject in self.select_files_by_predlist_path(path=ast.path) ]
+            elif type(ast) in [ int, long ]:
+                # this is a bare subject identifier
+                return ast
+        raise BadRequest('Sub-query expression "%s" not a valid expression.' % query)
+        
+    def validateFilename(self, file, tagdef='', subject=None):        
         results = self.select_files_by_predlist(subjpreds=[web.Storage(tag='name', op='=', vals=[file])],
                                                 listtags=['id'])
         if len(results) == 0:
-            raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagname))
+            raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagdef.tagname))
 
     def validateVersionedFilename(self, vfile, tagdef=None, subject=None):
         tagname = ''
@@ -1444,7 +1460,17 @@ class Application:
 
         validator = self.tagtypeValidators.get(typedef.typedef)
         if validator:
-            validator(value, tagdef, subject)
+            results = validator(value, tagdef, subject)
+            if results != None:
+                # validator converted user-supplied value to internal form to use instead
+                if type(results) == type([]):
+                    # validatator generated a set of values, recursively try to set these instead
+                    for val in results:
+                        self.set_tag(subject, tagdef, val)
+                    return
+                else:
+                    # override value and continue processing
+                    value = results
 
         try:
             if value:

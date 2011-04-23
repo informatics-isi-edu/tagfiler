@@ -52,14 +52,22 @@ def dictmerge(base, custom):
     custom.update(base)
     return custom
 
+class Subquery:
+    """Stub AST node holds a query path that is not wrapped in a full URI.
+
+       This class cannot be invoked by the URL dispatcher as it has no web methods."""
+    def __init__(self, path):
+        self.path = path
+        self.is_subquery = True
+
 class Node (object, Application):
     """Abstract AST node for all URI patterns"""
 
     __slots__ = [ 'appname' ]
 
-    def __init__(self, appname):
+    def __init__(self, parser, appname):
         self.appname = appname
-        Application.__init__(self)
+        Application.__init__(self, parser)
 
     def uri2referer(self, uri):
         return self.config['home'] + uri
@@ -72,8 +80,8 @@ class TransmitNumber (Node):
 
     __slots__ = []
 
-    def __init__(self, appname):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname):
+        Node.__init__(self, parser, appname)
 
     def POST(self, uri):
 
@@ -109,8 +117,8 @@ class Study (Node):
 
     __slots__ = []
 
-    def __init__(self, appname, subjpreds=[], queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, subjpreds=[], queryopts={}):
+        Node.__init__(self, parser, appname)
         self.action = 'get'
         self.study_type = None
         self.study_size = None
@@ -269,8 +277,8 @@ class AppletError (Node):
 
     __slots__ = []
 
-    def __init__(self, appname, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, queryopts={}):
+        Node.__init__(self, parser, appname)
         self.action = None
         self.status = None
 
@@ -297,8 +305,8 @@ class FileList (Node):
 
     __slots__ = []
 
-    def __init__(self, appname, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, queryopts={}):
+        Node.__init__(self, parser, appname)
         self.globals['view'] = None
         self.queryopts = queryopts
 
@@ -441,8 +449,8 @@ class LogList (Node):
        GET LOG or LOG/  -- gives a listing
        """
 
-    def __init__(self, appname, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, queryopts={}):
+        Node.__init__(self, parser, appname)
 
     def GET(self, uri):
         if not self.authn.hasRoles(['admin']):
@@ -471,8 +479,8 @@ class Contact (Node):
        GET CONTACT
        """
 
-    def __init__(self, appname, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, queryopts={}):
+        Node.__init__(self, parser, appname)
 
     def GET(self, uri):
         
@@ -487,8 +495,8 @@ class FileId(Node, FileIO):
 
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
-    def __init__(self, appname, path, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, path, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
+        Node.__init__(self, parser, appname)
         FileIO.__init__(self)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         self.file = file
@@ -506,8 +514,8 @@ class LogId(Node, LogFileIO):
 
     """
     __slots__ = [ ]
-    def __init__(self, appname, name, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, name, queryopts={}):
+        Node.__init__(self, parser, appname)
         LogFileIO.__init__(self)
         self.name = name
         self.queryopts = queryopts
@@ -517,8 +525,8 @@ class Tagdef (Node):
 
     __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writepolicy', 'readpolicy', 'multivalue', 'queryopts' ]
 
-    def __init__(self, appname, tag_id=None, typestr=None, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, tag_id=None, typestr=None, queryopts={}):
+        Node.__init__(self, parser, appname)
         self.tag_id = tag_id
         self.typestr = typestr
         self.writepolicy = None
@@ -744,8 +752,8 @@ class FileTags (Node):
 
     __slots__ = [ 'tag_id', 'value', 'tagvals' ]
 
-    def __init__(self, appname, path=None, queryopts={}):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, path=None, queryopts={}):
+        Node.__init__(self, parser, appname)
         if path:
             self.path = path
         else:
@@ -1106,8 +1114,8 @@ class FileTags (Node):
 
 class Query (Node):
     __slots__ = [ 'subjpreds', 'queryopts', 'action' ]
-    def __init__(self, appname, queryopts={}, path=[]):
-        Node.__init__(self, appname)
+    def __init__(self, parser, appname, queryopts={}, path=[]):
+        Node.__init__(self, parser, appname)
         self.path = path
         if len(self.path) == 0:
             self.path = [ ( [], [], [] ) ]
