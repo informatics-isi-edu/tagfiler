@@ -16,6 +16,7 @@ limitations under the License.
 -->
 <xsl:stylesheet version="1.0"
 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+<xsl:strip-space elements="*"/>
 <xsl:template match="head">
 </xsl:template>
 <xsl:template match="script">
@@ -32,17 +33,33 @@ xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 </xsl:template>
 <xsl:template match="//table[@class='topmenu']">
 </xsl:template>
-<xsl:template match="td//td">
-  <xsl:if test="@class='file-tag readusers multivalue'">
-    <xsl:text>read users: ( '</xsl:text><xsl:value-of select="normalize-space(.)" /><xsl:text>' )</xsl:text>
-  </xsl:if>
-  <xsl:if test="@class='file-tag writeusers multivalue'">
-    <xsl:text>write users: ( '</xsl:text><xsl:value-of select="normalize-space(.)" /><xsl:text>' )</xsl:text>
-  </xsl:if>
-</xsl:template>
-<xsl:template match="td[@class='tag name']">
-</xsl:template>
-<xsl:template match="td[@class='file-tag tagdefmultivalue']">
+<xsl:template match="td">
+  <xsl:choose>
+  <xsl:when test="@class='tag name'">
+    <xsl:value-of select="normalize-space(.)" /><xsl:text>: ( </xsl:text>
+  </xsl:when>
+  <xsl:otherwise>
+    <xsl:for-each select="table/tr/td">
+      <xsl:if test="table/tr/td/a">
+        <xsl:if test="normalize-space(.)!=''">
+          <xsl:text>'</xsl:text><xsl:value-of select="normalize-space(table/tr/td/a)" /><xsl:text>' </xsl:text>
+        </xsl:if>
+      </xsl:if>
+      <xsl:if test="not(table/tr/td/a)">
+        <xsl:if test="normalize-space(.)!=''">
+          <xsl:text>'</xsl:text><xsl:value-of select="normalize-space(.)" /><xsl:text>' </xsl:text>
+        </xsl:if>
+      </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="table/tr/form/td">
+        <xsl:if test="text()">
+          <xsl:text>'</xsl:text><xsl:value-of select="normalize-space(.)" /><xsl:text>' </xsl:text>
+        </xsl:if>
+    </xsl:for-each>
+    <xsl:text>)
+    </xsl:text>
+  </xsl:otherwise>
+  </xsl:choose>
 </xsl:template>
 </xsl:stylesheet>
 

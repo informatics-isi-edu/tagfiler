@@ -16,12 +16,25 @@ limitations under the License.
 -->
 <xsl:stylesheet version="1.0"
 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-<xsl:template match="/">
-  <xsl:for-each select="//fieldset/legend">
-	<xsl:text>
-	</xsl:text>
-	<xsl:value-of select="." />
-  </xsl:for-each>
+<xsl:template match="head">
+</xsl:template>
+<xsl:template match="script">
+</xsl:template>
+<xsl:template match="h2">
+</xsl:template>
+<xsl:template match="//tr">
+  <xsl:if test="@class='tagdef writeok' or @class='tagdef readonly'">
+    <xsl:text>( </xsl:text>
+    <xsl:for-each select="td">
+      <xsl:text>'</xsl:text> <xsl:value-of select="." /><xsl:text>' </xsl:text>
+    </xsl:for-each>
+    <xsl:text>)
+    </xsl:text>
+  </xsl:if>
+  <xsl:if test="@class='heading'">
+    <xsl:text>
+    </xsl:text>
+  </xsl:if>
 </xsl:template>
 </xsl:stylesheet>
 
