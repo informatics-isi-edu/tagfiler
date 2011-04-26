@@ -1276,4 +1276,3 @@ class Query (Node):
             yield res
 
 
->
