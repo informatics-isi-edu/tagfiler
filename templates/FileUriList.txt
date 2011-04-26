@@ -15,5 +15,19 @@ $if None:
 	$# See the License for the specific language governing permissions and
 	$# limitations under the License.
 	$#
+$ names = []
+$for file in files:
+	$if file.name != None:
+		$ names.append(file.name)
+	$elif file.tagdef != None:
+		$ names.append('tagdef=' + file.tagdef)
+	$elif file.config != None:
+		$ names.append('config=' + file.config)
+	$elif file.view != None:
+		$ names.append('view=' + file.view)
+	$elif file.typedef != None:
+		$ names.append('typedef=' + file.typedef)
+	$else:
+		$ names.append('id=' + file.id)
 $# this lambda is to do a ternary operator in old Python 2.4
-$:{ (lambda s: s + ("", "\n")[len(s) > 0])("\n".join([ "%s/file/%s" % (home, urlquote(file.name)) for file in files]))}
+$:{ (lambda s: s + ("", "\n")[len(s) > 0])("\n".join([ "%s/file/%s" % (home, file) for file in names]))}

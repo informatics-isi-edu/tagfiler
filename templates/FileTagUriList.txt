@@ -21,13 +21,25 @@ $code
 	def rendertagvals():
 		s = ""
 		for file in files:
+			if file.name != None:
+				subject = file.name
+			elif file.tagdef != None:
+				subject = 'tagdef=' + file.tagdef
+			elif file.config != None:
+				subject = 'config=' + file.config
+			elif file.view != None:
+				subject = 'view=' + file.view
+			elif file.typedef != None:
+				subject = 'typedef=' + file.typedef
+			else:
+				subject = 'id=' + file.id
 			for tagdef in tagdefs:
 				if file[tagdef.tagname]:
 					if tagdef.typestr == 'empty':
-						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + ")\n"
+						s += home + "/tags/" + subject + "(" + tagdef.tagname + ")\n"
 					elif tagdef.multivalue:
-						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + ','.join([urlquote(val) for val in file[tagdef.tagname]] + ")\n"
+						s += home + "/tags/" + subject + "(" + tagdef.tagname + "=" + ','.join([str(val) for val in file[tagdef.tagname]]) + ")\n"
 					else:
-						s += home + "/tags/" + urlquote(file.file) + "(" + urlquote(tagdef.tagname) + "=" + urlquote(file[tagdef.tagname]) + ")\n"
+						s += home + "/tags/" + subject + "(" + tagdef.tagname + "=" + str(file[tagdef.tagname]) + ")\n"
 		return s
 ${rendertagvals()[:-1]}

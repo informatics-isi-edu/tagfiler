@@ -839,6 +839,7 @@ class FileTags (Node):
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
                 web.header('Content-Type', 'text/uri-list')
+                self.globals['str'] = str 
                 return self.render.FileTagUriList(files, all)
             elif acceptType == 'application/x-www-form-urlencoded' and len(files) == 1:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
