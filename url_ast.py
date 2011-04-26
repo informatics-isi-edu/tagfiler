@@ -435,6 +435,7 @@ class FileList (Node):
         else:
             path = []
         ast = FileId(appname=self.appname,
+                     parser=self.url_parse_func,
                      path=path,
                      url=url,
                      dtype=dtype,
@@ -1275,3 +1276,4 @@ class Query (Node):
             yield res
 
 
+>
