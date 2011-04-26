@@ -62,7 +62,7 @@ tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())
 # (consuming code must unescape after parsing)
 
 def t_ESCAPESTRING(t):
-    r'%[0-9]+'
+    r'%[0-9A-Fa-f]+'
     t.value = urllib.unquote_plus(t.value)
     return t
 
