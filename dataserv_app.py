@@ -2028,7 +2028,7 @@ class Application:
             except:
                 limit = 25
                 
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True)
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
         if unique == False:
             versions = 'latest'
         else:
@@ -2038,7 +2038,7 @@ class Application:
         versions = self.queryopts.get('versions', versions)
         if versions not in [ 'latest', 'any' ]:
             versions = 'latest'
-
+            
         return (path, listtags, writetags, limit, versions)
 
     
