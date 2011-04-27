@@ -37,6 +37,8 @@ CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
+CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
+CLUSTER subjecttags USING subjecttags_subject_key;
 EOF
 
 # insert/get normalized datum id
@@ -62,21 +64,29 @@ EOF
 # pre-established stored data
 # MUST NOT be called more than once with same name during deploy 
 # e.g. only deploys version 1 properly
-dataset()
+dataset_core()
 {
-   # args: <name> url <url> <owner> [<readuser>]...
-   # args: <name> blank <owner> [<readuser>]...
-   # args: <name> typedef <owner> [<readuser>]...
-   # args: <name> tagdef <owner> [<readuser>]...
-   # args: <name> config <owner> [<readuser>]...
-   # args: <name> view <owner> [<readuser>]...
+   psql -A -t -q <<EOF
+INSERT INTO resources DEFAULT VALUES RETURNING subject;
+EOF
+}
 
-   local file="$1"
-   local type="$2"
+dataset_complete()
+{
+   # args: <subjectid> <name> url <url> <owner> [<readuser>]...
+   # args: <subjectid> <name> blank <owner> [<readuser>]...
+   # args: <subjectid> <name> typedef <owner> [<readuser>]...
+   # args: <subjectid> <name> tagdef <owner> [<readuser>]...
+   # args: <subjectid> <name> config <owner> [<readuser>]...
+   # args: <subjectid> <name> view <owner> [<readuser>]...
+
+   local subject="$1"
+   local file="$2"
+   local type="$3"
    local url
    local owner
 
-   shift 2
+   shift 3
 
    case "$type" in
       url)
@@ -104,11 +114,6 @@ dataset()
    local owner="$1"
    shift
 
-   local subject=$(psql -A -t -q <<EOF
-INSERT INTO resources DEFAULT VALUES RETURNING subject;
-EOF
-   )
-
    if [[ -n "$owner" ]]
    then
        tag "$subject" owner text "$owner" >&2
@@ -121,7 +126,7 @@ EOF
    done
 
    case "$type" in
-      file|url)
+      url)
 	 tag "$subject" name text "$file" >&2
 	 tag "$subject" 'latest with name' text "$file" >&2
 	 tag "$subject" vname text "$file@1" >&2
@@ -137,8 +142,13 @@ EOF
 	 tag "$subject" "$type" text "$file" >&2
 	 ;;
    esac
+}
 
-   echo "$subject"
+dataset()
+{
+    local subject=$(dataset_core)
+    dataset_complete "$subject" "$@"
+    echo "$subject"
 }
 
 tag()
@@ -218,9 +228,9 @@ EOF
    done
 }
 
-tagdef_tags()
+tagdef_phase2()
 {
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey]]
+   # args: subject tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey [tagref]]]
 
    # policy is one of:
    #   anonymous  -- any client can access
@@ -230,37 +240,43 @@ tagdef_tags()
    #   tag -- tag access rule is observed for tag access
    #   system  -- no client can access
 
-   echo "create tagdef '$1'..." >&2
+   echo "populate tagdef '$2'..." >&2
 
-   local subject=$(dataset "" tagdef "$3" "*")
+   dataset_complete "$1" "" tagdef "$4" "*"
+   local subject="$1"
 
-   tag "$subject" "tagdef" text "$1" >&2
+   tag "$subject" "tagdef" text "$2" >&2
    tag "$subject" "tagdef active" >&2
 
-   tag "$subject" "tagdef readpolicy" tagpolicy "$4" >&2
-   tag "$subject" "tagdef writepolicy" tagpolicy "$5" >&2
+   tag "$subject" "tagdef readpolicy" tagpolicy "$5" >&2
+   tag "$subject" "tagdef writepolicy" tagpolicy "$6" >&2
 
-   if [[ "$6" == "true" ]]
+   if [[ "$7" == "true" ]]
    then
       tag "$subject" "tagdef multivalue" >&2
    fi
 
-   if [[ -n "$7" ]]
+   if [[ -n "$8" ]]
    then
-      tag "$subject" "tagdef type" type "$7" >&2
+      tag "$subject" "tagdef type" type "$8" >&2
    else
-      tag "$subject" "tagdef type" type "$2" >&2
+      tag "$subject" "tagdef type" type "$3" >&2
    fi
 
-   if [[ "$8" == "true" ]]
+   if [[ "$9" == "true" ]]
    then
       tag "$subject" "tagdef unique" >&2
    fi
 }
 
-tagdef_table()
+tagdef_phase1()
 {
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey]]
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey [tagref]]]
+
+   local tagref
+   local fk
+   local default
+   local uniqueval
 
    if [[ -n "$2" ]] && [[ "$2" != empty ]]
    then
@@ -270,18 +286,21 @@ tagdef_table()
       else
          default=""
       fi
-      if [[ "$7" = "file" ]]
-      then
-         fk="REFERENCES \"_latest with name\" (value) ON DELETE CASCADE"
-      elif [[ "$7" = "vfile" ]]
-      then
-         fk="REFERENCES \"_vname\" (value) ON DELETE CASCADE"
-      elif [[ "$1" = "vname" ]] || [[ "$8" = true ]]
+
+      if [[ "$1" = "vname" ]] || [[ "$8" = true ]]
       then
          fk="UNIQUE"
       else
          fk=""
       fi
+
+      tagref="$9"
+
+      if [[ -n "$tagref" ]]
+      then
+	  fk="${fk} REFERENCES \"_${tagref}\" (value) ON DELETE CASCADE"
+      fi
+
       if [[ "$6" = "true" ]]
       then
          uniqueval='UNIQUE(subject, value)'
@@ -293,7 +312,7 @@ tagdef_table()
       # UNIQUE(subject, value) implies index _$1_subject_key on (subject, value)
       # UNIQUE(subject) implies index _$1_subject_key on (subject)
 
-      psql -q -t <<EOF
+      psql -q -t >&2 <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
 $(if [[ "$uniqueval" = "UNIQUE(subject)" ]] ; then 
@@ -304,13 +323,19 @@ $(if [[ "$uniqueval" = "UNIQUE(subject)" ]] ; then
   fi)
 EOF
    else
-      psql -q -t <<EOF
+      psql -q -t >&2 <<EOF
 CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (subject) ON DELETE CASCADE );
 CLUSTER "_$1" USING "_$1_subject_key";
 EOF
    fi
+
+   local subject=$(dataset_core "" tagdef "$3" "*")
+   tag "$subject" "tagdef" text "$1" >&2
+   
+   echo "$subject"
 }
 
+tag_subjects=()
 tag_names=()
 tag_dbtypes=()
 tag_owners=()
@@ -329,8 +354,8 @@ tagdef()
    tag_multivalues[${#tag_multivalues[*]}]="$6"
    tag_typestrs[${#tag_typestrs[*]}]="$7"
    tag_uniques[${#tag_uniques[*]}]="$8"
-
-   tagdef_table "$@"
+   tag_tagrefs[${#tag_tagrefs[*]}]="$9"
+   tag_subjects[${#tag_subjects[*]}]=$(tagdef_phase1 "$@")
 }
 
 tagdefs_complete()
@@ -339,17 +364,19 @@ tagdefs_complete()
    echo ${!tag_names[*]}
    for i in ${!tag_names[*]}
    do
-      tagdef_tags "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_typestrs[$i]}" "${tag_uniques[$i]}"
+      tagdef_phase2 "${tag_subjects[$i]}" "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_typestrs[$i]}" "${tag_uniques[$i]}" "${tag_tagrefs[$i]}"
    done
 }
 
-typedef()
+typedef_core()
 {
    typename="$1"
    dbtype="$2"
    desc="$3"
+   tagref="$4"
    shift 3
-   local subject=$(dataset "" typedef "" "*")
+   shift  # shift 4 can fail to shift when only 3 args were passed!
+   local subject=$(dataset_core "" typedef "" "*")
    tag "$subject" "typedef" text "${typename}" >&2
    tag "$subject" "typedef dbtype" text "${dbtype}" >&2
    tag "$subject" "typedef description" text "${desc}" >&2
@@ -357,34 +384,57 @@ typedef()
    then
       tag "$subject" "typedef values" text "$@" >&2
    fi
+   echo "$subject"
 }
 
+typedef_tagref()
+{
+    local subject="$1"
+    local tagref="$2"
+    dataset_complete "$subject" "" typedef "" "*"
+    if [[ -n "$tagref" ]]
+    then
+	tag "$subject" "typedef tagref" text "$tagref" >&2
+    fi
+}
 
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY
+type_subjects=()
+type_tagrefs=()
 
-tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
-tagdef 'tagdef'              text        ""         anonymous   system       false      ""         true
+typedef()
+{
+    local subject=$(typedef_core "$@")
+    type_subjects[${#type_subjects[*]}]="$subject"
+    type_tagrefs[${#type_tagrefs[*]}]="$4"
+}
+
+typedefs_complete()
+{
+    local i
+    for i in ${!type_subjects[*]}
+    do
+      typedef_tagref "${type_subjects[$i]}" "${type_tagrefs[$i]}"
+    done
+}
+
+# sequencing is crucial here to avoid unresolved dependencies!
+
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
+tagdef 'tagdef'              text        ""         anonymous   system       false      ""         true  
 tagdef 'typedef'             text        ""         anonymous   subject      false      ""         true
-tagdef 'config'              text        ""         anonymous   subject      false      ""         true
-tagdef 'view'                text        ""         anonymous   subject      false      ""         true
-
-tagdef 'default view'        text        ""         subject     subject      false      viewname
-
-tagdef 'tagdef type'         text        ""         anonymous   system       false      type
+tagdef 'typedef description' text        ""         anonymous   subject      false
+tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
+tagdef 'typedef values'      text        ""         anonymous   subject      true
 tagdef 'tagdef unique'       empty       ""         anonymous   system       false      ""
-
 tagdef 'tagdef multivalue'   empty       ""         anonymous   system       false
 tagdef 'tagdef active'       empty       ""         anonymous   system       false
 tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false      tagpolicy
 tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false      tagpolicy
-
+tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
+tagdef 'config'              text        ""         anonymous   subject      false      ""         true
+tagdef 'view'                text        ""         anonymous   subject      false      ""         true
 tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
 tagdef 'tag write users'     text        ""         anonymous   subjectowner true       rolepat
-
-tagdef 'typedef description' text        ""         anonymous   subject      false
-tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
-tagdef 'typedef values'      text        ""         anonymous   subject      true
-
 tagdef owner                 text        ""         anonymous   tag          false      role
 tagdef created               timestamptz ""         anonymous   system       false
 tagdef "version created"     timestamptz ""         anonymous   system       false
@@ -397,37 +447,62 @@ tagdef version               int8        ""         anonymous   system       fal
 tagdef name                  text        ""         anonymous   system       false
 tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
 tagdef vname                 text        ""         anonymous   system       false      ""         true
+tagdef parentof              text        ""         subject     subject      true       id
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
-
-tagdef contains              text        ""         subject     subject      true       file
-tagdef vcontains             text        ""         subject     subject      true       vfile
-tagdef parentof              text        ""         subject     subject      true       id
 tagdef key                   text        ""         anonymous   subject      false      ""         true
 tagdef "check point offset"  int8        ""         anonymous   subject      false
 tagdef "incomplete"          empty       ""         anonymous   subject      false
-
 tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
 tagdef "Image Set"           empty       "${admin}" subject     subject      false
+tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
+tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY
+#       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
+typedef empty        ''            'No content'
+typedef int8         int8          'Integer'
+typedef float8       float8        'Floating point'
+typedef date         date          'Date'
+typedef timestamptz  timestamptz   'Date and time with timezone'
+typedef text         text          'Text'
+typedef role         text          'Role'
+typedef rolepat      text          'Role pattern'
+typedef dtype        text          'Dataset type'                  ""                 'blank Dataset node for metadata-only' 'file Named dataset for locally stored file' 'url Named dataset for URL redirecting'
+typedef url          text          'URL'
+typedef id           int8          'Subject ID or subquery'
+typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
+typedef type         text          'Scalar value type'             typedef
+typedef tagdef       text          'Tag definition'                tagdef
+typedef name         text          'Subject name'                  "latest with name"
+typedef vname        text          'Subject name@version'          vname
+typedef view         text          'View name'                     view
+#       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
 
-psql -q -t <<EOF
-CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
-CLUSTER subjecttags USING subjecttags_subject_key;
-EOF
-
+# complete split-phase definitions and redefine as combined phase
 tagdefs_complete
-
-# redefine tagdef to perform both phases, now that core (recursively constrained) tagdefs are in place
 tagdef()
 {
-   tagdef_table "$@"
-   tagdef_tags "$@"
+   local subject=$(tagdef_phase1 "$@")
+   tagdef_phase2 "$subject" "$@"
 }
+
+typedefs_complete
+typedef()
+{
+    local subject=$(typedef_core "$@")
+    typedef_tagref "$subject" "$4"
+}
+
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
+tagdef 'default view'        text        ""         subject     subject      false      view       ""       view
+tagdef contains              text        ""         subject     subject      true       name       ""       "latest with name"
+tagdef vcontains             text        ""         subject     subject      true       vname      ""       vname
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
+
 
 # add tagdef foreign key referencing constraint
 # drop storage for psuedo tag 'id' which we can synthesize from any subject column
@@ -467,28 +542,8 @@ do
 done
 
 tagfilercfg=$(dataset "tagfiler" config "${admin}" "*")
-tag $tagfilercfg "view" text "default"  # config="tagfiler" is also view="default"
+tag "$tagfilercfg" "view" text "default"  # config="tagfiler" is also view="default"
 
-typedef empty        ''            'No content'
-typedef int8         int8          'Integer'
-typedef float8       float8        'Floating point'
-typedef date         date          'Date'
-typedef timestamptz  timestamptz   'Date and time with timezone'
-typedef text         text          'Text'
-typedef role         text          'Role'
-typedef rolepat      text          'Role pattern'
-typedef tagname      text          'Tag name'
-typedef tagdef       text          'Tag definition'
-typedef dtype        text          'Dataset type' 'blank Dataset node for metadata-only' 'file Named dataset for locally stored file' 'url Named dataset for URL redirecting'
-typedef url          text          'URL'
-typedef id           int8          'Dataset ID'
-typedef file         text          'Dataset name'
-typedef vfile        text          'Dataset name with version number'
-
-typedef tagpolicy    text          'Tag policy model' 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
-
-typedef type         text          'Scalar value type'
-typedef viewname     text          'View name'
 
 cfgtags=$(dataset "config" view "${admin}" "*")
 
@@ -497,21 +552,21 @@ cfgtagdef()
    local tagname="_cfg_$1"
    shift
    tagdef "$tagname" "$@"
-   tag "$cfgtags" "_cfg_file list tags" tagname "$tagname"
-   [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagname "$tagname"
+   tag "$cfgtags" "_cfg_file list tags" tagdef "$tagname"
+   [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagdef "$tagname"
 }
 
 #      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
 
 # file list tags MUST BE DEFINED FIRST
-cfgtagdef 'file list tags'            text  ""      subject     subject       true       tagname
+cfgtagdef 'file list tags'            text  ""      subject     subject       true       tagdef
 # tag list tags MUST BE DEFINED NEXT...
-cfgtagdef 'tag list tags'             text  ""      subject     subject       true       tagname
+cfgtagdef 'tag list tags'             text  ""      subject     subject       true       tagdef
 
 # THEN, need to do this manually to break dependency loop
 tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
-cfgtagdef 'file list tags write'      text  ""      subject     subject       true       tagname
+cfgtagdef 'file list tags write'      text  ""      subject     subject       true       tagdef
 cfgtagdef 'tagdef write users'        text  ""      subject     subject       true       rolepat
 cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
 cfgtagdef home                        text  ""      subject     subject       false
@@ -534,8 +589,8 @@ cfgtagdef 'client socket buffer size' int8  ""      subject     subject       fa
 cfgtagdef 'client retry count'        int8  ""      subject     subject       false
 cfgtagdef 'client chunk bytes'        int8  ""      subject     subject       false
 cfgtagdef 'client socket timeout'     int8  ""      subject     subject       false
-cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagname
-cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagname
+cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagdef
+cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagdef
 cfgtagdef 'applet custom properties'  text  ""      subject     subject       true
 cfgtagdef 'applet test log'           text  ""      subject     subject       false
 cfgtagdef 'applet test properties'    text  ""      subject     subject       true
@@ -579,43 +634,43 @@ cfgtag "file list tags" text bytes owner 'read users' 'write users'
 tagdeftags=$(dataset "tagdef" view "${admin}" "*")
 for tagname in "tagdef type" "tagdef multivalue" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 do
-   tag "$tagdeftags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$tagdeftags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$tagdeftags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$tagdeftags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 typedeftags=$(dataset "typedef" view "${admin}" "*")
-for tagname in "typedef description" "typedef dbtype" "typedef values"
+for tagname in "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
 do
-   tag "$typedeftags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$typedeftags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$typedeftags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$typedeftags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 viewtags=$(dataset "view" view "${admin}" "*")
 for tagname in "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
 do
-   tag "$viewtags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$viewtags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$viewtags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$viewtags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 vcontainstags=$(dataset "vcontains" view "${admin}" "*")
 for tagname in "vcontains"
 do
-   tag "$vcontainstags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$vcontainstags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$vcontainstags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$vcontainstags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 containstags=$(dataset "contains" view "${admin}" "*")
 for tagname in "contains"
 do
-   tag "$containstags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$containstags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$containstags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$containstags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 urltags=$(dataset "url" view "${admin}" "*")
 for tagname in "url"
 do
-   tag "$urltags" "_cfg_file list tags" "tagname" "$tagname"
-   tag "$urltags" "_cfg_tag list tags" "tagname" "$tagname"
+   tag "$urltags" "_cfg_file list tags" tagdef "$tagname"
+   tag "$urltags" "_cfg_tag list tags" tagdef "$tagname"
 done
 
 # remapping rules:

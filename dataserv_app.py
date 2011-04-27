@@ -405,6 +405,7 @@ class Application:
                            ('typedef description', 'text', False, 'subject', False),
                            ('typedef dbtype', 'text', False, 'subject', False),
                            ('typedef values', 'text', True, 'subject', False),
+                           ('typedef tagref', 'text', False, 'subject', False),
                            ('read users', 'rolepat', True, 'subjectowner', False),
                            ('write users', 'rolepat', True, 'subjectowner', False),
                            ('owner', 'role', False, 'subjectowner', False),
@@ -816,20 +817,28 @@ class Application:
                             tagnames = self.globals['tagdefsdict'].keys()
                             type = self.globals['typesdict'][tagdef.typestr]
                             typevals = type['typedef values']
+                            tagref = type['typedef tagref']
                             roleinfo = self.globals['roleinfo']
-                            if tagdef.typestr in ['role', 'rolepat', 'tagname'] or typevals:
-                                if typevals:
-                                    options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
-                                elif tagdef.typestr in [ 'role', 'rolepat' ]:
-                                    if roleinfo != None:
-                                        if tagdef.typestr == 'rolepat':
-                                            options = [ (role, role) for role in set(roleinfo).union(set(['*'])).difference(set(values)) ]
-                                        else:
-                                            options = [ (role, role) for role in set(roleinfo).difference(set(values)) ]
+
+                            if typevals:
+                                options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
+                            elif tagdef.typestr in [ 'role', 'rolepat' ]:
+                                if roleinfo != None:
+                                    if tagdef.typestr == 'rolepat':
+                                        options = [ (role, role) for role in set(roleinfo).union(set(['*'])).difference(set(values)) ]
                                     else:
-                                        options = None
-                                elif tagdef.typestr == 'tagname' and tagnames:
-                                    options = [ (tag, tag) for tag in set(tagnames).difference(set(values)) ]
+                                        options = [ (role, role) for role in set(roleinfo).difference(set(values)) ]
+                                else:
+                                    options = None
+                            elif tagref:
+                                if tagref in tagnames:
+                                    options = [ (value, value) for value in
+                                                set([ res.value for res in self.db.query('SELECT DISTINCT value FROM %s' % self.wraptag(tagref))])
+                                                .difference(set(values)) ]
+                                else:
+                                    options = None
+                            elif tagdef.typestr == 'tagname' and tagnames:
+                                options = [ (tag, tag) for tag in set(tagnames).difference(set(values)) ]
                             else:
                                 options = None
                             return options
@@ -1132,7 +1141,7 @@ class Application:
             subjpreds = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
         else:
             subjpreds = [ web.Storage(tag='typedef', op=None, vals=[]) ]
-        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
+        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values', 'typedef tagref' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags) ]
 
     def select_file_members(self, subject, membertag='vcontains'):
@@ -1287,7 +1296,7 @@ class Application:
 
         type = self.globals['typesdict'].get(tagdef.typestr, None)
         if type == None:
-            raise BadRequest('Referenced type "%s" is not defined.' % tagdef.typestr)
+            raise Conflict('Referenced type "%s" is not defined.' % tagdef.typestr)
 
         dbtype = type['typedef dbtype']
         if dbtype != '':
@@ -1295,11 +1304,20 @@ class Application:
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             tabledef += ' NOT NULL'
-            
-            if tagdef.typestr == 'file':
-                tabledef += ' REFERENCES "_latest with name" (value) ON DELETE CASCADE'
-            elif tagdef.typestr == 'vfile':
-                tabledef += ' REFERENCES "_vname" (value) ON DELETE CASCADE'
+
+            tagref = type['typedef tagref']
+                
+            if tagref:
+                if tagref == 'name':
+                    tagref = 'latest with name' # need to remap to unique variant
+
+                referenced_tagdef = self.globals['tagdefsdict'].get(tagref, None)
+
+                if referenced_tagdef == None:
+                    raise Conflict('Referenced tag "%s" not found.' % tagref)
+
+                if referenced_tagdef.unique and referenced_tagdef.typestr != 'empty':
+                    tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
             if not tagdef.multivalue:
                 tabledef += ", UNIQUE(subject)"
