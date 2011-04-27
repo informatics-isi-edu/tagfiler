@@ -1896,6 +1896,7 @@ class Application:
     def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         values = dict()
         tagdefs = self.globals['tagdefsdict']
+        typedefs = self.globals['typesdict']
         
         def build_query_recursive(stack, qd, limit):
             subjpreds, listpreds, ordertags = stack[0]
@@ -1913,10 +1914,15 @@ class Application:
                 if len(clistpreds) != 1:
                     raise BadRequest("Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
                 projection = clistpreds[0].tag
-                if tagdefs[projection].typestr not in [ 'text', 'file', 'vfile', 'id', 'tagname', 'viewname' ]:
+
+                tagref = typedefs[tagdefs[projection]]['typedef tagref']
+                if tagref == None and tagdefs[projection].typestr not in [ 'text', 'id' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 
-                context_attr = dict(text='name', file='name', vfile='vname', id='id', viewname='view', tagname='tagdef')[tagdefs[projection].typestr]
+                if tagref != None:
+                    context_attr = tagref
+                else:
+                    context_attr = dict(text='name', id='id')[tagdefs[projection].typestr]
                 if tagdefs[projection].multivalue:
                     projectclause = 'unnest("%s")' % projection
                 else:
