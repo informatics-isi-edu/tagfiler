@@ -526,7 +526,7 @@ homelinks=(
 $(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}")
 $(dataset "Upload study"                         url "${homepath}/study?action=upload"             "${admin}" "${curator}" "${uploader}")
 $(dataset "Download study"                       url "${homepath}/study?action=download"           "${admin}" "${curator}" "${downloader}")
-$(dataset "Query by tags, latest versions"       url "${homepath}/query?action=edit"               "${admin}" "${curator}" "${downloader}")
+$(dataset "Query by tags, latest versions"       url "${homepath}/query?action=edit&versions=latest"	"${admin}" "${curator}" "${downloader}")
 $(dataset "Query by tags, all versions"          url "${homepath}/query?action=edit&versions=any"  "${admin}" "${curator}" "${downloader}")
 $(dataset "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*")
 $(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}")

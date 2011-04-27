@@ -22,7 +22,7 @@ $if None:
 	<li><a href="${homepath}/study?action=upload">Upload study</a></li>
   $if authn.hasRoles(['curator', 'downloader']):
 	<li><a href="${homepath}/study?action=download">Download study</a></li>
-	<li><a href="${homepath}/query?action=edit">Query by tags latest file versions</a>, <a href="${homepath}/query?action=edit&versions=any">Query by tags on all file versions</a></li>
+	<li><a href="${homepath}/query?action=edit&versions=latest">Query by tags latest file versions</a>, <a href="${homepath}/query?action=edit&versions=any">Query by tags on all file versions</a></li>
   <li><a href="${help}">Help and documentation</a></li>
   <li><a href="${bugs}">View or submit bug reports/issues</a></li>
   <li><a href="${homepath}/query/tagdef?view=tagdef">View available tag definitions</a></li>
