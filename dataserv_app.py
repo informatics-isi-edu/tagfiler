@@ -1915,7 +1915,7 @@ class Application:
                     raise BadRequest("Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
                 projection = clistpreds[0].tag
 
-                tagref = typedefs[tagdefs[projection]]['typedef tagref']
+                tagref = typedefs[tagdefs[projection].typestr]['typedef tagref']
                 if tagref == None and tagdefs[projection].typestr not in [ 'text', 'id' ]:
                     raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 
