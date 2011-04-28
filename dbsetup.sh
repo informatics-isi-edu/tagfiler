@@ -714,5 +714,8 @@ cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
 cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
 
 
+cmddir=$(dirname "$0")
 #. ./dbsetup-nei-demo.sh
+
+. ${cmddir}/dbsetup-psoc-demo.sh
 

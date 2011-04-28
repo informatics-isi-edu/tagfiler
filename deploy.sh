@@ -113,9 +113,12 @@ runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 mkdir -p /etc/httpd/passwd
 
 cp dbsetup.sh /home/${SVCUSER}/dbsetup.sh
-
 chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
 chmod a+x /home/${SVCUSER}/dbsetup.sh
+
+cp dbsetup-psoc-demo.sh /home/${SVCUSER}/dbsetup-psoc-demo.sh
+chown ${SVCUSER}: /home/${SVCUSER}/dbsetup-psoc-demo.sh
+chmod a+x /home/${SVCUSER}/dbsetup-psoc-demo.sh
 
 # setup db tables
 runuser -c "~${SVCUSER}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\"" - ${SVCUSER}
