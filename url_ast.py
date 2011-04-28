@@ -806,9 +806,10 @@ class FileTags (Node):
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'all'],
                                       list_prefix='tag',
-                                      extra_tags=[ 'id', 'file','name', 'version','Image Set',
-                                                   'tagdef', 'typedef', 'config', 'view',
-                                                   'write users', 'modified' ])
+                                      extra_tags=
+                                      [ 'id', 'file', 'name', 'version', 'Image Set',
+                                        'write users', 'modified' ] 
+                                      + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
         
@@ -1223,8 +1224,8 @@ class Query (Node):
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
                                           extra_tags=[ 'id', 'file','name', 'version','Image Set',
-                                                       'tagdef', 'typedef', 'config', 'view',
-                                                       'write users', 'modified', 'url' ])
+                                                       'write users', 'modified', 'url' ]
+                                          + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
             self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
             self.globals['filelisttagswrite'] = writetags

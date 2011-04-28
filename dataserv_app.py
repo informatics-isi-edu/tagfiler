@@ -1091,7 +1091,8 @@ class Application:
 
     def classify_subject(self, subject):
         datapred = None
-        for dtype in [ 'file', 'url', 'tagdef', 'typedef', 'config', 'view' ]:
+        for dtype in [ 'file', 'url', 'tagdef', 'typedef', 'config', 'view' ] \
+                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] :
             keyv = subject.get(dtype, None)
             if keyv:
                 return dtype
@@ -1099,7 +1100,8 @@ class Application:
 
     def subject2identifiers(self, subject, showversions=True):
         dtype = self.classify_subject(subject)
-        if dtype in [ 'tagdef', 'typedef', 'config', 'view' ]:
+        # [ 'tagdef', 'typedef', 'config', 'view' ]
+        if dtype in  [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ]:
             keyv = subject.get(dtype, None)
             if self.globals['tagdefsdict'][dtype].multivalue:
                 keyv = keyv[0]
