@@ -1277,6 +1277,8 @@ class Application:
             tags.append( ('owner', owner) )
         if self.multivalue:
             tags.append( ('tagdef multivalue', None) )
+        if self.is_unique:
+            tags.append( ('tagdef unique', None) )
 
         for tag, value in tags:
             self.set_tag(subject, self.globals['tagdefsdict'][tag], value)

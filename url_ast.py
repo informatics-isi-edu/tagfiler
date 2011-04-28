@@ -533,6 +533,7 @@ class Tagdef (Node):
         self.writepolicy = None
         self.readpolicy = None
         self.multivalue = None
+        self.is_unique = None
         self.action = None
         self.tagdefs = {}
         self.queryopts = queryopts
@@ -649,6 +650,16 @@ class Tagdef (Node):
             else:
                 self.multivalue = False
 
+        if self.is_unique == None:
+            try:
+                unique = self.queryopts['unique'].lower()
+            except:
+                unique = 'false'
+            if unique in [ 'true', 't', 'yes', 'y' ]:
+                self.is_unique = True
+            else:
+                self.is_unique = False
+
         def body():
             if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of tag definitions')
@@ -691,7 +702,11 @@ class Tagdef (Node):
                             multivalue = storage['multivalue-%s' % (key[4:])]
                         except:
                             raise BadRequest(data="The value cardinality must be specified.")
-                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, parseBoolString(multivalue))
+                        try:
+                            unique = storage['unique-%s' % (key[4:])]
+                        except:
+                            unique = False
+                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, parseBoolString(multivalue), parseBoolString(unique))
             try:
                 self.tag_id = storage.tag
             except:
@@ -711,7 +726,7 @@ class Tagdef (Node):
                 
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
-                    self.typestr, self.readpolicy, self.writepolicy, self.multivalue = self.tagdefs[tagname]
+                    self.typestr, self.readpolicy, self.writepolicy, self.multivalue, self.is_unique = self.tagdefs[tagname]
                     results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
                     if len(results) > 0:
                         raise Conflict(data="Tag %s is already defined." % self.tag_id)

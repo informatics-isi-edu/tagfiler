@@ -817,7 +817,8 @@ function renderTagdefs(home, table) {
 		       "Owner" : "Owner",
 		       "multivalue" : "#&nbsp;Values",
 		       "readpolicy" : "Tag readers",
-		       "writepolicy" : "Tag writers" };
+		       "writepolicy" : "Tag writers",
+		       "unique" : "Tag unique" };
 	    headers[i].innerHTML = labels[headers[i].innerHTML];
 	}
     }

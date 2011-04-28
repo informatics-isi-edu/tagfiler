@@ -29,6 +29,7 @@ $ typedict = dict(typenames)
 <th name="owner">Owner</th>
 <th name="readpolicy">readpolicy</th>
 <th name="writepolicy">writepolicy</th>
+<th name="unique">unique</th>
 </tr>
 $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config['tagdef write users']))) > 0:
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
@@ -55,8 +56,12 @@ $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config[
 	$for pol in ['users', 'anonymous', 'subject', 'subjectowner', 'tag']:
 		<option value="${pol}">${policies[pol]}</option>
 	</select>
-	<input type="hidden" name="action" value="add" />
 	</td>
+	<td><select name="unique-1">
+	<option value="false">not set</option>
+	<option value="true">set</option>
+	</select></td>
+	<input type="hidden" name="action" value="add" />
 	</tr>
 	<tr class="tagdefcreate"><td><input type="submit" value="Define tag" /></td><td /><td /><td /><td /><td /></tr></form>
 $ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
@@ -65,7 +70,11 @@ $for tagdef in tagdefs:
 		$ writeclass = 'writeok'
 	$else:
 		$ writeclass = 'readonly'
-	<tr class="tagdef ${writeclass}"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td></tr>
+	$if tagdef.unique:
+		$ unique = 'is set'
+	$else:
+		$ unique = 'not set'
+	<tr class="tagdef ${writeclass}"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td><td>${unique}</td></tr>
 </table>
 <script type="text/javascript">
 renderTagdefs("${home}", document.getElementById("${idquote(title) + '_tagdefs'}"));
