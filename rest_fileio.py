@@ -148,9 +148,9 @@ class FileIO (Application):
             # this happens when we accept a name w/o version in lieu of unique predicate(s)
             self.versions = 'latest'
 
-        listpreds = [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'content-type', 'bytes', 'url',
-                                                                       'modified', 'modified by', 'name', 'version', 'Image Set',
-                                                                       'tagdef', 'typedef', 'config', 'view', 'incomplete'] ]
+        listpreds = [ web.Storage(tag=tag,op=None,vals=[])
+                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'Image Set', 'incomplete']
+                      + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
 
