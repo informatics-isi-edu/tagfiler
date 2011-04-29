@@ -27,6 +27,8 @@ $if len(files) > 0:
 			$ suffix = suffix + '&view=%s' % view
 		$if showversions:
 			$ suffix = '%s&versions=any' % suffix
+		$else:
+			$ suffix = '%s&versions=latest' % suffix
 		<p><b>Results limited to ${limit} matches.</b> <a href="${queryTarget}${suffix}">View all results.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
