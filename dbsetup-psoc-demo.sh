@@ -121,6 +121,7 @@ entity     "observationID"
 entityrefN "observationID" "observations"
 
 entity     "sampleID"
+entityref1 "sampleID" "sample"
 entityrefN "sampleID" "samples"
 
 entity     "researcherID"
@@ -152,11 +153,11 @@ view()
 }
 
 view mouseID mouseID dob dos litter cage "start age" "mouse strain" "lot#" supplier preparation treatment samples observations
-view experimentID experimentID principal lab start mice
+view experimentID experimentID principal lab start mice observations
 view preparationID preparationID "cancer type" start performer "#cells" weight
 view treatmentID treatmentID drug dose "lot#" performer
-view observationID observationID start weight performer 
-view sampleID sampleID start performer freezer shelf "sample type" "serum sample type"
+view observationID observationID start weight performer sample samples
+view sampleID sampleID start performer freezer shelf "sample type" "serum sample type" observations
 view researcherID researcherID email lab
 view labID labID site
 view siteID siteID address
@@ -168,14 +169,26 @@ CSHL=$(dataset "" blank "PSOC")
 tag "$CSHL" siteID text "CSHL"
 tag "$CSHL" address text "CSHL, 1 Bungtown Rd, Cold Spring Harbor, NY, 11724"
 
+stanford=$(dataset "" blank "PSOC")
+tag "$stanford" siteID text "Stanford University"
+
 lab1=$(dataset "" blank "PSOC")
 tag "$lab1" labID text "Scott Lowe"
 tag "$lab1" site text "CSHL"
+
+lab2=$(dataset "" blank "PSOC")
+tag "$lab2" labID text "Parag Mallick"
+tag "$lab2" site text "Stanford University"
 
 miething=$(dataset "" blank "miething" "PSOC")
 tag "$miething" researcherID text "miething"
 tag "$miething" email text "miething@cshl.edu"
 tag "$miething" lab text "Scott Lowe"
+
+parag=$(dataset "" blank "paragm" "PSOC")
+tag "$parag" researcherID text "paragm"
+tag "$parag" email text "paragm@stanford.edu"
+tag "$parag" lab text "Parag Mallick"
 
 CRL=$(dataset "" blank "PSOC")
 tag "$CRL" supplierID text "Charles River Laboratories"
@@ -214,6 +227,7 @@ do
     tag "$mouse" "start age" int8 "$(datediff ${experimentStart[$expnum]} ${experimentMouseDob[$expnum]})"
     tag "$mouse" "mouse strain" text "C57b6"
     tag "$mouse" supplier text "Charles River Laboratories"
+    tag "$mouse" "lot#" int8 67889
 
     prep=$(dataset "" blank "PSOC" "PSOC")
     prepID="${mouseID}"
@@ -248,7 +262,13 @@ do
     tag "$samp" performer text "miething"
     tag "$samp" freezer int8 6
     tag "$samp" shelf int8 ${experimentShelf[$expnum]}
-    
+
+    obsv=$(dataset "" blank "PSOC" "PSOC")
+    obsvID="${mouseID}-A"
+    tag "$obsv" observationID text "$obsvID"
+    tag "$samp" observations text "$obsvID"
+    tag "$obsv" sample text "$sampID"
+    tag "$obsv" performer text "paragm"
 
   done
 
