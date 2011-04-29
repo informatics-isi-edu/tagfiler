@@ -31,7 +31,7 @@ $for pred in predlist:
 	$else:
 		<i>${opsdict[pred['op']]}</i>
 	$if pred['vals']:
-		"${','.join(pred['vals'])}"
+		"${','.join([ sq_path_linearize(v) for v in pred['vals'] ])}"
 	</li>
 </ul>
 <h3>Matching Datasets</h3>

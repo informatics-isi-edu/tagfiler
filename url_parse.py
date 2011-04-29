@@ -215,13 +215,21 @@ def p_pred_not_tag(p):
     p[0] = web.Storage([ ('tag', p[1]), ('op', ':not:'), ('vals', []) ])
 
 def p_pred_vallist(p):
-    """vallist : string"""
+    """vallist : val"""
     p[0] = list([ p[1] ])
 
 def p_pred_vallist_grow(p):
-    """vallist : vallist ',' string"""
+    """vallist : vallist ',' val"""
     p[0] = p[1]
     p[1].append(p[3])
+
+def p_pred_val_string(p):
+    """val : string"""
+    p[0] = p[1]
+
+def p_pred_val_subquery(p):
+    """val : '@' '(' querypath ')' """
+    p[0] = url_ast.Subquery(path=p[3])
 
 def p_compare_eq(p):
     """compare : '='"""

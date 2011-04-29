@@ -94,7 +94,7 @@ def parseBoolString(theString):
         return True
     else:
         return False
-              
+
 def predlist_linearize(predlist):
     def pred_linearize(pred):
         vals = [ urlquote(val) for val in pred.vals ]
@@ -470,6 +470,12 @@ class Application:
         
         self.render = web.template.render(self.config['template path'], globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
+
+        def sq_path_linearize(v):
+            if hasattr(v, 'is_subquery'):
+                return path_linearize(v.path)
+            else:
+                return v
         
         # 'globals' are local to this Application instance and also used by its templates
         self.globals['smartTagValues'] = True
@@ -478,6 +484,7 @@ class Application:
         self.globals['idquote'] = idquote
         self.globals['jsonWriter'] = jsonWriter
         self.globals['subject2identifiers'] = lambda subject, showversions=True: self.subject2identifiers(subject, showversions)
+        self.globals['sq_path_linearize'] = sq_path_linearize
 
         self.globals['home'] = self.config.home + web.ctx.homepath
         self.globals['homepath'] = web.ctx.homepath
@@ -1572,7 +1579,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False, listpreds=None):
+    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False, listpreds=None, vprefix=''):
 
         #web.debug(subjpreds, listtags, ordertags, listas)
 
@@ -1647,7 +1654,7 @@ class Application:
                 # not matches if tag column is null
                 if tag == 'id':
                     raise Conflict('The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
-                outertables.append((self.wraptag(tag), 't%s' % p ))
+                outertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p) ))
                 if tagdef.readok == False and enforce_read_authz:
                     # this tag cannot be read so act like it is absent
                     wheres.append('True')
@@ -1655,17 +1662,17 @@ class Application:
                     # this tag rule is more restrictive than file or static checks already done
                     # act like it is NULL if user isn't allowed to read this tag
                     outertables_special.append( 'roles AS ownerrole_%d ON (_owner.value = ownerrole_%d.role)' % (p, p) )
-                    wheres.append('t%s.subject IS NULL OR (ownerrole_%d.role IS NULL)' % (p, p))
+                    wheres.append('t%s%s.subject IS NULL OR (ownerrole_%d.role IS NULL)' % (vprefix, p, p))
                 else:
                     # covers all cases where tag is more or equally permissive to file or static checks already done
-                    wheres.append('t%s.subject IS NULL' % p)
+                    wheres.append('t%s%s.subject IS NULL' % (vprefix, p))
             elif op == 'IN':
                 # special internal operation to restrict by sub-query, doesn't need to be sanity checked
                 if tag == 'id':
                     wheres.append('subject IN (%s)' % (vals))
                 else:
-                    innertables.append((self.wraptag(tag), 't%s' % p))
-                    wheres.append('t%s.value IN (%s)' % (p, vals))
+                    innertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p)))
+                    wheres.append('t%s%s.value IN (%s)' % (vprefix, p, vals))
             else:
                 # all others match if and only if tag column is not null and we have read access
                 # ...and any value constraints are met
@@ -1678,16 +1685,41 @@ class Application:
                         need_subjectowner_test = True
                                     
                     if tag != 'id':
-                        innertables.append((self.wraptag(tag), 't%s' % p))
+                        innertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p)))
 
                     if op and vals and len(vals) > 0:
                         valpreds = []
                         for v in range(0, len(vals)):
-                            if tag != 'id':
-                                valpreds.append("t%s.value %s $val%s_%s_%d" % (p, self.opsDB[op], p, v, qd))
+                            if hasattr(vals[v], 'is_subquery'):
+                                typedef = self.globals['typesdict'][tagdef.typestr]
+                                if op != '=':
+                                    raise BadRequest('Operator "%s" not allowed with subquery for subject predicate values.' % op)
+                                
+                                sq_path = [ x for x in vals[v].path ]
+                                sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
+                                sq_listpreds = [ x for x in sq_listpreds ]
+                                
+                                if typedef['typedef tagref']:
+                                    # subquery needs to generate results by tagref tagname
+                                    sq_listpreds.append( web.Storage(tag=typedef['typedef tagref'], op=None, vals=[]) )
+                                    sq_project = typedef['typedef tagref']
+                                elif tagdef.tagname == 'id':
+                                    # subquery just needs to generate results w/ ID
+                                    sq_project = 'id'
+                                else:
+                                    raise BadRequest('Subquery predicate not supported for tag "%s".' % tagdef.tagname)
+                                
+                                sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
+                                q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sv%s_%s_%d__" % (vprefix, p, v, qd))
+                                sq = "SELECT DISTINCT \"%s\" FROM (%s) AS sq_%s%s_%s_%d" % (sq_project, q, vprefix, p, v, qd)
+                                values.update(qvs)
+                                valpreds.append("t%s%s.value IN (%s)" % (vprefix, p, sq))
                             else:
-                                valpreds.append("subject %s $val%s_%s_%d" % (self.opsDB[op], p, v, qd))
-                            values["val%s_%s_%d" % (p, v, qd)] = vals[v]
+                                if tag != 'id':
+                                    valpreds.append("t%s%s.value %s $val%s%s_%s_%d" % (vprefix, p, self.opsDB[op], vprefix, p, v, qd))
+                                else:
+                                    valpreds.append("subject %s $val%s%s_%s_%d" % (self.opsDB[op], vprefix, p, v, qd))
+                                values["val%s%s_%s_%d" % (vprefix, p, v, qd)] = vals[v]
                         wheres.append(" OR ".join(valpreds))
                     
 
@@ -1722,8 +1754,8 @@ class Application:
 
         if id:
             # special single-entry lookup
-            values['id_%d' % qd] = id
-            wheres.append("subject = $id_$d" % qd)
+            values['id_%s%d' % (vprefix, qd)] = id
+            wheres.append("subject = $id_%s%d" % (vprefix, qd))
 
         # constrain to latest named files ONLY
         if versions == 'latest':
@@ -1795,8 +1827,33 @@ class Application:
                         raise BadRequest('Inappropriate operator "%s" for tag "%s".' % (pred.op, pred.tag))
                     valpreds = []
                     for v in range(0, len(pred.vals)):
-                        valpreds.append( '%s %s $listval_%s_%d_%d' % (vref, self.opsDB[pred.op], t, p, v) )
-                        values['listval_%s_%d_%d' % (t, p, v)] = pred.vals[v]
+                        if hasattr(pred.vals[v], 'is_subquery'):
+                            typedef = self.globals['typesdict'][tagdef.typestr]
+                            if pred.op not in [ '=', 'IN' ]:
+                                raise BadRequest('Operator "%s" not allowed with subquery for list predicate values.' % op)
+                            
+                            sq_path = [ x for x in pred.vals[v].path ]
+                            sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
+                            sq_listpreds = [ x for x in sq_listpreds ]
+                            
+                            if typedef['typedef tagref']:
+                                # subquery needs to generate results by tagref tagname
+                                sq_listpreds.append( web.Storage(tag=typedef['typedef tagref'], op=None, vals=[]) )
+                                sq_project = typedef['typedef tagref']
+                            elif tagdef.tagname == 'id':
+                                # subquery just needs to generate results w/ ID
+                                sq_project = 'id'
+                            else:
+                                raise BadRequest('Subquery predicate not supported for tag "%s".' % tagdef.tagname)
+
+                            sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
+                            q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sp%s_%s_%d__" % (vprefix, p, v, qd))
+                            sq = "SELECT DISTINCT \"%s\" FROM (%s) AS sq_%s%s_%s_%d" % (sq_project, q, vprefix, p, v, qd)
+                            values.update(qvs)
+                            valpreds.append("%s IN (%s)" % (vref, sq))
+                        else:
+                            valpreds.append( '%s %s $listval_%s%s_%d_%d_%d' % (vref, self.opsDB[pred.op], vprefix, t, p, v, qd) )
+                            values['listval_%s%s_%d_%d_%d' % (vprefix, t, p, v, qd)] = pred.vals[v]
                     listwheres.append( ' OR '.join([ '(%s)' % valpred for valpred in valpreds ]) )
                         
             return ' AND '.join([ '(%s)' % listwhere for listwhere in listwheres])
@@ -1897,7 +1954,7 @@ class Application:
         #    web.debug(r)
         return self.db.query(query, vars=values)
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, vprefix='', assume_roles=False):
         values = dict()
         tagdefs = self.globals['tagdefsdict']
         typedefs = self.globals['typesdict']
@@ -1907,7 +1964,7 @@ class Application:
             subjpreds = [ p for p in subjpreds ]
             if len(stack) == 1:
                 # this query element is not contextualized
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=assume_roles or qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz, vprefix=vprefix)
                 values.update(v)
                 return q
             else:
@@ -1937,7 +1994,7 @@ class Application:
                 cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
                 
                 subjpreds.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz)
+                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=assume_roles or qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz, vprefix=vprefix)
                 values.update(v)
                 return q
         
