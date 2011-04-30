@@ -1108,7 +1108,7 @@ class Application:
     def subject2identifiers(self, subject, showversions=True):
         dtype = self.classify_subject(subject)
         # [ 'tagdef', 'typedef', 'config', 'view' ]
-        if dtype in  [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ]:
+        if dtype in  set([ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ]).difference(set(['file'])):
             keyv = subject.get(dtype, None)
             if self.globals['tagdefsdict'][dtype].multivalue:
                 keyv = keyv[0]
