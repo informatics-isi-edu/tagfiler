@@ -111,9 +111,6 @@ entity     "experimentID"
 entityref1 "experimentID" "experiment"
 entityrefN "experimentID" "experiments"
 
-entity     "preparationID"
-entityref1 "preparationID" "preparation"
-
 entity     "treatmentID"
 entityref1 "treatmentID" "treatment"
 
@@ -152,9 +149,8 @@ view()
     done
 }
 
-view mouseID mouseID dob dos litter cage "start age" "mouse strain" "lot#" supplier preparation treatment samples observations
+view mouseID mouseID dob dos litter cage "start age" "mouse strain" "lot#" supplier treatment samples observations "cancer type" start performer "#cells" weight
 view experimentID experimentID principal lab start mice observations
-view preparationID preparationID "cancer type" start performer "#cells" weight
 view treatmentID treatmentID drug dose "lot#" performer
 view observationID observationID start weight performer sample samples
 view sampleID sampleID start performer freezer shelf "sample type" "serum sample type" observations
@@ -228,16 +224,11 @@ do
     tag "$mouse" "mouse strain" text "C57b6"
     tag "$mouse" supplier text "Charles River Laboratories"
     tag "$mouse" "lot#" int8 67889
-
-    prep=$(dataset "" blank "PSOC" "PSOC")
-    prepID="${mouseID}"
-    tag "$prep" preparationID text "$prepID"
-    tag "$mouse" preparation text "$prepID"
-    tag "$prep" "cancer type" text "lymphoma"
-    tag "$prep" start date "${experimentStart[$expnum]}"
-    tag "$prep" performer text "miething"
-    tag "$prep" "#cells" float8 "5e6"
-    tag "$prep" weight int8 $(( 98 + $RANDOM % 5 ))
+    tag "$mouse" "cancer type" text "lymphoma"
+    tag "$mouse" start date "${experimentStart[$expnum]}"
+    tag "$mouse" performer text "miething"
+    tag "$mouse" "#cells" float8 "5e6"
+    tag "$mouse" weight int8 $(( 98 + $RANDOM % 5 ))
 
     treat=$(dataset "" blank "PSOC" "PSOC")
     treatID="${mouseID}"
