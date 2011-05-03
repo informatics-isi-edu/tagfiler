@@ -161,18 +161,18 @@ view supplierID supplierID address email
 
 # some demo data
 
-CSHL=$(dataset "" blank "PSOC")
+CSHL=$(dataset "" blank "$admin" "PSOC")
 tag "$CSHL" siteID text "CSHL"
 tag "$CSHL" address text "CSHL, 1 Bungtown Rd, Cold Spring Harbor, NY, 11724"
 
-stanford=$(dataset "" blank "PSOC")
+stanford=$(dataset "" blank "$admin" "PSOC")
 tag "$stanford" siteID text "Stanford University"
 
-lab1=$(dataset "" blank "PSOC")
+lab1=$(dataset "" blank "$admin" "PSOC")
 tag "$lab1" labID text "Scott Lowe"
 tag "$lab1" site text "CSHL"
 
-lab2=$(dataset "" blank "PSOC")
+lab2=$(dataset "" blank "$admin" "PSOC")
 tag "$lab2" labID text "Parag Mallick"
 tag "$lab2" site text "Stanford University"
 
@@ -186,7 +186,7 @@ tag "$parag" researcherID text "paragm"
 tag "$parag" email text "paragm@stanford.edu"
 tag "$parag" lab text "Parag Mallick"
 
-CRL=$(dataset "" blank "PSOC")
+CRL=$(dataset "" blank "$admin" "PSOC")
 tag "$CRL" supplierID text "Charles River Laboratories"
 
 experimentID=(miething-1 miething-2)
@@ -204,7 +204,7 @@ datediff()
 
 for expnum in ${!experimentID[*]}
 do
-  exp=$(dataset "" blank "PSOC" "PSOC")
+  exp=$(dataset "" blank "$admin" "PSOC")
   tag "$exp" experimentID text "${experimentID[$expnum]}"
   tag "$exp" principal text "miething"
   tag "$exp" lab text "Scott Lowe"
@@ -212,7 +212,7 @@ do
 
   for mousenum in {1..8}
   do
-    mouse=$(dataset "" blank "PSOC" "PSOC")
+    mouse=$(dataset "" blank "$admin" "PSOC")
     mouseID="${experimentID[$expnum]}-$mousenum"
     tag "$mouse" mouseID text "$mouseID"
     tag "$exp" mice text "$mouseID"
@@ -230,7 +230,7 @@ do
     tag "$mouse" "#cells" float8 "5e6"
     tag "$mouse" weight int8 $(( 98 + $RANDOM % 5 ))
 
-    treat=$(dataset "" blank "PSOC" "PSOC")
+    treat=$(dataset "" blank "$admin" "PSOC")
     treatID="${mouseID}"
     tag "$treat" treatmentID text "$treatID"
     tag "$mouse" treatment text "$treatID"
@@ -243,7 +243,7 @@ do
 	tag "$treat" drug text "N/A"
     fi
 
-    samp=$(dataset "" blank "PSOC" "PSOC")
+    samp=$(dataset "" blank "$admin" "PSOC")
     sampID="${mouseID}-serum-1"
     tag "$samp" sampleID text "$sampID"
     tag "$mouse" samples text "$sampID"
@@ -254,7 +254,7 @@ do
     tag "$samp" freezer int8 6
     tag "$samp" shelf int8 ${experimentShelf[$expnum]}
 
-    obsv=$(dataset "" blank "PSOC" "PSOC")
+    obsv=$(dataset "" blank "$admin" "PSOC")
     obsvID="${mouseID}-A"
     tag "$obsv" observationID text "$obsvID"
     tag "$samp" observations text "$obsvID"
@@ -265,3 +265,19 @@ do
 
 done
 
+# some stored queries
+
+homelinks=(
+$(dataset "DEMO: Table of experiments" url "${homepath}/tags/experimentID?view=experimentID" "${admin}" "PSOC")
+$(dataset "DEMO: View experiment miething-2" url "${homepath}/file/experimentID=miething-2" "${admin}" "PSOC")
+$(dataset "DEMO: Table of mice" url "${homepath}/tags/mouseID?view=mouseID" "${admin}" "PSOC")
+$(dataset "DEMO: Table of mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/?view=mouseID" "${admin}" "PSOC")
+)
+
+i=0
+while [[ $i -lt "${#homelinks[*]}" ]]
+do
+   tag "${homelinks[$i]}" "list on homepage"
+   tag "${homelinks[$i]}" "homepage order" int8 "$(( $i + 10 ))"
+   i=$(( $i + 1 ))
+done
