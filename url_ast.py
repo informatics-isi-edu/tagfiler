@@ -780,7 +780,7 @@ class FileTags (Node):
         self.referer = None
         self.queryopts = queryopts
         self.globals['queryTarget'] = self.qtarget()
-        self.globals['queryAllTags'] = self.qAllTags()
+        self.globals['queryAllTags'] = None
 
     def qAllTags(self):
         if self.queryopts.get('view') == 'default':
@@ -820,6 +820,7 @@ class FileTags (Node):
             try_default_view = True
         else:
             try_default_view = False
+            self.globals['queryAllTags'] = self.qAllTags()
             
         all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
@@ -827,7 +828,7 @@ class FileTags (Node):
         files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
         if len(files) == 0:
             raise NotFound('subject matching "%s"' % predlist_linearize(self.path_modified[-1][0]))
-        elif len(files) == 1:
+        else:
             subject = files[0]
             datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
 
@@ -835,6 +836,7 @@ class FileTags (Node):
                 view = self.select_view(subject.dtype)
                 if view and view['tag list tags']:
                     self.listtags = view['tag list tags']
+                    self.globals['queryAllTags'] = self.qAllTags()
 
         length = 0
         for file in files:

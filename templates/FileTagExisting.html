@@ -22,11 +22,11 @@ $if title != '':
 	<h2>${title}</h2>
 $if len(tagdefs) > 0:
 	$if queryAllTags:
-		<p><a href="${queryAllTags}">View all tags.</a></p>
+		<p>This is a limited tag view. <a href="${queryAllTags}">View all tags.</a></p>
 	<table class="file-list">
 	<tr class="file-heading">
-	<th class="tag-name">Tag name</th>
-	<th class="file-tags">Current Value(s)</th>
+	<th class="tag-name">Tag</th>
+	<th class="file-tags">${subject2identifiers(file)[2]}</th>
 	</tr>
 	$for tagdef in tagdefs:
 		$if odd:

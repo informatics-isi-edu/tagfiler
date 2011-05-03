@@ -19,6 +19,8 @@ $if title:
 	<h2>${title}</h2>
 $if title == 'System' and datapred:
 	<a href="${home + '/file/' + datapred}">Link to ${dataname}</a>
+$if queryAllTags:
+	<p>This is a limited tag view. <a href="${queryAllTags}">View all tags.</a></p>
 $ odd = True
 <table class="file-list">
 <tr class="file-heading"><th class="file-tag">Tag</th>
