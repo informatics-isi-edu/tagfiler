@@ -118,7 +118,6 @@ entity     "observationID"
 entityrefN "observationID" "observations"
 
 entity     "sampleID"
-entityref1 "sampleID" "sample"
 entityrefN "sampleID" "samples"
 
 entity     "researcherID"
@@ -152,7 +151,7 @@ view()
 view mouseID mouseID dob dos litter cage "start age" "mouse strain" "lot#" supplier treatment samples observations "cancer type" start performer "#cells" weight
 view experimentID experimentID principal lab start mice observations
 view treatmentID treatmentID drug dose "lot#" performer
-view observationID observationID start weight performer sample samples
+view observationID observationID start weight performer samples
 view sampleID sampleID start performer freezer shelf "sample type" "serum sample type" observations
 view researcherID researcherID email lab
 view labID labID site
@@ -258,7 +257,7 @@ do
     obsvID="${mouseID}-A"
     tag "$obsv" observationID text "$obsvID"
     tag "$samp" observations text "$obsvID"
-    tag "$obsv" sample text "$sampID"
+    tag "$obsv" samples text "$sampID"
     tag "$obsv" performer text "paragm"
 
   done
@@ -268,10 +267,15 @@ done
 # some stored queries
 
 homelinks=(
-$(dataset "DEMO: Table of experiments" url "${homepath}/tags/experimentID?view=experimentID" "${admin}" "PSOC")
-$(dataset "DEMO: View experiment miething-2" url "${homepath}/file/experimentID=miething-2" "${admin}" "PSOC")
-$(dataset "DEMO: Table of mice" url "${homepath}/tags/mouseID?view=mouseID" "${admin}" "PSOC")
-$(dataset "DEMO: Table of mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/?view=mouseID" "${admin}" "PSOC")
+$(dataset "DEMO: All experiments"               url "${homepath}/tags/experimentID?view=experimentID" "${admin}" "PSOC")
+$(dataset "DEMO: Experiment miething-2"    url "${homepath}/file/experimentID=miething-2" "${admin}" "PSOC")
+$(dataset "DEMO: All mice"                      url "${homepath}/tags/mouseID?view=mouseID" "${admin}" "PSOC")
+$(dataset "DEMO: Mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/?view=mouseID" "${admin}" "PSOC")
+$(dataset "DEMO: Mice in experiment miething-2 which were treated w/ 10 mg/kg cyclophosphamide" url "${homepath}/tags/experimentID=miething-1(mice)/treatment=@(drug=cyclophosphamide;dose=10)?view=mouseID" "${admin}" "PSOC")
+$(dataset "DEMO: Samples for mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/(samples)/?view=sampleID" "${admin}" "PSOC")
+$(dataset "DEMO: Samples for mice in experiment miething-2 which were treated w/ 10 mg/kg cyclophosphamide" url "${homepath}/tags/experimentID=miething-1(mice)/treatment=@(drug=cyclophosphamide;dose=10)(samples)/?view=sampleID" "${admin}" "PSOC")
+$(dataset "DEMO: Observations for mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/(samples)/(observations)/?view=observationID" "${admin}" "PSOC")
+$(dataset "DEMO: Samples for mouse miething-2-2" url "${homepath}/tags/mouseID=miething-2-2(samples)/?view=sampleID" "${admin}" "PSOC")
 )
 
 i=0
