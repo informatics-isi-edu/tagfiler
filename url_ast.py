@@ -60,6 +60,9 @@ class Subquery:
         self.path = path
         self.is_subquery = True
 
+    def __repr__(self):
+        return "@(%s)" % path_linearize(self.path)
+
 class Node (object, Application):
     """Abstract AST node for all URI patterns"""
 
