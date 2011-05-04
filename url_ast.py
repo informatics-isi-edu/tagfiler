@@ -857,8 +857,6 @@ class FileTags (Node):
                 tagvals[tagname] = str(tagvals[tagname])
             return tagvals
 
-        web.debug(files, self.listtags)
-
         self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
