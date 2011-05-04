@@ -857,6 +857,8 @@ class FileTags (Node):
                 tagvals[tagname] = str(tagvals[tagname])
             return tagvals
 
+        web.debug(files, self.listtags)
+
         self.setNoCache()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
@@ -880,9 +882,13 @@ class FileTags (Node):
             elif acceptType == 'application/json':
                 web.header('Content-Type', 'application/json')
                 return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
-            elif acceptType == 'text/plain' and len(files) == 1:
+            elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
                 web.header('Content-Type', 'text/plain')
-                return '\n'.join(values) + '\n'
+                val = files[0][self.listtags[0]]
+                if type(val) == list:
+                    return '\n'.join(val) + '\n'
+                else:
+                    return '%s\n' % val
             elif acceptType == 'text/html':
                 break
                 
