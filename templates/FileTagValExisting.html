@@ -25,7 +25,8 @@ $ odd = True
 <table class="file-list">
 <tr class="file-heading"><th class="file-tag">Tag</th>
 $for file in files:
-	<th class="file-name">${subject2identifiers(file)[2]}</th>
+	$ datapred, dataid, dataname, dtype = subject2identifiers(file)
+	<th class="file-name"><a href="${home}/tags/${datapred}">${dataname}</a></th>
 </tr>
 $for tagdef in tagdefs:
 	$if odd:
