@@ -854,7 +854,10 @@ class FileTags (Node):
             tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
             tagvals = dict(tagvals)
             for tagname in jsonMungeTags:
-                tagvals[tagname] = str(tagvals[tagname])
+                try:
+                    tagvals[tagname] = str(tagvals[tagname])
+                except:
+                    pass
             return tagvals
 
         self.setNoCache()
@@ -1230,16 +1233,37 @@ class Query (Node):
 
             path, self.listtags, writetags, self.limit, self.versions = \
                   self.prepare_path_query(self.path,
-                                          list_priority=['path', 'list', 'view', 'default'],
+                                          list_priority=['path', 'list', 'view', 'all'],
                                           list_prefix='file',
                                           extra_tags=[ 'id', 'file','name', 'version','Image Set',
                                                        'write users', 'modified', 'url' ]
                                           + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
+            self.txlog('QUERY', dataset=path_linearize(self.path))
+
+            if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
+                try_default_view = True
+            else:
+                try_default_view = False
+
+            files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
+
+            if len(files) > 0:
+                subject = files[0]
+                datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
+
+                if try_default_view and subject.dtype:
+                    view = self.select_view(subject.dtype)
+                    if view:
+                        if view['file list tags']:
+                            self.listtags = view['file list tags']
+                        if view['file list tags write']:
+                            writetags = view['file list tags write']
+
             self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
             self.globals['filelisttagswrite'] = writetags
 
-            return self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit)
+            return files
 
         def postCommit(files):
             if self.versions == 'any':
@@ -1253,12 +1277,15 @@ class Query (Node):
             jsonMungeTags = set( [ tagname for tagname in self.globals['filelisttags']
                                    if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
 
-            def jsonFile(file):
+            def dictFile(file):
                 tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
-                    tagvals[tagname] = str(tagvals[tagname])
-                return jsonWriter(tagvals)
+                    try:
+                        tagvals[tagname] = str(tagvals[tagname])
+                    except:
+                        pass
+                return tagvals
 
             self.setNoCache()
 
@@ -1280,10 +1307,10 @@ class Query (Node):
                     elif acceptType == 'application/json':
                         yield '['
                         if len(files) > 0:
-                            yield jsonFile(files[0]) + '\n'
+                            yield jsonWriter(dictFile(files[0])) + '\n'
                         if len(files) > 1:
                             for i in range(1,len(files)):
-                                yield ',' + jsonFile(files[i]) + '\n'
+                                yield ',' + jsonWriter(dictFile(files[i])) + '\n'
                         yield ']\n'
                         return
                     elif acceptType == 'text/html':
