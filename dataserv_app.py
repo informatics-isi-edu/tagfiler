@@ -1098,11 +1098,11 @@ class Application:
 
     def classify_subject(self, subject):
         datapred = None
-        for dtype in [ 'file', 'url', 'tagdef', 'typedef', 'config', 'view' ] \
+        for dtype in [ 'url', 'name', 'tagdef', 'typedef', 'config', 'view' ] \
                 + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] :
             keyv = subject.get(dtype, None)
             if keyv:
-                return dtype
+                return { 'name' : 'file' }.get(dtype, dtype)
         return None
 
     def subject2identifiers(self, subject, showversions=True):

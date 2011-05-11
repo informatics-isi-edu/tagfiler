@@ -717,5 +717,5 @@ cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
 cmddir=$(dirname "$0")
 #. ./dbsetup-nei-demo.sh
 
-. ${cmddir}/dbsetup-psoc-demo.sh
+#. ${cmddir}/dbsetup-psoc-demo.sh
 
