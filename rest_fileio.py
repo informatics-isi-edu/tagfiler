@@ -245,7 +245,7 @@ class FileIO (Application):
                     if content_type == None:
                         p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                         line = p.stdout.readline()
-                        content_type, rest = line.strip().split(' ', 1)
+                        content_type = line.strip().split(' ', 1)[0]
                     return (f, content_type)
                 except:
                     # this may happen sporadically under race condition:
