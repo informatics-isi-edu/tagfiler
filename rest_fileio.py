@@ -64,7 +64,7 @@ def yieldBytes(f, first, last, chunkbytes):
             yield bytearray(readbytes - rlen)
             
 
-def choose_content_type(clientval, guessedval, taggedval):
+def choose_content_type(clientval, guessedval, taggedval, name=None):
     """Hueristic choice between client-supplied and guessed Content-Type.
 
        TODO: expand this with practical experience of bogus browser
@@ -82,6 +82,30 @@ def choose_content_type(clientval, guessedval, taggedval):
     if bclientval in [ 'application/octet-stream' ]:
         clientval = None
         bclientval = None
+
+    if name:
+        # try to use client-provided name extensions to clean up poor guessing by CentOS 'file' utility
+        m = re.match(r'.+\.(?P<ext>[^.]+)', name)
+        if m:
+            ext = m.groupdict()['ext']
+        
+            if bguessedval in [ 'application/x-zip', 'application/zip' ] and name:
+                guessedval = {
+                    'xlsx' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'docx' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'pptx' : 'application/vnd.openxmlformats-officedocument.presentationml.presentation'                    
+                    }.get(ext, guessedval)
+            elif bguessedval in [ 'application/msword' ]:
+                guessedval = {
+                    'ppt' : 'application/vnd.ms-powerpoint',
+                    'xls' : 'application/vnd.ms-excel'
+                    }.get(ext, guessedval)
+            elif bguessedval in [ 'text/plain' ]:
+                guessedval = {
+                    'csv' : 'text/csv'
+                    }.get(ext, guessedval)
+
+            bguessedval = basetype(guessedval)
 
     if taggedval:
         if btaggedval in [ bclientval, bguessedval ]:
@@ -221,7 +245,7 @@ class FileIO (Application):
                     if content_type == None:
                         p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                         line = p.stdout.readline()
-                        content_type = line.strip()
+                        content_type, rest = line.strip().split(' ', 1)
                     return (f, content_type)
                 except:
                     # this may happen sporadically under race condition:
@@ -513,7 +537,8 @@ class FileIO (Application):
 
             content_type = choose_content_type(self.client_content_type,
                                                guessed_content_type,
-                                               tagged_content_type)
+                                               tagged_content_type,
+                                               name=self.name)
 
         if self.subject:
             if self.unique == False:
