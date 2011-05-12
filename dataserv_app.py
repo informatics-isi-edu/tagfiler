@@ -147,12 +147,6 @@ def buildPolicyRules(rules, fatal=False):
                 raise KeyError()
             else:
                 continue
-        if dstrole == '':
-            web.debug('Policy rule "%s" has illegal empty destination role.' % rule)
-            if fatal:
-                raise ValueError()
-            else:
-                continue
         if readers != '':
             readers = [ urllib.unquote(reader.strip()) for reader in readers.split(',') ]
             readers = [ reader for reader in readers if reader != '' ]
@@ -617,7 +611,7 @@ class Application:
             raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
 
         if tagname == 'typedef values':
-            results = self.gettagvals('typedef', subject=subject)
+            results = self.gettagvals(subject, self.globals['tagdefsdict']['typedef'])
             if len(results) == 0:
                 raise Conflict('Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
