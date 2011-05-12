@@ -206,6 +206,10 @@ def p_pred_tag_val_comp(p):
     """pred : string compare vallist"""
     p[0] = web.Storage([ ('tag', p[1]), ('op', p[2]), ('vals', p[3]) ])
 
+def p_pred_tag_val_comp_epsilon(p):
+    """pred : string compare"""
+    p[0] = web.Storage([ ('tag', p[1]), ('op', p[2]), ('vals', ['']) ])
+
 def p_pred_tag(p):
     """pred : string"""
     p[0] = web.Storage([ ('tag', p[1]), ('op', None), ('vals', []) ])
