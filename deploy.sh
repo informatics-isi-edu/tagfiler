@@ -214,7 +214,8 @@ then
     create 0600 tagfiler tagfiler
     daily
     minsize 500k
-    maxage 30
+    rotate 31
+    maxage 31
     ifempty
     sharedscripts
     postrotate
