@@ -939,7 +939,7 @@ class Application:
                         t.rollback()
                         self.logException('programming error in transaction body')
                         raise RuntimeError(data=str(te))
-                    except (psycopg2.IntegrityError), te:
+                    except (psycopg2.IntegrityError, psycopg2.extensions.TransactionRollbackError), te:
                         t.rollback()
                         error = str(te)
                         #m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
@@ -947,7 +947,7 @@ class Application:
                         #web.debug('IntegrityError', error)
                         if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
-                            self.logException('integrity error during transaction body')
+                            self.logException('error during transaction body')
                             raise IntegrityError(data=error)
                     except (IOError), te:
                         t.rollback()
@@ -958,7 +958,10 @@ class Application:
                         # else fall through to retry...
                     except:
                         t.rollback()
-                        self.logException('unmatched error in transaction body')
+                        et, ev, tb = sys.exc_info()
+                        web.debug('got unmatched exception in dbtransact',
+                                  traceback.format_exception(et, ev, tb),
+                                  ev)
                         raise
 
                 except psycopg2.InterfaceError:
@@ -1477,18 +1480,25 @@ class Application:
         return self.db.query(query, vars=vars)
 
     def set_tag_lastmodified(self, subject, tagdef):
-        now = datetime.datetime.now()
-
-        vars = dict(subject=subject.id, now=now)
-        updated = self.db.query('UPDATE %s SET value = $now WHERE subject = $subject RETURNING subject' % self.wraptag('subject last tagged'), vars=vars)
-        if len(updated) == 0:
-            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('subject last tagged'), vars=vars)
+        now = datetime.datetime.now(pytz.timezone('UTC'))
 
         vars = dict(subject=tagdef.id, now=now)
-        updated = self.db.query('UPDATE %s SET value = $now WHERE subject = $subject RETURNING subject' % self.wraptag('tag last modified'), vars=vars)
-        if len(updated) == 0:
+        self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % self.wraptag('tag last modified'))
+        results = self.db.query('SELECT value FROM %s WHERE subject = $subject'  % self.wraptag('tag last modified'), vars=vars)
+        if len(results) > 0:
+            if results[0].value < now:
+                self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % self.wraptag('tag last modified'), vars=vars)
+        else:
             self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('tag last modified'), vars=vars)
         
+        vars = dict(subject=subject.id, now=now)
+        results = self.db.query('SELECT value FROM %s WHERE subject = $subject' % self.wraptag('subject last tagged'), vars=vars)
+        if len(results) > 0:
+            if results[0].value < now:
+                self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % self.wraptag('subject last tagged'), vars=vars)
+        else:
+            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('subject last tagged'), vars=vars)
+
     def delete_tag(self, subject, tagdef, value=None):
         wheres = ['tag.subject = $id']
 
@@ -1506,7 +1516,7 @@ class Application:
             if len(results) > 0:
                 fire_doPolicyRule = True
 
-        query = 'DELETE FROM %s AS tag RETURNING subject' % self.wraptag(tagdef.tagname) + wheres
+        query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres + ' RETURNING subject'
         vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
         deleted = self.db.query(query, vars=vars)
         if len(deleted) > 0:
