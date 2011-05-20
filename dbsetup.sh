@@ -210,6 +210,30 @@ EOF
 INSERT INTO subjecttags (subject, tagname) VALUES ('$file', '$tagname');
 EOF
    fi
+
+   updated=$(psql -A -q -t <<EOF
+UPDATE "_subject last tagged" SET value = 'now' WHERE subject = '$file' RETURNING subject;
+EOF
+   )
+   if [[ -z "$updated" ]]
+   then
+       psql -A -q -t <<EOF
+INSERT INTO "_subject last tagged" (subject, value) VALUES ('$file', 'now');
+EOF
+   fi
+
+   updated=$(psql -A -q -t <<EOF
+UPDATE "_tag last modified" SET value = 'now' WHERE subject IN (SELECT subject FROM "_tagdef" WHERE value = '$tagname') RETURNING subject;
+EOF
+   )
+   if [[ -z "$updated" ]]
+   then
+       psql -A -q -t <<EOF
+INSERT INTO "_tag last modified" (subject, value) SELECT subject, 'now' FROM "_tagdef" WHERE value = '$tagname';
+EOF
+   fi
+
+   
 }
 
 tagacl()
@@ -330,7 +354,6 @@ EOF
    fi
 
    local subject=$(dataset_core "" tagdef "$3" "*")
-   tag "$subject" "tagdef" text "$1" >&2
    
    echo "$subject"
 }
@@ -442,6 +465,8 @@ tagdef "read users"          text        ""         anonymous   subjectowner tru
 tagdef "write users"         text        ""         anonymous   subjectowner true       rolepat
 tagdef "modified by"         text        ""         anonymous   system       false      role
 tagdef modified              timestamptz ""         anonymous   system       false
+tagdef "subject last tagged" timestamptz ""         anonymous   system       false
+tagdef "tag last modified"   timestamptz ""         anonymous   system       false
 tagdef bytes                 int8        ""         anonymous   system       false
 tagdef version               int8        ""         anonymous   system       false
 tagdef name                  text        ""         anonymous   system       false

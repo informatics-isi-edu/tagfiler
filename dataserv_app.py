@@ -1,5 +1,4 @@
 
-
 # 
 # Copyright 2010 University of Southern California
 # 
@@ -55,6 +54,55 @@ except:
 # see rules = [ ... ] for real matching rules
 
 render = None
+
+class DbCache:
+    """A little helper to share state between web requests."""
+
+    def __init__(self, idtagname, idalias=None):
+        self.idtagname = idtagname
+        self.idalias = idalias
+        self.cache = dict()
+        self.fill_time = None
+
+    def select(self, db, fillfunc, idtagval=None):
+        def cache_is_fresh():
+            if self.fill_time:
+                # modified time is latest modification time of:
+                #  identifying tag (tracked as "tag last modified" on its tagdef
+                #  individual subjects (tracked as "subject last tagged" on each identified subject
+                results = db.query('SELECT max(mtime) AS mtime FROM ('
+                                   + 'SELECT max(value) AS mtime FROM %s' % wraptag('subject last tagged')
+                                   + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
+                                   + ' UNION '
+                                   + 'SELECT value AS mtime FROM %s' % wraptag('tag last modified')
+                                   + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
+                                   vars=dict(idtag=self.idtagname))
+                mtime = results[0].mtime
+                return self.fill_time >= mtime
+            else:
+                return False
+        
+        if not cache_is_fresh():
+            # need to refill cache
+            web.debug('DbCache: filling %s cache' % self.idtagname)
+            if self.idalias:
+                self.cache = dict( [ (res[self.idalias], res) for res in fillfunc() ] )
+            else:
+                self.cache = dict( [ (res[self.idtagname], res) for res in fillfunc() ] )
+            #web.debug(self.cache)
+            self.fill_time = datetime.datetime.now(pytz.timezone('UTC'))
+
+        if idtagval != None:
+            return self.cache.get(idtagval, None)
+        else:
+            return self.cache.itervalues()
+
+config_cache = DbCache('config')
+tagdef_cache = DbCache('tagdef', 'tagname')
+typedef_cache = DbCache('typedef')
+
+def wraptag(tagname, suffix='', prefix='_'):
+    return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
@@ -259,10 +307,10 @@ class Application:
                                     ('help', None),
                                     ('home', 'https://%s' % self.hostname),
                                     ('log path', '/var/www/%s-logs' % self.daemonuser),
+                                    ('logo', ''),
                                     ('policy remappings', []),
                                     ('store path', '/var/www/%s-data' % self.daemonuser),
                                     ('subtitle', ''),
-                                    ('logo', ''),
                                     ('tag list tags', []),
                                     ('tagdef write users', []),
                                     ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
@@ -270,7 +318,7 @@ class Application:
                                     ('webauthn require', 'False') ]
 
         results = self.select_files_by_predlist(subjpreds=[pred],
-                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag ],
+                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged'],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
             config = results[0]
@@ -305,6 +353,7 @@ class Application:
     def __init__(self, parser=None):
         "store common configuration data for all service classes"
         global render
+        global db_cache
 
         self.url_parse_func = parser
 
@@ -404,6 +453,8 @@ class Application:
                            ('write users', 'rolepat', True, 'subjectowner', False),
                            ('owner', 'role', False, 'subjectowner', False),
                            ('modified', 'timestamptz', False, 'system', False),
+                           ('subject last tagged', 'timestamptz', False, 'system', False),
+                           ('tag last modified', 'timestamptz', False, 'system', False),
                            ('name', 'text', False, 'system', False),
                            ('version', 'int8', False, 'system', False),
                            ('latest with name', 'text', False, 'system', True),
@@ -458,9 +509,15 @@ class Application:
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
 
+        def fill_config():
+            config = self.select_config()
+            config['policy remappings'] = buildPolicyRules(config['policy remappings'])
+            return [ config ]
+
         # get full config
-        self.config = self.select_config()
-        self.config['policy remappings'] = buildPolicyRules(self.config['policy remappings'])
+        self.config = config_cache.select(self.db, fill_config, 'tagfiler')
+        #self.config = self.select_config()
+        #self.config['policy remappings'] = buildPolicyRules(self.config['policy remappings'])
         
         self.render = web.template.render(self.config['template path'], globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
@@ -615,7 +672,7 @@ class Application:
             if len(results) == 0:
                 raise Conflict('Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
-            results = self.get_type(typename)
+            results = typedef_cache.select(self.db, lambda: self.get_type(), typename)
             if len(results) == 0:
                 raise Conflict('The type "%s" is not defined!' % typename)
             type = results[0]
@@ -710,7 +767,8 @@ class Application:
         self.db = app.db
         self.set_authn(app.authn)
         # we need to re-do this after having proper authn info
-        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
+        self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
+        #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatchCore(self, uri, setcookie=True):
         if self.globals['webauthnhome']:
@@ -732,7 +790,8 @@ class Application:
             self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
 
         # we need to re-do this after having proper authn info
-        self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
+        self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
+        #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatch(self, uri):
         def body():
@@ -808,7 +867,7 @@ class Application:
                         # build up globals useful to almost all classes, to avoid redundant coding
                         # this is fragile to make things fast and simple
                         db_globals_dict = dict(roleinfo=lambda : self.buildroleinfo(),
-                                               typeinfo=lambda : self.get_type(),
+                                               typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type())],
                                                typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]))
                         for key in self.needed_db_globals:
                             self.globals[key] = db_globals_dict[key]()
@@ -1218,7 +1277,8 @@ class Application:
                        'tagdef writepolicy': 'writepolicy',
                        'tagdef unique': 'unique',
                        'tag read users': 'tagreaders',
-                       'tag write users': 'tagwriters' }
+                       'tag write users': 'tagwriters',
+                       'tag last modified': 'modified' }
 
     def select_tagdef(self, tagname=None, subjpreds=[], order=None, enforce_read_authz=True):
         listtags = [ 'owner' ]
@@ -1416,6 +1476,19 @@ class Application:
         #web.debug(query, vars)
         return self.db.query(query, vars=vars)
 
+    def set_tag_lastmodified(self, subject, tagdef):
+        now = datetime.datetime.now()
+
+        vars = dict(subject=subject.id, now=now)
+        updated = self.db.query('UPDATE %s SET value = $now WHERE subject = $subject RETURNING subject' % self.wraptag('subject last tagged'), vars=vars)
+        if len(updated) == 0:
+            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('subject last tagged'), vars=vars)
+
+        vars = dict(subject=tagdef.id, now=now)
+        updated = self.db.query('UPDATE %s SET value = $now WHERE subject = $subject RETURNING subject' % self.wraptag('tag last modified'), vars=vars)
+        if len(updated) == 0:
+            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('tag last modified'), vars=vars)
+        
     def delete_tag(self, subject, tagdef, value=None):
         wheres = ['tag.subject = $id']
 
@@ -1433,30 +1506,32 @@ class Application:
             if len(results) > 0:
                 fire_doPolicyRule = True
 
-        query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres
+        query = 'DELETE FROM %s AS tag RETURNING subject' % self.wraptag(tagdef.tagname) + wheres
         vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
-        self.db.query(query, vars=vars)
+        deleted = self.db.query(query, vars=vars)
+        if len(deleted) > 0:
+            self.set_tag_lastmodified(subject, tagdef)
 
-        results = self.select_tag_noauthn(subject, tagdef)
-        if len(results) == 0:
-            query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
-            self.db.query(query, vars=vars)
-
-        # update in-memory representation too for caller's sake
-        if tagdef.multivalue:
-            subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
-        elif tagdef.typestr != 'empty':
             results = self.select_tag_noauthn(subject, tagdef)
-            if len(results) > 0:
-                subject[tagdef.tagname] = results[0].value
-            else:
-                subject[tagdef.tagname] = None
-        else:
-            subject[tagdef.tagname ] = False
+            if len(results) == 0:
+                query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
+                self.db.query(query, vars=vars)
 
-        if fire_doPolicyRule:
-            self.doPolicyRule(subject)
-            
+            # update in-memory representation too for caller's sake
+            if tagdef.multivalue:
+                subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
+            elif tagdef.typestr != 'empty':
+                results = self.select_tag_noauthn(subject, tagdef)
+                if len(results) > 0:
+                    subject[tagdef.tagname] = results[0].value
+                else:
+                    subject[tagdef.tagname] = None
+            else:
+                subject[tagdef.tagname ] = False
+
+            if fire_doPolicyRule:
+                self.doPolicyRule(subject)
+
     def downcast_value(self, dbtype, value):
         if dbtype == 'int8':
             value = int(value)
@@ -1470,7 +1545,7 @@ class Application:
         else:
             pass
         return value
-            
+
     def set_tag(self, subject, tagdef, value=None):
         typedef = self.globals['typesdict'].get(tagdef.typestr, None)
         if typedef == None:
@@ -1547,7 +1622,10 @@ class Application:
             results = self.db.query("INSERT INTO subjecttags (subject, tagname) VALUES ($subject, $tagname)", vars=vars)
         else:
             # may already be reverse-indexed in multivalue case
-            pass            
+            pass
+
+        self.set_tag_lastmodified(subject, tagdef)
+        
 
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"
