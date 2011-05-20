@@ -82,7 +82,10 @@ class Dispatcher:
             #web.debug((uri,astmethod))
             result = astmethod(uri)
             if hasattr(result, 'next'):
-            	first = result.next()
+                try:
+                    first = result.next()
+                except StopIteration:
+                    return result
             	return itertools.chain([first], result)
             else:
             	return result
