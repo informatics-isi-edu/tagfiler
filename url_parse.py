@@ -35,6 +35,7 @@ start = 'start'
 def p_start(p):
     """start : filelist
              | file
+             | subject
              | tagdef
              | tags
              | query
@@ -80,6 +81,14 @@ def p_contact(p):
 def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[5])
+
+def p_subject(p):
+    """subject : slash string slash SUBJECT slash querypath"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6])
+
+def p_subject_opts(p):
+    """subject : slash string slash SUBJECT slash querypath queryopts"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
 def p_file(p):
     """file : slash string slash FILE slash querypath"""

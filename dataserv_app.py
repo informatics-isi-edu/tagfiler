@@ -1153,13 +1153,11 @@ class Application:
         return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
     def classify_subject(self, subject):
-        datapred = None
-        for dtype in [ 'url', 'name', 'tagdef', 'typedef', 'config', 'view' ] \
-                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] :
+        for dtype in [ 'url', 'tagdef', 'typedef', 'config', 'view', 'file', 'name' ] \
+                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname] :
             keyv = subject.get(dtype, None)
             if keyv:
-                return { 'name' : 'file' }.get(dtype, dtype)
-        return None
+                return dtype
 
     def subject2identifiers(self, subject, showversions=True):
         dtype = self.classify_subject(subject)

@@ -24,6 +24,7 @@ import os
 import webauthn
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize
 from rest_fileio import FileIO, LogFileIO
+import subjects
 import json
 
 jsonMungeTypes = set([ 'date', 'timestamptz' ])
@@ -508,6 +509,16 @@ class FileId(Node, FileIO):
         self.url = url
         self.queryopts = queryopts
         self.versions = versions
+        if storage:
+            self.storage = storage
+
+class Subject(Node, subjects.Subject):
+    __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
+    def __init__(self, parser, appname, path, queryopts={}, storage=None):
+        Node.__init__(self, parser, appname)
+        subjects.Subject.__init__(self)
+        self.path = [ ( e[0], e[1], [] ) for e in path ]
+        self.queryopts = queryopts
         if storage:
             self.storage = storage
 

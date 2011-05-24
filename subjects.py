@@ -44,6 +44,7 @@ class Subject (Application):
         Application.__init__(self)
         self.action = None
         self.key = None
+        self.dtype = None
         self.url = None
         self.file = None
         self.bytes = None
@@ -107,6 +108,7 @@ class Subject (Application):
             raise Conflict('Found %d matching subjects, but this operation only supports 1.' % (count))
         
         self.subjects = [ x for x in results ]
+        self.subject = self.subjects[0]
 
         for s in range(0, len(self.subjects)):
             # get file tag which is 'system' authz model so not included already
@@ -116,9 +118,11 @@ class Subject (Application):
             else:
                 self.subjects[s].file = None
             datapred, dataid, dataname, self.subjects[s].dtype = self.subject2identifiers(self.subjects[s])
-
-        self.subject = self.subjects[0]
-        self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
+            if s == 0:
+                self.datapred = datapred
+                self.dataid = dataid
+                self.dataname = dataname
+                self.dtype = self.subjects[s].dtype
 
     def get_body(self):
         self.populate_subject(allow_blank=True)
@@ -462,7 +466,7 @@ class Subject (Application):
                                  lambda result : result)
 
         self.subject_prewrite = self.subject
-        self.mustInsert = False
+        self.mustInsert = True
 
         # we get here if write is not disallowed
  

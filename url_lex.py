@@ -35,6 +35,7 @@ literals = [ '(', ')', ':', ';', ',', '=', '@', '&', '$',
 # special strings which are keywords
 keywords = {
     'file' : 'FILE',
+    'subject' : 'SUBJECT',
     'tagdef' : 'TAGDEF',
     'tags' : 'TAGS',
     'query' : 'QUERY',
