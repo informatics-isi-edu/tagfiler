@@ -23,6 +23,7 @@ __author__ = ["misd@isi.edu"]
 __license__ = "University of Southern California"
 
 import dataserv_app
+import subjects
 import rest_fileio
 import url_ast
 import url_lex

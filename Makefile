@@ -28,7 +28,7 @@ WSGIFILE=tagfiler.wsgi
 
 SCRIPTFILES=functions.js main.css calendar.gif
 
-FILES=dataserv_app.py rest_fileio.py \
+FILES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
 
