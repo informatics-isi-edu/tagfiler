@@ -118,9 +118,6 @@ def choose_content_type(clientval, guessedval, taggedval, name=None):
             return clientval
     return guessedval
 
-file_cache = dict()  # cache[(user, subjpreds)] = (ctime, fileresult)
-file_cache_time = -1 # maximum cache time in seconds
-
 class FileIO (Application):
     """Basic bulk file I/O
 
@@ -144,7 +141,6 @@ class FileIO (Application):
         self.subject = None
         self.newMatch = None
         #self.needed_db_globals = []  # turn off expensive db queries we ignore
-        self.cachekey = None
         self.mergeSubjpredsTags = False
 
     def populate_subject(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False, post_method=False):
@@ -255,29 +251,6 @@ class FileIO (Application):
                 datapred, dataid, dataname, dtype = self.subject2identifiers(result)
                 raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
 
-        now = datetime.datetime.now(pytz.timezone('UTC'))
-        def preRead():
-            f = None
-            content_type = None
-            self.subject = None
-            cachekey = (self.authn.role, path_linearize(self.path))
-            cached = file_cache.get((self.authn.role, cachekey), None)
-            if cached:
-                ctime, subject = cached
-                if (now - ctime).seconds < file_cache_time:
-                    self.subject = subject
-                    f, content_type = postCommit((subject, subject['content-type']))
-                    if not f:
-                        file_cache.pop((self.authn.role, cachekey), None)
-                else:
-                    file_cache.pop((self.authn.role, cachekey), None)
-            if not f:
-                return self.dbtransact(body, postCommit)
-            else:
-                # never re-cache a cache hit
-                self.newMatch = False
-                return (f, content_type)
-
         count = 0
         limit = 10
         f = None
@@ -289,11 +262,7 @@ class FileIO (Application):
                 raise web.internalerror('Could not access local copy of ' + path_linearize(self.path))
 
             # we do this in a loop to compensate for race conditions noted above
-            f, content_type = preRead()
-
-        if self.newMatch:
-            cachekey = (self.authn.role, path_linearize(self.path))
-            file_cache[(self.authn.role, cachekey)] = (now, self.subject)
+            f, content_type = self.dbtransact(body, postCommit)
 
         # we only get here if we were able to both:
         #   a. open the file for reading its content
@@ -760,8 +729,6 @@ class FileIO (Application):
             if self.update:
                 if self.unique:
                     if self.subject.dtype == 'file' and self.subject.file:
-                        # we can cache this validated result
-                        self.newMatch = True
                         filename = self.config['store path'] + '/' + self.subject.file
                         f = open(filename, 'r+b', 0)
                         return f
@@ -838,34 +805,7 @@ class FileIO (Application):
         else:
             self.update = False
 
-        now = datetime.datetime.now(pytz.timezone('UTC'))
-        def preWriteCached():
-            f = None
-            cachekey = (self.authn.role, path_linearize(self.path))
-            cached = file_cache.get((self.authn.role, cachekey), None)
-            if cached:
-                ctime, subject = cached
-                if subject and (now - ctime).seconds < file_cache_time:
-                    self.subject = subject
-                    filename = self.config['store path'] + '/' + self.subject.file
-                    f = open(filename, 'r+b', 0)
-                    if not f:
-                        file_cache.pop((self.authn.role, cachekey), None)
-                else:
-                    file_cache.pop((self.authn.role, cachekey), None)
-                    
-            if not f:
-                return self.dbtransact(preWriteBody, preWritePostCommit)
-            else:
-                self.newMatch = False
-                return f
-            
-        # this retries if a file was found but could not be opened due to races
-        if self.update and len(self.queryopts) == 0:
-            f = preWriteCached()
-        else:
-            # don't trust cache for version updates nor queryopts-based tag writing...
-            f = self.dbtransact(preWriteBody, preWritePostCommit)
+        f = self.dbtransact(preWriteBody, preWritePostCommit)
 
         self.subject_prewrite = self.subject
 
@@ -918,10 +858,6 @@ class FileIO (Application):
                 res = ''
             return res
 
-        if self.newMatch:
-            # cache newly obtained results
-            cachekey = (self.authn.role, path_linearize(self.path))
-            file_cache[cachekey] = (now, self.subject)
         if not self.mustInsert \
                 and self.subject.dtype == 'file' \
                 and self.unique \
