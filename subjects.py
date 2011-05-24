@@ -522,7 +522,7 @@ class Subject (Application):
             return self.renderlist("Delete Confirmation",
                                    [self.render.ConfirmForm(ftype)])
         
-        contentType = web.ctx.env['CONTENT_TYPE'].lower()
+        contentType = web.ctx.env.get('CONTENT_TYPE', '').lower()
         if contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()
             
@@ -576,6 +576,9 @@ class Subject (Application):
                 raise BadRequest(data="Form field action=%s not understood." % self.action)
 
         else:
-            raise BadRequest(data="Content-Type %s not expected via this interface."% contentType)
+            # any unrecognized input type is ignored, and we just process URI with action=post
+            return self.dbtransact(lambda : self.insertForStore(allow_blank=True, post_method=True),
+                                   putPostCommit)
+
 
 
