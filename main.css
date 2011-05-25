@@ -44,16 +44,22 @@ tr.file-heading, tr.heading, tr.file-heading A:link, tr.heading A:link, tr.file-
   background-color: #990000;
   color: #ffcc00;
 }
+tr.file-footer {
+  border: 1px black;
+}
 tr.odd {
   background-color: #cccccc;
 }
 tr.even {
 }
-tr.file-tag.odd {
+tr.file-tag.odd, tr.file-footer.odd {
+  background-color: #ffffff;
+}
+tr.file-tag.even, tr.file-footer.even {
   background-color: #cccccc;
 }
-tr.file-tag.even {
-
+td.entity {
+  vertical-align: top;
 }
 td.bytes {
   text-align: right;
@@ -108,6 +114,7 @@ td.tag-name {
 }
 td.status-wrapper {
     text-align: center;
+    font-weight:bold;
 }
 table.table-border {
     border: 1px solid black;
