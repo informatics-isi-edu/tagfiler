@@ -1,0 +1,61 @@
+$def with ()
+$if None:
+	$# 
+	$# Copyright 2010 University of Southern California
+	$# 
+	$# Licensed under the Apache License, Version 2.0 (the "License");
+	$# you may not use this file except in compliance with the License.
+	$# You may obtain a copy of the License at
+	$# 
+	$#    http://www.apache.org/licenses/LICENSE-2.0
+	$# 
+	$# Unless required by applicable law or agreed to in writing, software
+	$# distributed under the License is distributed on an "AS IS" BASIS,
+	$# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	$# See the License for the specific language governing permissions and
+	$# limitations under the License.
+	$#
+<HTML>
+<HEAD>
+<TITLE>PSOC</TITLE>
+  <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
+<script type="text/javascript" src="${home}/static/functions.js"></script>
+<script type="text/javascript" src="${home}/static/psoc.js"></script>
+</HEAD>
+<BODY onload='init("${home}")' >
+<div id="all_subjects" style="display:none;">
+</div>
+<select id="tags" name="tags" onchange="selectTags()">
+</select>
+<p>
+<table>
+	<tr>
+		<td class="status-wrapper" id="Status" >
+		$for i in 'Click a "Submit" button to begin file upload':
+			&nbsp;
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<table id="psoc_progress_bar" class="table-border" style="display:none">
+				<tr>
+					<td id="ProgressBar">
+					$for i in 'Click a "Submit" button to begin file upload':
+						&nbsp;
+					</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
+</table>
+<input type="button" name="Submit" onclick="genericTest();" value="Submit"/>
+<p>
+<input type="button" onclick="alert(document.getElementById('all_subjects').innerHTML);" value="Test"/>
+<input type="button" onclick="var a = document.getElementById('all_subjects').innerHTML; if (document.getElementById('AllBody').style.display == '') {document.getElementById('AllBody').style.display = 'none';} else {document.getElementById('AllBody').value =a;document.getElementById('AllBody').style.display = '';}" value="TestBody"/>
+<p>
+<textarea id="AllBody" style="display:none" cols="200" rows="50" >
+</textarea>
+</p>
+</BODY>
+</HTML>
+
