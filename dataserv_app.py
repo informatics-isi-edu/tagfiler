@@ -100,6 +100,7 @@ class DbCache:
 config_cache = DbCache('config')
 tagdef_cache = DbCache('tagdef', 'tagname')
 typedef_cache = DbCache('typedef')
+view_cache = DbCache('view')
 
 def wraptag(tagname, suffix='', prefix='_'):
     return '"' + prefix + tagname.replace('"','""') + suffix + '"'
@@ -334,17 +335,18 @@ class Application:
 
         return config
 
+    def select_view_all(self):
+        return self.select_files_by_predlist(subjpreds=[ web.Storage(tag='view', op=None, vals=[]) ],
+                                             listtags=[ 'view' ] + [ "_cfg_%s" % key for key in ['file list tags', 'file list tags write', 'tag list tags'] ],
+                                             listas=dict([ ("_cfg_%s" % key, key) for key in ['file list tags', 'file list tags write', 'tag list tags'] ]))
+
     def select_view(self, viewname=None, default='default'):
         if viewname == None:
             viewname = default
         if viewname == None:
             return None
 
-        view = self.select_config(web.Storage(tag='view', op='=', vals=[viewname]),
-                                  [ ('file list tags', []),
-                                    ('file list tags write', []),
-                                    ('tag list tags', []) ],
-                                  fake_missing=False)
+        view = view_cache.select(self.db, lambda : self.select_view_all(), viewname)
         if view == None:
             return self.select_view(default, None)
         else:
@@ -852,6 +854,7 @@ class Application:
         try:
             count = 0
             limit = 10
+            error = None
             while True:
                 try:
                     t = self.db.transaction()
@@ -973,7 +976,7 @@ class Application:
                 # count=9 is roughly 10 seconds
                 # randomly jittered from 75-125% of exponential delay
                 delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.00000001
-                web.debug('transaction retry: delaying %f' % delay)
+                web.debug('transaction retry: delaying %f on "%s"' % (delay, error))
                 time.sleep(delay)
 
         finally:
@@ -1478,6 +1481,10 @@ class Application:
         return self.db.query(query, vars=vars)
 
     def set_tag_lastmodified(self, subject, tagdef):
+        if tagdef.writepolicy == 'system':
+            # skip modification tracking of system-managed tags for speed...
+            return
+        
         now = datetime.datetime.now(pytz.timezone('UTC'))
 
         vars = dict(subject=tagdef.id, now=now)
@@ -1490,6 +1497,7 @@ class Application:
             self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('tag last modified'), vars=vars)
         
         vars = dict(subject=subject.id, now=now)
+        self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % self.wraptag('subject last tagged'))
         results = self.db.query('SELECT value FROM %s WHERE subject = $subject' % self.wraptag('subject last tagged'), vars=vars)
         if len(results) > 0:
             if results[0].value < now:

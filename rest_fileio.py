@@ -469,6 +469,7 @@ class FileIO (Subject):
         self.bytes = flen
         self.wbytes = wbytes
 
+        now = datetime.datetime.now(pytz.timezone('UTC'))
         if not self.mustInsert \
                 and self.subject.dtype == 'file' \
                 and self.unique \
@@ -478,7 +479,7 @@ class FileIO (Subject):
                 and not self.subject['url'] \
                 and len(self.queryopts.keys()) == 0:
             # skip tag update transaction if and only if it is a noop
-            return postWritePostCommit([])
+            return self.put_postWritePostCommit([])
         else:
             try:
                 result = self.dbtransact(lambda : self.put_postWriteBody(),

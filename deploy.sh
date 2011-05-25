@@ -157,6 +157,11 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
    Satisfy Any
    Allow from all
 
+   <IfModule mod_expires.c>
+      ExpiresActive On
+      ExpiresDefault "access plus 1 hour"
+   </IfModule>
+
 </Location>
 
 <Directory ${TAGFILERDIR}/wsgi>
