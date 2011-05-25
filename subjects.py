@@ -33,6 +33,9 @@ import urllib
 
 from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred
 
+myrand = random.Random()
+myrand.seed(os.getpid())
+
 class Subject (Application):
     """Basic subject CRUD
 
@@ -291,7 +294,9 @@ class Subject (Application):
             self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.authn.role)
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
-        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > 5 or basefile.id != newfile.id:
+        maxage = myrand.uniform(3, 8)
+
+        if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > maxage or basefile.id != newfile.id:
             self.set_tag(newfile, self.globals['tagdefsdict']['modified'], 'now')
 
         if newfile.dtype == 'file':

@@ -1567,30 +1567,32 @@ class Application:
         if typedef == None:
             raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
         dbtype = typedef['typedef dbtype']
-        
-        validator = self.tagnameValidators.get(tagdef.tagname)
-        if validator:
-            validator(value, tagdef, subject)
 
-        validator = self.tagtypeValidators.get(typedef.typedef)
-        if validator:
-            results = validator(value, tagdef, subject)
-            if results != None:
-                # validator converted user-supplied value to internal form to use instead
-                if type(results) == type([]):
-                    # validatator generated a set of values, recursively try to set these instead
-                    for val in results:
-                        self.set_tag(subject, tagdef, val)
-                    return
-                else:
-                    # override value and continue processing
-                    value = results
+        if tagdef.writepolicy != 'system':
+            # only run extra validation on user-provided values...
+            validator = self.tagnameValidators.get(tagdef.tagname)
+            if validator:
+                validator(value, tagdef, subject)
 
-        try:
-            if value:
-                value = self.downcast_value(dbtype, value)
-        except:
-            raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
+            validator = self.tagtypeValidators.get(typedef.typedef)
+            if validator:
+                results = validator(value, tagdef, subject)
+                if results != None:
+                    # validator converted user-supplied value to internal form to use instead
+                    if type(results) == type([]):
+                        # validatator generated a set of values, recursively try to set these instead
+                        for val in results:
+                            self.set_tag(subject, tagdef, val)
+                        return
+                    else:
+                        # override value and continue processing
+                        value = results
+
+            try:
+                if value:
+                    value = self.downcast_value(dbtype, value)
+            except:
+                raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
         if tagdef.unique:
             results = self.select_tag_noauthn(None, tagdef, value)
@@ -1600,19 +1602,41 @@ class Application:
                 else:
                     raise Conflict('Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
 
-        if not tagdef.multivalue:
-            results = self.select_tag_noauthn(subject, tagdef)
-            if len(results) > 0:
-                if dbtype == '' or results[0].value == value:
-                    return
-                else:
-                    self.delete_tag(subject, tagdef)
-        else:
-            results = self.select_tag_noauthn(subject, tagdef, value)
-            if len(results) > 0:
-                # (file, tag, value) already set, so we're done
-                return
+        # check whether triple already exists
+        results = self.select_tag_noauthn(subject, tagdef, value)
+        if len(results) > 0:
+            return
 
+        vars = dict(subject=subject.id, value=value, tagname=tagdef.tagname)
+
+        if not tagdef.multivalue:
+            # check pre-conditions before inserting triple
+            if dbtype == '':
+                # subject must not be tagged yet or we wouldn't be here...
+                pass
+            else:
+                if value != None:
+                    query = 'UPDATE %s' % self.wraptag(tagdef.tagname) \
+                            + ' SET value = $value' \
+                            + ' WHERE subject = $subject'
+                    if tagdef.tagname == 'modified' and subject.has_key('modified'):
+                        # optimize for concurrent file access
+                        query += ' AND value < $value'
+                    query +=  ' RETURNING value'
+                else:
+                    query = 'UPDATE %s' % self.wraptag(tagdef.tagname) \
+                            + ' SET value = DEFAULT' \
+                            + ' WHERE subject = $subject' \
+                            + ' RETURNING value'
+
+                results = self.db.query(query, vars=vars)
+
+                if len(results) > 0 or (tagdef.tagname == 'modified' and subject.has_key('modified')):
+                    # (subject, value) updated in place, so we're almost done...
+                    self.set_tag_lastmodified(subject, tagdef)
+                    return
+
+        # if we get here, insertion is needed
         if dbtype != '' and value != None:
             query = 'INSERT INTO %s' % self.wraptag(tagdef.tagname) \
                     + ' (subject, value) VALUES ($subject, $value)'
@@ -1621,8 +1645,6 @@ class Application:
             query = 'INSERT INTO %s' % self.wraptag(tagdef.tagname) \
                     + ' (subject) VALUES ($subject)'
 
-        vars = dict(subject=subject.id, value=value, tagname=tagdef.tagname)
-        #web.debug(query, vars)
         self.db.query(query, vars=vars)
 
         # update in-memory representation too for caller's sake
