@@ -76,6 +76,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
+#	make --no-print-directory -f psoc/Makefile install
 
 restart: force install
 	service httpd restart
