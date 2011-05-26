@@ -433,13 +433,13 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	container.setAttribute('id', makeId(subjectId1, 'container'));
 	parent.appendChild(container);
 	var dl = document.createElement('dl');
-	dl.setAttribute('style', 'color: blue; cursor: default');
 	container.appendChild(dl);
 	var dt = document.createElement('dt');
 	dt.setAttribute('onclick', makeFunction('tog', 'this', str(header)));
 	dt.setAttribute('id', makeId(subjectId, 'span'));
 	dl.appendChild(dt);
 	var span = document.createElement('span');
+	span.setAttribute('style', 'color: blue; cursor: default');
 	dt.appendChild(span);
 	span.innerHTML = '<img src="'+resourcePrefix+'minus.png" width="16" height="16" border="0" alt="-">'+header;
 	var dd = document.createElement('dd');
