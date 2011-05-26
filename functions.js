@@ -572,6 +572,32 @@ function deleteAll(dataname, url) {
 	ajax_client.send(params);
 }
 
+/**
+ * Delete a dataset or its contains
+ * dataname = the dataset name (predicate)
+ * url = the URL to POST the request
+ */
+function deleteDataset(dataname, url) {
+	var param = '';
+	if (url.lastIndexOf('/') == url.length-1) {
+		param = 'content of the ';
+	}
+	var answer = confirm ('Do you want to delete the ' + param + 'dataset "' + dataname + '"?');
+	if (!answer) {
+		return;
+	}
+	document.body.style.cursor = "wait";
+	ajax_client.open("POST", url, true);
+	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
+	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
+	var params = 'action=ConfirmDelete&referer='+window.location;
+	ajax_client.onreadystatechange = processDeleteAll;
+	ajax_client.send(params);
+}
+
+/**
+ * Callback function to check the delete result
+ */
 function processDeleteAll() {
 	if(ajax_client.readyState == 4) {
 		if(ajax_client.status == 200) {

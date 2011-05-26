@@ -49,23 +49,11 @@ $else:
 		</td>
 		$if filerecord.writeok:
 			<td>
-			<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}" method="post">
-			    <div>
-			    <input type="hidden" name="action" value="delete" />
-			    <input type="hidden" name="referer" value="${referer}" />
-			    <input type="submit" value="Delete" />
-			    </div>
-			</form>
+					<button type="button" name="Delete" id="Delete" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}')" >Delete</button>
 			</td>
 			$if filerecord.get('Image Set', False):
 				<td>
-				<form enctype="application/x-www-form-urlencoded" action="${home}/file/${datapred}/" method="post">
-				    <div>
-				    <input type="hidden" name="action" value="delete" />
-				    <input type="hidden" name="referer" value="${referer}" />
-				    <input type="submit" value="Delete Contents" />
-				    </div>
-				</form>
+					<button type="button" name="Delete Contents" id="Delete Contents" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}/')" >Delete Contents</button>
 				</td>
 				<td>
 					<button type="button" name="Delete All" id="Delete All" onclick="deleteAll('${dataname}', '${home}/file/${datapred}')" >Delete All</button>
