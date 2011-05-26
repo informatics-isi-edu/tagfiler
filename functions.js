@@ -555,21 +555,18 @@ function deleteAll(dataname, url) {
 		return;
 	}
 	document.body.style.cursor = "wait";
-	ajax_client.open("POST", url+'/', true);
+	ajax_client.open("DELETE", url+'/', true);
 	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-	var params = 'action=ConfirmDelete&referer='+window.location;
 	ajax_client.onreadystatechange = function() {
 		if(ajax_client.readyState == 4) {
-			ajax_client.open("POST", url, true);
+			ajax_client.open("DELETE", url, true);
 			ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-			ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
 			ajax_client.onreadystatechange = processDelete;
-			ajax_client.send(params);
+			ajax_client.send(null);
 			return;
 		}
 	}
-	ajax_client.send(params);
+	ajax_client.send(null);
 }
 
 /**
@@ -587,12 +584,10 @@ function deleteDataset(dataname, url) {
 		return;
 	}
 	document.body.style.cursor = "wait";
-	ajax_client.open("POST", url, true);
+	ajax_client.open("DELETE", url, true);
 	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-	var params = 'action=ConfirmDelete&referer='+window.location;
 	ajax_client.onreadystatechange = processDelete;
-	ajax_client.send(params);
+	ajax_client.send(null);
 }
 
 /**
@@ -600,11 +595,12 @@ function deleteDataset(dataname, url) {
  */
 function processDelete() {
 	if(ajax_client.readyState == 4) {
-		if(ajax_client.status == 200 || ajax_client.status == 404) {
+		if(ajax_client.status == 200 || ajax_client.status == 404 || ajax_client.status == 204) {
 			window.location.reload(true);
 		} else {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
-			alert(err != null ? unescape(err) : ajax_client.responseText);
+			var status = 'Status: ' + ajax_client.status + '. ';
+			alert(status + (err != null ? unescape(err) : ajax_client.responseText));
 		}
 		document.body.style.cursor = "default";
 	}
