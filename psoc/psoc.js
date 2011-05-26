@@ -748,6 +748,7 @@ var SVCPREFIX;
 var resourcePrefix;
 
 function init(home) {
+	expiration_warning = false;
 	HOME = home;
 	SVCPREFIX = home.substring(home.lastIndexOf('/')+1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
@@ -809,6 +810,7 @@ function genericTest() {
 	var subjects = getAllSubjects();
 	resolveDependencies(subjects);
 	postSubjects(subjects);
+	expiration_warning = true;
 }
 
 function getSubjectTags(group, position) {
