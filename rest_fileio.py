@@ -130,7 +130,8 @@ class FileIO (Subject):
     __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
     def __init__(self):
-        Application.__init__(self)
+        Subject.__init__(self)
+        self.api = 'file'
         self.action = None
         self.key = None
         self.url = None
@@ -458,13 +459,13 @@ class FileIO (Subject):
             else:
                 raise Conflict(data='The resource "%s" is not unique, so byte-range update is unsafe.' % path_linearize(self.path))
         
-    def PUT(self, uri):
+    def PUT(self, uri, post_method=False):
         """store file content from client"""
         self.uri = uri
         cfirst, clast, clen, flen, self.content_range = self.put_prepareRequest()
 
         inf = web.ctx.env['wsgi.input']
-        f = self.dbtransact(lambda : self.put_preWriteBody(),
+        f = self.dbtransact(lambda : self.put_preWriteBody(post_method=post_method),
                             lambda result : result)
 
         self.subject_prewrite = self.subject
@@ -527,9 +528,16 @@ class FileIO (Subject):
             view = ''
             if self.dtype:
                 view = '?view=%s' % urlquote('%s' % self.dtype)
-            raise web.seeother('/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view))
+            if web.ctx.env.get('HTTP_REFERER', None) != None:
+                url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
+                raise web.seeother(url)
+            else:
+                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
+                web.header('Location', uri)
+                web.ctx.status = '204 No Content'
+                return ''
 
-        contentType = web.ctx.env['CONTENT_TYPE'].lower()
+        contentType = web.ctx.env.get('CONTENT_TYPE', "").lower()
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
 
@@ -579,8 +587,11 @@ class FileIO (Subject):
                 self.deleteFile(tempFileName)
                 raise
 
-        else:
+        elif contentType[0:33] == 'application/x-www-form-urlencoded':
             return Subject.POST(self, uri)
+
+        else:
+            return self.PUT(uri, post_method=True)
 
 
 class LogFileIO (FileIO):

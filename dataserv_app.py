@@ -853,7 +853,7 @@ class Application:
 
         try:
             count = 0
-            limit = 10
+            limit = 8
             error = None
             while True:
                 try:

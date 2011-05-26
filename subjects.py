@@ -45,6 +45,7 @@ class Subject (Application):
 
     def __init__(self):
         Application.__init__(self)
+        self.api = 'subject'
         self.action = None
         self.key = None
         self.dtype = None
@@ -105,6 +106,8 @@ class Subject (Application):
 
         if len(results) == 0:
             raise NotFound('dataset matching "%s"' % request)
+        elif len(results) > 0 and self.unique and post_method:
+            raise Conflict('Cannot POST to existing subject "%s".' % (self.subject2identifiers(results[0])[2]))
         elif len(results) > 1 and not allow_multiple:
             count = len(results)
             names = ['"%s"' % self.subject2identifiers(result)[2] for result in results]
@@ -237,6 +240,7 @@ class Subject (Application):
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=path_linearize(self.path))
+            web.debug(self.file)
             self.id = self.insert_file(self.name, self.version, self.file)
 
         if self.id != None:
@@ -300,7 +304,7 @@ class Subject (Application):
             self.set_tag(newfile, self.globals['tagdefsdict']['modified'], 'now')
 
         if newfile.dtype == 'file':
-            if not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id:
+            if newfile.bytes != None and (not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['bytes'], newfile.bytes)
             if not basefile or basefile.url and basefile.version == newfile.version:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['url'])
@@ -361,10 +365,10 @@ class Subject (Application):
         """Extension point for returning writables in subtypes..."""
         return None
 
-    def put_preWriteBody(self):
+    def put_preWriteBody(self, post_method=False):
         status = web.ctx.status
         try:
-            self.populate_subject(enforce_read_authz=False)
+            self.populate_subject(enforce_read_authz=False, allow_blank=post_method, post_method=post_method)
             if not self.subject.readok:
                 raise Forbidden('access to file "%s"' % path_linearize(self.path))
             if not self.subject.writeok: 
@@ -374,9 +378,16 @@ class Subject (Application):
         except NotFound:
             web.ctx.status = status
             self.subject = None
-            if self.unique:
-                # not found w/ unique subjpreds is not to be confused with creating new files
+            
+            if len(self.path) == 0:
+                self.path = [ ( [], [], [] ) ]
+            
+            subjpreds, listpreds, ordertags = self.path[-1]
+            self.versioned_unique = self.unique and self.validate_subjpreds_unique(acceptName=False, acceptBlank=post_method, subjpreds=subjpreds)
+            if self.versioned_unique:
+                # special corner case where we cannot create the missing, unique file
                 raise
+            
             # not found and not unique, treat as new file put
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
                 raise Forbidden('creation of datasets')
@@ -452,11 +463,11 @@ class Subject (Application):
     def put_postWritePostCommit(self, junk_files):
         if not self.content_range and junk_files:
             self.deletePrevious(junk_files)
-        uri = self.config['home'] + self.config['store path'] + '/' + self.subject2identifiers(self.subject)[0]
+        uri = self.config['home'] + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
         web.header('Location', uri)
-        if self.file:
+        if self.subject_prewrite == None or self.subject.id != self.subject_prewrite.id:
             web.ctx.status = '201 Created'
-            res = uri
+            res = uri + '\n'
         else:
             web.ctx.status = '204 No Content'
             res = ''
@@ -490,7 +501,14 @@ class Subject (Application):
             view = ''
             if self.dtype:
                 view = '?view=%s' % urlquote('%s' % self.dtype)
-            raise web.seeother('/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view))
+            if web.ctx.env.get('HTTP_REFERER', None) != None:
+                url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
+                raise web.seeother(url)
+            else:
+                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
+                web.header('Location', url)
+                web.ctx.status = '201 Created'
+                return '%s\n' % url
 
         def deleteBody():
             return self.delete_body()
@@ -530,7 +548,7 @@ class Subject (Application):
         contentType = web.ctx.env.get('CONTENT_TYPE', '').lower()
         if contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()
-            
+
             def get_param(param, default=None):
                 """get params from any of web.input(), self.queryopts, self.storage"""
                 try:

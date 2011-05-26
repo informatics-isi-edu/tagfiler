@@ -409,42 +409,10 @@ class FileList (Node):
             return self.dbtransact(body, postCommit)
 
     def POST(self, uri):
-        storage = web.input()
-        name = None
-        url = None
-        dtype = None
-        try:
-            action = storage.action
-            
-            try:
-                name = storage.name
-            except:
-                pass
-            
-            try:
-                url = storage.url
-                dtype = 'url'
-            except:
-                pass
-        except:
-            raise BadRequest('Expected action form field.')
-        subjpreds = []
-        storage=dict([(k, urlquote(v)) for k, v in storage.items()])
-        if storage['action'] == 'define':
-            if name:
-                subjpreds.append( web.Storage(tag='name', op='=', vals=[name]) )
-            storage.action = 'post'
-        if subjpreds:
-            path = [ ( subjpreds, [], [] ) ]
-        else:
-            path = []
-        ast = FileId(appname=self.appname,
-                     parser=self.url_parse_func,
-                     path=path,
-                     url=url,
-                     dtype=dtype,
-                     queryopts=self.queryopts,
-                     storage=storage)
+        ast = FileId(parser=self.url_parse_func,
+                     appname=self.appname,
+                     path=[],
+                     queryopts=self.queryopts)
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 
@@ -500,13 +468,10 @@ class FileId(Node, FileIO):
 
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
-    def __init__(self, parser, appname, path, file=None, dtype='url', queryopts={}, versions='any', url=None, storage=None):
+    def __init__(self, parser, appname, path, queryopts={}, versions='any', storage=None):
         Node.__init__(self, parser, appname)
         FileIO.__init__(self)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
-        self.file = file
-        self.dtype = dtype
-        self.url = url
         self.queryopts = queryopts
         self.versions = versions
         if storage:
