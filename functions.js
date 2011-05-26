@@ -564,7 +564,7 @@ function deleteAll(dataname, url) {
 			ajax_client.open("POST", url, true);
 			ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
 			ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-			ajax_client.onreadystatechange = processDeleteAll;
+			ajax_client.onreadystatechange = processDelete;
 			ajax_client.send(params);
 			return;
 		}
@@ -591,16 +591,16 @@ function deleteDataset(dataname, url) {
 	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
 	var params = 'action=ConfirmDelete&referer='+window.location;
-	ajax_client.onreadystatechange = processDeleteAll;
+	ajax_client.onreadystatechange = processDelete;
 	ajax_client.send(params);
 }
 
 /**
  * Callback function to check the delete result
  */
-function processDeleteAll() {
+function processDelete() {
 	if(ajax_client.readyState == 4) {
-		if(ajax_client.status == 200) {
+		if(ajax_client.status == 200 || ajax_client.status == 404) {
 			window.location.reload(true);
 		} else {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
