@@ -485,6 +485,7 @@ tagdef "homepage order"      int8        "${admin}" anonymous   tag          fal
 tagdef "Image Set"           empty       "${admin}" subject     subject      false
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
+tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
@@ -505,6 +506,7 @@ typedef tagdef       text          'Tag definition'                tagdef
 typedef name         text          'Subject name'                  "latest with name"
 typedef vname        text          'Subject name@version'          vname
 typedef view         text          'View name'                     view
+typedef 'template mode' text       'Template rendering mode'       ""                 'embedded Embedded in Tagfiler HTML' 'page Standalone document'
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
 
 # complete split-phase definitions and redefine as combined phase

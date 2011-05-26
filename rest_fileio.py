@@ -150,16 +150,24 @@ class FileIO (Subject):
             # read authz implied by finding subject
             if self.subject.dtype == 'file':
                 filename = self.config['store path'] + '/' + self.subject.file
-                f = open(filename, "rb", 0)
-                if self.subject.get('content-type', None) == None:
-                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
-                    line = p.stdout.readline()
-                    self.subject['content-type'] = line.strip().split(' ', 1)[0]
-                return f
+                f = None
+                render = None
+                if self.subject['template mode'] in ['embedded', 'page']:
+                    # use the file as a web template
+                    render = web.template.frender(filename, globals=self.globals)
+                else:
+                    # use the file as raw bytes
+                    f = open(filename, "rb", 0)
+                    if self.subject.get('content-type', None) == None:
+                        p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                        line = p.stdout.readline()
+                        self.subject['content-type'] = line.strip().split(' ', 1)[0]
+                return f, render
             else:
-                return None
+                return None, None
 
-        def postCommit(f):
+        def postCommit(results):
+            f, render = results
             # if the dataset is a remote URL, just redirect client
             if self.subject.dtype == 'url':
                 opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
@@ -173,11 +181,22 @@ class FileIO (Subject):
                     querystr = ''
                 raise web.seeother(self.subject.url + querystr)
             elif self.subject.dtype == 'file':
-                return f
+                return f, render
             else:
                 Subject.get_postCommit(self, f, sendBody)
 
-        f = self.dbtransact(body, postCommit)
+        f, render = self.dbtransact(body, postCommit)
+
+        if render != None and self.subject['template mode'] == 'embedded':
+            # render the template in the tagfiler GUI
+            self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
+            yield self.renderlist(None,
+                                   [render()])
+            return
+        elif render != None and self.subject['template mode'] == 'page':
+            # render the template as a standalone page
+            yield render()
+            return
 
         # we only get here if we were able to both:
         #   a. open the file for reading its content
