@@ -89,7 +89,7 @@ dataset_complete()
    shift 3
 
    case "$type" in
-      url)
+      url|file)
          url="$1"
          shift         
 
@@ -126,7 +126,7 @@ dataset_complete()
    done
 
    case "$type" in
-      url)
+      url|file)
 	 tag "$subject" name text "$file" >&2
 	 tag "$subject" 'latest with name' text "$file" >&2
 	 tag "$subject" vname text "$file@1" >&2

@@ -266,6 +266,12 @@ done
 
 # some stored queries
 
+psocfilename=${admin}-psoctemplate
+psocdataset="name=DEMO%3A%20Create%20PSOC%20entries"
+psoctemplate=$(dataset "DEMO: Create PSOC entries" file "${homepath}/file/${psocdataset}" "${admin}" "PSOC")
+tag "${psoctemplate}" "template mode" text "embedded"
+tag "${psoctemplate}" "file" text "${psocdataset}/${psocfilename}"
+
 homelinks=(
 $(dataset "DEMO: All experiments"               url "${homepath}/tags/experimentID?view=experimentID" "${admin}" "PSOC")
 $(dataset "DEMO: Experiment miething-2"    url "${homepath}/file/experimentID=miething-2" "${admin}" "PSOC")
@@ -276,6 +282,7 @@ $(dataset "DEMO: Samples for mice in experiment miething-2" url "${homepath}/tag
 $(dataset "DEMO: Samples for mice in experiment miething-2 which were treated w/ 10 mg/kg cyclophosphamide" url "${homepath}/tags/experimentID=miething-1(mice)/treatment=@(drug=cyclophosphamide;dose=10)(samples)/?view=sampleID" "${admin}" "PSOC")
 $(dataset "DEMO: Observations for mice in experiment miething-2" url "${homepath}/tags/experimentID=miething-1(mice)/(samples)/(observations)/?view=observationID" "${admin}" "PSOC")
 $(dataset "DEMO: Samples for mouse miething-2-2" url "${homepath}/tags/mouseID=miething-2-2(samples)/?view=sampleID" "${admin}" "PSOC")
+${psoctemplate}
 )
 
 i=0

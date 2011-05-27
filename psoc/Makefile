@@ -35,6 +35,13 @@ TEMPLATEBASES=psoc.html
 
 TEMPLATES=$(TEMPLATEBASES:%=psoc/templates/%)
 
+SVCDIR=/var/www/$(INSTALLSVC)
+DATADIR=$(SVCDIR)-data
+PSOCNAME="name=DEMO%3A%20Create%20PSOC%20entries"
+PSOCDIR=$(DATADIR)/$(PSOCNAME)
+PSOCFILE=$(PSOCDIR)/admin-psoctemplate
+
+
 # turn off annoying built-ins
 .SUFFIXES:
 
@@ -42,4 +49,8 @@ install: $(TEMPLATES)
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
-
+	rm -fR $(PSOCDIR)
+	mkdir -p $(PSOCDIR)
+	cp $(INSTALLDIR)/templates/psoc.html $(PSOCFILE)
+	chmod go-r $(PSOCFILE)
+	chown -R $(INSTALLSVC):apache $(PSOCDIR)
