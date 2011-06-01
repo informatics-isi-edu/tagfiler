@@ -415,17 +415,24 @@ class FileIO (Subject):
         #web.debug('stored %d of %d bytes' %( bytes, flen))
         return (bytes, flen)
 
-
     def getTemporary(self, mode):
         """get a temporary file"""
 
-        prefix = self.authn.role
-        if prefix != None:
-            prefix += '-'
-        else:
-            prefix = 'anonymous-'
-            
-        dir = self.config['store path'] + '/' + path_linearize(self.path)
+        # make a psuedo-randomly balanced tree to optimize directory lookups for large catalogs
+        # cannot use subject.id because we don't know it until postwrite phase
+        
+        userparts = path_linearize(self.path, lambda x : urllib.quote(x, safe="/"))
+        userparts = [ part for part in userparts.split('/') if part ]
+        
+        hashval = '%8.8x' % ( abs(hash(userparts[0])) % (pow(2,31) - 1 ) )
+        dir = self.config['store path'] + '/%s/%s/%s' % ( hashval[0:2], hashval[2:5], hashval[5:] )
+
+        # include leading user parts in dir path
+        for part in userparts[0:-1]:
+            dir += '/%s' % part
+
+        # use final user part as base of random filename
+        prefix = '%s-' % userparts[-1]
 
         """posible race condition in mkdir and rmdir"""
         count = 0
