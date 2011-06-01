@@ -426,8 +426,46 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		suffix = '-'+suffix;
 	}
 	groupName[groupName.length] = subjectGroupName;
+	var firstSubject = 0;
+	
+	// check if we have already such subjects
+	if (inner == 'false') {
+		var PREFIX = HOME + '/query/';
+		var LIKE = 'ID:like:';
+		var SUFFIX = '?limit=none&versions=latest';
+		var data_id = USER + '-' + subjectGroupName + '%';
+		var url = PREFIX + value.substr(0,1).toLowerCase() + value.substr(1) + LIKE + encodeURIComponent(data_id) + SUFFIX;
+		ajax_client.open("GET", url, false);
+		ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
+		ajax_client.setRequestHeader("Accept", "text/uri-list"); 
+		ajax_client.send(null);
+		if(ajax_client.readyState == 4) {
+			if (ajax_client.status == 200) {
+				var a = ajax_client.responseText;
+				var rows = a.split('\n');
+				var values = new Array();
+				for (var j=0; j<rows.length; j++) {
+					if (rows[j].length > 0) {
+						var index = rows[j].lastIndexOf('-') + 1;
+						var val = parseInt(rows[j].substr(index));
+						if (val > firstSubject) {
+							firstSubject = val;
+						}
+					}
+				}
+			} else {
+				var err = ajax_client.getResponseHeader('X-Error-Description');
+				alert(err != null ? unescape(err) : ajax_client.responseText);
+			}
+		} else {
+			var err = ajax_client.getResponseHeader('X-Error-Description');
+			alert(err != null ? unescape(err) : ajax_client.responseText);
+		}
+	}
+	
+	firstSubject += 1;
 	selectedTags[selectedTags.length] = new Array();
-	groupCounter[groupCounter.length] = 1;
+	groupCounter[groupCounter.length] = firstSubject;
 	groupType[groupType.length] = value;
 	if (groupCounter.length == 1) {
 		document.getElementById('all_subjects').style.display = 'block';
@@ -436,7 +474,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 
 	var container = document.createElement('div');
 	var subjectId = makeId('Subject', index);
-	var subjectId1 = makeId(subjectId, 1);
+	var subjectId1 = makeId(subjectId, firstSubject);
 	var headerId = makeId(subjectId1, 'header');
 	container.setAttribute('id', makeId(subjectId1, 'container'));
 	parent.appendChild(container);
@@ -454,16 +492,16 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var dd = document.createElement('dd');
 	dl.appendChild(dd);
 	var trAttr = makeAttributes('class', 'odd',
-				    'id', makeId(subjectId, 'val', 1));
+				    'id', makeId(subjectId, 'val', firstSubject));
 	if (inner == 'false') {
-		var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', index, 1));
+		var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', index, firstSubject));
 		var tdAttr = makeAttributes('id', makeId(subjectId1, 'removeValue'));
 		var inputAttr = makeAttributes('type', 'button',
-					       'onclick', makeFunction('deleteSubject', index, 1),
+					       'onclick', makeFunction('deleteSubject', index, firstSubject),
 					       'value', 'Remove '+value);
 		var valuesTable = document.createElement('table');
 		valuesTable.innerHTML = '<tr ' + trAttr + '>' + 
-					     '<td class="file-tag multivalue"><a '+ anchorAttr + '>'+ USER + '-' + subjectGroupName+typeCode+1 + '</a></td>' +
+					     '<td class="file-tag multivalue"><a '+ anchorAttr + '>'+ USER + '-' + subjectGroupName+typeCode+firstSubject + '</a></td>' +
 					     '<td ' + tdAttr + '>' +
 						'<input ' + inputAttr + '/></td></tr>';
 		var newSubjectTable = document.createElement('table');
@@ -495,13 +533,13 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				     'id', subjectsId,
 				     'suffix', suffix);
 	var inputAttr = makeAttributes('type', 'button',
-				       'onclick', makeFunction('hideSubject', index, 1),
+				       'onclick', makeFunction('hideSubject', index, firstSubject),
 				       'value', 'Hide '+value);
 	var td2Attr = makeAttributes('class', 'file-tag',
 				     'id', subjectId1);
 	var table = '<tr><td><table class="file-list">'+
 				'<tr class="file-heading"><th class="file-tag">Tags</th>' +
-					'<th ' + thAttr + '>'+(inner == 'false' ? USER+'-' : '') +subjectGroupName+typeCode+1+suffix+'</th></tr>'+
+					'<th ' + thAttr + '>'+(inner == 'false' ? USER+'-' : '') +subjectGroupName+typeCode+firstSubject+suffix+'</th></tr>'+
 		    		'<tr class="file-footer"><td ' + td1Attr + '>'+addTagsElement(index)+'</td><td ' + td2Attr + '><input ' + inputAttr + '/></td></tr>'+
 			    '</table>'+
 			'</td>' +
@@ -528,11 +566,11 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	document.getElementById('selectTag').selected = "selected";
 	newTags(groupCounter.length, value);
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
-	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + 1 + suffix;
+	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
 	document.getElementById(makeId(id, 'input')).value = textValue;
 	document.getElementById(makeId(id, 'input')).setAttribute('size', textValue.length);
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
-	return subjectGroupName + typeCode + 1 + suffix;
+	return subjectGroupName + typeCode + firstSubject + suffix;
 }
 
 function addTags(group) {
