@@ -314,7 +314,10 @@ function newTags(group, value) {
 }
 
 function newSubject(group, inner) {
-	var typeCode = groupType[group-1].substr(0,2);
+	var typeCode = '';
+	if (inner == 'true') {
+		typeCode = '-' + groupType[group-1] + '-';
+	}
 	var subjectsId = makeId('subjects', group);
 	var suffix = document.getElementById(subjectsId).getAttribute('suffix');
 	var values = new Array();
@@ -324,7 +327,7 @@ function newSubject(group, inner) {
 	var th = document.createElement('th');
 	th.setAttribute('class', 'file-tag');
 	th.setAttribute('id', makeId(subjectId, 'header'));
-	th.innerHTML = groupType[group-1] + ' ' + groupName[group-1]+typeCode+countIndex+suffix;
+	th.innerHTML = (inner == 'false' ? USER + '-' : '') + groupName[group-1]+typeCode+countIndex+suffix;
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
 		var id = makeId(subjectId, selectedTags[group-1][i]);
@@ -345,7 +348,9 @@ function newSubject(group, inner) {
 	appendColumn(subjectsId, values);
 	var id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
 	var subjectName = groupName[group-1] + typeCode+countIndex+suffix;
-	document.getElementById(makeId(id, 'input')).value = subjectName;
+	var textValue = (inner == 'false' ? USER + '-' + subjectName : subjectName);
+	document.getElementById(makeId(id, 'input')).value = textValue;
+	document.getElementById(makeId(id, 'input')).setAttribute('size', textValue.length);
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
@@ -383,7 +388,7 @@ function selectTags() {
 	var value = select_list_field.options[select_list_selected_index].value;
 	var subjectGroupName;
 	while (true) {
-		subjectGroupName = prompt("Subject name:");
+		subjectGroupName = prompt(value + ' name:');
 		if (subjectGroupName == null) {
 			// cancel
 			document.getElementById('selectTag').selected = "selected";
@@ -393,7 +398,7 @@ function selectTags() {
 		if (subjectGroupName.length > 0) {
 			break;
 		} else {
-			alert("Subject name can not be empty.");
+			alert(value + ' name can not be empty.');
 		}
 	}
 	selectSubject(value, subjectGroupName+'-', null, document.getElementById('all_subjects'), subjectGroupName);
@@ -409,7 +414,10 @@ function tog(dt, header) {
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var inner = (subjectGroupName == header+'-') ? 'false' : 'true';
-	var typeCode = value.substr(0,2);
+	var typeCode = '';
+	if (inner == 'true') {
+		typeCode = '-' + value + '-';
+	}
 	if (suffix == null) {
 		suffix = '';
 	}
@@ -441,7 +449,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var span = document.createElement('span');
 	span.setAttribute('style', 'color: blue; cursor: default');
 	dt.appendChild(span);
-	span.innerHTML = '<img src="'+resourcePrefix+'minus.png" width="16" height="16" border="0" alt="-">'+header;
+	span.innerHTML = '<img src="'+resourcePrefix+'minus.png" width="16" height="16" border="0" alt="-">' + 
+							(inner == 'false' ? USER + '-' + header : header);
 	var dd = document.createElement('dd');
 	dl.appendChild(dd);
 	var trAttr = makeAttributes('class', 'odd',
@@ -454,7 +463,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					       'value', 'Remove '+value);
 		var valuesTable = document.createElement('table');
 		valuesTable.innerHTML = '<tr ' + trAttr + '>' + 
-					     '<td class="file-tag multivalue"><a '+ anchorAttr + '>'+ subjectGroupName+typeCode+1 + '</a></td>' +
+					     '<td class="file-tag multivalue"><a '+ anchorAttr + '>'+ USER + '-' + subjectGroupName+typeCode+1 + '</a></td>' +
 					     '<td ' + tdAttr + '>' +
 						'<input ' + inputAttr + '/></td></tr>';
 		var newSubjectTable = document.createElement('table');
@@ -491,7 +500,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var td2Attr = makeAttributes('class', 'file-tag',
 				     'id', subjectId1);
 	var table = '<tr><td><table class="file-list">'+
-				'<tr class="file-heading"><th class="file-tag">Tags</th><th ' + thAttr + '>'+value+' '+subjectGroupName+typeCode+1+suffix+'</th></tr>'+
+				'<tr class="file-heading"><th class="file-tag">Tags</th>' +
+					'<th ' + thAttr + '>'+(inner == 'false' ? USER+'-' : '') +subjectGroupName+typeCode+1+suffix+'</th></tr>'+
 		    		'<tr class="file-footer"><td ' + td1Attr + '>'+addTagsElement(index)+'</td><td ' + td2Attr + '><input ' + inputAttr + '/></td></tr>'+
 			    '</table>'+
 			'</td>' +
@@ -518,7 +528,9 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	document.getElementById('selectTag').selected = "selected";
 	newTags(groupCounter.length, value);
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
-	document.getElementById(makeId(id, 'input')).value = subjectGroupName + typeCode + 1 + suffix;
+	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + 1 + suffix;
+	document.getElementById(makeId(id, 'input')).value = textValue;
+	document.getElementById(makeId(id, 'input')).setAttribute('size', textValue.length);
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 	return subjectGroupName + typeCode + 1 + suffix;
 }
@@ -616,7 +628,7 @@ function addSubjectValue(value, group, position) {
 	table.appendChild(tr);
 	var td = document.createElement('td');
 	var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', group, position));
-	td.innerHTML = '<a ' + anchorAttr + '>' + value + '</a>';
+	td.innerHTML = '<a ' + anchorAttr + '>' + USER + '-' + value + '</a>';
 	tr.appendChild(td);
 	td = document.createElement('td');
 	td.setAttribute('id', makeId(subjectId, 'removeValue'));
@@ -744,12 +756,14 @@ function addTagsElement(group) {
 }
 
 var HOME;
+var USER;
 var SVCPREFIX;
 var resourcePrefix;
 
-function init(home) {
+function init(home, user) {
 	expiration_warning = false;
 	HOME = home;
+	USER = user;
 	SVCPREFIX = home.substring(home.lastIndexOf('/')+1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
 	var html = '<option id="selectTag" value="">Choose Subject Type</option>';
