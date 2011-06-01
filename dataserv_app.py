@@ -144,26 +144,26 @@ def parseBoolString(theString):
     else:
         return False
 
-def predlist_linearize(predlist):
+def predlist_linearize(predlist, quotefunc=urlquote):
     def pred_linearize(pred):
-        vals = [ urlquote(val) for val in pred.vals ]
+        vals = [ quotefunc(val) for val in pred.vals ]
         vals.sort()
         vals = ','.join(vals)
         if pred.op:
-            return '%s%s%s' % (urlquote(pred.tag), pred.op, vals)
+            return '%s%s%s' % (quotefunc(pred.tag), pred.op, vals)
         else:
-            return '%s' % (urlquote(pred.tag))
+            return '%s' % (quotefunc(pred.tag))
     predlist = [ pred_linearize(pred) for pred in predlist ]
     predlist.sort()
     return ';'.join(predlist)
 
-def path_linearize(path):
+def path_linearize(path, quotefunc=urlquote):
     def elem_linearize(elem):
-        linear = predlist_linearize(elem[0])
+        linear = predlist_linearize(elem[0], quotefunc)
         if elem[1]:
-            linear += '(%s)' % predlist_linearize(elem[1])
+            linear += '(%s)' % predlist_linearize(elem[1], quotefunc)
             if elem[2]:
-                linear += ','.join(urlquote(elem[2]))
+                linear += ','.join(quotefunc(elem[2]))
         return linear
     return '/' + '/'.join([ elem_linearize(elem) for elem in path ])
 
