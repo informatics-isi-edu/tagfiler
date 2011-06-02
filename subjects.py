@@ -351,9 +351,11 @@ class Subject (Application):
         dir = os.path.dirname(filename)
         os.unlink(filename)
 
-        if len(os.listdir(dir)) == 0:
+        while dir != self.config['store path'] and len(os.listdir(dir)) == 0:
+            basedir = dir
+            dir = os.path.dirname(basedir)
             try:
-                os.rmdir(dir)
+                os.rmdir(basedir)
             except:
                 pass
             
