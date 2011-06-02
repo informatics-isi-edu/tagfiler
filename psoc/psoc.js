@@ -970,11 +970,12 @@ function postSubjects(subjects) {
 	totalRequests = 2 * subjectsQueue.length;
 	sentRequests = 0;
 	document.getElementById("Status").innerHTML = 'Saving the form. Please wait...';
+	document.getElementById("Error").innerHTML = '';
 	for (var i=0; i<subjectsQueue.length; i++) {
 		if (!postSubject(subjects, subjectsQueue[i])) {
+			document.getElementById("Status").innerHTML = '';
 			drawProgressBar(0);
 			document.getElementById('psoc_progress_bar').style.display = 'none';
-			alert('ERROR');
 			subjectsQueue.length = 0;
 			return;
 		}
@@ -983,7 +984,7 @@ function postSubjects(subjects) {
 	drawProgressBar(0);
 	document.getElementById('psoc_progress_bar').style.display = 'none';
 	subjectsQueue.length = 0;
-	alert('Success');
+	listSubjects(subjects);
 }
 
 function postSubject(subjects, subject) {
@@ -1029,23 +1030,24 @@ function postSubject(subjects, subject) {
 			drawProgressBar(Math.ceil(++sentRequests * 100 / totalRequests));
 			if(ajax_client.readyState == 4) {
 				if (ajax_client.status != 200) {
-					alert('ERROR: ' + ajax_client.status);
+					document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
 					var err = ajax_client.getResponseHeader('X-Error-Description');
-					alert(err != null ? unescape(err) : ajax_client.responseText);
+					document.getElementById("Error").innerHTML += '<br /><br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
 				} else {
 					success = true;
 				}
 			} else {
 				var err = ajax_client.getResponseHeader('X-Error-Description');
-				alert(err != null ? unescape(err) : ajax_client.responseText);
+				document.getElementById("Error").innerHTML = 'ERROR: ' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
 			}
 		} else {
+			document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
 			var err = ajax_client.getResponseHeader('X-Error-Description');
-			alert(err != null ? unescape(err) : ajax_client.responseText);
+			document.getElementById("Error").innerHTML += '<br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
 		}
 	} else {
 		var err = ajax_client.getResponseHeader('X-Error-Description');
-		alert(err != null ? unescape(err) : ajax_client.responseText);
+		document.getElementById("Error").innerHTML = 'ERROR: ' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
 	}
 	return success;
 }
@@ -1083,6 +1085,32 @@ function addToQueue(subjects, subject) {
 	if (!subjectsQueue.contains(subject)) {
 		subjectsQueue.push(subject);
 	}
+}
+
+function listSubjects(subjects) {
+	var ul = document.createElement('ul');
+	var psoc = document.getElementById('psoc');
+	for (var subject in subjects) {
+		if (subjects.hasOwnProperty(subject)) {
+			var li = document.createElement('li');
+			li.innerHTML = document.getElementById(subject+'_header').innerHTML;
+			ul.appendChild(li);
+		}
+	}
+	psoc.innerHTML = '';
+	var h2 = document.createElement('h2');
+	psoc.appendChild(h2);
+	h2.innerHTML = 'Completed';
+	var p = document.createElement('p');
+	psoc.appendChild(p);
+	var b = document.createElement('b');
+	p.appendChild(b);
+	b.setAttribute('style', 'color:green');
+	b.innerHTML = 'All subjects were successfully created.';
+	p = document.createElement('p');
+	psoc.appendChild(p);
+	p.innerHTML = 'See below for a summary of the subjects.';
+	psoc.appendChild(ul);
 }
 
 var subjectsQueue = new Array();

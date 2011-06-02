@@ -16,11 +16,14 @@ $if None:
 	$# limitations under the License.
 	$#
 <script type="text/javascript" src="${home}/static/psoc.js"></script>
+<div id="psoc">
 <div id="all_subjects" style="display:none;">
 </div>
 <select id="tags" name="tags" onchange="selectTags()">
 </select>
 <p>
+<div id="Error" class="error">
+</div>
 <table>
 	<tr>
 		<td class="status-wrapper" id="Status" >
@@ -49,6 +52,7 @@ $if None:
 <textarea id="AllBody" style="display:none" cols="200" rows="50" >
 </textarea>
 </p>
+</div>
 <script type="text/javascript">
 init("${home}", "${authn.role}");
 </script>
