@@ -967,7 +967,7 @@ var sentRequests;
 
 function postSubjects(subjects) {
 	document.getElementById('psoc_progress_bar').style.display = '';
-	totalRequests = 2 * subjectsQueue.length;
+	totalRequests = subjectsQueue.length;
 	sentRequests = 0;
 	document.getElementById("Status").innerHTML = 'Saving the form. Please wait...';
 	document.getElementById("Error").innerHTML = '';
@@ -990,60 +990,34 @@ function postSubjects(subjects) {
 function postSubject(subjects, subject) {
 	// POST the subject
 	var success = false;
-	var url = HOME + '/file?incomplete';
+	var url = HOME + '/subject/?incomplete&';
+	var values = subjects[subject]['values'];
+	var tags = new Array();
+	for (var value in values) {
+		if (values.hasOwnProperty(value)) {
+			var tag = encodeURIComponent(value) + '=';
+			var tagVals = new Array();
+			var tagValues = values[value];
+			for (var i=0; i<tagValues.length; i++) {
+				tagVals.push(encodeURIComponent(tagValues[i]));
+			}
+			tags.push(encodeURIComponent(value) + '=' + tagVals.join(','));
+		}
+	}
+	url += tags.join('&');
 	ajax_client.open("POST", url, false);
 	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-	var params = 'action=post&incomplete=';
+	var params = 'action=post';
 	ajax_client.send(params);
 	drawProgressBar(Math.ceil(++sentRequests * 100 / totalRequests));
 	if(ajax_client.readyState == 4) {
-		if (ajax_client.status == 200) {
-			var a = ajax_client.responseText;
-			var start = a.indexOf('id=')+3;
-			var index = start+1;
-			var id = '' + a.charAt(start);
-			while (!isNaN(parseInt(a.charAt(index)))) {
-				id += a.charAt(index);
-				index++;
-			}
-			// PUT the tags values
-			url = HOME + '/tags/id=' + id + '(';
-			var values = subjects[subject]['values'];
-			var tags = new Array();
-			for (var value in values) {
-				if (values.hasOwnProperty(value)) {
-					var tag = encodeURIComponent(value) + '=';
-					var tagVals = new Array();
-					var tagValues = values[value];
-					for (var i=0; i<tagValues.length; i++) {
-						tagVals.push(encodeURIComponent(tagValues[i]));
-					}
-					tags.push(encodeURIComponent(value) + '=' + tagVals.join(','));
-				}
-			}
-			url += tags.join(';') + ')';
-			ajax_client.open("PUT", url, false);
-			ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-			ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-			ajax_client.send(null);
-			drawProgressBar(Math.ceil(++sentRequests * 100 / totalRequests));
-			if(ajax_client.readyState == 4) {
-				if (ajax_client.status != 200) {
-					document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
-					var err = ajax_client.getResponseHeader('X-Error-Description');
-					document.getElementById("Error").innerHTML += '<br /><br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
-				} else {
-					success = true;
-				}
-			} else {
-				var err = ajax_client.getResponseHeader('X-Error-Description');
-				document.getElementById("Error").innerHTML = 'ERROR: ' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
-			}
-		} else {
+		if (ajax_client.status != 200) {
 			document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
 			var err = ajax_client.getResponseHeader('X-Error-Description');
-			document.getElementById("Error").innerHTML += '<br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
+			document.getElementById("Error").innerHTML += '<br /><br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
+		} else {
+			success = true;
 		}
 	} else {
 		var err = ajax_client.getResponseHeader('X-Error-Description');
