@@ -1589,7 +1589,7 @@ class Application:
 
         if type(value) in [ list, set ]:
             # validatator generated a set of values, recursively try to set these instead
-            for val in results:
+            for val in value:
                 self.set_tag(subject, tagdef, val)
             return
 
