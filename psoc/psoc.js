@@ -314,7 +314,7 @@ function newTags(group, value) {
 }
 
 function newSubject(group, inner) {
-	var typeCode = '';
+	var typeCode = groupType[group-1] + '-';
 	if (inner == 'true') {
 		typeCode = '-' + groupType[group-1] + '-';
 	}
@@ -414,7 +414,7 @@ function tog(dt, header) {
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var inner = (subjectGroupName == header+'-') ? 'false' : 'true';
-	var typeCode = '';
+	var typeCode = value + '-';
 	if (inner == 'true') {
 		typeCode = '-' + value + '-';
 	}
@@ -433,7 +433,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		var PREFIX = HOME + '/query/';
 		var LIKE = 'ID:like:';
 		var SUFFIX = '?limit=none&versions=latest';
-		var data_id = USER + '-' + subjectGroupName + '%';
+		var data_id = USER + '-' + subjectGroupName + value + '-' + '%';
 		var url = PREFIX + value.substr(0,1).toLowerCase() + value.substr(1) + LIKE + encodeURIComponent(data_id) + SUFFIX;
 		ajax_client.open("GET", url, false);
 		ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
