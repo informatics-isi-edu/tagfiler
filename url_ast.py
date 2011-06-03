@@ -1292,12 +1292,12 @@ class Query (Node):
                     elif acceptType == 'text/html':
                         break
                 yield self.renderlist(self.title,
-                                       [self.render.QueryViewStatic(self.ops, self.subjpreds),
+                                       [self.render.QueryViewStatic(Application.ops, self.subjpreds),
                                         self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
             else:
                 yield self.renderlist(self.title,
-                                       [self.render.QueryAdd(self.ops, self.opsExcludeTypes),
-                                        self.render.QueryView(self.ops, self.subjpreds),
+                                       [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
+                                        self.render.QueryView(Application.ops, self.subjpreds),
                                         self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
 
         for res in self.dbtransact(body, postCommit):

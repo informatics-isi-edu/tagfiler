@@ -352,6 +352,124 @@ class Application:
         else:
             return view
         
+    ops = [ ('', 'Tagged'),
+            (':not:', 'Not tagged'),
+            ('=', 'Equal'),
+            ('!=', 'Not equal'),
+            (':lt:', 'Less than'),
+            (':leq:', 'Less than or equal'),
+            (':gt:', 'Greater than'),
+            (':geq:', 'Greater than or equal'),
+            (':like:', 'LIKE (SQL operator)'),
+            (':simto:', 'SIMILAR TO (SQL operator)'),
+            (':regexp:', 'Regular expression (case sensitive)'),
+            (':!regexp:', 'Negated regular expression (case sensitive)'),
+            (':ciregexp:', 'Regular expression (case insensitive)'),
+            (':!ciregexp:', 'Negated regular expression (case insensitive)')]
+
+    opsExcludeTypes = dict([ ('', []),
+                             (':not:', []),
+                             ('=', ['empty']),
+                             ('!=', ['empty']),
+                             (':lt:', ['empty']),
+                             (':leq:', ['empty']),
+                             (':gt:', ['empty']),
+                             (':geq:', ['empty']),
+                             (':like:', ['empty', 'int8', 'timestamptz']),
+                             (':simto:', ['empty', 'int8', 'timestamptz']),
+                             (':regexp:', ['empty', 'int8', 'timestamptz']),
+                             (':!regexp:', ['empty', 'int8', 'timestamptz']),
+                             (':ciregexp:', ['empty', 'int8', 'timestamptz']),
+                             (':!ciregexp:', ['empty', 'int8', 'timestamptz']) ])
+
+    opsDB = dict([ ('=', '='),
+                   ('!=', '!='),
+                   (':lt:', '<'),
+                   (':leq:', '<='),
+                   (':gt:', '>'),
+                   (':geq:', '>='),
+                   (':like:', 'LIKE'),
+                   (':simto:', 'SIMILAR TO'),
+                   (':regexp:', '~'),
+                   (':!regexp:', '!~'),
+                   (':ciregexp:', '~*'),
+                   (':!ciregexp:', '!~*') ])
+    
+    # static representation of important tagdefs
+    static_tagdefs = []
+    # -- the system tagdefs needed by the select_files_by_predlist call we make below
+    for prototype in [ ('config', 'text', False, 'subject', True),
+                       ('id', 'int8', False, 'system', True),
+                       ('tagdef', 'text', False, 'system', True),
+                       ('tagdef type', 'type', False, 'system', False),
+                       ('tagdef multivalue', 'empty', False, 'system', False),
+                       ('tagdef active', 'empty', False, 'system', False),
+                       ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
+                       ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
+                       ('tagdef unique', 'empty', False, 'system', False),
+                       ('tag read users', 'rolepat', True, 'subjectowner', False),
+                       ('tag write users', 'rolepat', True, 'subjectowner', False),
+                       ('typedef', 'text', False, 'subject', True),
+                       ('typedef description', 'text', False, 'subject', False),
+                       ('typedef dbtype', 'text', False, 'subject', False),
+                       ('typedef values', 'text', True, 'subject', False),
+                       ('typedef tagref', 'text', False, 'subject', False),
+                       ('read users', 'rolepat', True, 'subjectowner', False),
+                       ('write users', 'rolepat', True, 'subjectowner', False),
+                       ('owner', 'role', False, 'subjectowner', False),
+                       ('modified', 'timestamptz', False, 'system', False),
+                       ('subject last tagged', 'timestamptz', False, 'system', False),
+                       ('tag last modified', 'timestamptz', False, 'system', False),
+                       ('name', 'text', False, 'system', False),
+                       ('version', 'int8', False, 'system', False),
+                       ('latest with name', 'text', False, 'system', True),
+                       ('_cfg_applet custom properties', 'text', True, 'subject', False),
+                       ('_cfg_applet tags', 'tagname', True, 'subject', False),
+                       ('_cfg_applet tags require', 'tagname', True, 'subject', False),
+                       ('_cfg_applet test log', 'text', False, 'subject', False),
+                       ('_cfg_applet test properties', 'text', True, 'subject', False),
+                       ('_cfg_bugs', 'text', False, 'subject', False),
+                       ('_cfg_chunk bytes', 'text', False, 'subject', False),
+                       ('_cfg_client chunk bytes', 'int8', False, 'subject', False),
+                       ('_cfg_client socket timeout', 'int8', False, 'subject', False),
+                       ('_cfg_client connections', 'int8', False, 'subject', False),
+                       ('_cfg_client download chunks', 'empty', False, 'subject', False),
+                       ('_cfg_client socket buffer size', 'int8', False, 'subject', False),
+                       ('_cfg_client retry count', 'int8', False, 'subject', False),
+                       ('_cfg_client upload chunks', 'empty', False, 'subject', False),
+                       ('_cfg_contact', 'text', False, 'subject', False),
+                       ('_cfg_file list tags', 'tagname', True, 'subject', False),
+                       ('_cfg_file list tags write', 'tagname', True, 'subject', False),
+                       ('_cfg_file write users', 'rolepat', True, 'subject', False),
+                       ('_cfg_help', 'text', False, 'subject', False),
+                       ('_cfg_home', 'text', False, 'subject', False),
+                       ('_cfg_log path', 'text', False, 'subject', False),
+                       ('_cfg_logo', 'text', False, 'subject', False),
+                       ('_cfg_policy remappings', 'text', True, 'subject', False),
+                       ('_cfg_store path', 'text', False, 'subject', False),
+                       ('_cfg_subtitle', 'text', False, 'subject', False),
+                       ('_cfg_tag list tags', 'tagname', True, 'subject', False),
+                       ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
+                       ('_cfg_template path', 'text', False, 'subject', False),
+                       ('_cfg_webauthn home', 'text', False, 'subject', False),
+                       ('_cfg_webauthn require', 'empty', False, 'subject', False) ]:
+        deftagname, typestr, multivalue, writepolicy, unique = prototype
+        static_tagdefs.append(web.Storage(tagname=deftagname,
+                                          owner=None,
+                                          typestr=typestr,
+                                          multivalue=multivalue,
+                                          active=True,
+                                          readpolicy='anonymous',
+                                          readok=True,
+                                          writepolicy=writepolicy,
+                                          unique=unique,
+                                          tagreaders=[],
+                                          tagwriters=[]))
+
+    static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
+
+    rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
+
     def __init__(self, parser=None):
         "store common configuration data for all service classes"
         global render
@@ -365,51 +483,8 @@ class Application:
         self.subjpreds = []
         self.globals = dict()
 
-        self.ops = [ ('', 'Tagged'),
-                     (':not:', 'Not tagged'),
-                     ('=', 'Equal'),
-                     ('!=', 'Not equal'),
-                     (':lt:', 'Less than'),
-                     (':leq:', 'Less than or equal'),
-                     (':gt:', 'Greater than'),
-                     (':geq:', 'Greater than or equal'),
-                     (':like:', 'LIKE (SQL operator)'),
-                     (':simto:', 'SIMILAR TO (SQL operator)'),
-                     (':regexp:', 'Regular expression (case sensitive)'),
-                     (':!regexp:', 'Negated regular expression (case sensitive)'),
-                     (':ciregexp:', 'Regular expression (case insensitive)'),
-                     (':!ciregexp:', 'Negated regular expression (case insensitive)')]
-
-        self.opsExcludeTypes = dict([ ('', []),
-                                      (':not:', []),
-                                      ('=', ['empty']),
-                                      ('!=', ['empty']),
-                                      (':lt:', ['empty']),
-                                      (':leq:', ['empty']),
-                                      (':gt:', ['empty']),
-                                      (':geq:', ['empty']),
-                                      (':like:', ['empty', 'int8', 'timestamptz']),
-                                      (':simto:', ['empty', 'int8', 'timestamptz']),
-                                      (':regexp:', ['empty', 'int8', 'timestamptz']),
-                                      (':!regexp:', ['empty', 'int8', 'timestamptz']),
-                                      (':ciregexp:', ['empty', 'int8', 'timestamptz']),
-                                      (':!ciregexp:', ['empty', 'int8', 'timestamptz']) ])
-
-        self.opsDB = dict([ ('=', '='),
-                            ('!=', '!='),
-                            (':lt:', '<'),
-                            (':leq:', '<='),
-                            (':gt:', '>'),
-                            (':geq:', '>='),
-                            (':like:', 'LIKE'),
-                            (':simto:', 'SIMILAR TO'),
-                            (':regexp:', '~'),
-                            (':!regexp:', '!~'),
-                            (':ciregexp:', '~*'),
-                            (':!ciregexp:', '!~*') ])
-
         # this ordered list can be pruned to optimize transactions
-        self.needed_db_globals = [ 'roleinfo', 'typeinfo', 'typesdict' ]
+        self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -432,81 +507,9 @@ class Application:
         self.dbstr = getParamEnv('dbstr', '')
         self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
 
-        # static representation of important tagdefs
-        self.static_tagdefs = []
-        # -- the system tagdefs needed by the select_files_by_predlist call we make below
-        for prototype in [ ('config', 'text', False, 'subject', True),
-                           ('id', 'int8', False, 'system', True),
-                           ('tagdef', 'text', False, 'system', True),
-                           ('tagdef type', 'type', False, 'system', False),
-                           ('tagdef multivalue', 'empty', False, 'system', False),
-                           ('tagdef active', 'empty', False, 'system', False),
-                           ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
-                           ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
-                           ('tagdef unique', 'empty', False, 'system', False),
-                           ('tag read users', 'rolepat', True, 'subjectowner', False),
-                           ('tag write users', 'rolepat', True, 'subjectowner', False),
-                           ('typedef', 'text', False, 'subject', True),
-                           ('typedef description', 'text', False, 'subject', False),
-                           ('typedef dbtype', 'text', False, 'subject', False),
-                           ('typedef values', 'text', True, 'subject', False),
-                           ('typedef tagref', 'text', False, 'subject', False),
-                           ('read users', 'rolepat', True, 'subjectowner', False),
-                           ('write users', 'rolepat', True, 'subjectowner', False),
-                           ('owner', 'role', False, 'subjectowner', False),
-                           ('modified', 'timestamptz', False, 'system', False),
-                           ('subject last tagged', 'timestamptz', False, 'system', False),
-                           ('tag last modified', 'timestamptz', False, 'system', False),
-                           ('name', 'text', False, 'system', False),
-                           ('version', 'int8', False, 'system', False),
-                           ('latest with name', 'text', False, 'system', True),
-                           ('_cfg_applet custom properties', 'text', True, 'subject', False),
-                           ('_cfg_applet tags', 'tagname', True, 'subject', False),
-                           ('_cfg_applet tags require', 'tagname', True, 'subject', False),
-                           ('_cfg_applet test log', 'text', False, 'subject', False),
-                           ('_cfg_applet test properties', 'text', True, 'subject', False),
-                           ('_cfg_bugs', 'text', False, 'subject', False),
-                           ('_cfg_chunk bytes', 'text', False, 'subject', False),
-                           ('_cfg_client chunk bytes', 'int8', False, 'subject', False),
-                           ('_cfg_client socket timeout', 'int8', False, 'subject', False),
-                           ('_cfg_client connections', 'int8', False, 'subject', False),
-                           ('_cfg_client download chunks', 'empty', False, 'subject', False),
-                           ('_cfg_client socket buffer size', 'int8', False, 'subject', False),
-                           ('_cfg_client retry count', 'int8', False, 'subject', False),
-                           ('_cfg_client upload chunks', 'empty', False, 'subject', False),
-                           ('_cfg_contact', 'text', False, 'subject', False),
-                           ('_cfg_file list tags', 'tagname', True, 'subject', False),
-                           ('_cfg_file list tags write', 'tagname', True, 'subject', False),
-                           ('_cfg_file write users', 'rolepat', True, 'subject', False),
-                           ('_cfg_help', 'text', False, 'subject', False),
-                           ('_cfg_home', 'text', False, 'subject', False),
-                           ('_cfg_log path', 'text', False, 'subject', False),
-                           ('_cfg_logo', 'text', False, 'subject', False),
-                           ('_cfg_policy remappings', 'text', True, 'subject', False),
-                           ('_cfg_store path', 'text', False, 'subject', False),
-                           ('_cfg_subtitle', 'text', False, 'subject', False),
-                           ('_cfg_tag list tags', 'tagname', True, 'subject', False),
-                           ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
-                           ('_cfg_template path', 'text', False, 'subject', False),
-                           ('_cfg_webauthn home', 'text', False, 'subject', False),
-                           ('_cfg_webauthn require', 'empty', False, 'subject', False) ]:
-            deftagname, typestr, multivalue, writepolicy, unique = prototype
-            self.static_tagdefs.append(web.Storage(tagname=deftagname,
-                                                   owner=None,
-                                                   typestr=typestr,
-                                                   multivalue=multivalue,
-                                                   active=True,
-                                                   readpolicy='anonymous',
-                                                   readok=True,
-                                                   writepolicy=writepolicy,
-                                                   unique=unique,
-                                                   tagreaders=[],
-                                                   tagwriters=[]))
-
-        self.static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in self.static_tagdefs ] )
 
         # BEGIN: get runtime parameters from database
-        self.globals['tagdefsdict'] = self.static_tagdefs # need these for select_config() below
+        self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
 
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
@@ -518,6 +521,8 @@ class Application:
 
         # get full config
         self.config = config_cache.select(self.db, fill_config, 'tagfiler')
+        del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
+        
         #self.config = self.select_config()
         #self.config['policy remappings'] = buildPolicyRules(self.config['policy remappings'])
         
@@ -578,20 +583,6 @@ class Application:
             self.storage = web.storage([ parsekv(kv.split('=', 1)) for kv in uri.split('?', 1)[1].replace(';', '&').split('&') ])
         except:
             self.storage = web.storage([]) 
-
-        self.rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
-
-        self.tagnameValidators = { 'owner' : self.validateRole,
-                                   'read users' : self.validateRolePattern,
-                                   'write users' : self.validateRolePattern,
-                                   'modified by' : self.validateRole,
-                                   'typedef values' : self.validateEnumeration,
-                                   '_cfg_policy remappings' : self.validatePolicyRule }
-        
-        self.tagtypeValidators = { 'tagname' : self.validateTagname,
-                                   'file' : self.validateFilename,
-                                   'vfile' : self.validateVersionedFilename,
-                                   'id' : self.validateSubjectQuery }
 
     def validateSubjectQuery(self, query, tagdef=None, subject=None):
         if type(query) in [ int, long ]:
@@ -769,7 +760,7 @@ class Application:
         self.db = app.db
         self.set_authn(app.authn)
         # we need to re-do this after having proper authn info
-        self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
+        #self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
         #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatchCore(self, uri, setcookie=True):
@@ -792,7 +783,7 @@ class Application:
             self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
 
         # we need to re-do this after having proper authn info
-        self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
+        #self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
         #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatch(self, uri):
@@ -831,7 +822,7 @@ class Application:
 
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))
-        now_rfc1123 = now.strftime(self.rfc1123)
+        now_rfc1123 = now.strftime(Application.rfc1123)
         web.header('Cache-control', 'no-cache')
         web.header('Expires', now_rfc1123)
 
@@ -871,9 +862,11 @@ class Application:
                         # this is fragile to make things fast and simple
                         db_globals_dict = dict(roleinfo=lambda : self.buildroleinfo(),
                                                typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type())],
-                                               typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]))
+                                               typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
+                                               tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ]) )
                         for key in self.needed_db_globals:
-                            self.globals[key] = db_globals_dict[key]()
+                            if not self.globals.has_key(key):
+                                self.globals[key] = db_globals_dict[key]()
 
                         def tagOptions(tagname, values=[]):
                             tagdef = self.globals['tagdefsdict'][tagname]
@@ -1321,7 +1314,7 @@ class Application:
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=self.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
 
@@ -1570,13 +1563,13 @@ class Application:
 
         if tagdef.writepolicy != 'system':
             # only run extra validation on user-provided values...
-            validator = self.tagnameValidators.get(tagdef.tagname)
+            validator = Application.tagnameValidators.get(tagdef.tagname)
             if validator:
-                validator(value, tagdef, subject)
+                validator(self, value, tagdef, subject)
 
-            validator = self.tagtypeValidators.get(typedef.typedef)
+            validator = Application.tagtypeValidators.get(typedef.typedef)
             if validator:
-                results = validator(value, tagdef, subject)
+                results = validator(self, value, tagdef, subject)
                 if results != None:
                     # validator converted user-supplied value to internal form to use instead
                     value = results
@@ -1825,9 +1818,9 @@ class Application:
                                 valpreds.append("t%s%s.value IN (%s)" % (vprefix, p, sq))
                             else:
                                 if tag != 'id':
-                                    valpreds.append("t%s%s.value %s $val%s%s_%s_%d" % (vprefix, p, self.opsDB[op], vprefix, p, v, qd))
+                                    valpreds.append("t%s%s.value %s $val%s%s_%s_%d" % (vprefix, p, Application.opsDB[op], vprefix, p, v, qd))
                                 else:
-                                    valpreds.append("subject %s $val%s%s_%s_%d" % (self.opsDB[op], vprefix, p, v, qd))
+                                    valpreds.append("subject %s $val%s%s_%s_%d" % (Application.opsDB[op], vprefix, p, v, qd))
                                 values["val%s%s_%s_%d" % (vprefix, p, v, qd)] = vals[v]
                         wheres.append(" OR ".join(valpreds))
                     
@@ -1961,7 +1954,7 @@ class Application:
                             values.update(qvs)
                             valpreds.append("%s IN (%s)" % (vref, sq))
                         else:
-                            valpreds.append( '%s %s $listval_%s%s_%d_%d_%d' % (vref, self.opsDB[pred.op], vprefix, t, p, v, qd) )
+                            valpreds.append( '%s %s $listval_%s%s_%d_%d_%d' % (vref, Application.opsDB[pred.op], vprefix, t, p, v, qd) )
                             values['listval_%s%s_%d_%d_%d' % (vprefix, t, p, v, qd)] = pred.vals[v]
                     listwheres.append( ' OR '.join([ '(%s)' % valpred for valpred in valpreds ]) )
                         
@@ -2211,4 +2204,16 @@ class Application:
             
         return (path, listtags, writetags, limit, versions)
 
-    
+    # static class fields
+    tagnameValidators = { 'owner' : validateRole,
+                          'read users' : validateRolePattern,
+                          'write users' : validateRolePattern,
+                          'modified by' : validateRole,
+                          'typedef values' : validateEnumeration,
+                          '_cfg_policy remappings' : validatePolicyRule }
+
+    tagtypeValidators = { 'tagname' : validateTagname,
+                          'file' : validateFilename,
+                          'vfile' : validateVersionedFilename,
+                          'id' : validateSubjectQuery }
+
