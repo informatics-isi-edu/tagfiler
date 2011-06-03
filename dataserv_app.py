@@ -1579,20 +1579,19 @@ class Application:
                 results = validator(value, tagdef, subject)
                 if results != None:
                     # validator converted user-supplied value to internal form to use instead
-                    if type(results) in [ list, set ]:
-                        # validatator generated a set of values, recursively try to set these instead
-                        for val in results:
-                            self.set_tag(subject, tagdef, val)
-                        return
-                    else:
-                        # override value and continue processing
-                        value = results
+                    value = results
 
             try:
                 if value:
                     value = self.downcast_value(dbtype, value)
             except:
                 raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
+
+        if type(results) in [ list, set ]:
+            # validatator generated a set of values, recursively try to set these instead
+            for val in results:
+                self.set_tag(subject, tagdef, val)
+            return
 
         if tagdef.unique:
             results = self.select_tag_noauthn(None, tagdef, value)
