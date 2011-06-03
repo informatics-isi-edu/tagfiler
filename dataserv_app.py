@@ -1587,7 +1587,7 @@ class Application:
             except:
                 raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
-        if type(results) in [ list, set ]:
+        if type(value) in [ list, set ]:
             # validatator generated a set of values, recursively try to set these instead
             for val in results:
                 self.set_tag(subject, tagdef, val)
