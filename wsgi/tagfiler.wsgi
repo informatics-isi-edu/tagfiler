@@ -80,6 +80,7 @@ class Dispatcher:
 
         try:
             #web.debug((uri,astmethod))
+            #web.debug(('env',web.ctx.env))
             result = astmethod(uri)
             if hasattr(result, 'next'):
                 try:
