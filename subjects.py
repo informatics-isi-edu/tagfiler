@@ -31,10 +31,48 @@ import datetime
 import pytz
 import urllib
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag
 
 myrand = random.Random()
 myrand.seed(os.getpid())
+
+
+class SubjectCache:
+
+    def __init__(self):
+        # entries[key] = (ctime, value)
+        self.querypath_entries = dict()
+
+    def select(self, db, searchfunc, querypath):
+        def cached():
+            ctime, subject = self.querypath_entries.get(querypath, (None, None))
+            if subject:
+                results = db.query('SELECT value AS mtime FROM %s' % wraptag('subject last tagged')
+                                   + ' WHERE subject = $id', vars=dict(id=subject.id))
+                if len(results) == 1:
+                    mtime = results[0].mtime
+                    
+                    if mtime <= ctime:
+                        return subject
+                        
+                del self.querypath_entries[querypath]
+
+            return None
+
+        cached_subject = cached()
+
+        if cached_subject:
+            return [ cached_subject ]
+        else:
+            ctime = datetime.datetime.now(pytz.timezone('UTC'))
+            subjects = searchfunc()
+
+            if len(subjects) == 1:
+                self.querypath_entries[querypath] = (ctime, subjects[0])
+
+            return subjects
+
+subject_cache = SubjectCache()
 
 class Subject (Application):
     """Basic subject CRUD
@@ -57,10 +95,29 @@ class Subject (Application):
         self.subject = None
         self.mergeSubjpredsTags = False
 
+    def populate_subject_cached(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False):
+        if len(self.path) == 0:
+            self.path = [ ( [], [], [] ) ]
+
+        def searchfunc():
+            self.populate_subject(enforce_read_authz, allow_blank, allow_multiple, enforce_parent)
+            return self.subjects
+
+        subjpreds, listpreds, ordertags = self.path[-1]
+        self.unique = self.validate_subjpreds_unique(acceptName=True, subjpreds=subjpreds)
+        
+        if self.unique != None:
+            self.subjects = subject_cache.select(self.db, searchfunc, path_linearize(self.path))
+            self.subject = self.subjects[0]
+            self.datapred, self.dataid, self.dataname, self.dtype = self.subject2identifiers(self.subject)
+        else:
+            self.populate_subject(enforce_read_authz, allow_blank, allow_multiple, enforce_parent)
+            
+
     def populate_subject(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False, post_method=False):
         if len(self.path) == 0:
             self.path = [ ( [], [], [] ) ]
-            
+
         subjpreds, listpreds, ordertags = self.path[-1]
 
         if len(listpreds) > 0:
@@ -131,7 +188,8 @@ class Subject (Application):
                 self.dtype = self.subjects[s].dtype
 
     def get_body(self):
-        self.populate_subject(allow_blank=True)
+        #self.populate_subject(allow_blank=True)
+        self.populate_subject_cached(allow_blank=True)
         # read authz implied by finding subject
         return None
 
@@ -370,7 +428,10 @@ class Subject (Application):
     def put_preWriteBody(self, post_method=False):
         status = web.ctx.status
         try:
-            self.populate_subject(enforce_read_authz=False, allow_blank=post_method, post_method=post_method)
+            if not post_method:
+                self.populate_subject_cached(enforce_read_authz=False, allow_blank=post_method)
+            else:
+                self.populate_subject(enforce_read_authz=False, allow_blank=post_method, post_method=post_method)
             if not self.subject.readok:
                 raise Forbidden('access to file "%s"' % path_linearize(self.path))
             if not self.subject.writeok: 

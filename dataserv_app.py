@@ -66,6 +66,7 @@ class DbCache:
 
     def select(self, db, fillfunc, idtagval=None):
         def cache_is_fresh():
+            now = datetime.datetime.now(pytz.timezone('UTC'))
             if self.fill_time:
                 # modified time is latest modification time of:
                 #  identifying tag (tracked as "tag last modified" on its tagdef
