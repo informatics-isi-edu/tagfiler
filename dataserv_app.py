@@ -85,7 +85,7 @@ class DbCache:
         
         if not cache_is_fresh():
             # need to refill cache
-            web.debug('DbCache: filling %s cache' % self.idtagname)
+            #web.debug('DbCache: filling %s cache' % self.idtagname)
             if self.idalias:
                 self.cache = dict( [ (res[self.idalias], res) for res in fillfunc() ] )
             else:
