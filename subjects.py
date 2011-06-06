@@ -39,12 +39,30 @@ myrand.seed(os.getpid())
 
 class SubjectCache:
 
+    purge_interval_seconds = 60
+    cache_stale_seconds = 300
+
     def __init__(self):
         # entries['%s %s' % (role, querypath)] = (ctime, value)
         self.querypath_entries = dict()
+        self.last_purge_time = None
+
+    def purge(self):
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        if self.last_purge_time and (now - self.last_purge_time).seconds < SubjectCache.purge_interval_seconds:
+            pass
+        else:
+            self.last_purge_time = now
+            for item in self.querypath_entries.items():
+                key, entry = item
+                ctime, subject = entry
+                if (now - ctime).seconds > SubjectCache.cache_stale_seconds:
+                    self.querypath_entries.pop(key, None)
 
     def select(self, db, searchfunc, querypath, role):
         key = '%s %s' % (role, querypath)
+
+        self.purge()
         
         def cached():
             ctime, subject = self.querypath_entries.get(key, (None, None))
@@ -57,7 +75,7 @@ class SubjectCache:
                     if mtime <= ctime:
                         return subject
                         
-                del self.querypath_entries[key]
+                self.querypath.entries.pop(key, None)
 
             return None
 
