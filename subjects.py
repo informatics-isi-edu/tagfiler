@@ -40,12 +40,14 @@ myrand.seed(os.getpid())
 class SubjectCache:
 
     def __init__(self):
-        # entries[key] = (ctime, value)
+        # entries['%s %s' % (role, querypath)] = (ctime, value)
         self.querypath_entries = dict()
 
-    def select(self, db, searchfunc, querypath):
+    def select(self, db, searchfunc, querypath, role):
+        key = '%s %s' % (role, querypath)
+        
         def cached():
-            ctime, subject = self.querypath_entries.get(querypath, (None, None))
+            ctime, subject = self.querypath_entries.get(key, (None, None))
             if subject:
                 results = db.query('SELECT value AS mtime FROM %s' % wraptag('subject last tagged')
                                    + ' WHERE subject = $id', vars=dict(id=subject.id))
@@ -55,7 +57,7 @@ class SubjectCache:
                     if mtime <= ctime:
                         return subject
                         
-                del self.querypath_entries[querypath]
+                del self.querypath_entries[key]
 
             return None
 
@@ -68,7 +70,7 @@ class SubjectCache:
             subjects = searchfunc()
 
             if len(subjects) == 1:
-                self.querypath_entries[querypath] = (ctime, subjects[0])
+                self.querypath_entries[key] = (ctime, subjects[0])
 
             return subjects
 
@@ -107,7 +109,7 @@ class Subject (Application):
         self.unique = self.validate_subjpreds_unique(acceptName=True, subjpreds=subjpreds)
         
         if self.unique != None:
-            self.subjects = subject_cache.select(self.db, searchfunc, path_linearize(self.path))
+            self.subjects = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.authn.role)
             self.subject = self.subjects[0]
             self.datapred, self.dataid, self.dataname, self.dtype = self.subject2identifiers(self.subject)
         else:
