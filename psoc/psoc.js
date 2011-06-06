@@ -797,6 +797,7 @@ var HOME;
 var USER;
 var SVCPREFIX;
 var resourcePrefix;
+var allSubjects;
 
 function init(home, user) {
 	expiration_warning = false;
@@ -804,64 +805,80 @@ function init(home, user) {
 	USER = user;
 	SVCPREFIX = home.substring(home.lastIndexOf('/')+1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
-	var html = '<option id="selectTag" value="">Choose Subject Type</option>';
+	var select = document.getElementById("tags");
+	var option = document.createElement('option');
+	option.setAttribute('id', 'selectTag');
+	option.setAttribute('value', 'Choose Subject Type');
+	option.innerHTML = 'Choose Subject Type';
+	select.appendChild(option);
 	for (var i=0; i < groupTags.length; i++) {
-		var optionAttr = makeAttributes('id', groupTags[i],
-						'value', groupTags[i]);
-		html += '<option ' + optionAttr + '>'+groupTags[i]+'</option>';
+		option = document.createElement('option');
+		option.setAttribute('id', groupTags[i]);
+		option.setAttribute('value', groupTags[i]);
+		option.innerHTML = groupTags[i];
+		select.appendChild(option);
 	}
-	document.getElementById("tags").innerHTML = html;
-	
 	document.getElementById("Status").innerHTML = 'Loading the form. Please wait...';
 	document.getElementById('psoc_progress_bar').style.display = '';
 	totalRequests = selectArray.length;
 	sentRequests = 0;
-	// get the values for the selectArray
+	drawProgressBar(0);
+	displayStatus('sendSelectRequest()');
+}
+
+function displayStatus(request) {
+	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
+	setTimeout(request, 1);
+}
+
+function sendSelectRequest() {
 	var PREFIX = HOME + '/query/';
 	var SUFFIX = 'ID?versions=any';
-	for (var i=0; i<selectArray.length; i++) {
-		var url = PREFIX + selectArray[i] + SUFFIX;
-		ajax_client.open("GET", url, false);
-		ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-		ajax_client.setRequestHeader("Accept", "text/uri-list"); 
-		drawProgressBar(Math.ceil(++sentRequests * 100 / totalRequests));
-		ajax_client.send(null);
-		if(ajax_client.readyState == 4) {
-			if (ajax_client.status == 200) {
-				var a = ajax_client.responseText;
-				var rows = a.split('\n');
-				var values = new Array();
-				for (var j=0; j<rows.length; j++) {
-					if (rows[j].length > 0) {
-						var index = rows[j].lastIndexOf('=') + 1;
-						values.push(decodeURIComponent(rows[j].substr(index)));
-					}
+	var url = PREFIX + selectArray[sentRequests] + SUFFIX;
+	ajax_client.open("GET", url, false);
+	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
+	ajax_client.setRequestHeader("Accept", "text/uri-list"); 
+	ajax_client.send(null);
+	var success = false;
+	if(ajax_client.readyState == 4) {
+		if (ajax_client.status == 200) {
+			var a = ajax_client.responseText;
+			var rows = a.split('\n');
+			var values = new Array();
+			for (var j=0; j<rows.length; j++) {
+				if (rows[j].length > 0) {
+					var index = rows[j].lastIndexOf('=') + 1;
+					values.push(decodeURIComponent(rows[j].substr(index)));
 				}
-				enumArray[selectArray[i]] = values.sort();
-				if (sharedId[selectArray[i]] != null) {
-					var tags = sharedId[selectArray[i]];
-					for (var j=0; j<tags.length; j++) {
-					 	enumArray[tags[j]] = enumArray[selectArray[i]].slice(0);
-					}
-				}
-			} else {
-				var err = ajax_client.getResponseHeader('X-Error-Description');
-				alert(err != null ? unescape(err) : ajax_client.responseText);
 			}
+			enumArray[selectArray[sentRequests]] = values.sort();
+			if (sharedId[selectArray[sentRequests]] != null) {
+				var tags = sharedId[selectArray[sentRequests]];
+				for (var j=0; j<tags.length; j++) {
+				 	enumArray[tags[j]] = enumArray[selectArray[sentRequests]].slice(0);
+				}
+			}
+			success = true;
 		} else {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
 			alert(err != null ? unescape(err) : ajax_client.responseText);
 		}
+	} else {
+		var err = ajax_client.getResponseHeader('X-Error-Description');
+		alert(err != null ? unescape(err) : ajax_client.responseText);
 	}
-	drawProgressBar(0);
-	document.getElementById("Status").innerHTML = '';
-	document.getElementById('psoc_progress_bar').style.display = 'none';
+	if (!success || ++sentRequests >= totalRequests) {
+		document.getElementById('psoc_progress_bar').style.display = 'none';
+		document.getElementById("Status").innerHTML = '';
+	} else {
+		displayStatus('sendSelectRequest()');
+	}
 }
 
 function genericTest() {
-	var subjects = getAllSubjects();
-	resolveDependencies(subjects);
-	postSubjects(subjects);
+	getAllSubjects();
+	resolveDependencies();
+	postSubjects();
 	expiration_warning = true;
 }
 
@@ -919,7 +936,7 @@ function getSubjectValues(group, position, tags) {
 
 function getAllSubjects() {
 	document.getElementById('AllBody').value ='';
-	var subjects = new Array();
+	allSubjects = new Array();
 	var tags;
 	for (var i=0; i < groupCounter.length; i++) {
 		tags = null;
@@ -931,7 +948,7 @@ function getAllSubjects() {
 				}
 				var subjectTags = new Array();
 				subjectTags['values'] = getSubjectValues(i+1, j, tags);
-				subjects[id] = subjectTags;
+				allSubjects[id] = subjectTags;
 				if (tagsIds[tags[0]] == null) {
 					tagsIds[tags[0]] = new Array();
 				}
@@ -942,9 +959,9 @@ function getAllSubjects() {
 			}
 		}
 	}
-	for (var subject in subjects) {
-		if (subjects.hasOwnProperty(subject)) {
-			var values = subjects[subject]['values'];
+	for (var subject in allSubjects) {
+		if (allSubjects.hasOwnProperty(subject)) {
+			var values = allSubjects[subject]['values'];
 			document.getElementById('AllBody').value += subject + '\n';
 			for (var value in values) {
 				if (values.hasOwnProperty(value)) {
@@ -959,39 +976,25 @@ function getAllSubjects() {
 		}
 	}
 	//document.getElementById('AllBody').style.display = '';
-	return subjects;
 }
 
 var totalRequests;
 var sentRequests;
 
-function postSubjects(subjects) {
+function postSubjects() {
 	document.getElementById('psoc_progress_bar').style.display = '';
 	totalRequests = subjectsQueue.length;
 	sentRequests = 0;
 	document.getElementById("Status").innerHTML = 'Saving the form. Please wait...';
 	document.getElementById("Error").innerHTML = '';
-	for (var i=0; i<subjectsQueue.length; i++) {
-		if (!postSubject(subjects, subjectsQueue[i])) {
-			document.getElementById("Status").innerHTML = '';
-			drawProgressBar(0);
-			document.getElementById('psoc_progress_bar').style.display = 'none';
-			subjectsQueue.length = 0;
-			return;
-		}
-	}
-	document.getElementById("Status").innerHTML = '';
-	drawProgressBar(0);
-	document.getElementById('psoc_progress_bar').style.display = 'none';
-	subjectsQueue.length = 0;
-	listSubjects(subjects);
+	displayStatus('postSubject()');
 }
 
-function postSubject(subjects, subject) {
+function postSubject() {
 	// POST the subject
 	var success = false;
 	var url = HOME + '/subject/?incomplete&';
-	var values = subjects[subject]['values'];
+	var values = allSubjects[subjectsQueue[sentRequests]]['values'];
 	var tags = new Array();
 	for (var value in values) {
 		if (values.hasOwnProperty(value)) {
@@ -1010,7 +1013,7 @@ function postSubject(subjects, subject) {
 	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
 	var params = 'action=post';
 	ajax_client.send(params);
-	drawProgressBar(Math.ceil(++sentRequests * 100 / totalRequests));
+	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if(ajax_client.readyState == 4) {
 		if (ajax_client.status != 200) {
 			document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
@@ -1023,21 +1026,32 @@ function postSubject(subjects, subject) {
 		var err = ajax_client.getResponseHeader('X-Error-Description');
 		document.getElementById("Error").innerHTML = 'ERROR: ' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
 	}
-	return success;
+	if (!success || ++sentRequests >= totalRequests) {
+		document.getElementById('psoc_progress_bar').style.display = 'none';
+		document.getElementById("Status").innerHTML = '';
+	}
+	if (success) {
+		if (sentRequests >= totalRequests){
+			subjectsQueue.length = 0;
+			listSubjects();
+		} else {
+			displayStatus('postSubject()');
+		}
+	}
 }
 
-function resolveDependencies(subjects) {
-	for (var subject in subjects) {
-		if (subjects.hasOwnProperty(subject)) {
+function resolveDependencies() {
+	for (var subject in allSubjects) {
+		if (allSubjects.hasOwnProperty(subject)) {
 			if (!subjectsQueue.contains(subject)) {
-				addToQueue(subjects, subject);
+				addToQueue(subject);
 			}
 		}
 	}
 }
 
-function addToQueue(subjects, subject) {
-	var values = subjects[subject]['values'];
+function addToQueue(subject) {
+	var values = allSubjects[subject]['values'];
 	var first = true;
 	for (var value in values) {
 		if (values.hasOwnProperty(value)) {
@@ -1050,7 +1064,7 @@ function addToQueue(subjects, subject) {
 				var tagValues = values[value];
 				for (var i=0; i<tagValues.length; i++) {
 					if (tagsIds[mapValue] != null && tagsIds[mapValue][tagValues[i]] != null) {
-						addToQueue(subjects, tagsIds[mapValue][tagValues[i]]);
+						addToQueue(tagsIds[mapValue][tagValues[i]]);
 					}
 				}
 			}
@@ -1061,11 +1075,11 @@ function addToQueue(subjects, subject) {
 	}
 }
 
-function listSubjects(subjects) {
+function listSubjects() {
 	var ul = document.createElement('ul');
 	var psoc = document.getElementById('psoc');
-	for (var subject in subjects) {
-		if (subjects.hasOwnProperty(subject)) {
+	for (var subject in allSubjects) {
+		if (allSubjects.hasOwnProperty(subject)) {
 			var li = document.createElement('li');
 			li.innerHTML = document.getElementById(subject+'_header').innerHTML;
 			ul.appendChild(li);
