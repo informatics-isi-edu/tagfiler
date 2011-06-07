@@ -258,10 +258,11 @@ tagdef_phase2()
 
    # policy is one of:
    #   anonymous  -- any client can access
-   #   users  -- any authenticated user can access
    #   subject  -- subject access rule is observed for tag access
    #   subjectowner  -- only subject owner can access
    #   tag -- tag access rule is observed for tag access
+   #   tagorsubject -- tag or subject access rules are sufficient
+   #   tagandsubject -- tag and subject access rules are required
    #   system  -- no client can access
 
    echo "populate tagdef '$2'..." >&2
@@ -500,7 +501,7 @@ typedef rolepat      text          'Role pattern'
 typedef dtype        text          'Dataset type'                  ""                 'blank Dataset node for metadata-only' 'file Named dataset for locally stored file' 'url Named dataset for URL redirecting'
 typedef url          text          'URL'
 typedef id           int8          'Subject ID or subquery'
-typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'users Any authenticated client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'system No client can access'
+typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'system No client can access'
 typedef type         text          'Scalar value type'             typedef
 typedef tagdef       text          'Tag definition'                tagdef
 typedef name         text          'Subject name'                  "latest with name"

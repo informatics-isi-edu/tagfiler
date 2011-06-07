@@ -75,7 +75,7 @@ class SubjectCache:
                     if mtime <= ctime:
                         return subject
                         
-                self.querypath.entries.pop(key, None)
+                self.querypath_entries.pop(key, None)
 
             return None
 

@@ -780,7 +780,6 @@ class FileTags (Node):
         return url
 
     def get_body(self):
-
         self.path_modified, self.listtags, writetags, self.limit, self.versions = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'all'],

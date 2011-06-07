@@ -98,10 +98,43 @@ class DbCache:
         else:
             return self.cache.itervalues()
 
-config_cache = DbCache('config')
-tagdef_cache = DbCache('tagdef', 'tagname')
-typedef_cache = DbCache('typedef')
-view_cache = DbCache('view')
+class PerUserDbCache:
+
+    max_cache_seconds = 500
+    purge_interval_seconds = 60
+
+    def __init__(self, idtagname, idalias=None):
+        self.idtagname = idtagname
+        self.idalias = idalias
+        self.caches = dict()
+        self.last_purge_time = None
+
+    def purge(self):
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        if self.last_purge_time and (now - self.last_purge_time).seconds < PerUserDbCache.purge_interval_seconds:
+            pass
+        else:
+            self.last_purge_time = now
+            for item in self.caches.items():
+                key, entry = item
+                ctime, cache = entry
+                if (now - ctime).seconds > PerUserDbCache.max_cache_seconds:
+                    self.caches.pop(key, None)
+
+    def select(self, db, fillfunc, user, idtagval=None):
+        ctime, cache = self.caches.get(user, (None, None))
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        if not ctime:
+            cache = DbCache(self.idtagname, self.idalias)
+        results = cache.select(db, fillfunc, idtagval)
+        self.caches[user] = (now, cache)
+        self.purge()
+        return results
+
+config_cache = PerUserDbCache('config')
+tagdef_cache = PerUserDbCache('tagdef', 'tagname')
+typedef_cache = PerUserDbCache('typedef')
+view_cache = PerUserDbCache('view')
 
 def wraptag(tagname, suffix='', prefix='_'):
     return '"' + prefix + tagname.replace('"','""') + suffix + '"'
@@ -347,7 +380,7 @@ class Application:
         if viewname == None:
             return None
 
-        view = view_cache.select(self.db, lambda : self.select_view_all(), viewname)
+        view = view_cache.select(self.db, lambda : self.select_view_all(), self.authn.role, viewname)
         if view == None:
             return self.select_view(default, None)
         else:
@@ -513,7 +546,7 @@ class Application:
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
 
         # set default anonymous authn info
-        self.set_authn(webauthn.providers.AuthnInfo('root', set(['root']), None, None, False, None))
+        self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
 
         def fill_config():
             config = self.select_config()
@@ -521,7 +554,7 @@ class Application:
             return [ config ]
 
         # get full config
-        self.config = config_cache.select(self.db, fill_config, 'tagfiler')
+        self.config = config_cache.select(self.db, fill_config, self.authn.role, 'tagfiler')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
         
         #self.config = self.select_config()
@@ -666,7 +699,7 @@ class Application:
             if len(results) == 0:
                 raise Conflict('Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
-            results = typedef_cache.select(self.db, lambda: self.get_type(), typename)
+            results = typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role, typename)
             if len(results) == 0:
                 raise Conflict('The type "%s" is not defined!' % typename)
             type = results[0]
@@ -741,6 +774,9 @@ class Application:
         self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
 
     def set_authn(self, authn):
+        if not hasattr(self, 'authn'):
+            self.authn = None
+        #web.debug(self.authn, authn)
         self.authn = authn
         self.globals['authn'] = authn
 
@@ -788,14 +824,7 @@ class Application:
         #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatch(self, uri):
-        def body():
-            self.preDispatchCore(uri)
-
-        def postCommit(results):
-            pass
-
-        if not self.skip_preDispatch:
-            self.dbtransact(body, postCommit)
+        self.preDispatchCore(uri)
 
     def postDispatch(self, uri=None):
         def body():
@@ -862,9 +891,9 @@ class Application:
                         # build up globals useful to almost all classes, to avoid redundant coding
                         # this is fragile to make things fast and simple
                         db_globals_dict = dict(roleinfo=lambda : self.buildroleinfo(),
-                                               typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type())],
+                                               typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role)],
                                                typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
-                                               tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ]) )
+                                               tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef(), self.authn.role) ]) )
                         for key in self.needed_db_globals:
                             if not self.globals.has_key(key):
                                 self.globals[key] = db_globals_dict[key]()
@@ -1078,12 +1107,10 @@ class Application:
         status = web.ctx.status
 
         # read is authorized or subject would not be found
-        if subject['write users'] == None:
-            subject['write users'] = []
         if mode == 'write':
-            if len(set(subject.get('%s users' % mode, []))
+            if len(set(self.authn.roles)
                    .union(set(['*']))
-                   .intersection(set(subject['write users']))) > 0:
+                   .intersection(set(subject['write users'] or []))) > 0:
                 return True
             elif self.authn.role:
                 return False
@@ -1097,18 +1124,37 @@ class Application:
 
            True: access allowed
            False: access forbidden
-           None: user needs to authenticate to be sure"""
-        if tagdef[mode + 'ok']:
-            return True
-        elif tagdef[mode + 'ok'] == None:
-            if tagdef[mode + 'policy'] == 'subject' and dict(read=True, write=subject.writeok)[mode]:
-                return True
-            elif tagdef[mode + 'policy']  == 'subjectowner' and subject.owner in self.authn.roles:
-                return True
-        if self.authn == None:
-            return None
+           None: user needs to authenticate to be sure
+                 or subject is None and subject is needed to make determination"""
+        policy = tagdef['%spolicy' % mode]
+
+        tag_ok = tagdef.owner in self.authn.roles \
+                 or len(set([ r for r in self.authn.roles])
+                        .union(set(['*']))
+                        .intersection(set(tagdef['tag' + mode[0:4] + 'ers'] or []))) > 0
+
+        if subject:
+            subject_ok = dict(read=True, write=subject.writeok)[mode]
+            subject_owner = subject.owner in self.authn.roles
         else:
+            subject_ok = None
+            subject_owner = None
+        
+        if policy == 'system':
             return False
+        elif policy == 'subjectowner':
+            return subject_owner
+        elif policy == 'subject':
+            return subject_ok
+        elif policy == 'tagandsubject':
+            return tag_ok and subject_ok
+        elif policy == 'tagorsubject':
+            return tag_ok or subject_ok
+        elif policy == 'tag':
+            return tag_ok
+        else:
+            # policy == 'anonymous'
+            return True
 
     def test_tagdef_authz(self, mode, tagdef):
         """Check whether access is allowed."""
@@ -1288,25 +1334,8 @@ class Application:
             ordertags = []
 
         def add_authz(tagdef):
-            def compute_authz(mode, tagdef):
-                policy = tagdef['%spolicy' % mode]
-                if policy == 'system':
-                    return False
-                elif policy in [ 'subjectowner', 'subject' ]:
-                    return None
-                elif policy == 'tag':
-                    return tagdef.owner in self.authn.roles \
-                           or len(set(self.authn.roles)
-                                  .union(set(['*']))
-                                  .intersection(set(tagdef['tag' + mode[0:4] + 'ers'] or []))) > 0
-                elif policy == 'users':
-                    return self.authn.role != None
-                else:
-                    # policy == 'anonymous'
-                    return True
-            
             for mode in ['read', 'write']:
-                tagdef['%sok' % mode] = compute_authz(mode, tagdef)
+                tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef)
 
             return tagdef
             
@@ -1435,7 +1464,7 @@ class Application:
 
     def select_tag(self, subject, tagdef, value=None):
         # subject would not be found if read of subject is not OK
-        if tagdef.readok == False or (tagdef.readok == None and subject.owner not in self.authn.roles):
+        if tagdef.readok == False or (tagdef.readok == None and not self.test_tag_authz('read', subject, tagdef)):
             raise Forbidden('read access to /tags/%s(%s)' % (self.subject2identifiers(subject)[0], tagdef.tagname))
         return self.select_tag_noauthn(subject, tagdef, value)
 
@@ -1768,6 +1797,7 @@ class Application:
                     wheres.append('t%s%s.subject IS NULL OR (ownerrole_%d.role IS NULL)' % (vprefix, p, p))
                 else:
                     # covers all cases where tag is more or equally permissive to file or static checks already done
+                    # e.g. read policy in [ 'subject', 'tagandsubject', 'tag', 'tagorsubject', 'anonymous' ]
                     wheres.append('t%s%s.subject IS NULL' % (vprefix, p))
             elif op == 'IN':
                 # special internal operation to restrict by sub-query, doesn't need to be sanity checked
@@ -1786,6 +1816,10 @@ class Application:
                     if tagdef.readpolicy == 'subjectowner' and enforce_read_authz:
                         # this predicate is conjunctive with more restrictive access check, which we only need to add once
                         need_subjectowner_test = True
+                    else:
+                        # covers all cases where tag is more or equally permissive to file or static checks already done
+                        # e.g. read policy in [ 'subject', 'tagandsubject', 'tag', 'tagorsubject', 'anonymous' ]
+                        pass
                                     
                     if tag != 'id':
                         innertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p)))
@@ -1998,7 +2032,7 @@ class Application:
                 elif tagdef.readok:
                     # we can read this tag for any subject we can find
                     pass
-                elif tagdef.readpolicy == 'subject':
+                elif tagdef.readpolicy in [ 'subject', 'tagorsubject', 'tagandsubject' ]:
                     # we can read this tag for any subject we can read
                     # which is all subjects being read, when we are enforcing
                     pass
