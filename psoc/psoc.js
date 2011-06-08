@@ -347,11 +347,11 @@ function newSubject(group, inner) {
 				   'id', subjectId,
 				   'class', 'file-tag');
 	var input = document.createElement('input');
-	td.appendChild(input);
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', makeFunction('hideSubject', group, countIndex),
 				   'value', 'Hide ' + groupType[group-1]);
+	td.appendChild(input);
 	values.push(td);
 	appendColumn(subjectsId, values);
 	var id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
@@ -557,24 +557,24 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		makeAttributes(td,
 					   'id', makeId(subjectId1, 'removeValue'));
 		var input = document.createElement('input');
-		td.appendChild(input);
 		makeAttributes(input,
 					   'type', 'button',
 				       'onclick', makeFunction('deleteSubject', index, firstSubject),
 				       'value', 'Remove ' + value);
+		td.appendChild(input);
 		var newSubjectTable = document.createElement('table');
 		tr = document.createElement('tr');
 		newSubjectTable.appendChild(tr);
 		td = document.createElement('td');
 		tr.appendChild(td);
 		input = document.createElement('input');
-		td.appendChild(input);
 		makeAttributes(input,
 					   'id', makeId(subjectId, 'subject'),
 				       'tagname', value,
 				       'type', 'button',
 				       'onclick', makeFunction('setValue', str(subjectId), str('subject')),
 				       'value', 'New ' + value);
+		td.appendChild(input);
 		var subjectTable = document.createElement('table');
 		var tr = document.createElement('tr');
 		subjectTable.appendChild(tr);
@@ -631,17 +631,16 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'class', 'file-tag',
 				   'id', subjectId1);
 	var input = document.createElement('input');
-	td.appendChild(input);
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', makeFunction('hideSubject', index, firstSubject),
 				   'value', 'Hide ' + value);
+	td.appendChild(input);
 	dd.appendChild(subject);
 	var div = document.createElement('div');
 	makeAttributes(div,
 				   'id', makeId(subjectId1, 'Buttons'));
 	var buttons = document.createElement('input');
-	div.appendChild(buttons);
 	makeAttributes(buttons,
 					'id', makeId(subjectsId, 'Expand'),
 					'type', 'button',
@@ -649,14 +648,15 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					'onclick', makeFunction('displayExpandColumn', index),
 					'style', 'display:none',
 					'value', 'Show All');
-	buttons = document.createElement('input');
 	div.appendChild(buttons);
+	buttons = document.createElement('input');
 	makeAttributes(buttons,
 					'id', makeId(subjectsId, 'Collapse'),
 					'type', 'button',
 					'name', 'Collapse',
 					'onclick', makeFunction('displayCollapseColumn', index),
 					'value', 'Hide All');
+	div.appendChild(buttons);
 	dd.appendChild(div);
 	dd.appendChild(document.createElement('p'));
 	document.getElementById('selectTag').selected = "selected";
@@ -768,11 +768,11 @@ function addSubjectValue(value, group, position) {
 	makeAttributes(td,
 				   'id', makeId(subjectId, 'removeValue'));
 	var input = document.createElement('input');
-	td.appendChild(input);
 	makeAttributes(input,
 					'type', 'button',
 				    'onclick', makeFunction('deleteSubject', group, position),
 				    'value', 'Remove ' + groupType[group-1]);
+	td.appendChild(input);
 	tr.appendChild(td);
 	var headerId = makeId(subjectId, position, 'header');
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
@@ -798,11 +798,11 @@ function addButtonValue(parent, value, group, position) {
 				   'class', 'file-tag multivalue delete',
 				   'id', makeId(subjectId, 'removeValue'));
 	var input = document.createElement('input');
-	td.appendChild(input);
 	makeAttributes(input,
 					'type', 'button',
 				    'onclick', makeFunction('deleteSubject', group, position),
 				    'value', 'Remove ' + groupType[group-1]);
+	td.appendChild(input);
 	tr.appendChild(td);
 	parent.insertBefore(tr, parent.lastChild);
 }
@@ -824,11 +824,11 @@ function addValue(parent, id, suffix, value) {
 				   'id', makeId(id, 'removeValue'));
 	var deleteAction = makeFunction('deleteElementById', str(valId));
 	var input = document.createElement('input');
-	td.appendChild(input);
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', deleteAction,
 				   'value', 'Remove Value');
+	td.appendChild(input);
 	tr.appendChild(td);
 	parent.insertBefore(tr, parent.lastChild);
 }
@@ -861,11 +861,11 @@ function tagCell(group, tagname, index) {
 			var td = document.createElement('td');
 			tr.appendChild(td);
 			var input = document.createElement('input');
-			td.appendChild(input);
 			makeAttributes(input,
 							'type', 'button',
 						    'onclick', makeFunction('setValue', str(id), str(type)),
 						    'value', 'New ' + tagMapArray[tagname]);
+			td.appendChild(input);
 			tr = document.createElement('tr');
 			tdTable.appendChild(tr);
 			var td = document.createElement('td');
@@ -876,11 +876,11 @@ function tagCell(group, tagname, index) {
 		} else {
 			type = 'input';
 			var input = document.createElement('input');
-			td.appendChild(input);
 			makeAttributes(input,
 							'type', 'text',
 						    'id', inputId,
 						    'tagname', tagname);
+			td.appendChild(input);
 			if (dateArray.contains(tagname)) {
 				var a = document.createElement('a');
 				td.appendChild(a);
@@ -925,11 +925,11 @@ function tagCell(group, tagname, index) {
 		makeAttributes(td,
 						'class', 'file-tag multivalue set');
 		var input = document.createElement('input');
-		td.appendChild(input);
 		makeAttributes(input,
 						'type', 'button',
 					    'onclick', makeFunction('setValue', str(id), str(type)),
 					    'value', 'Set Value');
+		td.appendChild(input);
 	}
 	return table;
 }
