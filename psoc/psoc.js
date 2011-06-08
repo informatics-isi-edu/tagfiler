@@ -82,11 +82,10 @@ function makeFunction() {
 }
 
 function makeAttributes() {
-	var parts = new Array();
-	for( var i=0; i < arguments.length; i+=2 ) {
-		parts.push(arguments[i] + '="' + arguments[i+1] + '"');
+	var elem = arguments[0];
+	for( var i=1; i < arguments.length; i+=2 ) {
+		elem.setAttribute(arguments[i], arguments[i+1]);
 	}
-	return parts.join(' ');
 }
 
 function getLeftOffset(id) {
@@ -239,8 +238,7 @@ function displayExpandColumn(group) {
 function showColumn(group, index) {
 	var dt = document.getElementById(makeId('Subject', group, 'span'));
 	if (dt.nextSibling.style.display == 'none') {
-		var headerIndex = dt.getElementsByTagName('span')[0].innerHTML.indexOf(">");
-		var header = dt.getElementsByTagName('span')[0].innerHTML.substr(headerIndex+1);
+		var header = dt.getElementsByTagName('span')[0].children[0].children[0].children[1].innerHTML;
 		tog(dt, header);
 	}
 	displayCollapseColumn(group);
@@ -288,10 +286,12 @@ function newTags(group, value) {
 	var rowClass = 'even';
 	for (var i=0; i<newTags.length; i++) {
 		var row = document.createElement('tr');
-		row.setAttribute('class', 'file-tag '+rowClass);
+		makeAttributes(row,
+					   'class', 'file-tag ' + rowClass);
 		rowClass = (rowClass == 'odd') ? 'even' : 'odd';
 		var td = document.createElement('td');
-		td.setAttribute('class', 'file-tag');
+		makeAttributes(td,
+					   'class', 'file-tag');
 		td.innerHTML = newTags[i];
 		row.appendChild(td);
 		for (var j=1; j <= groupCounter[group-1]; j++) {
@@ -302,15 +302,17 @@ function newTags(group, value) {
 			}
 			var id = makeId(subjectId, newTags[i]);
 			var td = document.createElement('td');
-			td.setAttribute('nowrap', 'nowrap');
-			td.setAttribute('id', id);
-			td.setAttribute('class', 'file-tag');
-			td.innerHTML = tagCell(group, newTags[i], j);
+			makeAttributes(td,
+						   'nowrap', 'nowrap',
+						   'id', id,
+						   'class', 'file-tag');
+			td.appendChild(tagCell(group, newTags[i], j));
 			row.appendChild(td);
 		}
 		table.insertBefore(row, table.lastChild);
 	}
-	table.lastChild.setAttribute('class', 'file-footer '+rowClass);
+	makeAttributes(table.lastChild,
+				   'class', 'file-footer ' + rowClass);
 }
 
 function newSubject(group, inner) {
@@ -325,32 +327,39 @@ function newSubject(group, inner) {
 	var subjectId = makeId('Subject', group, countIndex);
 	groupCounter[group-1] = countIndex;
 	var th = document.createElement('th');
-	th.setAttribute('class', 'file-tag');
-	th.setAttribute('id', makeId(subjectId, 'header'));
-	th.innerHTML = (inner == 'false' ? USER + '-' : '') + groupName[group-1]+typeCode+countIndex+suffix;
+	makeAttributes(th,
+				   'class', 'file-tag',
+				   'id', makeId(subjectId, 'header'));
+	th.innerHTML = (inner == 'false' ? USER + '-' : '') + groupName[group-1] + typeCode + countIndex + suffix;
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
 		var id = makeId(subjectId, selectedTags[group-1][i]);
 		var td = document.createElement('td');
-		td.setAttribute('nowrap', 'nowrap');
-		td.setAttribute('id', id);
-		td.setAttribute('class', 'file-tag entity');
-		td.innerHTML = tagCell(group, selectedTags[group-1][i], countIndex);
+		makeAttributes(td,
+					   'nowrap', 'nowrap',
+					   'id', id,
+					   'class', 'file-tag entity');
+		td.appendChild(tagCell(group, selectedTags[group-1][i], countIndex));
 		values.push(td);
 	}
 	var td = document.createElement('td');
-	td.setAttribute('id', subjectId);
-	td.setAttribute('class', 'file-tag');
-	td.innerHTML = '<input ' + makeAttributes('type', 'button',
-						  'onclick', makeFunction('hideSubject', group, countIndex),
-						  'value', 'Hide '+groupType[group-1]) +'/>';
+	makeAttributes(td,
+				   'id', subjectId,
+				   'class', 'file-tag');
+	var input = document.createElement('input');
+	td.appendChild(input);
+	makeAttributes(input,
+				   'type', 'button',
+				   'onclick', makeFunction('hideSubject', group, countIndex),
+				   'value', 'Hide ' + groupType[group-1]);
 	values.push(td);
 	appendColumn(subjectsId, values);
 	var id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
-	var subjectName = groupName[group-1] + typeCode+countIndex+suffix;
+	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
 	var textValue = (inner == 'false' ? USER + '-' + subjectName : subjectName);
 	document.getElementById(makeId(id, 'input')).value = textValue;
-	document.getElementById(makeId(id, 'input')).setAttribute('size', textValue.length);
+	makeAttributes(document.getElementById(makeId(id, 'input')),
+				   'size', textValue.length);
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
@@ -368,7 +377,8 @@ function deleteSubject(group, position) {
 	deleteColumn(id);
 	if (row.children.length == 1) {
 		// the div that contains the table;
-		var div = row.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
+		id = makeId('Subject', group, 1, 'container');
+		var div = document.getElementById(id);
 		deleteElement(div);
 	} else {
 		enableNavigationButtons(group);
@@ -401,7 +411,7 @@ function selectTags() {
 			alert(value + ' name can not be empty.');
 		}
 	}
-	selectSubject(value, subjectGroupName+'-', null, document.getElementById('all_subjects'), subjectGroupName);
+	selectSubject(value, subjectGroupName + '-', null, document.getElementById('all_subjects'), subjectGroupName);
 	document.getElementById('selectTag').selected = "selected";
 }
 
@@ -409,11 +419,28 @@ function tog(dt, header) {
 	var dd = dt.nextSibling;
 	var toOpen = (dd.style.display == 'none');
 	dd.style.display = toOpen ? '' : 'none';
-	dt.getElementsByTagName('span')[0].innerHTML = (toOpen ? '<img src="'+resourcePrefix+'minus.png" width="16" height="16" border="0" alt="-">' : '<img src="'+resourcePrefix+'plus.png" width="16" height="16" border="0" alt="+">') + header;
+	dt.getElementsByTagName('span')[0].innerHTML = '';
+	var spanTitle = document.createElement('table');
+	dt.getElementsByTagName('span')[0].appendChild(spanTitle);
+	var tr = document.createElement('tr');
+	spanTitle.appendChild(tr);
+	var td = document.createElement('td');
+	tr.appendChild(td);
+	var img = document.createElement('img');
+	td.appendChild(img);
+	makeAttributes(img,
+				   'src', resourcePrefix + (toOpen ? 'minus.png' : 'plus.png'),
+				   'width', '16',
+				   'height', '16',
+				   'border', '0',
+				   'alt', (toOpen ? '-' : '+'));
+	td = document.createElement('td');
+	tr.appendChild(td);
+	td.innerHTML = header;
 }
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
-	var inner = (subjectGroupName == header+'-') ? 'false' : 'true';
+	var inner = (subjectGroupName == header + '-') ? 'false' : 'true';
 	var typeCode = value + '-';
 	if (inner == 'true') {
 		typeCode = '-' + value + '-';
@@ -423,7 +450,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	}
 	suffix = suffix.replace(/^\s*/, "").replace(/\s*$/, "");
 	if (suffix.length > 0) {
-		suffix = '-'+suffix;
+		suffix = '-' + suffix;
 	}
 	groupName[groupName.length] = subjectGroupName;
 	var firstSubject = 0;
@@ -476,45 +503,82 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var subjectId = makeId('Subject', index);
 	var subjectId1 = makeId(subjectId, firstSubject);
 	var headerId = makeId(subjectId1, 'header');
-	container.setAttribute('id', makeId(subjectId1, 'container'));
+	makeAttributes(container,
+				   'id', makeId(subjectId1, 'container'));
 	parent.appendChild(container);
 	var dl = document.createElement('dl');
 	container.appendChild(dl);
 	var dt = document.createElement('dt');
-	dt.setAttribute('onclick', makeFunction('tog', 'this', str(header)));
-	dt.setAttribute('id', makeId(subjectId, 'span'));
+	makeAttributes(dt,
+				   'onclick', makeFunction('tog', 'this', str((inner == 'false' ? USER + '-' + header : header))),
+				   'id', makeId(subjectId, 'span'));
 	dl.appendChild(dt);
 	var span = document.createElement('span');
-	span.setAttribute('style', 'color: blue; cursor: default');
+	makeAttributes(span,
+				   'style', 'color: blue; cursor: default');
 	dt.appendChild(span);
-	span.innerHTML = '<img src="'+resourcePrefix+'minus.png" width="16" height="16" border="0" alt="-">' + 
-							(inner == 'false' ? USER + '-' + header : header);
+	var spanTitle = document.createElement('table');
+	span.appendChild(spanTitle);
+	var tr = document.createElement('tr');
+	spanTitle.appendChild(tr);
+	var td = document.createElement('td');
+	tr.appendChild(td);
+	var img = document.createElement('img');
+	td.appendChild(img);
+	makeAttributes(img,
+				   'src', resourcePrefix + 'minus.png',
+				   'width', '16',
+				   'height', '16',
+				   'border', '0',
+				   'alt', '-');
+	td = document.createElement('td');
+	tr.appendChild(td);
+	td.innerHTML = (inner == 'false' ? USER + '-' + header : header);
 	var dd = document.createElement('dd');
 	dl.appendChild(dd);
-	var trAttr = makeAttributes('class', 'odd',
-				    'id', makeId(subjectId, 'val', firstSubject));
 	if (inner == 'false') {
-		var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', index, firstSubject));
-		var tdAttr = makeAttributes('id', makeId(subjectId1, 'removeValue'));
-		var inputAttr = makeAttributes('type', 'button',
-					       'onclick', makeFunction('deleteSubject', index, firstSubject),
-					       'value', 'Remove '+value);
 		var valuesTable = document.createElement('table');
-		valuesTable.innerHTML = '<tr ' + trAttr + '>' + 
-					     '<td class="file-tag multivalue"><a '+ anchorAttr + '>'+ USER + '-' + subjectGroupName+typeCode+firstSubject + '</a></td>' +
-					     '<td ' + tdAttr + '>' +
-						'<input ' + inputAttr + '/></td></tr>';
-		var newSubjectTable = document.createElement('table');
-		inputAttr = makeAttributes('id', makeId(subjectId, 'subject'),
-					   'tagname', value,
+		var tr = document.createElement('tr');
+		valuesTable.appendChild(tr);
+		makeAttributes(tr,
+					   'class', 'odd',
+					   'id', makeId(subjectId, 'val', firstSubject));
+		var td = document.createElement('td');
+		tr.appendChild(td);
+		makeAttributes(td,
+					   'class', 'file-tag multivalue');
+		var a = document.createElement('a');
+		td.appendChild(a);
+		makeAttributes(a,
+					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject));
+		a.innerHTML = USER + '-' + subjectGroupName + typeCode + firstSubject;
+		td = document.createElement('td');
+		tr.appendChild(td);
+		makeAttributes(td,
+					   'id', makeId(subjectId1, 'removeValue'));
+		var input = document.createElement('input');
+		td.appendChild(input);
+		makeAttributes(input,
 					   'type', 'button',
-					   'onclick', makeFunction('setValue', str(subjectId), str('subject')),
-					   'value', 'New '+value);
-		newSubjectTable.innerHTML = '<tr><td><input ' + inputAttr + '></td></tr>';
+				       'onclick', makeFunction('deleteSubject', index, firstSubject),
+				       'value', 'Remove ' + value);
+		var newSubjectTable = document.createElement('table');
+		tr = document.createElement('tr');
+		newSubjectTable.appendChild(tr);
+		td = document.createElement('td');
+		tr.appendChild(td);
+		input = document.createElement('input');
+		td.appendChild(input);
+		makeAttributes(input,
+					   'id', makeId(subjectId, 'subject'),
+				       'tagname', value,
+				       'type', 'button',
+				       'onclick', makeFunction('setValue', str(subjectId), str('subject')),
+				       'value', 'New ' + value);
 		var subjectTable = document.createElement('table');
 		var tr = document.createElement('tr');
 		subjectTable.appendChild(tr);
-		var td = document.createElement('td');
+		td = document.createElement('td');
 		tr.appendChild(td);
 		td.appendChild(valuesTable);
 		tr = document.createElement('tr');
@@ -527,40 +591,72 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 
 	var subjectsId = makeId('subjects', index);
 	var subject = document.createElement('table');
-	var thAttr = makeAttributes('id', headerId,
-				    'class', 'file-tag');
-	var td1Attr = makeAttributes('class', 'file-tag',
-				     'id', subjectsId,
-				     'suffix', suffix);
-	var inputAttr = makeAttributes('type', 'button',
-				       'onclick', makeFunction('hideSubject', index, firstSubject),
-				       'value', 'Hide '+value);
-	var td2Attr = makeAttributes('class', 'file-tag',
-				     'id', subjectId1);
-	var table = '<tr><td><table class="file-list">'+
-				'<tr class="file-heading"><th class="file-tag">Tags</th>' +
-					'<th ' + thAttr + '>'+(inner == 'false' ? USER+'-' : '') +subjectGroupName+typeCode+firstSubject+suffix+'</th></tr>'+
-		    		'<tr class="file-footer"><td ' + td1Attr + '>'+addTagsElement(index)+'</td><td ' + td2Attr + '><input ' + inputAttr + '/></td></tr>'+
-			    '</table>'+
-			'</td>' +
-		    '</tr>';
-	subject.innerHTML = table;
+	var tr = document.createElement('tr');
+	subject.appendChild(tr);
+	td = document.createElement('td');
+	tr.appendChild(td);
+	var table = document.createElement('table');
+	td.appendChild(table);
+	makeAttributes(table,
+				   'class', 'file-list');
+	tr = document.createElement('tr');
+	makeAttributes(tr,
+				   'class', 'file-heading');
+	table.appendChild(tr);
+	var th = document.createElement('th');
+	tr.appendChild(th);
+	makeAttributes(th,
+				   'class', 'file-tag');
+	th.innerHTML = 'Tags';
+	th = document.createElement('th');
+	tr.appendChild(th);
+	makeAttributes(th,
+				   'id', headerId,
+				   'class', 'file-tag');
+	th.innerHTML = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
+	tr = document.createElement('tr');
+	table.appendChild(tr);
+	makeAttributes(tr,
+				   'class', 'file-footer');
+	td = document.createElement('td');
+	tr.appendChild(td);
+	makeAttributes(td,
+				   'class', 'file-tag',
+				   'id', subjectsId,
+				   'suffix', suffix);
+	td.appendChild(addTagsElement(index));
+	td = document.createElement('td');
+	tr.appendChild(td);
+	makeAttributes(td,
+				   'class', 'file-tag',
+				   'id', subjectId1);
+	var input = document.createElement('input');
+	td.appendChild(input);
+	makeAttributes(input,
+				   'type', 'button',
+				   'onclick', makeFunction('hideSubject', index, firstSubject),
+				   'value', 'Hide ' + value);
 	dd.appendChild(subject);
 	var div = document.createElement('div');
-	div.setAttribute('id', makeId(subjectId1, 'Buttons'));
-	var input1Attr = makeAttributes('id', makeId(subjectsId, 'Expand'),
+	makeAttributes(div,
+				   'id', makeId(subjectId1, 'Buttons'));
+	var buttons = document.createElement('input');
+	div.appendChild(buttons);
+	makeAttributes(buttons,
+					'id', makeId(subjectsId, 'Expand'),
 					'type', 'button',
 					'name', 'Expand',
 					'onclick', makeFunction('displayExpandColumn', index),
 					'style', 'display:none',
 					'value', 'Show All');
-	var input2Attr = makeAttributes('id', makeId(subjectsId, 'Collapse'),
+	buttons = document.createElement('input');
+	div.appendChild(buttons);
+	makeAttributes(buttons,
+					'id', makeId(subjectsId, 'Collapse'),
 					'type', 'button',
 					'name', 'Collapse',
 					'onclick', makeFunction('displayCollapseColumn', index),
 					'value', 'Hide All');
-	var buttons = '<input ' + input1Attr + '/><input ' + input2Attr + '/>';
-	div.innerHTML = buttons;
 	dd.appendChild(div);
 	dd.appendChild(document.createElement('p'));
 	document.getElementById('selectTag').selected = "selected";
@@ -568,7 +664,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
 	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
 	document.getElementById(makeId(id, 'input')).value = textValue;
-	document.getElementById(makeId(id, 'input')).setAttribute('size', textValue.length);
+	makeAttributes(document.getElementById(makeId(id, 'input')),
+				   'size', textValue.length);
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 	return subjectGroupName + typeCode + firstSubject + suffix;
 }
@@ -606,7 +703,7 @@ function setValue(id, type) {
 			var subjectType = groupType[parts[1] - 1];
 			var subjectID = makeId('Subject', parts[1], parts[2], subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID', 'input');
 			var name = document.getElementById(subjectID).value;
-			value = selectSubject(tagMapArray[tagname], name, '', parent, 'All '+tagname);
+			value = selectSubject(tagMapArray[tagname], name, '', parent, 'All ' + tagname);
 			group = parent.children[0].getAttribute('id').split('_')[1];
 			position = 1;
 		} else {
@@ -634,24 +731,19 @@ function setValue(id, type) {
 			addSubjectValue(value, group, position);
 		}
 		else if (type == 'button') {
-			var parent = document.getElementById(elemId).parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
+			var parent = document.getElementById(makeId(elemId, 'entity'));
 			addButtonValue(parent, value, group, position);
 		}
 		else {
 			var suffix;
 			var valId = makeId(id, 'val');
-			var parent = document.getElementById(elemId).parentNode.parentNode.parentNode.parentNode.parentNode;
-			if (parent.children.length > 1 && !multivalueArray.contains(tagname)) {
-				parent.removeChild(parent.firstChild);
+			var currentIndex = multivalueIds[valId];
+			if (currentIndex == null) {
+				currentIndex = 0;
 			}
-			if (multivalueArray.contains(tagname)) {
-				var currentIndex = multivalueIds[valId];
-				if (currentIndex == null) {
-					currentIndex = 0;
-				}
-				multivalueIds[valId] = ++currentIndex;
-				suffix = currentIndex;
-			}
+			multivalueIds[valId] = ++currentIndex;
+			suffix = currentIndex;
+			var parent = document.getElementById(id);
 			addValue(parent, id, suffix, value);
 		}
 	}
@@ -661,19 +753,26 @@ function addSubjectValue(value, group, position) {
 	var subjectId = makeId('Subject', group);
 	var table = document.getElementById(makeId(subjectId, 'subject')).parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.children[0].children[0].children[0].children[0];
 	var tr = document.createElement('tr');
-	tr.setAttribute('id', makeId(subjectId, 'val', position));
-	tr.setAttribute('class', 'odd');
+	makeAttributes(tr,
+				   'id', makeId(subjectId, 'val', position),
+				   'class', 'odd');
 	table.appendChild(tr);
 	var td = document.createElement('td');
-	var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', group, position));
-	td.innerHTML = '<a ' + anchorAttr + '>' + USER + '-' + value + '</a>';
+	var a = document.createElement('a');
+	td.appendChild(a);
+	makeAttributes(a,
+				   'href', 'javascript:' + makeFunction('showColumn', group, position));
+	a.innerHTML = USER + '-' + value;
 	tr.appendChild(td);
 	td = document.createElement('td');
-	td.setAttribute('id', makeId(subjectId, 'removeValue'));
-	var inputAttr = makeAttributes('type', 'button',
-				       'onclick', makeFunction('deleteSubject', group, position),
-				       'value', 'Remove '+groupType[group-1]);
-	td.innerHTML = '<input ' + inputAttr + '/>';
+	makeAttributes(td,
+				   'id', makeId(subjectId, 'removeValue'));
+	var input = document.createElement('input');
+	td.appendChild(input);
+	makeAttributes(input,
+					'type', 'button',
+				    'onclick', makeFunction('deleteSubject', group, position),
+				    'value', 'Remove ' + groupType[group-1]);
 	tr.appendChild(td);
 	var headerId = makeId(subjectId, position, 'header');
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
@@ -681,95 +780,156 @@ function addSubjectValue(value, group, position) {
 
 function addButtonValue(parent, value, group, position) {
 	var subjectId = makeId('Subject', group);
-	var table = document.createElement('table');
-	table.setAttribute('class', 'file-tag-list');
-	table.setAttribute('id', makeId(subjectId, 'val', position));
 	var tr = document.createElement('tr');
-	table.appendChild(tr);
+	makeAttributes(tr,
+				   'class', 'file-tag-list',
+				   'id', makeId(subjectId, 'val', position));
 	var td = document.createElement('td');
-	td.setAttribute('class', 'file-tag multivalue');
-	var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('showColumn', group, position));
-	td.innerHTML = '<a ' + anchorAttr + '>' + value + '</a>';
+	makeAttributes(td,
+				   'class', 'file-tag multivalue');
+	var a = document.createElement('a');
+	td.appendChild(a);
+	makeAttributes(a,
+				   'href', 'javascript:' + makeFunction('showColumn', group, position));
+	a.innerHTML = value;
 	tr.appendChild(td);
 	td = document.createElement('td');
-	td.setAttribute('class', 'file-tag multivalue delete');
-	td.setAttribute('id', makeId(subjectId, 'removeValue'));
-	var inputAttr = makeAttributes('type', 'button',
-				       'onclick', makeFunction('deleteSubject', group, position),
-				       'value', 'Remove '+groupType[group-1]);
-	td.innerHTML = '<input ' + inputAttr + '/>';
+	makeAttributes(td,
+				   'class', 'file-tag multivalue delete',
+				   'id', makeId(subjectId, 'removeValue'));
+	var input = document.createElement('input');
+	td.appendChild(input);
+	makeAttributes(input,
+					'type', 'button',
+				    'onclick', makeFunction('deleteSubject', group, position),
+				    'value', 'Remove ' + groupType[group-1]);
 	tr.appendChild(td);
-	parent.insertBefore(table, parent.lastChild);
+	parent.insertBefore(tr, parent.lastChild);
 }
 
 function addValue(parent, id, suffix, value) {
 	var valId = suffix ? makeId(id, 'val', suffix) : makeId(id, 'val');
-	var table = document.createElement('table');
-	table.setAttribute('class', 'file-tag-list');
-	table.setAttribute('id', valId);
 	var tr = document.createElement('tr');
-	table.appendChild(tr);
+	makeAttributes(tr,
+				   'class', 'file-tag-list',
+				   'id', valId);
 	var td = document.createElement('td');
-	td.setAttribute('class', 'file-tag multivalue');
+	makeAttributes(td,
+				   'class', 'file-tag multivalue');
 	td.innerHTML = value;
 	tr.appendChild(td);
 	td = document.createElement('td');
-	td.setAttribute('class', 'file-tag multivalue delete');
-	td.setAttribute('id', makeId(id, 'removeValue'));
+	makeAttributes(td,
+				   'class', 'file-tag multivalue delete',
+				   'id', makeId(id, 'removeValue'));
 	var deleteAction = makeFunction('deleteElementById', str(valId));
-	td.innerHTML = '<input type="button" onclick="'+deleteAction+'" value="Remove Value" />';
+	var input = document.createElement('input');
+	td.appendChild(input);
+	makeAttributes(input,
+				   'type', 'button',
+				   'onclick', deleteAction,
+				   'value', 'Remove Value');
 	tr.appendChild(td);
-	parent.insertBefore(table, parent.lastChild);
+	parent.insertBefore(tr, parent.lastChild);
 }
 
 function tagCell(group, tagname, index) {
 	var id = makeId('Subject', group, index, tagname);
 	var inputId = makeId(id, 'input');
 	var type;
-	var tableAttr = makeAttributes('id', makeId(id, 'setValue'),
-				       'class', 'file-tag-list');
-	var table = '<table ' + tableAttr + '><tr><td class="file-tag multivalue input">';
+	var table = document.createElement('table');
+	makeAttributes(table,
+					'id', makeId(id, 'setValue'),
+				    'class', 'file-tag-list');
+	var tr = document.createElement('tr');
+	table.appendChild(tr);
+	var td = document.createElement('td');
+	tr.appendChild(td);
+	makeAttributes(td,
+				    'class', 'file-tag multivalue input');
 	var options = enumArray[tagname];
 	if (options == null) {
 		if (linkArray[tagname] != null) {
 			type = 'button';
-			var val = makeId(id, 'button');
-			var inputAttr = makeAttributes('type', 'button',
-						       'onclick', makeFunction('setValue', str(id), str(type)),
-						       'value', 'New '+tagMapArray[tagname]);
-			var tdAttr = makeAttributes('id', makeId(id, 'button'),
+			var tdTable = document.createElement('table');
+			td.appendChild(tdTable);
+			makeAttributes(tdTable,
+						    'class', 'entity',
+						    'id', makeId(id, 'button', 'entity'));
+			var tr = document.createElement('tr');
+			tdTable.appendChild(tr);
+			var td = document.createElement('td');
+			tr.appendChild(td);
+			var input = document.createElement('input');
+			td.appendChild(input);
+			makeAttributes(input,
+							'type', 'button',
+						    'onclick', makeFunction('setValue', str(id), str(type)),
+						    'value', 'New ' + tagMapArray[tagname]);
+			tr = document.createElement('tr');
+			tdTable.appendChild(tr);
+			var td = document.createElement('td');
+			tr.appendChild(td);
+			makeAttributes(td,
+							'id', makeId(id, 'button'),
 						    'class', 'file-tag multivalue input');
-			table += '<table class="entity"><tr><td><input ' + inputAttr + '></td></tr><tr><td ' + tdAttr + '></td></tr></table></td></tr></table>';
 		} else {
 			type = 'input';
-			var inputAttr = makeAttributes('type', 'text',
-						       'id', inputId,
-						       'tagname', tagname);
-			table += '<input ' + inputAttr + '/>';
+			var input = document.createElement('input');
+			td.appendChild(input);
+			makeAttributes(input,
+							'type', 'text',
+						    'id', inputId,
+						    'tagname', tagname);
 			if (dateArray.contains(tagname)) {
-				var anchorAttr = makeAttributes('href', 'javascript:' + makeFunction('generateCalendar', str(inputId)));
-				table += '<a ' + anchorAttr + '><img src="'+resourcePrefix+'calendar.gif" width="16" height="16" border="0" alt="Pick a date"></a>';
+				var a = document.createElement('a');
+				td.appendChild(a);
+				makeAttributes(a,
+								'href', 'javascript:' + makeFunction('generateCalendar', str(inputId)));
+				var img = document.createElement('img');
+				a.appendChild(img);
+				makeAttributes(img,
+								'src', resourcePrefix + 'calendar.gif',
+								'width', '16',
+								'height', '16',
+								'border', '0',
+								'alt', 'Pick a date');
 			}
 		}
 	} else {
 		type = 'select';
 		var val = makeId(id, 'select');
-		var selectAttr = makeAttributes('id', val,
+		var select = document.createElement('select');
+		td.appendChild(select);
+		makeAttributes(select,
+						'id', val,
 						'tagname', tagname,
 						'name', val);
-		table += '<select ' + selectAttr + '><option value="">Select a value</option>';
+		var option = document.createElement('option');
+		select.appendChild(option);
+		makeAttributes(option,
+						'value', '');
+		option.innerHTML = 'Select a value';
 		var options = enumArray[tagname];
 		for (var j=0; j<options.length; j++) {
-			var optionAttr = makeAttributes('value', options[j]);
-			table += '<option ' + optionAttr + '>'+options[j]+'</option>';
+			option = document.createElement('option');
+			select.appendChild(option);
+			makeAttributes(option,
+							'value', options[j]);
+			option.innerHTML = options[j];
 		}
-		table += '</select>';
 	}
 	if (type != 'button' && multivalueArray.contains(tagname)) {
-		var inputAttr = makeAttributes('type', 'button',
-					       'onclick', makeFunction('setValue', str(id), str(type)),
-					       'value', 'Set Value');
-		table += '</td><td class="file-tag multivalue set"><input ' + inputAttr + '/></td></tr></table>';
+		td = document.createElement('td');
+		tr.appendChild(td);
+		makeAttributes(td,
+						'class', 'file-tag multivalue set');
+		var input = document.createElement('input');
+		td.appendChild(input);
+		makeAttributes(input,
+						'type', 'button',
+					    'onclick', makeFunction('setValue', str(id), str(type)),
+					    'value', 'Set Value');
 	}
 	return table;
 }
@@ -777,20 +937,26 @@ function tagCell(group, tagname, index) {
 function addTagsElement(group) {
 	var tagsId = makeId('addtags', group);
 	var tagId = makeId('add', group);
-	var selectAttr = makeAttributes('id', tagsId,
+	var select = document.createElement('select');
+	makeAttributes(select,
+					'id', tagsId,
 					'name', tagsId,
 					'onchange', makeFunction('addTags', group));
-	var html = '<select ' + selectAttr + '>';
-	var optionAttr = makeAttributes('id', makeId('addTag', group),
+	var option = document.createElement('option');
+	select.appendChild(option);
+	makeAttributes(option,
+					'id', makeId('addTag', group),
 					'value', '');
-	html += '<option ' + optionAttr + '>Add Tags</option>';
+	option.innerHTML = 'Add Tags';
 	for (var i=0; i < groupTags.length; i++) {
-		optionAttr = makeAttributes('id', makeId(tagId, groupTags[i]),
-					    'value', groupTags[i]);
-		html += '<option ' + optionAttr + '>'+groupTags[i]+'</option>';
+		option = document.createElement('option');
+		select.appendChild(option);
+		makeAttributes(option,
+						'id', makeId(tagId, groupTags[i]),
+						'value', groupTags[i]);
+		option.innerHTML = groupTags[i];
 	}
-	html += '</select>';
-	return html;
+	return select;
 }
 
 var HOME;
@@ -803,18 +969,20 @@ function init(home, user) {
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
-	SVCPREFIX = home.substring(home.lastIndexOf('/')+1);
+	SVCPREFIX = home.substring(home.lastIndexOf('/') + 1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
 	var select = document.getElementById("tags");
 	var option = document.createElement('option');
-	option.setAttribute('id', 'selectTag');
-	option.setAttribute('value', 'Choose Subject Type');
+	makeAttributes(option,
+				   'id', 'selectTag',
+				   'value', 'Choose Subject Type');
 	option.innerHTML = 'Choose Subject Type';
 	select.appendChild(option);
 	for (var i=0; i < groupTags.length; i++) {
 		option = document.createElement('option');
-		option.setAttribute('id', groupTags[i]);
-		option.setAttribute('value', groupTags[i]);
+		makeAttributes(option,
+					   'id', groupTags[i],
+					   'value', groupTags[i]);
 		option.innerHTML = groupTags[i];
 		select.appendChild(option);
 	}
@@ -901,34 +1069,46 @@ function getSubjectValues(group, position, tags) {
 		if (tables.length > 1) {
 			var values = new Array();
 			for (var j=0; j<tables.length-1; j++) {
-				var td = tables[j].children[0].children[0];
-				var value = td.innerHTML;
+				var td = tables[j].children[0];
+				var value;
 				if (td.children.length > 0) {
 					// anchor values
 					value = td.children[0].innerHTML;
+				} else {
+					value = td.innerHTML;
 				}
 				values.push(value);
 			}
 			result[tags[i]] = values;
 		} else if (tables.length == 1) {
-				var td = tables[0].children[0].children[0].children[0].children[0];
-				if (td.nodeName == 'SELECT') {
-					var select_list_field = td;
-					var select_list_selected_index = select_list_field.selectedIndex;
-					if (select_list_selected_index > 0) {
-						var values = new Array();
-						var value = select_list_field.options[select_list_selected_index].value;
-						values.push(value);
-						result[tags[i]] = values;
-					}
-				} else if (td.nodeName == 'INPUT') {
-					var value = td.value.replace(/^\s*/, "").replace(/\s*$/, "");
-					if (value.length > 0) {
-						var values = new Array();
-						values.push(value);
-						result[tags[i]] = values;
-					}
+			var td = tables[0].children[0].children[0].children[0];
+			if (td.nodeName == 'SELECT') {
+				var select_list_field = td;
+				var select_list_selected_index = select_list_field.selectedIndex;
+				if (select_list_selected_index > 0) {
+					var values = new Array();
+					var value = select_list_field.options[select_list_selected_index].value;
+					values.push(value);
+					result[tags[i]] = values;
 				}
+			} else if (td.nodeName == 'INPUT') {
+				var value = td.value.replace(/^\s*/, "").replace(/\s*$/, "");
+				if (value.length > 0) {
+					var values = new Array();
+					values.push(value);
+					result[tags[i]] = values;
+				}
+			} else if (td.nodeName == 'TABLE') {
+				var rows = td.children;
+				if (rows.length > 2) {
+					var values = new Array();
+					for (var j=1; j<rows.length-1; j++) {
+						var value = rows[j].children[0].children[0].innerHTML;
+						values.push(value);
+					}
+					result[tags[i]] = values;
+				}
+			}
 		}
 	}
 	return result;
@@ -1016,15 +1196,33 @@ function postSubject() {
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if(ajax_client.readyState == 4) {
 		if (ajax_client.status != 200) {
-			document.getElementById("Error").innerHTML += 'ERROR: ' + ajax_client.status;
+			var p = document.createElement('p');
+			document.getElementById("Error").appendChild(p);
+			p.innerHTML = 'ERROR: ' + ajax_client.status;
 			var err = ajax_client.getResponseHeader('X-Error-Description');
-			document.getElementById("Error").innerHTML += '<br /><br />' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
+			var br = document.createElement('br');
+			document.getElementById("Error").appendChild(br);
+			br = document.createElement('br');
+			document.getElementById("Error").appendChild(br);
+			p = document.createElement('p');
+			document.getElementById("Error").appendChild(p);
+			p.innerHTML = (err != null ? unescape(err) : ajax_client.responseText);
+			br = document.createElement('br');
+			document.getElementById("Error").appendChild(br);
+			br = document.createElement('br');
+			document.getElementById("Error").appendChild(br);
 		} else {
 			success = true;
 		}
 	} else {
 		var err = ajax_client.getResponseHeader('X-Error-Description');
-		document.getElementById("Error").innerHTML = 'ERROR: ' + (err != null ? unescape(err) : ajax_client.responseText) + '<br /><br />';
+		var p = document.createElement('p');
+		document.getElementById("Error").appendChild(p);
+		p.innerHTML = (err != null ? unescape(err) : ajax_client.responseText);
+		var br = document.createElement('br');
+		document.getElementById("Error").appendChild(br);
+		br = document.createElement('br');
+		document.getElementById("Error").appendChild(br);
 	}
 	if (!success || ++sentRequests >= totalRequests) {
 		document.getElementById('psoc_progress_bar').style.display = 'none';
@@ -1081,7 +1279,7 @@ function listSubjects() {
 	for (var subject in allSubjects) {
 		if (allSubjects.hasOwnProperty(subject)) {
 			var li = document.createElement('li');
-			li.innerHTML = document.getElementById(subject+'_header').innerHTML;
+			li.innerHTML = document.getElementById(subject + '_header').innerHTML;
 			ul.appendChild(li);
 		}
 	}
@@ -1093,7 +1291,8 @@ function listSubjects() {
 	psoc.appendChild(p);
 	var b = document.createElement('b');
 	p.appendChild(b);
-	b.setAttribute('style', 'color:green');
+	makeAttributes(b,
+				   'style', 'color:green');
 	b.innerHTML = 'All subjects were successfully created.';
 	p = document.createElement('p');
 	psoc.appendChild(p);
