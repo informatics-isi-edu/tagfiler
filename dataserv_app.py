@@ -62,37 +62,35 @@ class DbCache:
         self.idtagname = idtagname
         self.idalias = idalias
         self.cache = dict()
-        self.fill_time = None
+        self.fill_txid = None
 
     def select(self, db, fillfunc, idtagval=None):
-        def cache_is_fresh():
-            now = datetime.datetime.now(pytz.timezone('UTC'))
-            if self.fill_time:
-                # modified time is latest modification time of:
-                #  identifying tag (tracked as "tag last modified" on its tagdef
-                #  individual subjects (tracked as "subject last tagged" on each identified subject
-                results = db.query('SELECT max(mtime) AS mtime FROM ('
-                                   + 'SELECT max(value) AS mtime FROM %s' % wraptag('subject last tagged')
-                                   + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
-                                   + ' UNION '
-                                   + 'SELECT value AS mtime FROM %s' % wraptag('tag last modified')
-                                   + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
-                                   vars=dict(idtag=self.idtagname))
-                mtime = results[0].mtime
-                return self.fill_time >= mtime
-            else:
-                return False
+        def latest_txid():
+            # modified time is latest modification time of:
+            #  identifying tag (tracked as "tag last modified" on its tagdef
+            #  individual subjects (tracked as "subject last tagged" on each identified subject
+            results = db.query('SELECT max(txid) AS txid FROM ('
+                               + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
+                               + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
+                               + ' UNION '
+                               + 'SELECT value AS txid FROM %s' % wraptag('tag last modified txid')
+                               + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
+                               vars=dict(idtag=self.idtagname))
+            return results[0].txid
+
+        latest = latest_txid()
         
-        if not cache_is_fresh():
+        if self.fill_txid == None or latest > self.fill_txid:
             # need to refill cache
-            #web.debug('DbCache: filling %s cache' % self.idtagname)
             if self.idalias:
                 self.cache = dict( [ (res[self.idalias], res) for res in fillfunc() ] )
             else:
                 self.cache = dict( [ (res[self.idtagname], res) for res in fillfunc() ] )
-            #web.debug(self.cache)
-            self.fill_time = datetime.datetime.now(pytz.timezone('UTC'))
+            self.fill_txid = latest
 
+            #web.debug(self.cache)
+            #web.debug('DbCache: filled %s cache txid = %s' % (self.idtagname, self.fill_txid))
+            
         if idtagval != None:
             return self.cache.get(idtagval, None)
         else:
@@ -1317,6 +1315,10 @@ class Application:
             if subject.version == latest.version and len(versions) > 1:
                 # we're deleting the latest version and there are previous versions
                 self.update_latestfile_version(subject.name, versions[1].id)
+
+        results = self.db.query('SELECT * FROM subjecttags WHERE subject = $subject', vars=dict(subject=subject.id))
+        for result in results:
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.tagname])
                 
         query = 'DELETE FROM resources WHERE subject = $id'
         self.db.query(query, vars=dict(id=subject.id))
@@ -1512,29 +1514,37 @@ class Application:
         return self.db.query(query, vars=vars)
 
     def set_tag_lastmodified(self, subject, tagdef):
-        if tagdef.writepolicy == 'system':
-            # skip modification tracking of system-managed tags for speed...
+        if tagdef.tagname in [ 'tag last modified', 'tag last modified txid', 'subject last tagged', 'subject last tagged txid' ]:
+            # don't recursively track tags we generate internally
             return
-        
-        now = datetime.datetime.now(pytz.timezone('UTC'))
 
-        vars = dict(subject=tagdef.id, now=now)
-        self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % self.wraptag('tag last modified'))
-        results = self.db.query('SELECT value FROM %s WHERE subject = $subject'  % self.wraptag('tag last modified'), vars=vars)
-        if len(results) > 0:
-            if results[0].value < now:
-                self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % self.wraptag('tag last modified'), vars=vars)
-        else:
-            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('tag last modified'), vars=vars)
-        
-        vars = dict(subject=subject.id, now=now)
-        self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % self.wraptag('subject last tagged'))
-        results = self.db.query('SELECT value FROM %s WHERE subject = $subject' % self.wraptag('subject last tagged'), vars=vars)
-        if len(results) > 0:
-            if results[0].value < now:
-                self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % self.wraptag('subject last tagged'), vars=vars)
-        else:
-            self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % self.wraptag('subject last tagged'), vars=vars)
+        def insert_or_update(table, vars):
+            self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % table)
+            results = self.db.query('SELECT value FROM %s WHERE subject = $subject'  % table, vars=vars)
+
+            if len(results) > 0:
+                value = results[0].value
+                if value < vars['now']:
+                    self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % table, vars=vars)
+                    #web.debug('set %s from %s to %s' % (table, value, vars['now']))
+                elif value == vars['now']:
+                    pass
+                else:
+                    pass
+                    #web.debug('refusing to set %s from %s to %s' % (table, value, vars['now']))
+            else:
+                self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % table, vars=vars)
+                #web.debug('set %s to %s' % (table, vars['now']))
+
+        now = datetime.datetime.now(pytz.timezone('UTC'))
+        txid = self.db.query('SELECT txid_current() AS txid')[0].txid
+
+        insert_or_update(self.wraptag('tag last modified'), dict(subject=tagdef.id, now=now))
+        insert_or_update(self.wraptag('tag last modified txid'), dict(subject=tagdef.id, now=txid))
+
+        if subject != None:
+            insert_or_update(self.wraptag('subject last tagged'), dict(subject=subject.id, now=now))
+            insert_or_update(self.wraptag('subject last tagged txid'), dict(subject=subject.id, now=txid))
 
     def delete_tag(self, subject, tagdef, value=None):
         wheres = ['tag.subject = $id']

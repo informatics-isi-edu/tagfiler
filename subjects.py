@@ -319,7 +319,7 @@ class Subject (Application):
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=path_linearize(self.path))
-            web.debug(self.file)
+            #web.debug(self.file)
             self.id = self.insert_file(self.name, self.version, self.file)
 
         if self.id != None:

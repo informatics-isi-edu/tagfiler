@@ -233,6 +233,28 @@ INSERT INTO "_tag last modified" (subject, value) SELECT subject, 'now' FROM "_t
 EOF
    fi
 
+   updated=$(psql -A -q -t <<EOF
+UPDATE "_subject last tagged txid" SET value = txid_current() WHERE subject = '$file' RETURNING subject;
+EOF
+   )
+   if [[ -z "$updated" ]]
+   then
+       psql -A -q -t <<EOF
+INSERT INTO "_subject last tagged txid" (subject, value) VALUES ('$file', txid_current());
+EOF
+   fi
+
+   updated=$(psql -A -q -t <<EOF
+UPDATE "_tag last modified txid" SET value = txid_current() WHERE subject IN (SELECT subject FROM "_tagdef" WHERE value = '$tagname') RETURNING subject;
+EOF
+   )
+   if [[ -z "$updated" ]]
+   then
+       psql -A -q -t <<EOF
+INSERT INTO "_tag last modified txid" (subject, value) SELECT subject, txid_current() FROM "_tagdef" WHERE value = '$tagname';
+EOF
+   fi
+
    
 }
 
@@ -468,6 +490,8 @@ tagdef "modified by"         text        ""         anonymous   system       fal
 tagdef modified              timestamptz ""         anonymous   system       false
 tagdef "subject last tagged" timestamptz ""         anonymous   system       false
 tagdef "tag last modified"   timestamptz ""         anonymous   system       false
+tagdef "subject last tagged txid" int8   ""         anonymous   system       false
+tagdef "tag last modified txid" int8     ""         anonymous   system       false
 tagdef bytes                 int8        ""         anonymous   system       false
 tagdef version               int8        ""         anonymous   system       false
 tagdef name                  text        ""         anonymous   system       false
