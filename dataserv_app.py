@@ -433,7 +433,7 @@ class Application:
     
     # static representation of important tagdefs
     static_tagdefs = []
-    # -- the system tagdefs needed by the select_files_by_predlist call we make below
+    # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
     for prototype in [ ('config', 'text', False, 'subject', True),
                        ('id', 'int8', False, 'system', True),
                        ('tagdef', 'text', False, 'system', True),

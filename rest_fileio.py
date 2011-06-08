@@ -140,7 +140,6 @@ class FileIO (Subject):
         self.update = False
         self.subject = None
         self.newMatch = None
-        #self.needed_db_globals = []  # turn off expensive db queries we ignore
         self.mergeSubjpredsTags = False
 
     def GET(self, uri, sendBody=True):
