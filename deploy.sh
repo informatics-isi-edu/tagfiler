@@ -149,6 +149,9 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
     # AuthUserFile /etc/httpd/passwd/passwd
     # Require valid-user
 
+    # site can disable redundant service logging by adding env=!dontlog to their CustomLog or similar directives
+    SetEnv dontlog
+
 </Location>
 
 <Location /${SVCPREFIX}/static>
@@ -161,6 +164,8 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
       ExpiresActive On
       ExpiresDefault "access plus 1 hour"
    </IfModule>
+
+   UnsetEnv dontlog
 
 </Location>
 

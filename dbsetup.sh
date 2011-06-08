@@ -663,14 +663,14 @@ cfgtag "webauthn require"
 #cfgtag "store path" text '${DATADIR}'
 #cfgtag "log path" text '${LOGDIR}'
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
-#cfgtag "chunk bytes" text '1048576'
+cfgtag "chunk bytes" text '1048576'
 
 cfgtag "client connections" int8 '4'
 cfgtag "client upload chunks"
 cfgtag "client download chunks"
 cfgtag "client socket buffer size" int8 '8192'
 cfgtag "client retry count" int8 '10'
-cfgtag "client chunk bytes" int8 '4194304'
+cfgtag "client chunk bytes" int8 '8388608'
 cfgtag "client socket timeout" int8 '120'
 
 cfgtag "file write users" text "*" "admin"
