@@ -708,29 +708,30 @@ done
 # these are actual (not logical) role names just like other ACLs and metadata
 # only the python code itself uses logical roles for built-in policies
 
+writers=
+readers=
+readok=
+writeok=
 if [[ "${uploader}" = "${curator}" ]]
 then
-   writers=
+    # all uploaders are curators, so they retain access
+    :
 else
-   # allow uploader to retain access
-   writers="${uploader}"
-   readers="${uploader}"
+    # allow non-curator uploaders to retain access, without sharing with other non-curator uploaders
+    readok=true
+    writeok=true
 fi
 
 if [[ "${downloader}" = "${curator}" ]]
 then
-   readers=
+    # all downloaders are curators, so they retain access
+    :
 else
-   # also give read access to downloaders
-   if [[ -n "${readers}" ]]
-   then
-      readers="${readers},${downloader}"
-   else
-      readers="${downloader}"
-   fi
+    # also give read access to all downloaders
+    readers="${downloader}"
 fi
 
-cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers}"
+cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${readok};${writeok}"
 
 #cfgtag "applet test properties" text '/home/userid/appletTest.properties'
 #cfgtag "applet test log" text '/home/userid/applet.log'

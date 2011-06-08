@@ -399,8 +399,12 @@ class FileList (Node):
                     url += '&write%20users=*'
                 raise web.seeother(url)
             else:
-                return self.renderlist("Define a dataset",
-                                       [self.render.NameForm()])
+                def body():
+                    return None
+                def postCommit(ignore):
+                    return self.renderlist("Define a dataset",
+                                           [self.render.NameForm()])
+                return self.dbtransact(body, postCommit)
         else:
             try:
                 self.globals['view'] = urllib.unquote_plus(self.storage.view)

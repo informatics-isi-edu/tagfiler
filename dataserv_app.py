@@ -219,11 +219,13 @@ idquote = make_filter(string.letters + string.digits + '_-:.' )
 def buildPolicyRules(rules, fatal=False):
     remap = dict()
     for rule in rules:
-        srcrole, dstrole, readers, writers = rule.split(';', 4)
+        srcrole, dstrole, readers, writers, readok, writeok = rule.split(';', 6)
         srcrole = urllib.unquote(srcrole.strip())
         dstrole = urllib.unquote(dstrole.strip())
         readers = readers.strip()
         writers = writers.strip()
+        readok = readok.strip().lower() in [ 'true', 'yes' ]
+        writeok = writeok.strip().lower() in [ 'true', 'yes' ]
         if remap.has_key(srcrole):
             web.debug('Policy rule "%s" duplicates already-mapped source role.' % rule)
             if fatal:
@@ -240,7 +242,7 @@ def buildPolicyRules(rules, fatal=False):
             writers = [ writer for writer in writers if writer != '' ]
         else:
             writers = []
-        remap[srcrole] = (dstrole, readers, writers)
+        remap[srcrole] = (dstrole, readers, writers, readok, writeok)
     return remap
 
 def traceInChunks(seq):
@@ -727,10 +729,16 @@ class Application:
             try:
                 t = self.db.transaction()
                 srcrole = srcroles.pop()
-                dstrole, readusers, writeusers = self.config['policy remappings'][srcrole]
+                dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'][srcrole]
+                readusers = [ u for u in readusers ]
+                writeusers = [ u for u in writeusers ]
                 #web.debug(self.remap)
                 #web.debug('remap:', self.remap[srcrole])
                 self.delete_tag(newfile, self.globals['tagdefsdict']['read users'])
+                if readok:
+                    readusers.append( self.authn.role )
+                if writeok:
+                    writeusers.append( self.authn.role )
                 for readuser in readusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readusers))
