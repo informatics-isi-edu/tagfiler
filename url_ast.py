@@ -688,7 +688,7 @@ class Tagdef (Node):
                         try:
                             unique = storage['unique-%s' % (key[4:])]
                         except:
-                            unique = False
+                            unique = 'false'
                         self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, parseBoolString(multivalue), parseBoolString(unique))
             try:
                 self.tag_id = storage.tag
