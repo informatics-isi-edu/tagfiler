@@ -423,6 +423,8 @@ function tog(dt, header) {
 	var spanTitle = document.createElement('table');
 	dt.getElementsByTagName('span')[0].appendChild(spanTitle);
 	var tr = document.createElement('tr');
+	makeAttributes(tr,
+				   'class', 'no-border');
 	spanTitle.appendChild(tr);
 	var td = document.createElement('td');
 	tr.appendChild(td);
@@ -520,6 +522,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var spanTitle = document.createElement('table');
 	span.appendChild(spanTitle);
 	var tr = document.createElement('tr');
+	makeAttributes(tr,
+				   'class', 'no-border');
 	spanTitle.appendChild(tr);
 	var td = document.createElement('td');
 	tr.appendChild(td);
@@ -592,6 +596,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var subjectsId = makeId('subjects', index);
 	var subject = document.createElement('table');
 	var tr = document.createElement('tr');
+	makeAttributes(tr,
+				   'class', 'no-border');
 	subject.appendChild(tr);
 	td = document.createElement('td');
 	tr.appendChild(td);
@@ -857,6 +863,8 @@ function tagCell(group, tagname, index) {
 						    'class', 'entity',
 						    'id', makeId(id, 'button', 'entity'));
 			var tr = document.createElement('tr');
+			makeAttributes(tr,
+						    'class', 'no-border');
 			tdTable.appendChild(tr);
 			var td = document.createElement('td');
 			tr.appendChild(td);
