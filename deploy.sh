@@ -235,25 +235,50 @@ then
 EOF
 fi
 
+umask 0007
 [[ -e /var/log/${SVCPREFIX} ]] || mkfifo /var/log/${SVCPREFIX}
 
 if [[ -d /usr/sbin ]] && [[ -d /etc/rc.d/init.d ]]
 then
+    if [[ -d /etc/sysconfig ]]
+	then
+	cat > /etc/sysconfig/${SVCPREFIX}-log <<EOF
+# configuration for ${SVCPREFIX}-log service
+# these settings override the built-in defaults if non-empty
+
+# how does syslog process the logs?
+SYSLOG_FACILITY=local1
+SYSLOG_TARGET=/var/log/${SVCPREFIX}
+
+# how do we copy the logs?
+COPY_TARGET=/var/www/${SVCPREFIX}-logs/messages
+COPY_USER=${SVCUSER}
+# where does copier send its events?  make sure this doesn't return to us
+COPY_FACILITY=local2
+
+EOF
+    fi
+
     cat > /usr/sbin/${SVCPREFIX}-log <<EOF
 #!/bin/sh
 
 # this tiny daemon copies logs from named pipe to file under apache server dir
 #
 
-SRC="\${1:-/var/log/${SVCPREFIX}}"
-DST="\${2:-/var/www/${SVCPREFIX}-logs/messages}"
-MODE="\${3:-reader}"
+[[ -r /etc/sysconfig/${SVCPREFIX}-log ]] && . /etc/sysconfig/${SVCPREFIX}-log
 
-WRITEUSER=${SVCUSER}
+SYSLOG_FACILITY=\${SYSLOG_FACILITY:-local1}
+SYSLOG_TARGET=\${SYSLOG_TARGET:-/var/log/${SVCPREFIX}}
+
+COPY_TARGET=\${COPY_TARGET:-/var/www/${SVCPREFIX}-logs/messages}
+COPY_USER=\${COPY_USER:-${SVCUSER}}
+COPY_FACILITY=\${COPY_FACILITY:-local2}
+
+MODE="\${1:-reader}"
 
 reader_exit()
 {
-    logger -i -p local1.notice -t "\$(basename "\$0")" "log reader stopped"
+    logger -i -p ${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader stopped"
 }
 
 reader()
@@ -261,17 +286,18 @@ reader()
     # this must be run as the reading user (root)
     trap reader_exit 0
 
-    logger -i -p local1.notice -t "\$(basename "\$0")" "log reader started"
+    logger -i -p ${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader started"
 
     while read line
     do
-	printf "%s\n" "\$line"
-    done < "\$SRC"
+       printf "%s\n" "\$line"
+    done < "\${SYSLOG_TARGET}"
 }
 
 writer_exit()
 {
-    logger -i -p local2.notice -t "\$(basename "\$0")" "log writer stopped"  2>&1 | cat >> "\$DST"
+    stopmsg=\$(logger -i -s -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "log writer stopped" 2>&1)
+    printf "%s %s %s\n" "\$(date +'%b %_d %H:%M:%S')" "\$(hostname -s)" "\$stopmsg" >> "\${COPY_TARGET}"
 }
 
 writer()
@@ -281,19 +307,20 @@ writer()
 
     trap writer_exit 0
 
-    logger -i -s -p local2.notice -t "\$(basename "\$0")" "log writer started" 2>&1 | cat >> "\$DST"
+    startmsg=\$(logger -i -s -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "log writer started" 2>&1)
+    printf "%s %s %s\n" "\$(date +'%b %_d %H:%M:%S')" "\$(hostname -s)" "\$startmsg" >> "\${COPY_TARGET}"
 
     while read line
     do
 	count=0
-	while ! printf "%s\n" "\$line" >> "\$DST"
+	while ! printf "%s\n" "\$line" >> "\${COPY_TARGET}"
 	do
 	    count=\$(( \$count + 1 ))
 	    if [[ \$count -lt 5 ]]
 	    then
 		sleep 1
 	    else
-		logger -i -p local2.notice -t "\$(basename "\$0")" "failed to copy: \$line"
+		logger -i -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "failed to copy: \$line"
 		break
 	    fi
 	done
@@ -304,7 +331,7 @@ writer()
 case "\$MODE" in
 
     reader)
-	reader | runuser -c "\$0 '' '\$DST' writer" - \$WRITEUSER &
+	reader | runuser -c "\$0 writer" - \${COPY_USER} &
 	;;
 
     writer)
@@ -312,7 +339,7 @@ case "\$MODE" in
 	;;
 
     *)
-	logger -i -s -p local2.notice -t "\$(basename "\$0")" "arguments not understood"
+	logger -i -s -p ${COPY_FACILITY}.notice -t "\$(basename "\$0")" "arguments not understood"
 	;;
 
 esac
