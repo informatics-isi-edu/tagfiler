@@ -237,6 +237,7 @@ fi
 
 umask 0007
 [[ -e /var/log/${SVCPREFIX} ]] || mkfifo /var/log/${SVCPREFIX}
+umask 0022
 
 if [[ -d /usr/sbin ]] && [[ -d /etc/rc.d/init.d ]]
 then
@@ -278,7 +279,7 @@ MODE="\${1:-reader}"
 
 reader_exit()
 {
-    logger -i -p ${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader stopped"
+    logger -i -p \${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader stopped"
 }
 
 reader()
@@ -286,7 +287,7 @@ reader()
     # this must be run as the reading user (root)
     trap reader_exit 0
 
-    logger -i -p ${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader started"
+    logger -i -p \${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader started"
 
     while read line
     do
