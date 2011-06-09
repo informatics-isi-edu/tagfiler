@@ -140,13 +140,13 @@ def wraptag(tagname, suffix='', prefix='_'):
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
 
-filehandler = logging.FileHandler('/var/www/tagfiler-logs/messages')
-fileformatter = logging.Formatter('%(asctime)s %(name)s: %(levelname)s: %(message)s')
-filehandler.setFormatter(fileformatter)
-logger.addHandler(filehandler)
+#filehandler = logging.FileHandler('/var/www/tagfiler-logs/messages')
+#fileformatter = logging.Formatter('%(asctime)s %(name)s: %(levelname)s: %(message)s')
+#filehandler.setFormatter(fileformatter)
+#logger.addHandler(filehandler)
 
 sysloghandler = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1)
-syslogformatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+syslogformatter = logging.Formatter('%(name)s: %(message)s')
 sysloghandler.setFormatter(syslogformatter)
 logger.addHandler(sysloghandler)
 

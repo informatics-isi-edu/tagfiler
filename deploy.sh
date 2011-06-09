@@ -229,9 +229,164 @@ then
     ifempty
     sharedscripts
     postrotate
-        /sbin/service httpd reload > /dev/null 2>/dev/null || true
+        /sbin/service ${SVCPREFIX}-log reload > /dev/null 2>/dev/null || true
     endscript
 }
 EOF
 fi
 
+[[ -e /var/log/${SVCPREFIX} ]] || mkfifo /var/log/${SVCPREFIX}
+
+if [[ -d /usr/sbin ]] && [[ -d /etc/rc.d/init.d ]]
+then
+    cat > /usr/sbin/${SVCPREFIX}-log <<EOF
+#!/bin/sh
+
+# this tiny daemon copies logs from named pipe to file under apache server dir
+#
+
+SRC="\${1:-/var/log/${SVCPREFIX}}"
+DST="\${2:-/var/www/${SVCPREFIX}-logs/messages}"
+MODE="\${3:-reader}"
+
+WRITEUSER=${DAEMONUSER}
+
+reader_exit()
+{
+    logger -i -p local1.notice -t "\$(basename "\$0")" "log reader stopped"
+}
+
+reader()
+{
+    # this must be run as the reading user (root)
+    trap reader_exit 0
+
+    logger -i -p local1.notice -t "\$(basename "\$0")" "log reader started"
+
+    while read line
+    do
+	printf "%s\n" "\$line"
+    done < "\$SRC"
+}
+
+writer_exit()
+{
+    logger -i -p local2.notice -t "\$(basename "\$0")" "log writer stopped"  2>&1 | cat >> "\$DST"
+}
+
+writer()
+{
+    # this must be run as the writing user
+    umask 0007
+
+    trap writer_exit 0
+
+    logger -i -p local2.notice -t "\$(basename "\$0")" "log writer started" 2>&1 | cat >> "\$DST"
+
+    while read line
+    do
+	count=0
+	while ! printf "%s\n" "\$line" >> "\$DST"
+	do
+	    count=\$(( \$count + 1 ))
+	    if [[ \$count -lt 5 ]]
+	    then
+		sleep 1
+	    else
+		logger -i -p local2.notice -t "\$(basename "\$0")" "failed to copy: \$line"
+		break
+	    fi
+	done
+    done
+}
+
+
+case "\$MODE" in
+
+    reader)
+	reader | runuser -c "\$0 '' '\$DST' writer" - \$WRITEUSER &
+	;;
+
+    writer)
+	writer
+	;;
+
+    *)
+	logger -i -s -p local2.notice -t "\$(basename "\$0")" "arguments not understood"
+	;;
+
+esac
+EOF
+
+    cat > /etc/rc.d/init.d/${SVCPREFIX}-log <<EOF
+#!/bin/sh
+#
+# ${SVCPREFIX}-log:		Audit log copy daemon for ${SVCPREFIX}.
+#
+# chkconfig:	- 85 15
+# description:	Copies log entries from FIFO /var/log/${SVCPREFIX} \
+#               to file /var/www/${SVCPREFIX}-logs/messages for serving to web clients.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# [ -r /etc/sysconfig/${SVCPREFIX}-log ] && . /etc/sysconfig/${SVCPREFIX}-log
+
+start() 
+{
+        [[ -e /var/lock/subsys/${SVCPREFIX}-log ]] && exit 0
+
+
+        echo -n \$"Starting ${SVCPREFIX}-log: "
+        daemon /usr/sbin/${SVCPREFIX}-log
+
+	touch /var/lock/subsys/${SVCPREFIX}-log
+        echo
+}
+
+stop() 
+{
+        echo -n \$"Shutting down ${SVCPREFIX}-log: "
+	killproc ${SVCPREFIX}-log
+
+	rm -f  /var/lock/subsys/${SVCPREFIX}-log
+        echo
+}
+
+# See how we were called.
+case "\$1" in
+  start)
+	start
+        ;;
+  stop)
+	stop
+        ;;
+  restart|reload)
+	stop
+	start
+	;;
+  status)
+  	status ${SVCPREFIX}-log
+	;;
+  *)
+        echo \$"Usage: $0 {start|stop|restart|reload}"
+        exit 1
+esac
+
+exit 0
+EOF
+
+    chmod a+x /usr/sbin/${SVCPREFIX}-log
+    chmod a+x /etc/rc.d/init.d/${SVCPREFIX}-log
+    chkconfig ${SVCPREFIX}-log on
+
+    if ! grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
+	then
+	cat >> /etc/syslog.conf <<EOF
+
+# ${SVCPREFIX} log copy service 
+local1.*                                        |/var/log/${SVCPREFIX}
+
+EOF
+    fi
+fi
