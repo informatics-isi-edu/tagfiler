@@ -249,7 +249,7 @@ SRC="\${1:-/var/log/${SVCPREFIX}}"
 DST="\${2:-/var/www/${SVCPREFIX}-logs/messages}"
 MODE="\${3:-reader}"
 
-WRITEUSER=${DAEMONUSER}
+WRITEUSER=${SVCUSER}
 
 reader_exit()
 {
@@ -281,7 +281,7 @@ writer()
 
     trap writer_exit 0
 
-    logger -i -p local2.notice -t "\$(basename "\$0")" "log writer started" 2>&1 | cat >> "\$DST"
+    logger -i -s -p local2.notice -t "\$(basename "\$0")" "log writer started" 2>&1 | cat >> "\$DST"
 
     while read line
     do
@@ -388,5 +388,6 @@ EOF
 local1.*                                        |/var/log/${SVCPREFIX}
 
 EOF
+	service syslog restart
     fi
 fi
