@@ -20,14 +20,14 @@
 #	<hostname>			- hostname of the service
 #	<user>				- authentication user
 #	<password>			- authentication password for user
-#	<usercookiefile>	- the cookie file for user
 #	<file>				- the path of the file to be uploaded
 
 hostname=|the service hostname|
 user=|the user|
 password=|password for user|
-usercookiefile=|the cookie file for user|
 file=|the path of the file to be uploaded|
+
+usercookiefile="$user"cookiefile
 
 HOST=https://$hostname
 LOGIN=https://$hostname/webauthn/login
@@ -169,13 +169,13 @@ curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/q
 echo "" >> $LOGFILE
 
 echo "Update \"$DATASET1\" dataset with url POST"  >> $LOGFILE
-echo "curl $USER_COOKIE $COMMON_OPTIONS -d \"action=put&url=$URL\" \"$HOST/tagfiler/file/name=$DATASET1;version=1\"" >> $LOGFILE
-curl $USER_COOKIE $COMMON_OPTIONS -d "action=put&url=$URL" "$HOST/tagfiler/file/name=$DATASET1;version=1" >> $LOGFILE
+echo "curl $USER_COOKIE $COMMON_OPTIONS -d \"action=put&url=$URL\" \"$HOST/tagfiler/file/name=$DATASET1\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS -d "action=put&url=$URL" "$HOST/tagfiler/file/name=$DATASET1" >> $LOGFILE
 echo "" >> $LOGFILE
 
 echo "Fetch the list of datasets"  >> $LOGFILE
-echo "curl $USER_COOKIE $COMMON_OPTIONS  -H \"Accept: text/uri-list\"  \"$HOST/tagfiler/query\"" >> $LOGFILE
-curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/query" >> $LOGFILE
+echo "curl $USER_COOKIE $COMMON_OPTIONS  -H \"Accept: text/uri-list\"  \"$HOST/tagfiler/query?versions=any\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/query?versions=any" >> $LOGFILE
 echo "" >> $LOGFILE
 
 echo "Update \"$DATASET1\" dataset with file POST"  >> $LOGFILE
@@ -185,14 +185,14 @@ date >> $LOGFILE
 echo "" >> $LOGFILE
 
 echo "Fetch the list of datasets"  >> $LOGFILE
-echo "curl $USER_COOKIE $COMMON_OPTIONS  -H \"Accept: text/uri-list\"  \"$HOST/tagfiler/query\"" >> $LOGFILE
-curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/query" >> $LOGFILE
+echo "curl $USER_COOKIE $COMMON_OPTIONS  -H \"Accept: text/uri-list\"  \"$HOST/tagfiler/query?versions=any\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/query?versions=any" >> $LOGFILE
 echo "" >> $LOGFILE
 
 echo "Get/Download \"$DATASET1\" dataset"  >> $LOGFILE
 date >> $LOGFILE
-echo "curl $USER_COOKIE $COMMON_OPTIONS -o \"$TEMPFILE\" -X GET \"$HOST/tagfiler/file/name=$DATASET1\"" >> $LOGFILE
-curl $USER_COOKIE $COMMON_OPTIONS -o "$TEMPFILE" -X GET "$HOST/tagfiler/file/name=$DATASET1"
+echo "curl $USER_COOKIE $COMMON_OPTIONS -o \"$TEMPFILE\" -X GET \"$HOST/tagfiler/file/name=$DATASET1;version=1\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS -o "$TEMPFILE" -X GET "$HOST/tagfiler/file/name=$DATASET1;version=1"
 date >> $LOGFILE
 echo "" >> $LOGFILE
 
@@ -211,7 +211,17 @@ echo "rm -f \"$TEMPFILE\""  >> $LOGFILE
 rm -f "$TEMPFILE"
 echo "" >> $LOGFILE
 
-echo "Delete \"$DATASET1\" dataset with POST"  >> $LOGFILE
+echo "Delete \"$DATASET1\" version=2 dataset with POST"  >> $LOGFILE
+echo "curl $USER_COOKIE $COMMON_OPTIONS -d \"action=ConfirmDelete\" \"$HOST/tagfiler/file/name=$DATASET1\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS -d "action=ConfirmDelete" "$HOST/tagfiler/file/name=$DATASET1" >> $LOGFILE
+echo "" >> $LOGFILE
+
+echo "Fetch the list of datasets"  >> $LOGFILE
+echo "curl $USER_COOKIE $COMMON_OPTIONS  -H \"Accept: text/uri-list\"  \"$HOST/tagfiler/query\"" >> $LOGFILE
+curl $USER_COOKIE $COMMON_OPTIONS  -H "Accept: text/uri-list"  "$HOST/tagfiler/query" >> $LOGFILE
+echo "" >> $LOGFILE
+
+echo "Delete \"$DATASET1\" version=1 dataset with POST"  >> $LOGFILE
 echo "curl $USER_COOKIE $COMMON_OPTIONS -d \"action=ConfirmDelete\" \"$HOST/tagfiler/file/name=$DATASET1\"" >> $LOGFILE
 curl $USER_COOKIE $COMMON_OPTIONS -d "action=ConfirmDelete" "$HOST/tagfiler/file/name=$DATASET1" >> $LOGFILE
 echo "" >> $LOGFILE

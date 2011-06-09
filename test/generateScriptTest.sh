@@ -23,10 +23,8 @@
 #	<hostname>			- hostname of the service
 #	<user1>				- authentication user1
 #	<password1>			- authentication password for user1
-#	<user1cookiefile>	- the cookie file for user1
 #	<user2>				- authentication user2
 #	<password2>			- authentication password for user2
-#	<user2cookiefile>	- the cookie file for user2
 #	<file>				- the path of the file to be uploaded
 #	<tagfiler>			- the service prefix
 #	<logfile>			- the path of the log file
@@ -38,14 +36,15 @@ echo ""
 hostname=|the service hostname|
 user1=|the user1|
 password1=|password for user1|
-user1cookiefile=|the cookie file for user1|
 user2=|the user2|
 password2=|password for user2|
-user2cookiefile=|the cookie file for user2|
 file=|the path of the file to be uploaded|
 tagfiler=|the service prefix|
 logfile=|the path of the log file|
 deletefile=|the path of the file to delete the defined users tags|
+
+user1cookiefile="$user1"cookiefile
+user2cookiefile="$user2"cookiefile
 
 echo HOST=https://$hostname
 echo LOGIN=https://$hostname/webauthn/login
@@ -53,7 +52,7 @@ echo AUTHENTICATION_USER1=\"-d username=$user1 -d password=$password1\"
 echo AUTHENTICATION_USER2=\"-d username=$user2 -d password=$password2\"
 echo USER1_COOKIE=\"-b $user1cookiefile -c $user1cookiefile\"
 echo USER2_COOKIE=\"-b $user2cookiefile -c $user2cookiefile\"
-echo FILE=$file
+echo FILE=\"$file\"
 echo URL=http://www.yahoo.com
 echo SVCPREFIX=$tagfiler
 echo ""
@@ -306,8 +305,8 @@ echo ""
 
 echo "echo \"Delete \\\"tag_read_anonymous_write_anonymous\\\" tag by user \\\"$user2\\\" with DELETE\" >> \$LOGFILE"
 echo "echo \"\" >> \$LOGFILE"
-echo "echo \"curl \$USER1_COOKIE \$COMMON_OPTIONS -X DELETE  \\\"\$HOST/\$SVCPREFIX/tagdef/tag_read_anonymous_write_anonymous\\\"\" >> \$LOGFILE"
-echo "curl \$USER1_COOKIE \$COMMON_OPTIONS -X DELETE  \"\$HOST/\$SVCPREFIX/tagdef/tag_read_anonymous_write_anonymous\" >> \$LOGFILE"
+echo "echo \"curl \$USER2_COOKIE \$COMMON_OPTIONS -X DELETE  \\\"\$HOST/\$SVCPREFIX/tagdef/tag_read_anonymous_write_anonymous\\\"\" >> \$LOGFILE"
+echo "curl \$USER2_COOKIE \$COMMON_OPTIONS -X DELETE  \"\$HOST/\$SVCPREFIX/tagdef/tag_read_anonymous_write_anonymous\" >> \$LOGFILE"
 echo "echo \"\" >> \$LOGFILE"
 echo ""
 
