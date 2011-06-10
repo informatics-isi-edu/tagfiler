@@ -24,7 +24,6 @@ import subprocess
 import tempfile
 import random
 import re
-import traceback
 import sys
 import time
 import datetime
@@ -277,7 +276,6 @@ class FileIO (Subject):
             except:
                 rangeset = None
 
-            self.log('GET', dataset=path_linearize(self.path))
             if rangeset != None:
 
                 if len(rangeset) == 0:
@@ -400,7 +398,7 @@ class FileIO (Subject):
                     eof = True
                 elif buflen == 0:
                     f.close()
-                    raise BadRequest(data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
+                    raise BadRequest(self, data="Only received %s bytes out of expected %s bytes." % (bytes, clen)) # entity undersized
             elif buflen == 0:
                 eof = True
 
@@ -461,9 +459,9 @@ class FileIO (Subject):
                     f = open(filename, 'r+b', 0)
                     return f
                 else:
-                    raise Conflict(data='The resource "%s" does not support byte-range update.' % path_linearize(self.path))
+                    raise Conflict(self, data='The resource "%s" does not support byte-range update.' % path_linearize(self.path))
             else:
-                raise Conflict(data='The resource "%s" is not unique, so byte-range update is unsafe.' % path_linearize(self.path))
+                raise Conflict(self, data='The resource "%s" is not unique, so byte-range update is unsafe.' % path_linearize(self.path))
         
     def PUT(self, uri, post_method=False):
         """store file content from client"""
@@ -525,7 +523,7 @@ class FileIO (Subject):
         def preWritePostCommit(results):
             f = results
             if f != None:
-                raise BadRequest(data='Cannot update an existing file version via POST.')
+                raise BadRequest(self, data='Cannot update an existing file version via POST.')
             return None
         
         def putPostCommit(junk_files):
@@ -579,7 +577,7 @@ class FileIO (Subject):
                 f.close()
                 if buf != boundaryN:
                     # we did not get an entire multipart body apparently
-                    raise BadRequest(data="The multipart/form-data terminal boundary was not found.")
+                    raise BadRequest(self, data="The multipart/form-data terminal boundary was not found.")
                 self.file = tempFileName[len(self.config['store path'])+1:len(tempFileName)]
                 self.dtype = 'file'
                 self.bytes = bytes
@@ -610,10 +608,10 @@ class LogFileIO (FileIO):
     def GET(self, uri, sendBody=True):
 
         if not self.authn.hasRoles(['admin']):
-            raise Forbidden('read access to log file "%s"' % self.name)
+            raise Forbidden(self, 'read access to log file "%s"' % self.name)
 
         if not self.config['log path']:
-            raise Conflict('log_path is not configured on this server.')
+            raise Conflict(self, 'log_path is not configured on this server.')
 
         if self.queryopts.get('action', None) == 'view':
             disposition_name = None
@@ -655,4 +653,4 @@ class LogFileIO (FileIO):
             et, ev, tb = sys.exc_info()
             web.debug('got exception in logfileIO',
                       traceback.format_exception(et, ev, tb))
-            raise NotFound('log file "%s"' % self.name)
+            raise NotFound(self, 'log file "%s"' % self.name)

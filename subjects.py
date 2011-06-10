@@ -24,7 +24,6 @@ import subprocess
 import tempfile
 import random
 import re
-import traceback
 import sys
 import time
 import datetime
@@ -146,7 +145,7 @@ class Subject (Application):
                and listpreds[0].tag == 'file' and not listpreds[0].op:
                 # we accept (file) listpred as a special disambiguator case for forward-compatibility
                 pass
-            raise BadRequest('FileIO module does not support general subject tag list "%s".' % predlist_linearize(listpreds))
+            raise BadRequest(self, 'FileIO module does not support general subject tag list "%s".' % predlist_linearize(listpreds))
         
         self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, subjpreds=subjpreds)
 
@@ -173,7 +172,7 @@ class Subject (Application):
             results = self.select_files_by_predlist_path(path=querypath[0:-1], versions=self.versions, enforce_read_authz=enforce_read_authz)
             parent = '/' + '/'.join([ '%s(%s)' % (predlist_linearize(s), predlist_linearize(l)) for s, l, o in self.path[0:-1] ])
             if len(results) != 1:
-                raise Conflict('The parent path "%s" does not resolve to a unique parent.' % parent)
+                raise Conflict(self, 'The parent path "%s" does not resolve to a unique parent.' % parent)
 
         request = '/' + '/'.join([ '%s(%s)' % (predlist_linearize(s), predlist_linearize(l)) for s, l, o in self.path ])
 
@@ -183,13 +182,13 @@ class Subject (Application):
             results = self.select_files_by_predlist_path(path=querypath, versions=self.versions, enforce_read_authz=enforce_read_authz)
 
         if len(results) == 0:
-            raise NotFound('dataset matching "%s"' % request)
+            raise NotFound(self, 'dataset matching "%s"' % request)
         elif len(results) > 0 and self.unique and post_method:
-            raise Conflict('Cannot POST to existing subject "%s".' % (self.subject2identifiers(results[0])[2]))
+            raise Conflict(self, 'Cannot POST to existing subject "%s".' % (self.subject2identifiers(results[0])[2]))
         elif len(results) > 1 and not allow_multiple:
             count = len(results)
             names = ['"%s"' % self.subject2identifiers(result)[2] for result in results]
-            raise Conflict('Found %d matching subjects, but this operation only supports 1.' % (count))
+            raise Conflict(self, 'Found %d matching subjects, but this operation only supports 1.' % (count))
         
         self.subjects = [ x for x in results ]
         self.subject = self.subjects[0]
@@ -229,7 +228,7 @@ class Subject (Application):
         self.populate_subject(allow_blank=True, allow_multiple=True)
         for subject in self.subjects:
             if not subject.writeok:
-                raise Forbidden('delete of dataset "%s"' % self.subject2identifiers(subject)[2])
+                raise Forbidden(self, 'delete of dataset "%s"' % self.subject2identifiers(subject)[2])
             self.delete_file(subject)
             self.txlog('DELETE', dataset=self.subject2identifiers(subject)[2])
         return (self.subjects)
@@ -269,7 +268,7 @@ class Subject (Application):
         try:
             self.populate_subject(allow_blank=allow_blank, enforce_parent=True, post_method=post_method)
             if not self.subject.writeok:
-                raise Forbidden('write to file "%s"' % path_linearize(self.path))
+                raise Forbidden(self, 'write to file "%s"' % path_linearize(self.path))
                 
         except NotFound:
             web.ctx.status = status
@@ -277,7 +276,7 @@ class Subject (Application):
             self.update = False
             # this is a new dataset independent of others
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
-                raise Forbidden('creation of datasets')
+                raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
             self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True, subjpreds=self.path[-1][0])
             self.mergeSubjpredsTags = True
@@ -413,7 +412,7 @@ class Subject (Application):
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
             if tagdef == None:
-                raise NotFound('tagdef="%s"' % tagname)
+                raise NotFound(self, 'tagdef="%s"' % tagname)
             self.enforce_tag_authz('write', newfile, tagdef)
             if tagdef.typestr == 'empty':
                 self.set_tag(newfile, tagdef)
@@ -454,9 +453,9 @@ class Subject (Application):
             else:
                 self.populate_subject(enforce_read_authz=False, allow_blank=post_method, post_method=post_method)
             if not self.subject.readok:
-                raise Forbidden('access to file "%s"' % path_linearize(self.path))
+                raise Forbidden(self, 'access to file "%s"' % path_linearize(self.path))
             if not self.subject.writeok: 
-                raise Forbidden('write to file "%s"' % self.subject2identifiers(self.subject)[0])
+                raise Forbidden(self, 'write to file "%s"' % self.subject2identifiers(self.subject)[0])
             return self.put_preWriteBody_result()
                 
         except NotFound:
@@ -474,7 +473,7 @@ class Subject (Application):
             
             # not found and not unique, treat as new file put
             if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
-                raise Forbidden('creation of datasets')
+                raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
             self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, restrictSchema=True)
             self.mergeSubjpredsTags = True
@@ -504,7 +503,7 @@ class Subject (Application):
 
             if clen != None:
                 if clast - cfirst + 1 != clen:
-                    raise BadRequest(data='Range: %s does not match content-length %s.' % (content_range, clen))
+                    raise BadRequest(self, data='Range: %s does not match content-length %s.' % (content_range, clen))
             else:
                 clen = clast - cfirst + 1
 
@@ -604,7 +603,7 @@ class Subject (Application):
         def preDeleteBody():
             self.populate_subject(allow_blank=True, allow_multiple=True)
             if not self.subject.writeok:
-                raise Forbidden('delete of dataset "%s"' % path_linearize(self.path))
+                raise Forbidden(self, 'delete of dataset "%s"' % path_linearize(self.path))
             
             if self.subject.dtype == 'url':
                 if self.subject['Image Set']:
@@ -652,7 +651,7 @@ class Subject (Application):
             self.key = get_param('key')
             self.action = get_param('action')
             if self.action == None:
-                raise BadRequest('Form field "action" is required.')
+                raise BadRequest(self, 'Form field "action" is required.')
 
             self.referer = get_param('referer', "/file")
 
@@ -680,7 +679,7 @@ class Subject (Application):
                                        putPostCommit)
 
             else:
-                raise BadRequest(data="Form field action=%s not understood." % self.action)
+                raise BadRequest(self, data="Form field action=%s not understood." % self.action)
 
         else:
             # any unrecognized input type is ignored, and we just process URI with action=post

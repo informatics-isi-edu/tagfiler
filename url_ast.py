@@ -178,7 +178,7 @@ class Study (Node):
                                                         versions=versions)
                 if len(results) == 0:
                     if not self.status:
-                        raise NotFound('study "%s@%s"' % (self.name, self.version))
+                        raise NotFound(self, 'study "%s@%s"' % (self.name, self.version))
                 else:
                     self.subject = results[0]
                     self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
@@ -221,9 +221,9 @@ class Study (Node):
                     url = '/appleterror'
                     if self.status:
                         url += '?status=%s' % urlquote(self.status)
-                    raise web.seeother(url)
+                    raise web.seeother(self, url)
             else:
-                raise BadRequest('Unrecognized action form field.')
+                raise BadRequest(self, 'Unrecognized action form field.')
 
         return self.dbtransact(body, postCommit)
 
@@ -269,7 +269,7 @@ class Study (Node):
 
         def postCommit(result):
             if not result:
-                raise Conflict('The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.name))
+                raise Conflict(self, 'The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.name))
 
         return self.dbtransact(body, postCommit)
 
@@ -431,7 +431,7 @@ class LogList (Node):
 
     def GET(self, uri):
         if not self.authn.hasRoles(['admin']):
-            raise Forbidden('listing of log files')
+            raise Forbidden(self, 'listing of log files')
         
         if self.config['log path']:
             lognames = sorted(os.listdir(self.config['log path']), reverse=True)
@@ -525,7 +525,7 @@ class Tagdef (Node):
 
         if self.tag_id != None:
             if len(self.queryopts) > 0:
-                raise BadRequest(data="Query options are not supported on this interface.")
+                raise BadRequest(self, data="Query options are not supported on this interface.")
             else:
                 return self.GETone(uri)
         else:
@@ -550,7 +550,7 @@ class Tagdef (Node):
                                     self.render.TagdefExisting('System', predefined )])
 
         if len(self.queryopts) > 0:
-            raise BadRequest(data="Query options are not supported on this interface.")
+            raise BadRequest(self, data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
 
@@ -559,7 +559,7 @@ class Tagdef (Node):
         def body():
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
-                raise NotFound(data='tag definition %s' % (self.tag_id))
+                raise NotFound(self, data='tag definition %s' % (self.tag_id))
             return results[0]
 
         def postCommit(tagdef):
@@ -572,10 +572,10 @@ class Tagdef (Node):
                         + '&multivalue=' + urlquote(unicode(tagdef.multivalue))
                         + '&owner=' + urlquote(unicode(tagdef.owner)))
             except:
-                raise NotFound(data='tag definition %s' % (self.tag_id))
+                raise NotFound(self, data='tag definition %s' % (self.tag_id))
 
         if len(self.queryopts) > 0:
-            raise BadRequest(data="Query options are not supported on this interface.")
+            raise BadRequest(self, data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
 
@@ -584,24 +584,23 @@ class Tagdef (Node):
         def body():
             tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
             if tagdef == None:
-                raise NotFound(data='tag definition %s' % (self.tag_id))
+                raise NotFound(self, data='tag definition %s' % (self.tag_id))
             self.enforce_tagdef_authz('write', tagdef)
             self.delete_tagdef(tagdef)
             return ''
 
         def postCommit(results):
-            self.log('DELETE', tag=self.tag_id)
             return ''
 
         if len(self.queryopts) > 0:
-            raise BadRequest(data="Query options are not supported on this interface.")
+            raise BadRequest(self, data="Query options are not supported on this interface.")
 
         return self.dbtransact(body, postCommit)
                 
     def PUT(self, uri):
 
         if self.tag_id == None:
-            raise BadRequest(data="Tag definitions require a non-empty tag name.")
+            raise BadRequest(self, data="Tag definitions require a non-empty tag name.")
 
         # self.typestr and self.writepolicy take precedence over queryopts...
 
@@ -645,18 +644,17 @@ class Tagdef (Node):
 
         def body():
             if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
-                raise Forbidden('creation of tag definitions')
+                raise Forbidden(self, 'creation of tag definitions')
                 
             results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
             if len(results) > 0:
-                raise Conflict(data="Tag %s is already defined." % self.tag_id)
+                raise Conflict(self, data="Tag %s is already defined." % self.tag_id)
             self.insert_tagdef()
             return None
 
         def postCommit(results):
             # send client back to get new tag definition
             # or should we just return empty success result?
-            self.log('CREATE', tag=self.tag_id)
             raise web.seeother('/tagdef/' + urlquote(self.tag_id))
 
         return self.dbtransact(body, postCommit)
@@ -672,19 +670,19 @@ class Tagdef (Node):
                         try:
                             typestr = storage['type-%s' % (key[4:])]
                         except:
-                            raise BadRequest(data="A tag type must be specified.")
+                            raise BadRequest(self, data="A tag type must be specified.")
                         try:
                             readpolicy = storage['readpolicy-%s' % (key[4:])]
                         except:
-                            raise BadRequest(data="A read policy must be specified.")
+                            raise BadRequest(self, data="A read policy must be specified.")
                         try:
                             writepolicy = storage['writepolicy-%s' % (key[4:])]
                         except:
-                            raise BadRequest(data="A write policy must be specified.")
+                            raise BadRequest(self, data="A write policy must be specified.")
                         try:
                             multivalue = storage['multivalue-%s' % (key[4:])]
                         except:
-                            raise BadRequest(data="The value cardinality must be specified.")
+                            raise BadRequest(self, data="The value cardinality must be specified.")
                         try:
                             unique = storage['unique-%s' % (key[4:])]
                         except:
@@ -700,25 +698,24 @@ class Tagdef (Node):
             et, ev, tb = sys.exc_info()
             web.debug('got exception during tagdef form post',
                       traceback.format_exception(et, ev, tb))
-            raise BadRequest(data="Error extracting form data.")
+            raise BadRequest(self, data="Error extracting form data.")
 
         def body():
             if self.action == 'add':
                 if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
-                    raise Forbidden('creation of tag definitions')
+                    raise Forbidden(self, 'creation of tag definitions')
                 
                 for tagname in self.tagdefs.keys():
                     self.tag_id = tagname
                     self.typestr, self.readpolicy, self.writepolicy, self.multivalue, self.is_unique = self.tagdefs[tagname]
                     results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
                     if len(results) > 0:
-                        raise Conflict(data="Tag %s is already defined." % self.tag_id)
+                        raise Conflict(self, data="Tag %s is already defined." % self.tag_id)
                     self.insert_tagdef()
-                    self.log('CREATE', tag=self.tag_id)
             elif self.action == 'delete' or self.action == 'CancelDelete':
                 tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
                 if tagdef == None:
-                    raise NotFound('tag definition "%s"' % self.tag_id)
+                    raise NotFound(self, 'tag definition "%s"' % self.tag_id)
                 self.globals['dataname'] = self.tag_id
                 self.globals['datapred'] = urlquote(self.tag_id)
                 self.enforce_tagdef_authz('write', tagdef)
@@ -726,12 +723,11 @@ class Tagdef (Node):
             elif self.action == 'ConfirmDelete':
                 tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
                 if tagdef == None:
-                    raise NotFound('tag definition "%s"' % self.tag_id)
+                    raise NotFound(self, 'tag definition "%s"' % self.tag_id)
                 self.enforce_tagdef_authz('write', tagdef)
                 self.delete_tagdef(tagdef)
-                self.log('DELETE', tag=self.tag_id)
             else:
-                raise BadRequest(data="Form field action=%s not understood." % self.action)
+                raise BadRequest(self, data="Form field action=%s not understood." % self.action)
             return None
 
         def postCommit(results):
@@ -806,7 +802,7 @@ class FileTags (Node):
 
         files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
         if len(files) == 0:
-            raise NotFound('subject matching "%s"' % predlist_linearize(self.path_modified[-1][0]))
+            raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0]))
         else:
             subject = files[0]
             datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
@@ -910,9 +906,9 @@ class FileTags (Node):
         self.tagvals = dict()
         for pred in listpreds:
             if pred.op and pred.op != '=':
-                raise BadRequest('Invalid operation "%s" for tag binding in PUT.' % pred.op)
+                raise BadRequest(self, 'Invalid operation "%s" for tag binding in PUT.' % pred.op)
             if self.tagvals.has_key(pred.tag):
-                raise BadRequest('Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
+                raise BadRequest(self, 'Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
             self.tagvals[pred.tag] = pred.vals
         
         listpreds =  subjpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'owner', 'write users', 'Image Set', 'url', 'incomplete'] ]
@@ -925,9 +921,9 @@ class FileTags (Node):
         
         results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
+            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath))
         elif len(results) > 1:
-            raise Conflict('PUT tags to more than one subject is not supported.')
+            raise Conflict(self, 'PUT tags to more than one subject is not supported.')
 
         self.subject = results[0]
         self.id = self.subject.id
@@ -943,7 +939,7 @@ class FileTags (Node):
         for tag_id in self.tagvals.keys():
             tagdef = self.globals['tagdefsdict'].get(tag_id, None)
             if tagdef == None:
-                raise NotFound(data='tag definition "%s"' % tag_id)
+                raise NotFound(self, data='tag definition "%s"' % tag_id)
             self.enforce_tag_authz('write', self.subject, tagdef)
             self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
             if self.tagvals[tag_id]:
@@ -988,7 +984,7 @@ class FileTags (Node):
                 val = urlunquote(val)
 
                 if tag == '':
-                    raise BadRequest(data="A non-empty tag name is required.")
+                    raise BadRequest(self, data="A non-empty tag name is required.")
 
                 try:
                     vals = tagvals[tag]
@@ -1022,7 +1018,7 @@ class FileTags (Node):
          
         results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
-            raise NotFound(data='subject matching "%s"' % path_linearize(simplepath))
+            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath))
         self.subjects = [ res for res in results ]
 
         # find subfiles of all subjects which are tagged Image Set
@@ -1033,7 +1029,7 @@ class FileTags (Node):
         for tag in set([pred.tag for pred in origlistpreds ]):
             tagdef = self.globals['tagdefsdict'].get(tag, None)
             if tagdef == None:
-                raise NotFound('tagdef="%s"' % tag)
+                raise NotFound(self, 'tagdef="%s"' % tag)
 
             if not previewOnly:
                 for subject in self.subjects:
@@ -1110,7 +1106,7 @@ class FileTags (Node):
             et, ev, tb = sys.exc_info()
             web.debug('got exception during filetags form post parsing',
                       traceback.format_exception(et, ev, tb))
-            raise BadRequest(data="Error extracting form data.")
+            raise BadRequest(self, data="Error extracting form data.")
 
         self.path[-1] = (subjpreds, listpreds, ordertags)
 
@@ -1119,7 +1115,7 @@ class FileTags (Node):
         elif action == 'delete':
             return self.dbtransact(self.delete_body, self.post_postCommit)
         else:
-            raise BadRequest(data="Form field action=%s not understood." % action)
+            raise BadRequest(self, data="Form field action=%s not understood." % action)
 
 class Query (Node):
     __slots__ = [ 'subjpreds', 'queryopts', 'action' ]
@@ -1201,7 +1197,7 @@ class Query (Node):
         elif self.action == 'edit':
             pass
         else:
-            raise BadRequest(data="Form field action=%s not understood." % self.action)
+            raise BadRequest(self, data="Form field action=%s not understood." % self.action)
 
         if self.action in [ 'add', 'delete' ]:
             # apply subjpreds changes to last path element

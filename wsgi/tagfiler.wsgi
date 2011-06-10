@@ -18,9 +18,9 @@
 import web
 import sys
 import os
-import sys
 import traceback
 import itertools
+import urllib
 
 # Uncomment the below line in case of a RPM installation
 from tagfiler import url_lex, url_parse, dataserv_app
@@ -79,21 +79,29 @@ class Dispatcher:
         astmethod = getattr(ast, methodname)
 
         try:
-            #web.debug((uri,astmethod))
-            #web.debug(('env',web.ctx.env))
-            result = astmethod(uri)
-            if hasattr(result, 'next'):
-                try:
-                    first = result.next()
-                except StopIteration:
+
+            try:
+                #web.debug((uri,astmethod))
+                #web.debug(('env',web.ctx.env))
+                result = astmethod(uri)
+
+                if hasattr(result, 'next'):
+                    try:
+                        first = result.next()
+                    except StopIteration:
+                        return result
+                    return itertools.chain([first], result)
+                else:
                     return result
-            	return itertools.chain([first], result)
-            else:
-            	return result
-        except dataserv_app.WebException, e:
-            if hasattr(e, 'detail'):
-                web.header('X-Error-Description', e.detail)
-            raise e
+            except dataserv_app.WebException, e:
+                if hasattr(e, 'detail'):
+                    web.header('X-Error-Description', e.detail)
+                raise e
+
+        finally:
+            # log after we force iterator, to flush any deferred transaction log messages
+            ast.lograw('%s%s req=%s (%s) %s %s://%s%s' % (web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
+                                                          ast and ast.request_guid or '', web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri))
 
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         # return result

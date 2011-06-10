@@ -39,6 +39,8 @@ try:
     import webauthn
 except:
     pass
+import base64
+import struct
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -157,7 +159,7 @@ if hasattr(json, 'write'):
 elif hasattr(json, 'dumps'):
     jsonWriter = json.dumps
 else:
-    raise RuntimeError('Could not configure JSON library.')
+    raise RuntimeError(ast=None, data='Could not configure JSON library.')
 
 def urlquote(url):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -251,9 +253,11 @@ def traceInChunks(seq):
 
 
 class WebException (web.HTTPError):
-    def __init__(self, status, data='', headers={}, desc='%s'):
+    def __init__(self, ast, status, data='', headers={}, desc='%s'):
         self.detail = urlquote(desc % data)
         #web.debug(self.detail, desc, data)
+        logger.info('%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
+                                        ast and ast.request_guid or '', desc % data))
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
@@ -263,52 +267,52 @@ class WebException (web.HTTPError):
 
 class NotFound (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '404 Not Found'
         desc = 'The requested %s could not be found.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Forbidden (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '403 Forbidden'
         desc = 'The requested %s is forbidden.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Unauthorized (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '401 Unauthorized'
         desc = 'The requested %s requires authorization.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '400 Bad Request'
         desc = 'The request is malformed. %s'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '409 Conflict'
         desc = 'The request conflicts with the state of the server. %s'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class IntegrityError (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a integrity error: %s.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class RuntimeError (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, data='', headers={}):
+    def __init__(self, ast, data='', headers={}):
         status = '500 Internal Server Error'
         desc = 'The request execution encountered a runtime error: %s.'
-        WebException.__init__(self, status, headers=headers, data=data, desc=desc)
+        WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 # BUG: use locking to avoid assumption that global interpreter lock protects us?
 configDataCache = dict()
@@ -509,6 +513,12 @@ class Application:
         global render
         global db_cache
 
+        def long2str(x):
+            s = ''
+            
+
+        self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
+
         self.url_parse_func = parser
 
         self.skip_preDispatch = False
@@ -629,13 +639,13 @@ class Application:
             elif type(ast) in [ int, long ]:
                 # this is a bare subject identifier
                 return ast
-        raise BadRequest('Sub-query expression "%s" not a valid expression.' % query)
+        raise BadRequest(self, 'Sub-query expression "%s" not a valid expression.' % query)
         
     def validateFilename(self, file, tagdef='', subject=None):        
         results = self.select_files_by_predlist(subjpreds=[web.Storage(tag='name', op='=', vals=[file])],
                                                 listtags=['id'])
         if len(results) == 0:
-            raise Conflict('Supplied file name "%s" for tag "%s" is not found.' % (file, tagdef.tagname))
+            raise Conflict(self, 'Supplied file name "%s" for tag "%s" is not found.' % (file, tagdef.tagname))
 
     def validateVersionedFilename(self, vfile, tagdef=None, subject=None):
         tagname = ''
@@ -647,27 +657,27 @@ class Application:
             try:
                 version = int(g['version'])
             except ValueError:
-                raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
+                raise BadRequest(self, 'Supplied versioned file name "%s" for tag "%s" has an invalid version suffix.' % (vfile, tagname))
             if g['data_id'] == '':
-                raise BadRequest('Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
+                raise BadRequest(self, 'Supplied versioned file name "%s" for tag "%s" has an invalid name.' % (vfile, tagname))
             results = self.select_files_by_predlist(subjpreds=[web.Storage(tag='vname', op='=', vals=[vfile]),
                                                               web.Storage(tag='version', op='=', vals=[version])],
                                                     listtags=['id'],
                                                     versions='any')
             if len(results) == 0:
-                raise Conflict('Supplied versioned file name "%s" for tag "%s" is not found.' % (vfile, tagname))
+                raise Conflict(self, 'Supplied versioned file name "%s" for tag "%s" is not found.' % (vfile, tagname))
         else:
-            raise BadRequest('Supplied versioned file name "%s" for tag "%s" has invalid syntax.' % (vfile, tagname))
+            raise BadRequest(self, 'Supplied versioned file name "%s" for tag "%s" has invalid syntax.' % (vfile, tagname))
 
     def validateTagname(self, tag, tagdef=None, subject=None):
         tagname = ''
         if tagdef:
             tagname = tagdef.tagname
         if tag == '':
-            raise Conflict('You must specify a defined tag name to set values for "%s".' % tagname)
+            raise Conflict(self, 'You must specify a defined tag name to set values for "%s".' % tagname)
         results = self.select_tagdef(tag)
         if len(results) == 0:
-            raise Conflict('Supplied tag name "%s" is not defined.' % tag)
+            raise Conflict(self, 'Supplied tag name "%s" is not defined.' % tag)
 
     def validateRole(self, role, tagdef=None, subject=None):
         if self.authn:
@@ -676,8 +686,8 @@ class Application:
             except NotImplemented, AttributeError:
                 valid = True
             if not valid:
-                web.debug('Supplied tag value "%s" is not a valid role.' % role)
-                raise Conflict('Supplied tag value "%s" is not a valid role.' % role)
+                #web.debug('Supplied tag value "%s" is not a valid role.' % role)
+                raise Conflict(self, 'Supplied tag value "%s" is not a valid role.' % role)
                 
     def validateRolePattern(self, role, tagdef=None, subject=None):
         if role in [ '*' ]:
@@ -692,22 +702,22 @@ class Application:
             key, desc = enum.split(" ", 1)
             key = urlunquote(key)
         except:
-            raise BadRequest('Supplied enumeration value "%s" does not have key and description fields.' % enum)
+            raise BadRequest(self, 'Supplied enumeration value "%s" does not have key and description fields.' % enum)
 
         if tagname == 'typedef values':
             results = self.gettagvals(subject, self.globals['tagdefsdict']['typedef'])
             if len(results) == 0:
-                raise Conflict('Set the "typedef" tag before trying to set "typedef values".')
+                raise Conflict(self, 'Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
             results = typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role, typename)
             if len(results) == 0:
-                raise Conflict('The type "%s" is not defined!' % typename)
+                raise Conflict(self, 'The type "%s" is not defined!' % typename)
             type = results[0]
             dbtype = type['typedef dbtype']
             try:
                 key = self.downcast_value(dbtype, key)
             except:
-                raise BadRequest(data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
+                raise BadRequest(self, data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
 
     def validatePolicyRule(self, rule, tagdef=None, subject=None):
         tagname = ''
@@ -716,10 +726,10 @@ class Application:
         try:
             remap = buildPolicyRules([rule], fatal=True)
         except (ValueError, KeyError):
-            raise BadRequest('Supplied rule "%s" is invalid for tag "%s".' % (rule, tagname))
+            raise BadRequest(self, 'Supplied rule "%s" is invalid for tag "%s".' % (rule, tagname))
         srcrole, mapping = remap.items()[0]
         if self.config['policy remappings'].has_key(srcrole):
-            raise BadRequest('Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
+            raise BadRequest(self, 'Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
     def doPolicyRule(self, newfile):
         srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
@@ -755,9 +765,9 @@ class Application:
                 t.rollback()
                 raise
         elif len(srcroles) > 1:
-            raise Conflict("Ambiguous remap rules encountered.")
+            raise Conflict(self, "Ambiguous remap rules encountered.")
 
-    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+    def logfmt_old(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         parts = []
         if dataset:
             parts.append('dataset "%s"' % dataset)
@@ -767,14 +777,18 @@ class Application:
             parts.append('value "%s"' % value)
         if mode:
             parts.append('mode "%s"' % mode)
-        if not self.authn.role:
-            user = 'anonymous'
-        else:
-            user = self.authn.role
-        return ('%s ' % action) + ', '.join(parts) + ' by user "%s"' % user
+
+        return ('%s ' % action) + ', '.join(parts)
+
+    def lograw(self, msg):
+        logger.info(msg)
+
+    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+        return '%s%s req=%s -- %s' % (web.ctx.ip, self.authn.role and ' user=%s' % urlquote(self.authn.role) or '', 
+                                      self.request_guid, self.logfmt_old(action, dataset, tag, mode, user, value))
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
-        logger.info(self.logfmt(action, dataset, tag, mode, user, value))
+        self.lograw(self.logfmt(action, dataset, tag, mode, user, value))
 
     def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
         self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
@@ -807,6 +821,7 @@ class Application:
         #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatchCore(self, uri, setcookie=True):
+        self.request_uri = uri
         if self.globals['webauthnhome']:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
@@ -961,32 +976,24 @@ class Application:
                         raise te
                     except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
                         t.rollback()
-                        self.logException('web error in transaction body')
                         raise te
                     except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                         t.rollback()
-                        self.logException('database error in transaction body')
-                        raise BadRequest(data='Logical error: %s.' % str(te))
+                        raise BadRequest(self, data='Logical error: %s.' % str(te))
                     except TypeError, te:
                         t.rollback()
-                        self.logException('programming error in transaction body')
-                        raise RuntimeError(data=str(te))
+                        raise RuntimeError(self, data=str(te))
                     except (psycopg2.IntegrityError, psycopg2.extensions.TransactionRollbackError), te:
                         t.rollback()
                         error = str(te)
-                        #m = re.match('duplicate key[^"]*"_version_[^"]*key"', error)
-                        #if not m or count > limit:
-                        #web.debug('IntegrityError', error)
                         if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
-                            self.logException('error during transaction body')
-                            raise IntegrityError(data=error)
+                            raise IntegrityError(self, data=error)
                     except (IOError), te:
                         t.rollback()
                         error = str(te)
                         if count > limit:
-                            self.logException('too many retries during transaction body')
-                            raise RuntimeError(data=error)
+                            raise RuntimeError(self, data=error)
                         # else fall through to retry...
                     except:
                         t.rollback()
@@ -1076,14 +1083,14 @@ class Application:
         for pred in subjpreds:
             tagdef = self.globals['tagdefsdict'].get(pred.tag, None)
             if tagdef == None:
-                raise Conflict('Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
+                raise Conflict(self, 'Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
 
             if restrictSchema:
                 if tagdef.tagname not in [ 'name', 'version' ] and tagdef.writeok == False:
-                    raise Conflict('Subject predicate sets restricted tag "%s".' % tagdef.tagname)
+                    raise Conflict(self, 'Subject predicate sets restricted tag "%s".' % tagdef.tagname)
                 if tagdef.typestr == 'empty' and pred.op or \
                        tagdef.typestr != 'empty' and pred.op != '=':
-                    raise Conflict('Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred.op, tagdef.tagname))
+                    raise Conflict(self, 'Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred.op, tagdef.tagname))
                     
             if tagdef.get('unique', False) and pred.op == '=' and pred.vals:
                 unique = True
@@ -1102,7 +1109,7 @@ class Application:
         elif acceptBlank:
             return None
         else:
-            raise Conflict('Subject-identifying predicate list requires a unique identifying constraint.')
+            raise Conflict(self, 'Subject-identifying predicate list requires a unique identifying constraint.')
 
     def test_file_authz(self, mode, subject):
         """Check whether access is allowed to user given mode and owner.
@@ -1176,27 +1183,27 @@ class Application:
         allow = self.test_file_authz(mode, subject)
         data = '%s of dataset "%s"' % self.subject2identifiers(subject)[0]
         if allow == False:
-            raise Forbidden(data=data)
+            raise Forbidden(self, data=data)
         elif allow == None:
-            raise Unauthorized(data=data)
+            raise Unauthorized(self, data=data)
 
     def enforce_tag_authz(self, mode, subject, tagdef):
         """Check whether access is allowed and throw web exception if not."""
         allow = self.test_tag_authz(mode, subject, tagdef)
         data = '%s of tag "%s" on dataset "%s"' % (mode, tagdef.tagname, self.subject2identifiers(subject)[0])
         if allow == False:
-            raise Forbidden(data=data)
+            raise Forbidden(self, data=data)
         elif allow == None:
-            raise Unauthorized(data=data)
+            raise Unauthorized(self, data=data)
 
     def enforce_tagdef_authz(self, mode, tagdef):
         """Check whether access is allowed and throw web exception if not."""
         allow = self.test_tagdef_authz(mode, tagdef)
         data = '%s of tagdef="%s"' % (mode, tagdef.tagname)
         if allow == False:
-            raise Forbidden(data=data)
+            raise Forbidden(self, data=data)
         elif allow == None:
-            raise Unauthorized(data=data)
+            raise Unauthorized(self, data=data)
 
     def wraptag(self, tagname, suffix='', prefix='_'):
         return '"' + prefix + tagname.replace('"','""') + suffix + '"'
@@ -1361,7 +1368,7 @@ class Application:
     def insert_tagdef(self):
         results = self.select_tagdef(self.tag_id)
         if len(results) > 0:
-            raise Conflict('Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
+            raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
         owner = self.authn.role
         newid = self.insert_file(None, None, None)
@@ -1398,7 +1405,7 @@ class Application:
 
         type = self.globals['typesdict'].get(tagdef.typestr, None)
         if type == None:
-            raise Conflict('Referenced type "%s" is not defined.' % tagdef.typestr)
+            raise Conflict(self, 'Referenced type "%s" is not defined.' % tagdef.typestr)
 
         dbtype = type['typedef dbtype']
         if dbtype != '':
@@ -1416,7 +1423,7 @@ class Application:
                 referenced_tagdef = self.globals['tagdefsdict'].get(tagref, None)
 
                 if referenced_tagdef == None:
-                    raise Conflict('Referenced tag "%s" not found.' % tagref)
+                    raise Conflict(self, 'Referenced tag "%s" not found.' % tagref)
 
                 if referenced_tagdef.unique and referenced_tagdef.typestr != 'empty':
                     tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
@@ -1475,7 +1482,7 @@ class Application:
     def select_tag(self, subject, tagdef, value=None):
         # subject would not be found if read of subject is not OK
         if tagdef.readok == False or (tagdef.readok == None and not self.test_tag_authz('read', subject, tagdef)):
-            raise Forbidden('read access to /tags/%s(%s)' % (self.subject2identifiers(subject)[0], tagdef.tagname))
+            raise Forbidden(self, 'read access to /tags/%s(%s)' % (self.subject2identifiers(subject)[0], tagdef.tagname))
         return self.select_tag_noauthn(subject, tagdef, value)
 
     def gettagvals(self, subject, tagdef):
@@ -1606,7 +1613,7 @@ class Application:
     def set_tag(self, subject, tagdef, value=None):
         typedef = self.globals['typesdict'].get(tagdef.typestr, None)
         if typedef == None:
-            raise Conflict('The tag definition references a field type "%s" which is not defined!' % typestr)
+            raise Conflict(self, 'The tag definition references a field type "%s" which is not defined!' % typestr)
         dbtype = typedef['typedef dbtype']
 
         if tagdef.writepolicy != 'system':
@@ -1626,7 +1633,7 @@ class Application:
                 if value:
                     value = self.downcast_value(dbtype, value)
             except:
-                raise BadRequest(data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
+                raise BadRequest(self, data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
 
         if type(value) in [ list, set ]:
             # validatator generated a set of values, recursively try to set these instead
@@ -1638,9 +1645,9 @@ class Application:
             results = self.select_tag_noauthn(None, tagdef, value)
             if len(results) > 0 and results[0].subject != subject.id:
                 if tagdef.typestr != 'empty':
-                    raise Conflict('Tag "%s" is defined as unique and value "%s" is already bound to another subject.' % (tagdef.tagname, value))
+                    raise Conflict(self, 'Tag "%s" is defined as unique and value "%s" is already bound to another subject.' % (tagdef.tagname, value))
                 else:
-                    raise Conflict('Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
+                    raise Conflict(self, 'Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
 
         # check whether triple already exists
         results = self.select_tag_noauthn(subject, tagdef, value)
@@ -1777,7 +1784,7 @@ class Application:
                 tagdefs_needed.append(tagdefs[tagname])
             except KeyError:
                 #web.debug(tagname)
-                raise BadRequest(data='The tag "%s" is not defined on this server.' % tagname)
+                raise BadRequest(self, data='The tag "%s" is not defined on this server.' % tagname)
 
         innertables = []  # (table, alias)
         innertables_special = []
@@ -1803,7 +1810,7 @@ class Application:
             if op == ':not:':
                 # not matches if tag column is null
                 if tag == 'id':
-                    raise Conflict('The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
+                    raise Conflict(self, 'The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
                 outertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p) ))
                 if tagdef.readok == False and enforce_read_authz:
                     # this tag cannot be read so act like it is absent
@@ -1848,7 +1855,7 @@ class Application:
                             if hasattr(vals[v], 'is_subquery'):
                                 typedef = self.globals['typesdict'][tagdef.typestr]
                                 if op != '=':
-                                    raise BadRequest('Operator "%s" not allowed with subquery for subject predicate values.' % op)
+                                    raise BadRequest(self, 'Operator "%s" not allowed with subquery for subject predicate values.' % op)
                                 
                                 sq_path = [ x for x in vals[v].path ]
                                 sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
@@ -1862,7 +1869,7 @@ class Application:
                                     # subquery just needs to generate results w/ ID
                                     sq_project = 'id'
                                 else:
-                                    raise BadRequest('Subquery predicate not supported for tag "%s".' % tagdef.tagname)
+                                    raise BadRequest(self, 'Subquery predicate not supported for tag "%s".' % tagdef.tagname)
                                 
                                 sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
                                 q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sv%s_%s_%d__" % (vprefix, p, v, qd))
@@ -1979,13 +1986,13 @@ class Application:
                     raise ValueError
                 elif pred.op and pred.vals:
                     if tagdef.typestr == 'empty':
-                        raise BadRequest('Inappropriate operator "%s" for tag "%s".' % (pred.op, pred.tag))
+                        raise BadRequest(self, 'Inappropriate operator "%s" for tag "%s".' % (pred.op, pred.tag))
                     valpreds = []
                     for v in range(0, len(pred.vals)):
                         if hasattr(pred.vals[v], 'is_subquery'):
                             typedef = self.globals['typesdict'][tagdef.typestr]
                             if pred.op not in [ '=', 'IN' ]:
-                                raise BadRequest('Operator "%s" not allowed with subquery for list predicate values.' % op)
+                                raise BadRequest(self, 'Operator "%s" not allowed with subquery for list predicate values.' % op)
                             
                             sq_path = [ x for x in pred.vals[v].path ]
                             sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
@@ -1999,7 +2006,7 @@ class Application:
                                 # subquery just needs to generate results w/ ID
                                 sq_project = 'id'
                             else:
-                                raise BadRequest('Subquery predicate not supported for tag "%s".' % tagdef.tagname)
+                                raise BadRequest(self, 'Subquery predicate not supported for tag "%s".' % tagdef.tagname)
 
                             sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
                             q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sp%s_%s_%d__" % (vprefix, p, v, qd))
@@ -2058,7 +2065,7 @@ class Application:
                     # need to condition read on subjectowner test
                     expr = 'CASE WHEN subjects.is_owner THEN %s ELSE NULL END' % expr
                 else:
-                    raise RuntimeError('Unimplemented list-tags authorization scenario in query by predlist for tag "%s".', tagdef.tagname)
+                    raise RuntimeError(self, 'Unimplemented list-tags authorization scenario in query by predlist for tag "%s".', tagdef.tagname)
                 
             selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tag, tag), prefix='')))
                 
@@ -2128,12 +2135,12 @@ class Application:
                 csubjpreds, clistpreds, cordertags = cstack[0]
                 
                 if len(clistpreds) != 1:
-                    raise BadRequest("Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
+                    raise BadRequest(self, "Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
                 projection = clistpreds[0].tag
 
                 tagref = typedefs[tagdefs[projection].typestr]['typedef tagref']
                 if tagref == None and tagdefs[projection].typestr not in [ 'text', 'id' ]:
-                    raise BadRequest('Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
+                    raise BadRequest(self, 'Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
                 
                 if tagref != None:
                     context_attr = tagref
