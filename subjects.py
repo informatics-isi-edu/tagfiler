@@ -645,7 +645,7 @@ class Subject (Application):
                         if value == None:
                             return default
                     else:
-                        return urllib.unquote_plus(value)
+                        return unicode(urllib.unquote_plus(value), 'utf8')
                 return value
 
             self.key = get_param('key')

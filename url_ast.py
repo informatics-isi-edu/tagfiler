@@ -107,7 +107,7 @@ class TransmitNumber (Node):
         self.storage = web.input()
         
         try:
-            self.table = urllib.unquote_plus(self.storage.table)
+            self.table = unicode(urllib.unquote_plus(self.storage.table), 'utf8')
         except:
             pass
         
@@ -139,22 +139,22 @@ class Study (Node):
 
     def GET(self, uri):
         try:
-            self.action = urllib.unquote_plus(self.storage.action)
+            self.action = unicode(urllib.unquote_plus(self.storage.action), 'utf8')
         except:
             pass
 
         try:
-            self.study_type = urllib.unquote_plus(self.storage.type)
+            self.study_type = unicode(urllib.unquote_plus(self.storage.type), 'utf8')
         except:
             pass
 
         try:
-            self.direction = urllib.unquote_plus(self.storage.direction)
+            self.direction = unicode(urllib.unquote_plus(self.storage.direction), 'utf8')
         except:
             pass
 
         try:
-            self.status = urllib.unquote_plus(self.storage.status)
+            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
         except:
             pass
 
@@ -230,27 +230,27 @@ class Study (Node):
     def PUT(self, uri):
         self.storage = web.input()
         try:
-            self.study_size = int(urllib.unquote_plus(self.storage.study_size))
+            self.study_size = int(unicode(urllib.unquote_plus(self.storage.study_size), 'utf8'))
         except:
             pass
 
         try:
-            self.count = int(urllib.unquote_plus(self.storage.count))
+            self.count = int(unicode(urllib.unquote_plus(self.storage.count), 'utf8'))
         except:
             pass
 
         try:
-            self.status = urllib.unquote_plus(self.storage.status)
+            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
         except:
             pass
 
         try:
-            self.direction = urllib.unquote_plus(self.storage.direction)
+            self.direction = unicode(urllib.unquote_plus(self.storage.direction), 'utf8')
         except:
             pass
 
         try:
-            self.key = urllib.unquote_plus(self.storage.key)
+            self.key = unicode(urllib.unquote_plus(self.storage.key), 'utf8')
         except:
             pass
 
@@ -288,7 +288,7 @@ class AppletError (Node):
 
     def GET(self, uri):
         try:
-            self.status = urllib.unquote_plus(self.storage.status)
+            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
         except:
             pass
 
@@ -370,12 +370,12 @@ class FileList (Node):
         readers = None
         writers = None
         try:
-            action = urllib.unquote_plus(self.storage.action)
+            action = unicode(urllib.unquote_plus(self.storage.action), 'utf8')
             try:
-                name = urllib.unquote_plus(self.storage.name)
-                filetype = urllib.unquote_plus(self.storage.type)
-                readers = urllib.unquote_plus(self.storage['read users'])
-                writers = urllib.unquote_plus(self.storage['write users'])
+                name = unicode(urllib.unquote_plus(self.storage.name), 'utf8')
+                filetype = unicode(urllib.unquote_plus(self.storage.type), 'utf8')
+                readers = unicode(urllib.unquote_plus(self.storage['read users']), 'utf8')
+                writers = unicode(urllib.unquote_plus(self.storage['write users']), 'utf8')
             except:
                 pass
         except:
@@ -407,7 +407,7 @@ class FileList (Node):
                 return self.dbtransact(body, postCommit)
         else:
             try:
-                self.globals['view'] = urllib.unquote_plus(self.storage.view)
+                self.globals['view'] = unicode(urllib.unquote_plus(self.storage.view), 'utf8')
             except:
                 pass
             return self.dbtransact(body, postCommit)
@@ -878,17 +878,17 @@ class FileTags (Node):
         tagdefs = [ x for x in all if x.tagname in self.listtags ]
             
         if len(files) == 1:
-            return self.renderlist('Tag(s) for subject matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
+            return self.renderlist('Tag(s) for subject matching "%s"' % unicode(urllib.unquote_plus(path_linearize(simplepath)), 'utf8'),
                                    [self.render.FileTagExisting('', files[0], tagdefs)])
         else:
-            return self.renderlist('Tag(s) for subjects matching "%s"' % urllib.unquote_plus(path_linearize(simplepath)),
+            return self.renderlist('Tag(s) for subjects matching "%s"' % unicode(urllib.unquote_plus(path_linearize(simplepath)), 'utf8'),
                                    [self.render.FileTagValExisting('', files, tagdefs)])
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
         self.globals['referer'] = self.config['home'] + uri
         try:
-            self.view_type = urllib.unquote_plus(self.storage.view)
+            self.view_type = unicode(urllib.unquote_plus(self.storage.view), 'utf8')
         except:
             pass
 

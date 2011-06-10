@@ -170,7 +170,7 @@ def urlquote(url):
 def urlunquote(url):
     if type(url) != type('text'):
         url = str(url)
-    return urllib.unquote_plus(url)
+    return unicode(urllib.unquote_plus(url), 'utf8')
 
 def parseBoolString(theString):
     if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
@@ -220,8 +220,8 @@ def buildPolicyRules(rules, fatal=False):
     remap = dict()
     for rule in rules:
         srcrole, dstrole, readers, writers, readok, writeok = rule.split(';', 6)
-        srcrole = urllib.unquote(srcrole.strip())
-        dstrole = urllib.unquote(dstrole.strip())
+        srcrole = unicode(urllib.unquote(srcrole.strip()), 'utf8')
+        dstrole = unicode(urllib.unquote(dstrole.strip()), 'utf8')
         readers = readers.strip()
         writers = writers.strip()
         readok = readok.strip().lower() in [ 'true', 'yes' ]
@@ -233,12 +233,12 @@ def buildPolicyRules(rules, fatal=False):
             else:
                 continue
         if readers != '':
-            readers = [ urllib.unquote(reader.strip()) for reader in readers.split(',') ]
+            readers = [ unicode(urllib.unquote(reader.strip()), 'utf8') for reader in readers.split(',') ]
             readers = [ reader for reader in readers if reader != '' ]
         else:
             readers = []
         if writers != '':
-            writers = [ urllib.unquote(writer.strip()) for writer in writers.split(',') ]
+            writers = [ unicode(urllib.unquote(writer.strip()), 'utf8') for writer in writers.split(',') ]
             writers = [ writer for writer in writers if writer != '' ]
         else:
             writers = []
