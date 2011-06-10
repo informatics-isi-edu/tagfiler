@@ -148,7 +148,7 @@ logger = logging.getLogger('tagfiler')
 #logger.addHandler(filehandler)
 
 sysloghandler = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1)
-syslogformatter = logging.Formatter('%(name)s: %(message)s')
+syslogformatter = logging.Formatter('%(name)s[%(process)d.%(thread)d]: %(message)s')
 sysloghandler.setFormatter(syslogformatter)
 logger.addHandler(sysloghandler)
 
