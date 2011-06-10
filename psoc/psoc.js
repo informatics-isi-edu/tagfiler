@@ -61,6 +61,8 @@ var selectedTags = new Array();
 
 var multivalueIds = new Array();
 
+var firstSubject;
+
 function str(value) {
 	return '\'' + value + '\'';
 }
@@ -455,7 +457,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		suffix = '-' + suffix;
 	}
 	groupName[groupName.length] = subjectGroupName;
-	var firstSubject = 0;
+	firstSubject = 0;
 	
 	// check if we have already such subjects
 	if (inner == 'false') {
@@ -464,32 +466,15 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		var SUFFIX = '?limit=none&versions=latest';
 		var data_id = USER + '-' + subjectGroupName + value + '-' + '%';
 		var url = PREFIX + value.substr(0,1).toLowerCase() + value.substr(1) + LIKE + encodeURIComponent(data_id) + SUFFIX;
-		ajax_client.open("GET", url, false);
-		ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-		ajax_client.setRequestHeader("Accept", "text/uri-list"); 
-		ajax_client.send(null);
-		if(ajax_client.readyState == 4) {
-			if (ajax_client.status == 200) {
-				var a = ajax_client.responseText;
-				var rows = a.split('\n');
-				var values = new Array();
-				for (var j=0; j<rows.length; j++) {
-					if (rows[j].length > 0) {
-						var index = rows[j].lastIndexOf('-') + 1;
-						var val = parseInt(rows[j].substr(index));
-						if (val > firstSubject) {
-							firstSubject = val;
-						}
-					}
-				}
-			} else {
-				var err = ajax_client.getResponseHeader('X-Error-Description');
-				alert(err != null ? unescape(err) : ajax_client.responseText);
-			}
-		} else {
-			var err = ajax_client.getResponseHeader('X-Error-Description');
-			alert(err != null ? unescape(err) : ajax_client.responseText);
-		}
+		$.ajax({
+			url: url,
+			accepts: {text: 'text/uri-list'},
+			dataType: 'text',
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: false,
+			success: handleSubjectResponse,
+			error: handleError
+		});
 	}
 	
 	firstSubject += 1;
@@ -674,6 +659,20 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'size', textValue.length);
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 	return subjectGroupName + typeCode + firstSubject + suffix;
+}
+
+function handleSubjectResponse(data, textStatus, jqXHR) {
+	var rows = jqXHR.responseText.split('\n');
+	var values = new Array();
+	for (var j=0; j<rows.length; j++) {
+		if (rows[j].length > 0) {
+			var index = rows[j].lastIndexOf('-') + 1;
+			var val = parseInt(rows[j].substr(index));
+			if (val > firstSubject) {
+				firstSubject = val;
+			}
+		}
+	}
 }
 
 function addTags(group) {
@@ -1011,39 +1010,41 @@ function sendSelectRequest() {
 	var PREFIX = HOME + '/query/';
 	var SUFFIX = 'ID?versions=any';
 	var url = PREFIX + selectArray[sentRequests] + SUFFIX;
-	ajax_client.open("GET", url, false);
-	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-	ajax_client.setRequestHeader("Accept", "text/uri-list"); 
-	ajax_client.send(null);
-	var success = false;
-	if(ajax_client.readyState == 4) {
-		if (ajax_client.status == 200) {
-			var a = ajax_client.responseText;
-			var rows = a.split('\n');
-			var values = new Array();
-			for (var j=0; j<rows.length; j++) {
-				if (rows[j].length > 0) {
-					var index = rows[j].lastIndexOf('=') + 1;
-					values.push(decodeURIComponent(rows[j].substr(index)));
-				}
-			}
-			enumArray[selectArray[sentRequests]] = values.sort();
-			if (sharedId[selectArray[sentRequests]] != null) {
-				var tags = sharedId[selectArray[sentRequests]];
-				for (var j=0; j<tags.length; j++) {
-				 	enumArray[tags[j]] = enumArray[selectArray[sentRequests]].slice(0);
-				}
-			}
-			success = true;
-		} else {
-			var err = ajax_client.getResponseHeader('X-Error-Description');
-			alert(err != null ? unescape(err) : ajax_client.responseText);
+	$.ajax({
+		url: url,
+		accepts: {text: 'text/uri-list'},
+		dataType: 'text',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: handleSelectResponse,
+		error: handleError
+	});
+}
+
+function handleError(jqXHR, textStatus, errorThrown) {
+	var err = jqXHR.getResponseHeader('X-Error-Description');
+	alert(err != null ? unescape(err) : jqXHR.responseText);
+	document.getElementById('psoc_progress_bar').style.display = 'none';
+	document.getElementById("Status").innerHTML = '';
+}
+
+function handleSelectResponse(data, textStatus, jqXHR) {
+	var rows = jqXHR.responseText.split('\n');
+	var values = new Array();
+	for (var j=0; j<rows.length; j++) {
+		if (rows[j].length > 0) {
+			var index = rows[j].lastIndexOf('=') + 1;
+			values.push(decodeURIComponent(rows[j].substr(index)));
 		}
-	} else {
-		var err = ajax_client.getResponseHeader('X-Error-Description');
-		alert(err != null ? unescape(err) : ajax_client.responseText);
 	}
-	if (!success || ++sentRequests >= totalRequests) {
+	enumArray[selectArray[sentRequests]] = values.sort();
+	if (sharedId[selectArray[sentRequests]] != null) {
+		var tags = sharedId[selectArray[sentRequests]];
+		for (var j=0; j<tags.length; j++) {
+		 	enumArray[tags[j]] = enumArray[selectArray[sentRequests]].slice(0);
+		}
+	}
+	if (++sentRequests >= totalRequests) {
 		document.getElementById('psoc_progress_bar').style.display = 'none';
 		document.getElementById("Status").innerHTML = '';
 	} else {
@@ -1196,54 +1197,47 @@ function postSubject() {
 		}
 	}
 	url += tags.join('&');
-	ajax_client.open("POST", url, false);
-	ajax_client.setRequestHeader("User-agent", "Tagfiler/1.0");
-	ajax_client.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-	var params = 'action=post';
-	ajax_client.send(params);
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
-	if(ajax_client.readyState == 4) {
-		if (ajax_client.status != 200) {
-			var p = document.createElement('p');
-			document.getElementById("Error").appendChild(p);
-			p.innerHTML = 'ERROR: ' + ajax_client.status;
-			var err = ajax_client.getResponseHeader('X-Error-Description');
-			var br = document.createElement('br');
-			document.getElementById("Error").appendChild(br);
-			br = document.createElement('br');
-			document.getElementById("Error").appendChild(br);
-			p = document.createElement('p');
-			document.getElementById("Error").appendChild(p);
-			p.innerHTML = (err != null ? unescape(err) : ajax_client.responseText);
-			br = document.createElement('br');
-			document.getElementById("Error").appendChild(br);
-			br = document.createElement('br');
-			document.getElementById("Error").appendChild(br);
-		} else {
-			success = true;
-		}
-	} else {
-		var err = ajax_client.getResponseHeader('X-Error-Description');
-		var p = document.createElement('p');
-		document.getElementById("Error").appendChild(p);
-		p.innerHTML = (err != null ? unescape(err) : ajax_client.responseText);
-		var br = document.createElement('br');
-		document.getElementById("Error").appendChild(br);
-		br = document.createElement('br');
-		document.getElementById("Error").appendChild(br);
-	}
-	if (!success || ++sentRequests >= totalRequests) {
+	$.ajax({
+		url: url,
+		type: 'POST',
+		headers: {'User-agent': 'Tagfiler/1.0', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+		data: {action: 'post'},
+		async: false,
+		success: handleSubmitResponse,
+		error: handleSubmitError
+	});
+}
+
+function handleSubmitResponse(data, textStatus, jqXHR) {
+	if (++sentRequests >= totalRequests) {
 		document.getElementById('psoc_progress_bar').style.display = 'none';
 		document.getElementById("Status").innerHTML = '';
+		subjectsQueue.length = 0;
+		listSubjects();
+	} else {
+		displayStatus('postSubject()');
 	}
-	if (success) {
-		if (sentRequests >= totalRequests){
-			subjectsQueue.length = 0;
-			listSubjects();
-		} else {
-			displayStatus('postSubject()');
-		}
-	}
+}
+
+function handleSubmitError(jqXHR, textStatus, errorThrown) {
+	var p = document.createElement('p');
+	document.getElementById("Error").appendChild(p);
+	p.innerHTML = 'ERROR: ' + textStatus;
+	var err = jqXHR.getResponseHeader('X-Error-Description');
+	var br = document.createElement('br');
+	document.getElementById("Error").appendChild(br);
+	br = document.createElement('br');
+	document.getElementById("Error").appendChild(br);
+	p = document.createElement('p');
+	document.getElementById("Error").appendChild(p);
+	p.innerHTML = (err != null ? unescape(err) : jqXHR.responseText);
+	br = document.createElement('br');
+	document.getElementById("Error").appendChild(br);
+	br = document.createElement('br');
+	document.getElementById("Error").appendChild(br);
+	document.getElementById('psoc_progress_bar').style.display = 'none';
+	document.getElementById("Status").innerHTML = '';
 }
 
 function resolveDependencies() {
