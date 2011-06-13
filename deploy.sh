@@ -215,207 +215,129 @@ chmod -R a+r ${deploydir}
 EOF
 fi
 
+cat > /usr/sbin/runuser-rsh <<EOF
+#!/bin/sh
+
+# support basic RSH args on top of runuser for local commands like rsync
+
+in_options=true
+TARGET_USER=
+
+usage()
+{
+    cat <<E2OF
+usage: \$0 [-l <user>] hostname cmd [arg]...
+
+Runs "cmd arg..." locally, using runuser if a target user is specified.
+Hostname is ignored for compatibility with RSH for localhost.
+
+E2OF
+}
+
+error()
+{
+    cat <<E2OF
+\$0: \$@
+E2OF
+    usage
+    exit 1
+}
+
+while [[ -n "\${in_options}" ]]
+do
+  case "\$1" in
+      -l)
+	  TARGET_USER="\$2"
+	  shift 2
+	  ;;
+
+      --)
+	  shift
+	  in_options=
+	  ;;
+
+      -*)
+	  error Unsupported option flag "\\"\$1\\"".
+	  ;;
+
+      *)
+	  in_options=
+	  ;;
+  esac
+done
+
+# discard hostname
+shift
+
+[[ \$# -gt 0 ]] || error Expected command and argument list
+
+if [[ -n "\${TARGET_USER}" ]]
+then
+    # run via runuser with target user
+    commandstring="\$1"
+    shift
+
+    for arg in "\$@"
+    do
+      commandstring+=" \\"\$(sed -e 's/\\"/\\\\\\"/g' <<< "\$arg")\\""
+    done
+
+    runuser -c "\${commandstring}" - "\${TARGET_USER}"
+else
+    # run command directly since there is no target user to switch to
+    exec "\$@"
+fi
+EOF
+
 if [[ -d /etc/logrotate.d/ ]]
 then
     cat > /etc/logrotate.d/${SVCPREFIX} <<EOF
-/var/www/${SVCPREFIX}-logs/messages {
+/var/log/${SVCPREFIX} {
     missingok
     dateext
-    create 0600 tagfiler tagfiler
     daily
-    minsize 500k
     rotate 31
     maxage 31
     ifempty
     sharedscripts
     postrotate
-        /sbin/service ${SVCPREFIX}-log reload > /dev/null 2>/dev/null || true
+	/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+	rsync --delete-after -a -e /usr/sbin/runuser-rsh /var/log/${SVCPREFIX}-* ${SVCUSER}@localhost:/var/www/${SVCPREFIX}-logs/ 2>/dev/null || true
     endscript
 }
 EOF
 fi
 
-umask 0007
-[[ -e /var/log/${SVCPREFIX} ]] || mkfifo /var/log/${SVCPREFIX}
-umask 0022
+# clean up old logging hacks
+[[ -f /etc/sysconfig/${SVCPREFIX}-log ]] && rm -f /etc/sysconfig/${SVCPREFIX}-log
+[[ -f /usr/sbin/${SVCPREFIX}-log ]] && rm -f /usr/sbin/${SVCPREFIX}-log 
+[[ -f /etc/rc.d/init.d/${SVCPREFIX}-log ]] && {
 
-if [[ -d /usr/sbin ]] && [[ -d /etc/rc.d/init.d ]]
+    service ${SVCPREFIX}-log stop
+    chkconfig ${SVCPREFIX}-log off
+    rm /etc/rc.d/init.d/${SVCPREFIX}-log
+
+}
+if grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
 then
-    if [[ -d /etc/sysconfig ]]
-	then
-	cat > /etc/sysconfig/${SVCPREFIX}-log <<EOF
-# configuration for ${SVCPREFIX}-log service
-# these settings override the built-in defaults if non-empty
-
-# how does syslog process the logs?
-SYSLOG_FACILITY=local1
-SYSLOG_TARGET=/var/log/${SVCPREFIX}
-
-# how do we copy the logs?
-COPY_TARGET=/var/www/${SVCPREFIX}-logs/messages
-COPY_USER=${SVCUSER}
-# where does copier send its events?  make sure this doesn't return to us
-COPY_FACILITY=local2
-
-EOF
-    fi
-
-    cat > /usr/sbin/${SVCPREFIX}-log <<EOF
-#!/bin/sh
-
-# this tiny daemon copies logs from named pipe to file under apache server dir
-#
-
-[[ -r /etc/sysconfig/${SVCPREFIX}-log ]] && . /etc/sysconfig/${SVCPREFIX}-log
-
-SYSLOG_FACILITY=\${SYSLOG_FACILITY:-local1}
-SYSLOG_TARGET=\${SYSLOG_TARGET:-/var/log/${SVCPREFIX}}
-
-COPY_TARGET=\${COPY_TARGET:-/var/www/${SVCPREFIX}-logs/messages}
-COPY_USER=\${COPY_USER:-${SVCUSER}}
-COPY_FACILITY=\${COPY_FACILITY:-local2}
-
-MODE="\${1:-reader}"
-
-reader_exit()
-{
-    logger -i -p \${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader stopped"
-}
-
-reader()
-{
-    # this must be run as the reading user (root)
-    trap reader_exit 0
-
-    logger -i -p \${SYSLOG_FACILITY}.notice -t "\$(basename "\$0")" "log reader started"
-
-    while read line
-    do
-       printf "%s\n" "\$line"
-    done < "\${SYSLOG_TARGET}"
-}
-
-writer_exit()
-{
-    stopmsg=\$(logger -i -s -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "log writer stopped" 2>&1)
-    printf "%s %s %s\n" "\$(date +'%b %_d %H:%M:%S')" "\$(hostname -s)" "\$stopmsg" >> "\${COPY_TARGET}"
-}
-
-writer()
-{
-    # this must be run as the writing user
-    umask 0007
-
-    trap writer_exit 0
-
-    startmsg=\$(logger -i -s -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "log writer started" 2>&1)
-    printf "%s %s %s\n" "\$(date +'%b %_d %H:%M:%S')" "\$(hostname -s)" "\$startmsg" >> "\${COPY_TARGET}"
-
-    while read line
-    do
-	count=0
-	while ! printf "%s\n" "\$line" >> "\${COPY_TARGET}"
-	do
-	    count=\$(( \$count + 1 ))
-	    if [[ \$count -lt 5 ]]
-	    then
-		sleep 1
-	    else
-		logger -i -p \${COPY_FACILITY}.notice -t "\$(basename "\$0")" "failed to copy: \$line"
-		break
-	    fi
-	done
-    done
-}
-
-
-case "\$MODE" in
-
-    reader)
-	reader | runuser -c "\$0 writer" - \${COPY_USER} &
-	;;
-
-    writer)
-	writer
-	;;
-
-    *)
-	logger -i -s -p ${COPY_FACILITY}.notice -t "\$(basename "\$0")" "arguments not understood"
-	;;
-
-esac
-EOF
-
-    cat > /etc/rc.d/init.d/${SVCPREFIX}-log <<EOF
-#!/bin/sh
-#
-# ${SVCPREFIX}-log:		Audit log copy daemon for ${SVCPREFIX}.
-#
-# chkconfig:	- 85 15
-# description:	Copies log entries from FIFO /var/log/${SVCPREFIX} \
-#               to file /var/www/${SVCPREFIX}-logs/messages for serving to web clients.
-
-# Source function library.
-. /etc/rc.d/init.d/functions
-
-# [ -r /etc/sysconfig/${SVCPREFIX}-log ] && . /etc/sysconfig/${SVCPREFIX}-log
-
-start() 
-{
-        [[ -e /var/lock/subsys/${SVCPREFIX}-log ]] && exit 0
-
-
-        echo -n \$"Starting ${SVCPREFIX}-log: "
-        daemon /usr/sbin/${SVCPREFIX}-log
-
-	touch /var/lock/subsys/${SVCPREFIX}-log
-        echo
-}
-
-stop() 
-{
-        echo -n \$"Shutting down ${SVCPREFIX}-log: "
-	killproc ${SVCPREFIX}-log
-
-	rm -f  /var/lock/subsys/${SVCPREFIX}-log
-        echo
-}
-
-# See how we were called.
-case "\$1" in
-  start)
-	start
-        ;;
-  stop)
-	stop
-        ;;
-  restart|reload)
-	stop
-	start
-	;;
-  status)
-  	status ${SVCPREFIX}-log
-	;;
-  *)
-        echo \$"Usage: $0 {start|stop|restart|reload}"
-        exit 1
-esac
-
-exit 0
-EOF
-
-    chmod a+x /usr/sbin/${SVCPREFIX}-log
-    chmod a+x /etc/rc.d/init.d/${SVCPREFIX}-log
-    chkconfig ${SVCPREFIX}-log on
-
-    if ! grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
-	then
-	cat >> /etc/syslog.conf <<EOF
-
-# ${SVCPREFIX} log copy service 
-local1.*                                        |/var/log/${SVCPREFIX}
-
-EOF
-	service syslog restart
-    fi
+    # disable old, conflicting entry
+    TMPF=$(mktemp syslog.conf.XXXXXXXXXX)
+    cat /etc/syslog.conf | sed -e 's:^\( *local1\..*|/var/log/${SVCPREFIX}\):# \1:' > $TMPF && cat $TMPF > /etc/syslog.conf
+    rm $TMPF
+    service syslog restart
 fi
+[[ -p /var/log/${SVCPREFIX} ]] && rm -f /var/log/${SVCPREFIX}
+
+
+# enable new logging entry
+if ! grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
+then
+    cat >> /etc/syslog.conf <<EOF
+
+# ${SVCPREFIX} log entries
+local1.*                                        /var/log/${SVCPREFIX}
+
+EOF
+    service syslog restart
+fi
+

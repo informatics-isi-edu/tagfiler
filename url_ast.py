@@ -447,7 +447,7 @@ class LogList (Node):
                 return self.render.LogUriList(lognames)
             elif acceptType == 'text/html':
                 break
-        return self.renderlist("Available logs",
+        return self.renderlist("Archived logs",
                                [self.render.LogList(lognames)])
 
 class Contact (Node):

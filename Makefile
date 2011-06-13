@@ -81,7 +81,6 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 
 restart: force install
 	service httpd restart
-	service $(INSTALLSVC)-log restart
 
 clean: force
 	rm -rf $(INSTALLDIR)
