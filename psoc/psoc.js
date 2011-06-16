@@ -25,6 +25,16 @@ tagsArray['Site'] = 'siteID	address'.split('\t');
 tagsArray['Supplier'] = 'supplierID	address	email'.split('\t');
 tagsArray['Treatment'] = 'treatmentID	drug	dose	lot#	performer'.split('\t');
 
+var tagMap = {
+	'start age' : 'startAge',
+	'mouse strain' : 'mouseStrain',
+	'lot#' : 'lot',
+	'cancer type' : 'cancerType',
+	'#cells' : 'cells',
+	'sample type' : 'sampleType',
+	'serum sample type' : 'serumSampleType'
+}
+
 var selectArray = 'lab	researcher	site	supplier	treatment'.split('\t');
 var sharedId = new Array();
 sharedId['researcher'] = 'performer	principal'.split('\t');
@@ -67,6 +77,15 @@ function str(value) {
 	return '\'' + value + '\'';
 }
 
+function getId(tag) {
+	var tagId = tagMap[tag];
+	return (tagId != null ? tagId : tag);
+}
+
+function getChild(item, index) {
+	return item.children(':nth-child(' + index + ')');
+}
+
 function makeId() {
 	var parts = new Array();
 	for( var i=0; i < arguments.length; i++ ) {
@@ -86,69 +105,51 @@ function makeFunction() {
 function makeAttributes() {
 	var elem = arguments[0];
 	for( var i=1; i < arguments.length; i+=2 ) {
-		elem.setAttribute(arguments[i], arguments[i+1]);
+		elem.attr(arguments[i], arguments[i+1]);
 	}
 }
 
 function getLeftOffset(id) {
-	var elem = document.getElementById(id);
-	var offset = elem.offsetLeft;
-	var parent = elem.offsetParent;
-	while (parent != null) {
-		if (parent.offsetLeft != null) {
-			offset += parent.offsetLeft;
-		}
-		parent = parent.offsetParent;
-	}
+	var elem = $('#' + id);
+	var offset = elem.offset().left;
 	return offset;
 }
 
 function getTopOffset(id) {
-	var elem = document.getElementById(id);
-	var offset = elem.offsetTop;
-	var parent = elem.offsetParent;
-	while (parent != null) {
-		if (parent.offsetTop != null) {
-			offset += parent.offsetTop;
-		}
-		parent = parent.offsetParent;
-	}
+	var elem = $('#' + id);
+	var offset = elem.offset().top;
 	return offset;
 }
 
 function deleteElementById(id) {
-	var elem = document.getElementById(id);
-	elem.parentNode.removeChild(elem);
-}
-
-function deleteElement(elem) {
-	elem.parentNode.removeChild(elem);
+	var elem = $('#' + id);
+	elem.remove();
 }
 
 function deleteColumn(id) {
-	var row = document.getElementById(id).parentNode;
-	var table = row.parentNode;
+	var row = $('#' + id).parent();
+	var table = row.parent();
 	var index = 0;
-	var columns = row.children;
-	for (var i=0; i < columns.length; i++) {
-		if (columns[i].getAttribute('id') == id) {
+	var count = row.children().size();
+	for (var i=1; i <= count; i++) {
+		if (getChild(row, i).attr('id') == id) {
 			index = i;
 			break;
 		}
 	}
-	var rows = table.children;
-	for (var i=0; i < rows.length; i++) {
-		var column = rows[i].children[index];
-		rows[i].removeChild(column);
+	count = table.children().size();
+	for (var i=1; i <= count; i++) {
+		var row = getChild(table, i);
+		getChild(row, index).remove();
 	}
 }
 
 function getColumnIndex(id) {
-	var row = document.getElementById(id).parentNode;
-	var columns = row.children;
+	var row = $('#' + id).parent();
+	var count = row.children().size();
 	var index = -1;
-	for (var i=0; i < columns.length; i++) {
-		if (columns[i].getAttribute('id') == id) {
+	for (var i=1; i <= count; i++) {
+		if (getChild(row, i).attr('id') == id) {
 			index = i;
 			break;
 		}
@@ -158,11 +159,11 @@ function getColumnIndex(id) {
 
 function getVisibleColumn(group) {
 	var id = makeId('subjects', group);
-	var row = document.getElementById(id).parentNode;
+	var row = $('#' + id).parent();
 	var position = -1;
-	var columns = row.children;
-	for (var i=1; i < columns.length; i++) {
-		if (columns[i].style.display.length == 0) {
+	var count = row.children().size();
+	for (var i=2; i <= count; i++) {
+		if (!getChild(row, i).is(':hidden')) {
 			position = i;
 			break;
 		}
@@ -172,11 +173,11 @@ function getVisibleColumn(group) {
 
 function getHideColumn(group) {
 	var id = makeId('subjects', group);
-	var row = document.getElementById(id).parentNode;
+	var row = $('#' + id).parent();
 	var position = -1;
-	var columns = row.children;
-	for (var i=1; i < columns.length; i++) {
-		if (columns[i].style.display.length > 0) {
+	var count = row.children().size();
+	for (var i=2; i <= count; i++) {
+		if (getChild(row, i).is(':hidden')) {
 			position = i;
 			break;
 		}
@@ -186,11 +187,11 @@ function getHideColumn(group) {
 
 function getVisibleColumnCount(group) {
 	var id = makeId('subjects', group);
-	var row = document.getElementById(id).parentNode;
+	var row = $('#' + id).parent();
 	var total = 0;
-	var columns = row.children;
-	for (var i=1; i < columns.length; i++) {
-		if (columns[i].style.display.length == 0) {
+	var count = row.children().size();
+	for (var i=2; i <= count; i++) {
+		if (!getChild(row, i).is(':hidden')) {
 			total++;
 		}
 	}
@@ -199,19 +200,21 @@ function getVisibleColumnCount(group) {
 
 function hideColumn(group, position) {
 	var id = makeId('subjects', group);
-	var table = document.getElementById(id).parentNode.parentNode;
-	var rows = table.children;
-	for (var i=0; i < rows.length; i++) {
-		rows[i].children[position].style.display = 'none';
+	var table = $('#' + id).parent().parent();
+	var count = table.children().size();
+	for (var i=1; i <= count; i++) {
+		var row = getChild(table, i);
+		getChild(row, position).css('display', 'none');
 	}
 }
 
 function displayColumn(group, position) {
 	var id = makeId('subjects', group);
-	var table = document.getElementById(id).parentNode.parentNode;
-	var rows = table.children;
-	for (var i=0; i < rows.length; i++) {
-		rows[i].children[position].style.display = '';
+	var table = $('#' + id).parent().parent();
+	var count = table.children().size();
+	for (var i=1; i <= count; i++) {
+		var row = getChild(table, i);
+		getChild(row, position).css('display', '');
 	}
 }
 
@@ -238,9 +241,14 @@ function displayExpandColumn(group) {
 }
 
 function showColumn(group, index) {
-	var dt = document.getElementById(makeId('Subject', group, 'span'));
-	if (dt.nextSibling.style.display == 'none') {
-		var header = dt.getElementsByTagName('span')[0].children[0].children[0].children[1].innerHTML;
+	var dt = $('#' + makeId('Subject', group, 'span'));
+	if (dt.next().css('display') == 'none') {
+		var spans = dt.children('span');
+		var span = getChild(spans, 1);
+		var table = getChild(span, 1);
+		var row = getChild(table, 1);
+		var td = getChild(row, 2);
+		var header = td.html();
 		tog(dt, header);
 	}
 	displayCollapseColumn(group);
@@ -254,25 +262,25 @@ function enableNavigationButtons(group) {
 	var id = makeId('subjects', group);
 	var expandId = makeId(id, 'Expand');
 	var collapseId = makeId(id, 'Collapse');
-	document.getElementById(expandId).style.display = 'none';
-	document.getElementById(collapseId).style.display = 'none';
+	$('#' + expandId).css('display', 'none');
+	$('#' + collapseId).css('display', 'none');
 
 	var count = getVisibleColumnCount(group);
-	var subjects = document.getElementById(id).parentNode.children.length-1;
+	var subjects = $('#' + id).parent().children().size()-1;
 	if (count > 0) {
-		document.getElementById(collapseId).style.display = '';
+		$('#' + collapseId).css('display', '');
 	}
 	if (count < subjects) {
-		document.getElementById(expandId).style.display = '';
+		$('#' + expandId).css('display', '');
 	}
 }
 
 function appendColumn(id, values) {
-	var row = document.getElementById(id).parentNode;
-	var table = row.parentNode;
-	var rows = table.children;
-	for (var i=0; i < rows.length; i++) {
-		rows[i].appendChild(values[i]);
+	var row = $('#' + id).parent();
+	var table = row.parent();
+	var count = table.children().size();
+	for (var i=0; i <= count; i++) {
+		getChild(table, i+1).append(values[i]);
 	}
 }
 
@@ -284,36 +292,36 @@ function newTags(group, value) {
 			newTags.push(tagsArray[value][i]);
 		}
 	}
-	var table = document.getElementById(makeId('subjects', group)).parentNode.parentNode;
+	var table = $('#' + makeId('subjects', group)).parent().parent();
 	var rowClass = 'even';
 	for (var i=0; i<newTags.length; i++) {
-		var row = document.createElement('tr');
+		var row = $('<tr>');
 		makeAttributes(row,
 					   'class', 'file-tag ' + rowClass);
 		rowClass = (rowClass == 'odd') ? 'even' : 'odd';
-		var td = document.createElement('td');
+		var td = $('<td>');
 		makeAttributes(td,
 					   'class', 'file-tag');
-		td.innerHTML = newTags[i];
-		row.appendChild(td);
+		td.html(newTags[i]);
+		row.append(td);
 		for (var j=1; j <= groupCounter[group-1]; j++) {
 			var subjectId = makeId('Subject', group, j);
-			if (document.getElementById(subjectId) == null) {
+			if ($('#' + subjectId).length == 0) {
 				// subject might have been deleted
 				continue;
 			}
-			var id = makeId(subjectId, newTags[i]);
-			var td = document.createElement('td');
+			var id = makeId(subjectId, getId(newTags[i]));
+			var td = $('<td>');
 			makeAttributes(td,
 						   'nowrap', 'nowrap',
 						   'id', id,
 						   'class', 'file-tag');
-			td.appendChild(tagCell(group, newTags[i], j));
-			row.appendChild(td);
+			td.append(tagCell(group, newTags[i], j));
+			row.append(td);
 		}
-		table.insertBefore(row, table.lastChild);
+		row.insertBefore(table.children(':last-child'));
 	}
-	makeAttributes(table.lastChild,
+	makeAttributes(table.children(':last-child'),
 				   'class', 'file-footer ' + rowClass);
 }
 
@@ -323,44 +331,44 @@ function newSubject(group, inner) {
 		typeCode = '-' + groupType[group-1] + '-';
 	}
 	var subjectsId = makeId('subjects', group);
-	var suffix = document.getElementById(subjectsId).getAttribute('suffix');
+	var suffix = $('#' + subjectsId).attr('suffix');
 	var values = new Array();
 	var countIndex = groupCounter[group-1] + 1;
 	var subjectId = makeId('Subject', group, countIndex);
 	groupCounter[group-1] = countIndex;
-	var th = document.createElement('th');
+	var th = $('<th>');
 	makeAttributes(th,
 				   'class', 'file-tag',
 				   'id', makeId(subjectId, 'header'));
-	th.innerHTML = (inner == 'false' ? USER + '-' : '') + groupName[group-1] + typeCode + countIndex + suffix;
+	th.html((inner == 'false' ? USER + '-' : '') + groupName[group-1] + typeCode + countIndex + suffix);
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
-		var id = makeId(subjectId, selectedTags[group-1][i]);
-		var td = document.createElement('td');
+		var id = makeId(subjectId, getId(selectedTags[group-1][i]));
+		var td = $('<td>');
 		makeAttributes(td,
 					   'nowrap', 'nowrap',
 					   'id', id,
 					   'class', 'file-tag entity');
-		td.appendChild(tagCell(group, selectedTags[group-1][i], countIndex));
+		td.append(tagCell(group, selectedTags[group-1][i], countIndex));
 		values.push(td);
 	}
-	var td = document.createElement('td');
+	var td = $('<td>');
 	makeAttributes(td,
 				   'id', subjectId,
 				   'class', 'file-tag');
-	var input = document.createElement('input');
+	var input = $('<input>');
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', makeFunction('hideSubject', group, countIndex),
 				   'value', 'Hide ' + groupType[group-1]);
-	td.appendChild(input);
+	td.append(input);
 	values.push(td);
 	appendColumn(subjectsId, values);
 	var id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
 	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
 	var textValue = (inner == 'false' ? USER + '-' + subjectName : subjectName);
-	document.getElementById(makeId(id, 'input')).value = textValue;
-	makeAttributes(document.getElementById(makeId(id, 'input')),
+	$('#' + makeId(id, 'input')).val(textValue);
+	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
@@ -374,14 +382,13 @@ function deleteSubject(group, position) {
 	var id = makeId('Subject', group, position);
 	var count = getVisibleColumnCount(group);
 	var index = getColumnIndex(id);
-	var row = document.getElementById(id).parentNode;
-	var length = row.children.length;
+	var row = $('#' + id).parent();
 	deleteColumn(id);
-	if (row.children.length == 1) {
+	if (row.children().size() == 1) {
 		// the div that contains the table;
 		id = makeId('Subject', group, 1, 'container');
-		var div = document.getElementById(id);
-		deleteElement(div);
+		var div = $('#' + id);
+		div.remove();
 	} else {
 		enableNavigationButtons(group);
 	}
@@ -395,52 +402,54 @@ function hideSubject(group, position) {
 }
 
 function selectTags() {
-	var select_list_field = document.getElementById("tags");
+	var select_list_field = $('#tags option:selected');
 	var select_list_selected_index = select_list_field.selectedIndex;
-	var value = select_list_field.options[select_list_selected_index].value;
+	var value = $('#tags option:selected').text();
 	var subjectGroupName;
 	while (true) {
 		subjectGroupName = prompt(value + ' name:');
 		if (subjectGroupName == null) {
 			// cancel
-			document.getElementById('selectTag').selected = "selected";
+			$('#selectTag').selected = 'selected';
 			return;
 		}
-		subjectGroupName = subjectGroupName.replace(/^\s*/, "").replace(/\s*$/, "");
+		subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
 		if (subjectGroupName.length > 0) {
 			break;
 		} else {
 			alert(value + ' name can not be empty.');
 		}
 	}
-	selectSubject(value, subjectGroupName + '-', null, document.getElementById('all_subjects'), subjectGroupName);
-	document.getElementById('selectTag').selected = "selected";
+	selectSubject(value, subjectGroupName + '-', null, $('#all_subjects'), subjectGroupName);
+	$('#selectTag').attr('selected', 'selected');
 }
 
 function tog(dt, header) {
-	var dd = dt.nextSibling;
-	var toOpen = (dd.style.display == 'none');
-	dd.style.display = toOpen ? '' : 'none';
-	dt.getElementsByTagName('span')[0].innerHTML = '';
-	var spanTitle = document.createElement('table');
-	dt.getElementsByTagName('span')[0].appendChild(spanTitle);
-	var tr = document.createElement('tr');
+	var dd = dt.next();
+	var toOpen = (dd.css('display') == 'none');
+	dd.css('display', toOpen ? '' : 'none');
+	var spans = dt.children('span');
+	var span = getChild(spans, 1);
+	span.html('');
+	var spanTitle = $('<table>');
+	span.append(spanTitle);
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'no-border');
-	spanTitle.appendChild(tr);
-	var td = document.createElement('td');
-	tr.appendChild(td);
-	var img = document.createElement('img');
-	td.appendChild(img);
+	spanTitle.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	var img = $('<img>');
 	makeAttributes(img,
 				   'src', resourcePrefix + (toOpen ? 'minus.png' : 'plus.png'),
 				   'width', '16',
 				   'height', '16',
 				   'border', '0',
 				   'alt', (toOpen ? '-' : '+'));
-	td = document.createElement('td');
-	tr.appendChild(td);
-	td.innerHTML = header;
+	td.append(img);
+	td = $('<td>');
+	tr.append(td);
+	td.html(header);
 }
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
@@ -452,7 +461,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	if (suffix == null) {
 		suffix = '';
 	}
-	suffix = suffix.replace(/^\s*/, "").replace(/\s*$/, "");
+	suffix = suffix.replace(/^\s*/, '').replace(/\s*$/, '');
 	if (suffix.length > 0) {
 		suffix = '-' + suffix;
 	}
@@ -482,156 +491,156 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	groupCounter[groupCounter.length] = firstSubject;
 	groupType[groupType.length] = value;
 	if (groupCounter.length == 1) {
-		document.getElementById('all_subjects').style.display = 'block';
+		$('#all_subjects').css('display', 'block');
 	}
 	var index = groupCounter.length;
 
-	var container = document.createElement('div');
 	var subjectId = makeId('Subject', index);
 	var subjectId1 = makeId(subjectId, firstSubject);
 	var headerId = makeId(subjectId1, 'header');
+	var container = $('<div>');
 	makeAttributes(container,
 				   'id', makeId(subjectId1, 'container'));
-	parent.appendChild(container);
-	var dl = document.createElement('dl');
-	container.appendChild(dl);
-	var dt = document.createElement('dt');
+	parent.append(container);
+	var dl = $('<dl>');
+	container.append(dl);
+	var dt = $('<dt>');
 	makeAttributes(dt,
-				   'onclick', makeFunction('tog', 'this', str((inner == 'false' ? USER + '-' + header : header))),
+				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? USER + '-' + header : header))),
 				   'id', makeId(subjectId, 'span'));
-	dl.appendChild(dt);
-	var span = document.createElement('span');
+	dl.append(dt);
+	var span = $('<span>');
 	makeAttributes(span,
 				   'style', 'color: blue; cursor: default');
-	dt.appendChild(span);
-	var spanTitle = document.createElement('table');
-	span.appendChild(spanTitle);
-	var tr = document.createElement('tr');
+	dt.append(span);
+	var spanTitle = $('<table>');
+	span.append(spanTitle);
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'no-border');
-	spanTitle.appendChild(tr);
-	var td = document.createElement('td');
-	tr.appendChild(td);
-	var img = document.createElement('img');
-	td.appendChild(img);
+	spanTitle.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	var img = $('<img>');
 	makeAttributes(img,
 				   'src', resourcePrefix + 'minus.png',
 				   'width', '16',
 				   'height', '16',
 				   'border', '0',
 				   'alt', '-');
-	td = document.createElement('td');
-	tr.appendChild(td);
-	td.innerHTML = (inner == 'false' ? USER + '-' + header : header);
-	var dd = document.createElement('dd');
-	dl.appendChild(dd);
+	td.append(img);
+	td = $('<td>');
+	tr.append(td);
+	td.html(inner == 'false' ? USER + '-' + header : header);
+	var dd = $('<dd>');
+	dl.append(dd);
 	if (inner == 'false') {
-		var valuesTable = document.createElement('table');
-		var tr = document.createElement('tr');
-		valuesTable.appendChild(tr);
+		var valuesTable = $('<table>');
+		var tr = $('<tr>');
 		makeAttributes(tr,
 					   'class', 'odd',
 					   'id', makeId(subjectId, 'val', firstSubject));
-		var td = document.createElement('td');
-		tr.appendChild(td);
+		valuesTable.append(tr);
+		var td = $('<td>');
 		makeAttributes(td,
 					   'class', 'file-tag multivalue');
-		var a = document.createElement('a');
-		td.appendChild(a);
+		tr.append(td);
+		var a = $('<a>');
 		makeAttributes(a,
 					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject));
-		a.innerHTML = USER + '-' + subjectGroupName + typeCode + firstSubject;
-		td = document.createElement('td');
-		tr.appendChild(td);
+		a.html(USER + '-' + subjectGroupName + typeCode + firstSubject);
+		td.append(a);
+		td = $('<td>');
 		makeAttributes(td,
 					   'id', makeId(subjectId1, 'removeValue'));
-		var input = document.createElement('input');
+		tr.append(td);
+		var input = $('<input>');
 		makeAttributes(input,
 					   'type', 'button',
 				       'onclick', makeFunction('deleteSubject', index, firstSubject),
 				       'value', 'Remove ' + value);
-		td.appendChild(input);
-		var newSubjectTable = document.createElement('table');
-		tr = document.createElement('tr');
-		newSubjectTable.appendChild(tr);
-		td = document.createElement('td');
-		tr.appendChild(td);
-		input = document.createElement('input');
+		td.append(input);
+		var newSubjectTable = $('<table>');
+		tr = $('<tr>');
+		newSubjectTable.append(tr);
+		td = $('<td>');
+		tr.append(td);
+		input = $('<input>');
 		makeAttributes(input,
 					   'id', makeId(subjectId, 'subject'),
 				       'tagname', value,
 				       'type', 'button',
 				       'onclick', makeFunction('setValue', str(subjectId), str('subject')),
 				       'value', 'New ' + value);
-		td.appendChild(input);
-		var subjectTable = document.createElement('table');
-		var tr = document.createElement('tr');
-		subjectTable.appendChild(tr);
-		td = document.createElement('td');
-		tr.appendChild(td);
-		td.appendChild(valuesTable);
-		tr = document.createElement('tr');
-		subjectTable.appendChild(tr);
-		td = document.createElement('td');
-		tr.appendChild(td);
-		td.appendChild(newSubjectTable);
-		dd.appendChild(subjectTable);
+		td.append(input);
+		var subjectTable = $('<table>');
+		var tr = $('<tr>');
+		subjectTable.append(tr);
+		td = $('<td>');
+		tr.append(td);
+		td.append(valuesTable);
+		tr = $('<tr>');
+		subjectTable.append(tr);
+		td = $('<td>');
+		tr.append(td);
+		td.append(newSubjectTable);
+		dd.append(subjectTable);
 	}
 
 	var subjectsId = makeId('subjects', index);
-	var subject = document.createElement('table');
-	var tr = document.createElement('tr');
+	var subject = $('<table>');
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'no-border');
-	subject.appendChild(tr);
-	td = document.createElement('td');
-	tr.appendChild(td);
-	var table = document.createElement('table');
-	td.appendChild(table);
+	subject.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var table = $('<table>');
 	makeAttributes(table,
 				   'class', 'file-list');
-	tr = document.createElement('tr');
+	td.append(table);
+	tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'file-heading');
-	table.appendChild(tr);
-	var th = document.createElement('th');
-	tr.appendChild(th);
+	table.append(tr);
+	var th = $('<th>');
 	makeAttributes(th,
 				   'class', 'file-tag');
-	th.innerHTML = 'Tags';
-	th = document.createElement('th');
-	tr.appendChild(th);
+	tr.append(th);
+	th.html('Tags');
+	th = $('<th>');
 	makeAttributes(th,
 				   'id', headerId,
 				   'class', 'file-tag');
-	th.innerHTML = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
-	tr = document.createElement('tr');
-	table.appendChild(tr);
+	th.html((inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix);
+	tr.append(th);
+	tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'file-footer');
-	td = document.createElement('td');
-	tr.appendChild(td);
+	table.append(tr);
+	td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag',
 				   'id', subjectsId,
 				   'suffix', suffix);
-	td.appendChild(addTagsElement(index));
-	td = document.createElement('td');
-	tr.appendChild(td);
+	tr.append(td);
+	td.append(addTagsElement(index));
+	td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag',
 				   'id', subjectId1);
-	var input = document.createElement('input');
+	tr.append(td);
+	var input = $('<input>');
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', makeFunction('hideSubject', index, firstSubject),
 				   'value', 'Hide ' + value);
-	td.appendChild(input);
-	dd.appendChild(subject);
-	var div = document.createElement('div');
+	td.append(input);
+	dd.append(subject);
+	var div = $('<div>');
 	makeAttributes(div,
 				   'id', makeId(subjectId1, 'Buttons'));
-	var buttons = document.createElement('input');
+	var buttons = $('<input>');
 	makeAttributes(buttons,
 					'id', makeId(subjectsId, 'Expand'),
 					'type', 'button',
@@ -639,23 +648,23 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					'onclick', makeFunction('displayExpandColumn', index),
 					'style', 'display:none',
 					'value', 'Show All');
-	div.appendChild(buttons);
-	buttons = document.createElement('input');
+	div.append(buttons);
+	buttons = $('<input>');
 	makeAttributes(buttons,
 					'id', makeId(subjectsId, 'Collapse'),
 					'type', 'button',
 					'name', 'Collapse',
 					'onclick', makeFunction('displayCollapseColumn', index),
 					'value', 'Hide All');
-	div.appendChild(buttons);
-	dd.appendChild(div);
-	dd.appendChild(document.createElement('p'));
-	document.getElementById('selectTag').selected = "selected";
+	div.append(buttons);
+	dd.append(div);
+	dd.append($('<p>'));
+	$('#selectTag').attr('selected', 'selected');
 	newTags(groupCounter.length, value);
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
 	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
-	document.getElementById(makeId(id, 'input')).value = textValue;
-	makeAttributes(document.getElementById(makeId(id, 'input')),
+	$('#' + makeId(id, 'input')).val(textValue);
+	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 	return subjectGroupName + typeCode + firstSubject + suffix;
@@ -676,10 +685,8 @@ function handleSubjectResponse(data, textStatus, jqXHR) {
 }
 
 function addTags(group) {
-	var select_list_field = document.getElementById(makeId('addtags', group));
-	var select_list_selected_index = select_list_field.selectedIndex;
-	var value = select_list_field.options[select_list_selected_index].value;
-	document.getElementById(makeId('addTag', group)).selected = "selected";
+	var value = $('#' + makeId('addtags', group) + ' option:selected').text();
+	$('#' + makeId('addTag', group)).attr('selected', 'selected');
 	newTags(group, value);
 }
 
@@ -690,7 +697,7 @@ function setValue(id, type) {
 	var group;
 	var position;
 	if (type != 'button') {
-		tagname = document.getElementById(elemId).getAttribute('tagname');
+		tagname = $('#' + elemId).attr('tagname');
 	} else {
 		var parts = id.split('_');
 		tagname = parts[parts.length - 1];
@@ -702,41 +709,38 @@ function setValue(id, type) {
 		position = groupCounter[group-1];
 	}
 	else if (type == 'button') {
-		var parent = document.getElementById(makeId(id, 'button'));
-		if (parent.children.length == 0) {
+		var parent = $('#' + makeId(id, 'button'));
+		if (parent.children().size() == 0) {
 			var parts = id.split('_');
 			var subjectType = groupType[parts[1] - 1];
 			var subjectID = makeId('Subject', parts[1], parts[2], subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID', 'input');
-			var name = document.getElementById(subjectID).value;
+			var name = $('#' + subjectID).val();
 			value = selectSubject(tagMapArray[tagname], name, '', parent, 'All ' + tagname);
-			group = parent.children[0].getAttribute('id').split('_')[1];
+			group = getChild(parent, 1).attr('id').split('_')[1];
 			position = 1;
 		} else {
-			var parts = parent.children[0].getAttribute('id').split('_');
+			var parts = getChild(parent, 1).attr('id').split('_');
 			group = parts[1];
 			value = newSubject(group, 'true');
 			position = groupCounter[group-1];
 		}
 	} else if (type == 'select') {
-		var select_list_field = document.getElementById(elemId);
-		var select_list_selected_index = select_list_field.selectedIndex;
-		if (select_list_selected_index > 0) {
-			value = select_list_field.options[select_list_selected_index].value;
+		if ($('#' + elemId).val() > 1) {
+			value = $('#' + elemId +' option:selected').text();
 		}
-		select_list_field.selectedIndex = 0;
 	} else {
-		value = document.getElementById(elemId).value.replace(/^\s*/, "").replace(/\s*$/, "");
+		value = $('#' + elemId).val().replace(/^\s*/, '').replace(/\s*$/, '');
 		if (value.length == 0) {
 			value = null;
 		}
-		document.getElementById(elemId).value = '';
+		$('#' + elemId).val('');
 	}
 	if (value != null) {
 		if (type == 'subject') {
 			addSubjectValue(value, group, position);
 		}
 		else if (type == 'button') {
-			var parent = document.getElementById(makeId(elemId, 'entity'));
+			var parent = $('#' + makeId(elemId, 'entity'));
 			addButtonValue(parent, value, group, position);
 		}
 		else {
@@ -748,7 +752,7 @@ function setValue(id, type) {
 			}
 			multivalueIds[valId] = ++currentIndex;
 			suffix = currentIndex;
-			var parent = document.getElementById(id);
+			var parent = $('#' + id);
 			addValue(parent, id, suffix, value);
 		}
 	}
@@ -756,187 +760,200 @@ function setValue(id, type) {
 
 function addSubjectValue(value, group, position) {
 	var subjectId = makeId('Subject', group);
-	var table = document.getElementById(makeId(subjectId, 'subject')).parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.children[0].children[0].children[0].children[0];
-	var tr = document.createElement('tr');
+	var parent = $('#' + makeId(subjectId, 'subject')).parent();
+	
+	while(!parent.is('TABLE')) {
+		parent = parent.parent();
+	}
+	while(!parent.is('TBODY')) {
+		parent = parent.parent();
+	}
+	
+	var table = getChild(parent, 1);
+	while(!table.is('TBODY')) {
+		table = getChild(table, 1);
+	}
+
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'id', makeId(subjectId, 'val', position),
 				   'class', 'odd');
-	table.appendChild(tr);
-	var td = document.createElement('td');
-	var a = document.createElement('a');
-	td.appendChild(a);
+	table.append(tr);
+	var td = $('<td>');
+	var a = $('<a>');
 	makeAttributes(a,
 				   'href', 'javascript:' + makeFunction('showColumn', group, position));
-	a.innerHTML = USER + '-' + value;
-	tr.appendChild(td);
-	td = document.createElement('td');
+	a.html(USER + '-' + value);
+	td.append(a);
+	tr.append(td);
+	td = $('<td>');
 	makeAttributes(td,
 				   'id', makeId(subjectId, 'removeValue'));
-	var input = document.createElement('input');
+	var input = $('<input>');
 	makeAttributes(input,
 					'type', 'button',
 				    'onclick', makeFunction('deleteSubject', group, position),
 				    'value', 'Remove ' + groupType[group-1]);
-	td.appendChild(input);
-	tr.appendChild(td);
+	td.append(input);
+	tr.append(td);
 	var headerId = makeId(subjectId, position, 'header');
 	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 }
 
 function addButtonValue(parent, value, group, position) {
 	var subjectId = makeId('Subject', group);
-	var tr = document.createElement('tr');
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'file-tag-list',
 				   'id', makeId(subjectId, 'val', position));
-	var td = document.createElement('td');
+	var td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag multivalue');
-	var a = document.createElement('a');
-	td.appendChild(a);
+	var a = $('<a>');
 	makeAttributes(a,
 				   'href', 'javascript:' + makeFunction('showColumn', group, position));
-	a.innerHTML = value;
-	tr.appendChild(td);
-	td = document.createElement('td');
+	a.html(value);
+	td.append(a);
+	tr.append(td);
+	td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag multivalue delete',
 				   'id', makeId(subjectId, 'removeValue'));
-	var input = document.createElement('input');
+	var input = $('<input>');
 	makeAttributes(input,
 					'type', 'button',
 				    'onclick', makeFunction('deleteSubject', group, position),
 				    'value', 'Remove ' + groupType[group-1]);
-	td.appendChild(input);
-	tr.appendChild(td);
-	parent.insertBefore(tr, parent.lastChild);
+	td.append(input);
+	tr.append(td);
+	tr.insertBefore(parent.children(':last-child'));
 }
 
 function addValue(parent, id, suffix, value) {
 	var valId = suffix ? makeId(id, 'val', suffix) : makeId(id, 'val');
-	var tr = document.createElement('tr');
+	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'file-tag-list',
 				   'id', valId);
-	var td = document.createElement('td');
+	var td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag multivalue');
-	td.innerHTML = value;
-	tr.appendChild(td);
-	td = document.createElement('td');
+	td.html(value);
+	tr.append(td);
+	td = $('<td>');
 	makeAttributes(td,
 				   'class', 'file-tag multivalue delete',
 				   'id', makeId(id, 'removeValue'));
 	var deleteAction = makeFunction('deleteElementById', str(valId));
-	var input = document.createElement('input');
+	var input = $('<input>');
 	makeAttributes(input,
 				   'type', 'button',
 				   'onclick', deleteAction,
 				   'value', 'Remove Value');
-	td.appendChild(input);
-	tr.appendChild(td);
-	parent.insertBefore(tr, parent.lastChild);
+	td.append(input);
+	tr.append(td);
+	tr.insertBefore(parent.children(':last-child'));
 }
 
 function tagCell(group, tagname, index) {
-	var id = makeId('Subject', group, index, tagname);
+	var id = makeId('Subject', group, index, getId(tagname));
 	var inputId = makeId(id, 'input');
 	var type;
-	var table = document.createElement('table');
+	var table = $('<table>');
 	makeAttributes(table,
 					'id', makeId(id, 'setValue'),
 				    'class', 'file-tag-list');
-	var tr = document.createElement('tr');
-	table.appendChild(tr);
-	var td = document.createElement('td');
-	tr.appendChild(td);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
 	makeAttributes(td,
 				    'class', 'file-tag multivalue input');
+	tr.append(td);
 	var options = enumArray[tagname];
 	if (options == null) {
 		if (linkArray[tagname] != null) {
 			type = 'button';
-			var tdTable = document.createElement('table');
-			td.appendChild(tdTable);
+			var tdTable = $('<table>');
 			makeAttributes(tdTable,
 						    'class', 'entity',
 						    'id', makeId(id, 'button', 'entity'));
-			var tr = document.createElement('tr');
+			td.append(tdTable);
+			var tr = $('<tr>');
 			makeAttributes(tr,
 						    'class', 'no-border');
-			tdTable.appendChild(tr);
-			var td = document.createElement('td');
-			tr.appendChild(td);
-			var input = document.createElement('input');
+			tdTable.append(tr);
+			var td = $('<td>');
+			tr.append(td);
+			var input = $('<input>');
 			makeAttributes(input,
 							'type', 'button',
 						    'onclick', makeFunction('setValue', str(id), str(type)),
 						    'value', 'New ' + tagMapArray[tagname]);
-			td.appendChild(input);
-			tr = document.createElement('tr');
-			tdTable.appendChild(tr);
-			var td = document.createElement('td');
-			tr.appendChild(td);
+			td.append(input);
+			tr = $('<tr>');
+			tdTable.append(tr);
+			var td = $('<td>');
+			tr.append(td);
 			makeAttributes(td,
 							'id', makeId(id, 'button'),
 						    'class', 'file-tag multivalue input');
 		} else {
 			type = 'input';
-			var input = document.createElement('input');
+			var input = $('<input>');
 			makeAttributes(input,
 							'type', 'text',
 						    'id', inputId,
 						    'tagname', tagname);
-			td.appendChild(input);
+			td.append(input);
 			if (dateArray.contains(tagname)) {
-				var a = document.createElement('a');
-				td.appendChild(a);
+				var a = $('<a>');
+				td.append(a);
 				makeAttributes(a,
 								'href', 'javascript:' + makeFunction('generateCalendar', str(inputId)));
-				var img = document.createElement('img');
-				a.appendChild(img);
+				var img = $('<img>');
 				makeAttributes(img,
 								'src', resourcePrefix + 'calendar.gif',
 								'width', '16',
 								'height', '16',
 								'border', '0',
 								'alt', 'Pick a date');
+				a.append(img);
 			}
 		}
 	} else {
 		type = 'select';
 		var val = makeId(id, 'select');
-		var select = document.createElement('select');
-		td.appendChild(select);
+		var select = $('<select>');
 		makeAttributes(select,
 						'id', val,
 						'tagname', tagname,
 						'name', val);
-		var option = document.createElement('option');
-		select.appendChild(option);
+		td.append(select);
+		var option = $('<option>');
 		makeAttributes(option,
 						'value', '');
-		option.innerHTML = 'Select a value';
+		option.html('Select a value');
+		select.append(option);
 		var options = enumArray[tagname];
 		for (var j=0; j<options.length; j++) {
-			option = document.createElement('option');
-			select.appendChild(option);
+			option = $('<option>');
 			makeAttributes(option,
 							'value', options[j]);
-			option.innerHTML = options[j];
+			option.text(options[j]);
+			select.append(option);
 		}
 	}
 	if (type != 'button' && multivalueArray.contains(tagname)) {
-		td = document.createElement('td');
-		tr.appendChild(td);
+		td = $('<td>');
 		makeAttributes(td,
 						'class', 'file-tag multivalue set');
-		var input = document.createElement('input');
+		tr.append(td);
+		var input = $('<input>');
 		makeAttributes(input,
 						'type', 'button',
 					    'onclick', makeFunction('setValue', str(id), str(type)),
 					    'value', 'Set Value');
-		td.appendChild(input);
+		td.append(input);
 	}
 	return table;
 }
@@ -944,24 +961,24 @@ function tagCell(group, tagname, index) {
 function addTagsElement(group) {
 	var tagsId = makeId('addtags', group);
 	var tagId = makeId('add', group);
-	var select = document.createElement('select');
+	var select = $('<select>');
 	makeAttributes(select,
 					'id', tagsId,
 					'name', tagsId,
 					'onchange', makeFunction('addTags', group));
-	var option = document.createElement('option');
-	select.appendChild(option);
+	var option = $('<option>');
 	makeAttributes(option,
 					'id', makeId('addTag', group),
 					'value', '');
-	option.innerHTML = 'Add Tags';
+	option.text('Add Tags');
+	select.append(option);
 	for (var i=0; i < groupTags.length; i++) {
-		option = document.createElement('option');
-		select.appendChild(option);
+		option = $('<option>');
 		makeAttributes(option,
 						'id', makeId(tagId, groupTags[i]),
 						'value', groupTags[i]);
-		option.innerHTML = groupTags[i];
+		option.text(groupTags[i]);
+		select.append(option);
 	}
 	return select;
 }
@@ -978,23 +995,23 @@ function init(home, user) {
 	USER = user;
 	SVCPREFIX = home.substring(home.lastIndexOf('/') + 1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
-	var select = document.getElementById("tags");
-	var option = document.createElement('option');
+	var select = $('#tags');
+	var option = $('<option>');
 	makeAttributes(option,
 				   'id', 'selectTag',
 				   'value', 'Choose Subject Type');
-	option.innerHTML = 'Choose Subject Type';
-	select.appendChild(option);
+	option.text('Choose Subject Type');
+	select.append(option);
 	for (var i=0; i < groupTags.length; i++) {
-		option = document.createElement('option');
+		option = $('<option>');
 		makeAttributes(option,
-					   'id', groupTags[i],
+					   'id', getId(groupTags[i]),
 					   'value', groupTags[i]);
-		option.innerHTML = groupTags[i];
-		select.appendChild(option);
+		option.text(groupTags[i]);
+		select.append(option);
 	}
-	document.getElementById("Status").innerHTML = 'Loading the form. Please wait...';
-	document.getElementById('psoc_progress_bar').style.display = '';
+	$('#psoc_progress_bar').css('display', '');
+	$('#Status').html('Loading the form. Please wait...');
 	totalRequests = selectArray.length;
 	sentRequests = 0;
 	drawProgressBar(0);
@@ -1024,8 +1041,8 @@ function sendSelectRequest() {
 function handleError(jqXHR, textStatus, errorThrown) {
 	var err = jqXHR.getResponseHeader('X-Error-Description');
 	alert(err != null ? unescape(err) : jqXHR.responseText);
-	document.getElementById('psoc_progress_bar').style.display = 'none';
-	document.getElementById("Status").innerHTML = '';
+	$('#psoc_progress_bar').css('display', 'none');
+	$('#Status').html('');
 }
 
 function handleSelectResponse(data, textStatus, jqXHR) {
@@ -1045,8 +1062,8 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 		}
 	}
 	if (++sentRequests >= totalRequests) {
-		document.getElementById('psoc_progress_bar').style.display = 'none';
-		document.getElementById("Status").innerHTML = '';
+		$('#psoc_progress_bar').css('display', 'none');
+		$('#Status').html('');
 	} else {
 		displayStatus('sendSelectRequest()');
 	}
@@ -1062,9 +1079,10 @@ function genericTest() {
 function getSubjectTags(group, position) {
 	var result = new Array();
 	var id = makeId('Subject', group, position, 'header');
-	var tbody = document.getElementById(id).parentNode.parentNode;
-	for (var i=1; i<tbody.children.length-1; i++) {
-		var tagname = tbody.children[i].children[0].innerHTML;
+	var tbody = $('#' + id).parent().parent();
+	for (var i=2; i<=tbody.children().size()-1; i++) {
+		var row = getChild(tbody, i);
+		var tagname = getChild(row, 1).html();
 		result.push(tagname);
 	}
 	return result;
@@ -1073,46 +1091,48 @@ function getSubjectTags(group, position) {
 function getSubjectValues(group, position, tags) {
 	var result = new Array();
 	for (var i=0; i<tags.length; i++) {
-		var id = makeId('Subject', group, position, tags[i]);
-		var tables = document.getElementById(id).children;
-		if (tables.length > 1) {
+		var id = makeId('Subject', group, position, getId(tags[i]));
+		var tables = $('#' + id).children();
+		if (tables.size() > 1) {
+			var item = $('#' + id);
 			var values = new Array();
-			for (var j=0; j<tables.length-1; j++) {
-				var td = tables[j].children[0];
-				var value;
-				if (td.children.length > 0) {
-					// anchor values
-					value = td.children[0].innerHTML;
-				} else {
-					value = td.innerHTML;
-				}
-				values.push(value);
+			for (var j=1; j<=tables.size()-1; j++) {
+				var row = getChild(item, j);
+				var td = getChild(row, 1);
+				values.push(td.html());
 			}
 			result[tags[i]] = values;
-		} else if (tables.length == 1) {
-			var td = tables[0].children[0].children[0].children[0];
-			if (td.nodeName == 'SELECT') {
-				var select_list_field = td;
-				var select_list_selected_index = select_list_field.selectedIndex;
-				if (select_list_selected_index > 0) {
+		} else if (tables.size() == 1) {
+			var table = getChild(tables, 1);
+			var tbody = getChild(table, 1);
+			var row = getChild(tbody, 1);
+			var td = getChild(row, 1);
+			if (td.is('SELECT')) {
+				if (td.children('option:selected').index() > 0) {
 					var values = new Array();
-					var value = select_list_field.options[select_list_selected_index].value;
+					var value = td.val();
 					values.push(value);
 					result[tags[i]] = values;
 				}
-			} else if (td.nodeName == 'INPUT') {
-				var value = td.value.replace(/^\s*/, "").replace(/\s*$/, "");
+			} else if (td.is('INPUT')) {
+				var value = td.val().replace(/^\s*/, '').replace(/\s*$/, '');
 				if (value.length > 0) {
+					if (dateArray.contains(tags[i]) && !validateDate(value)) {
+						alert('Invalid value for date tag "' + tags[i] + '". Expected format is "yyyy-mm-dd".');
+						return;
+					}
 					var values = new Array();
 					values.push(value);
 					result[tags[i]] = values;
 				}
-			} else if (td.nodeName == 'TABLE') {
-				var rows = td.children;
-				if (rows.length > 2) {
+			} else if (td.is('TABLE')) {
+				var rows = td.children();
+				if (rows.size() > 1) {
 					var values = new Array();
-					for (var j=1; j<rows.length-1; j++) {
-						var value = rows[j].children[0].children[0].innerHTML;
+					for (var j=1; j<=rows.size()-1; j++) {
+						var table = getChild(td, j);
+						var row = getChild(table, 1);
+						var value = getChild(row, 1).html();
 						values.push(value);
 					}
 					result[tags[i]] = values;
@@ -1124,14 +1144,13 @@ function getSubjectValues(group, position, tags) {
 }
 
 function getAllSubjects() {
-	document.getElementById('AllBody').value ='';
 	allSubjects = new Array();
 	var tags;
 	for (var i=0; i < groupCounter.length; i++) {
 		tags = null;
 		for (var j=1; j<=groupCounter[i]; j++) {
 			var id = makeId('Subject', i+1, j);
-			if (document.getElementById(id) != null) {
+			if ($('#' + id).length != 0) {
 				if (tags == null) {
 					tags = getSubjectTags(i+1, j);
 				}
@@ -1151,31 +1170,33 @@ function getAllSubjects() {
 	for (var subject in allSubjects) {
 		if (allSubjects.hasOwnProperty(subject)) {
 			var values = allSubjects[subject]['values'];
-			document.getElementById('AllBody').value += subject + '\n';
+			var bodyVal = $('#AllBody').val();
+			bodyVal += subject + '\n';
 			for (var value in values) {
 				if (values.hasOwnProperty(value)) {
-					document.getElementById('AllBody').value += value + ':\n';
+					bodyVal += value + ':\n';
 					var tagValues = values[value];
 					for (var i=0; i<tagValues.length; i++) {
-						document.getElementById('AllBody').value += '\t' + tagValues[i] + '\n';
+						bodyVal += '\t' + tagValues[i] + '\n';
 					}
 				}
 			}
-			document.getElementById('AllBody').value += '\n';
+			bodyVal += '\n';
+			$('#AllBody').val(bodyVal);
 		}
 	}
-	//document.getElementById('AllBody').style.display = '';
+	//$('#AllBody').css('display', '');
 }
 
 var totalRequests;
 var sentRequests;
 
 function postSubjects() {
-	document.getElementById('psoc_progress_bar').style.display = '';
+	$('#psoc_progress_bar').css('display', '');
 	totalRequests = subjectsQueue.length;
 	sentRequests = 0;
-	document.getElementById("Status").innerHTML = 'Saving the form. Please wait...';
-	document.getElementById("Error").innerHTML = '';
+	$('#Status').html('Saving the form. Please wait...');
+	$('#Error').html('');
 	displayStatus('postSubject()');
 }
 
@@ -1211,8 +1232,8 @@ function postSubject() {
 
 function handleSubmitResponse(data, textStatus, jqXHR) {
 	if (++sentRequests >= totalRequests) {
-		document.getElementById('psoc_progress_bar').style.display = 'none';
-		document.getElementById("Status").innerHTML = '';
+		$('#psoc_progress_bar').css('display', 'none');
+		$('#Status').html('');
 		subjectsQueue.length = 0;
 		listSubjects();
 	} else {
@@ -1221,23 +1242,15 @@ function handleSubmitResponse(data, textStatus, jqXHR) {
 }
 
 function handleSubmitError(jqXHR, textStatus, errorThrown) {
-	var p = document.createElement('p');
-	document.getElementById("Error").appendChild(p);
-	p.innerHTML = 'ERROR: ' + textStatus;
+	var p = $('<p>');
+	$('#Error').append(p);
+	p.html('ERROR: ' + errorThrown);
 	var err = jqXHR.getResponseHeader('X-Error-Description');
-	var br = document.createElement('br');
-	document.getElementById("Error").appendChild(br);
-	br = document.createElement('br');
-	document.getElementById("Error").appendChild(br);
-	p = document.createElement('p');
-	document.getElementById("Error").appendChild(p);
-	p.innerHTML = (err != null ? unescape(err) : jqXHR.responseText);
-	br = document.createElement('br');
-	document.getElementById("Error").appendChild(br);
-	br = document.createElement('br');
-	document.getElementById("Error").appendChild(br);
-	document.getElementById('psoc_progress_bar').style.display = 'none';
-	document.getElementById("Status").innerHTML = '';
+	p = $('<p>');
+	$('#Error').append(p);
+	p.html(err != null ? unescape(err) : jqXHR.responseText);
+	$('#psoc_progress_bar').css('display', 'none');
+	$('#Status').html('');
 }
 
 function resolveDependencies() {
@@ -1276,30 +1289,30 @@ function addToQueue(subject) {
 }
 
 function listSubjects() {
-	var ul = document.createElement('ul');
-	var psoc = document.getElementById('psoc');
+	var ul = $('<ul>');
+	var psoc = $('#psoc');
 	for (var subject in allSubjects) {
 		if (allSubjects.hasOwnProperty(subject)) {
-			var li = document.createElement('li');
-			li.innerHTML = document.getElementById(subject + '_header').innerHTML;
-			ul.appendChild(li);
+			var li = $('<li>');
+			li.html($('#' + subject + '_header').html());
+			ul.append(li);
 		}
 	}
-	psoc.innerHTML = '';
-	var h2 = document.createElement('h2');
-	psoc.appendChild(h2);
-	h2.innerHTML = 'Completed';
-	var p = document.createElement('p');
-	psoc.appendChild(p);
-	var b = document.createElement('b');
-	p.appendChild(b);
+	psoc.html('');
+	var h2 = $('<h2>');
+	psoc.append(h2);
+	h2.html('Completed');
+	var p = $('<p>');
+	psoc.append(p);
+	var b = $('<b>');
 	makeAttributes(b,
 				   'style', 'color:green');
-	b.innerHTML = 'All subjects were successfully created.';
-	p = document.createElement('p');
-	psoc.appendChild(p);
-	p.innerHTML = 'See below for a summary of the subjects.';
-	psoc.appendChild(ul);
+	p.append(b);
+	b.html('All subjects were successfully created.');
+	p = $('<p>');
+	psoc.append(p);
+	p.html('See below for a summary of the subjects.');
+	psoc.append(ul);
 }
 
 var subjectsQueue = new Array();
@@ -1319,4 +1332,23 @@ var tagsMap = {
 	'site' : 'siteID',
 	'supplier' : 'supplierID',
 	'treatment' : 'treatmentID'
+}
+
+function validateDate(value) {
+	var OK = false;
+	try {
+		var values = value.split('-');
+		if (values.length == 3) {
+			var year = parseInt(values[0]);
+			var month = parseInt(values[1]);
+			var day = parseInt(values[2]);
+			var leapYear = (((year % 4) == 0) && ((year % 100) != 0) || ((year % 400) == 0));
+			if (day <= DaysInMonth[month-1] || (month == 2 && leapYear && day == 29)) {
+				OK = true;
+			}
+		}
+	}
+	catch (e) {
+	}
+	return OK;
 }
