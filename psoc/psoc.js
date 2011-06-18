@@ -243,10 +243,11 @@ function displayExpandColumn(group) {
 function showColumn(group, index) {
 	var dt = $('#' + makeId('Subject', group, 'span'));
 	if (dt.next().css('display') == 'none') {
-		var spans = dt.children('span');
-		var span = getChild(spans, 1);
+		var span = getChild(dt, 1);
 		var table = getChild(span, 1);
-		var row = getChild(table, 1);
+		table = getChild(table, 1);
+		var tbody = getChild(table, 1);
+		var row = getChild(tbody, 1);
 		var td = getChild(row, 2);
 		var header = td.html();
 		tog(dt, header);
@@ -402,8 +403,6 @@ function hideSubject(group, position) {
 }
 
 function selectTags() {
-	var select_list_field = $('#tags option:selected');
-	var select_list_selected_index = select_list_field.selectedIndex;
 	var value = $('#tags option:selected').text();
 	var subjectGroupName;
 	while (true) {
@@ -422,6 +421,15 @@ function selectTags() {
 	}
 	selectSubject(value, subjectGroupName + '-', null, $('#all_subjects'), subjectGroupName);
 	$('#selectTag').attr('selected', 'selected');
+	$('#NewSubject').attr('disabled', 'disabled');
+	$('#GetSubject').attr('disabled', 'disabled');
+}
+
+function enableSubjectButtons() {
+	if ($('#tags').children('option:selected').index() > 0) {
+		$('#NewSubject').removeAttr('disabled');
+		$('#GetSubject').removeAttr('disabled');
+	}
 }
 
 function tog(dt, header) {
@@ -1069,7 +1077,128 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 	}
 }
 
-function genericTest() {
+function getSubject() {
+	var PREFIX = HOME + '/tags/';
+	var subjectType = $('#tags option:selected').text();
+	var subjectGroupName = prompt('Enter ' + subjectType + ' name:');;
+	if (subjectGroupName != null) {
+		subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
+	}
+	if (subjectGroupName == null || subjectGroupName.length == 0) {
+		return;
+	}
+	var position = prompt('Enter ' + subjectType + ' #:');;
+	if (position != null) {
+		position = position.replace(/^\s*/, '').replace(/\s*$/, '');
+	}
+	if (position == null || position.length == 0) {
+		return;
+	}
+	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + USER + '-' + subjectGroupName + '-' + subjectType + '-' + position;
+	var url = PREFIX + SUFFIX;
+	getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0);
+	$('#selectTag').attr('selected', 'selected');
+	$('#NewSubject').attr('disabled', 'disabled');
+	$('#GetSubject').attr('disabled', 'disabled');
+}
+
+function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index) {
+	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
+	var objId;
+	
+	if (index == 0) {
+		selectSubject(subjectType, subjectGroupName, suffix, parent, header);
+	} else {
+		var parts = getChild(parent, 1).attr('id').split('_');
+		newSubject(parts[1], 'true');
+	}
+	
+	var group = groupCounter.length;
+	var position = groupCounter[groupCounter.length-1];
+
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+					$.each(data, function(i, object) {
+						objId = object[idTag];
+						$.each(object, function(key, val) {
+							if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
+								if (key == idTag && subjectType == groupType[group-1]) {
+									var id = makeId('Subject', group, position, 'header');
+									$('#' + id).html(val);
+									id = makeId('Subject', group, 'val', position);
+									var tr = $('#' + id);
+									var td = getChild(tr, 1);
+									var a = getChild(td, 1);
+									a.html(val);
+								}
+								var id = makeId('Subject', group, position, getId(key));
+								var tables = $('#' + id).children();
+								var table = getChild(tables, 1);
+								var tbody = getChild(table, 1);
+								var row = getChild(tbody, 1);
+								var td = getChild(row, 1);
+								if ($.type(val) == 'array') {
+									var tag = tagMapArray[key];
+									var arrayParent = $('#' + makeId(id, 'button'));
+									var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
+									$.each(val, function(j, value) {
+										//values.push(value);
+										getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, 'All ' + key, j);
+										var arrayGroup;
+										var arrayPosition;
+										if (j == 0) {
+											arrayGroup = getChild(arrayParent, 1).attr('id').split('_')[1];
+											arrayPosition = 1;
+										} else {
+											var parts = getChild(arrayParent, 1).attr('id').split('_');
+											arrayGroup = parts[1];
+											arrayPosition = groupCounter[arrayGroup-1];
+										}
+										addButtonValue(arrayParent, value, arrayGroup, arrayPosition);
+									});
+								} else {
+									if (td.is('SELECT')) {
+										td.val(val);
+									} else if (td.is('INPUT')) {
+										id = makeId(id, 'input');
+										$('#' + id).val(val);
+									} else if (td.is('TABLE')) {
+									} else {
+									}
+								}
+							}
+						});
+					});
+				},
+		error: handleError
+	});
+}
+
+function handleJSONResponse(data, textStatus, jqXHR) {
+	$.each(data, function(i, object) {
+		$.each(object, function(key, val) {
+			if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
+				if ($.type(val) == 'array') {
+					var values = new Array();
+					$.each(val, function(j, value) {
+						values.push(value);
+					});
+					values = '[' + values.join(',') + ']';
+					alert(key + ': ' + values);
+				} else {
+					alert(key + ': ' + val);
+				}
+			}
+		});
+	});
+}
+
+function submitForm() {
 	getAllSubjects();
 	resolveDependencies();
 	postSubjects();

@@ -19,7 +19,7 @@ $if None:
 <div id="psoc">
 <div id="all_subjects" style="display:none;">
 </div>
-<select id="tags" name="tags" onchange="selectTags()">
+<select id="tags" name="tags" onchange="enableSubjectButtons()">
 </select>
 <p>
 <div id="Error" class="error">
@@ -44,7 +44,9 @@ $if None:
 		</td>
 	</tr>
 </table>
-<input type="button" name="Submit" onclick="genericTest();" value="Submit"/>
+<input type="button" id="NewSubject" name="NewSubject" onclick="selectTags();" disabled="disabled" value="New Subject"/>
+<input type="button" id="GetSubject" name="GetSubject" onclick="getSubject();" disabled="disabled" value="Get Subject"/>
+<input type="button" name="Submit" onclick="submitForm();" value="Submit"/>
 <p>
 <input type="button" onclick="alert(document.getElementById('all_subjects').innerHTML);" value="Test"/>
 <input type="button" onclick="var a = document.getElementById('all_subjects').innerHTML; if (document.getElementById('AllBody').style.display == '') {document.getElementById('AllBody').style.display = 'none';} else {document.getElementById('AllBody').value =a;document.getElementById('AllBody').style.display = '';}" value="TestBody"/>
