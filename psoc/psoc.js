@@ -1096,25 +1096,29 @@ function getSubject() {
 	}
 	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + USER + '-' + subjectGroupName + '-' + subjectType + '-' + position;
 	var url = PREFIX + SUFFIX;
-	getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0);
+	getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0);
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
 	$('#GetSubject').attr('disabled', 'disabled');
 }
 
-function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index) {
+function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup) {
 	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
 	var objId;
+	var group;
 	
 	if (index == 0) {
+		// new group
 		selectSubject(subjectType, subjectGroupName, suffix, parent, header);
+		group = groupCounter.length;
 	} else {
+		// extend existing group
 		var parts = getChild(parent, 1).attr('id').split('_');
 		newSubject(parts[1], 'true');
+		group = parentGroup;
 	}
 	
-	var group = groupCounter.length;
-	var position = groupCounter[groupCounter.length-1];
+	var position = groupCounter[group-1];
 
 	$.ajax({
 		url: url,
@@ -1127,7 +1131,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 						objId = object[idTag];
 						$.each(object, function(key, val) {
 							if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
-								if (key == idTag && subjectType == groupType[group-1]) {
+								if (key == idTag) {
 									var id = makeId('Subject', group, position, 'header');
 									$('#' + id).html(val);
 									id = makeId('Subject', group, 'val', position);
@@ -1143,24 +1147,39 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 								var row = getChild(tbody, 1);
 								var td = getChild(row, 1);
 								if ($.type(val) == 'array') {
+									// multivalue tag
 									var tag = tagMapArray[key];
-									var arrayParent = $('#' + makeId(id, 'button'));
-									var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
-									$.each(val, function(j, value) {
-										//values.push(value);
-										getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, 'All ' + key, j);
-										var arrayGroup;
-										var arrayPosition;
-										if (j == 0) {
-											arrayGroup = getChild(arrayParent, 1).attr('id').split('_')[1];
-											arrayPosition = 1;
-										} else {
-											var parts = getChild(arrayParent, 1).attr('id').split('_');
-											arrayGroup = parts[1];
-											arrayPosition = groupCounter[arrayGroup-1];
-										}
-										addButtonValue(arrayParent, value, arrayGroup, arrayPosition);
-									});
+									if (tag != null) {
+										// inner subjects
+										var arrayParent = $('#' + makeId(id, 'button'));
+										var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
+										var arrayGroup = group;
+										$.each(val, function(j, value) {
+											getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, 'All ' + key, j, arrayGroup);
+											var arrayPosition;
+											if (j == 0) {
+												arrayGroup = getChild(arrayParent, 1).attr('id').split('_')[1];
+												arrayPosition = 1;
+											} else {
+												var parts = getChild(arrayParent, 1).attr('id').split('_');
+												arrayGroup = parts[1];
+												arrayPosition = groupCounter[arrayGroup-1];
+											}
+											addButtonValue(arrayParent, value, arrayGroup, arrayPosition);
+										});
+									} else {
+										// multivalue
+										var valId = makeId(id, 'val');
+										var arrayParent = $('#' + id);
+										$.each(val, function(j, value) {
+											var currentIndex = multivalueIds[valId];
+											if (currentIndex == null) {
+												currentIndex = 0;
+											}
+											multivalueIds[valId] = ++currentIndex;
+											addValue(arrayParent, id, currentIndex, value);
+										});
+									}
 								} else {
 									if (td.is('SELECT')) {
 										td.val(val);
@@ -1176,25 +1195,6 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 					});
 				},
 		error: handleError
-	});
-}
-
-function handleJSONResponse(data, textStatus, jqXHR) {
-	$.each(data, function(i, object) {
-		$.each(object, function(key, val) {
-			if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
-				if ($.type(val) == 'array') {
-					var values = new Array();
-					$.each(val, function(j, value) {
-						values.push(value);
-					});
-					values = '[' + values.join(',') + ']';
-					alert(key + ': ' + values);
-				} else {
-					alert(key + ': ' + val);
-				}
-			}
-		});
 	});
 }
 
