@@ -420,6 +420,10 @@ class FileIO (Subject):
         
         userparts = path_linearize(self.path, lambda x : urllib.quote(x, safe="/"))
         userparts = [ part for part in userparts.split('/') if part ]
+
+        if len(userparts) == 0:
+            # anonymous node, so name it with timestamp for decent hash distribution
+            userparts = [ 'anonymous-node-%s' % datetime.datetime.now(pytz.timezone('UTC')) ]
         
         hashval = '%8.8x' % ( abs(hash(userparts[0])) % (pow(2,31) - 1 ) )
         dir = self.config['store path'] + '/%s/%s/%s' % ( hashval[0:2], hashval[2:5], hashval[5:] )
