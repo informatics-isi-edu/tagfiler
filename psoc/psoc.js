@@ -240,7 +240,7 @@ function displayExpandColumn(group) {
 	enableNavigationButtons(group);
 }
 
-function showColumn(group, index) {
+function showColumn(group, index, headerId) {
 	var dt = $('#' + makeId('Subject', group, 'span'));
 	if (dt.next().css('display') == 'none') {
 		var span = getChild(dt, 1);
@@ -257,6 +257,7 @@ function showColumn(group, index) {
 	var columnIndex = getColumnIndex(id);
 	displayColumn(group, columnIndex);
 	enableNavigationButtons(group);
+	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 }
 
 function enableNavigationButtons(group) {
@@ -373,7 +374,7 @@ function newSubject(group, inner) {
 				   'size', textValue.length);
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
-	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
+	showColumn(group, countIndex, headerId);
 	return subjectName;
 }
 
@@ -555,7 +556,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		tr.append(td);
 		var a = $('<a>');
 		makeAttributes(a,
-					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject));
+					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject, str(headerId)));
 		a.html(USER + '-' + subjectGroupName + typeCode + firstSubject);
 		td.append(a);
 		td = $('<td>');
@@ -674,13 +675,12 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	$('#' + makeId(id, 'input')).val(textValue);
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
-	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
+	showColumn(groupCounter.length, 1, headerId);
 	return subjectGroupName + typeCode + firstSubject + suffix;
 }
 
 function handleSubjectResponse(data, textStatus, jqXHR) {
 	var rows = jqXHR.responseText.split('\n');
-	var values = new Array();
 	for (var j=0; j<rows.length; j++) {
 		if (rows[j].length > 0) {
 			var index = rows[j].lastIndexOf('-') + 1;
@@ -768,6 +768,7 @@ function setValue(id, type) {
 
 function addSubjectValue(value, group, position) {
 	var subjectId = makeId('Subject', group);
+	var headerId = makeId(subjectId, position, 'header');
 	var parent = $('#' + makeId(subjectId, 'subject')).parent();
 	
 	while(!parent.is('TABLE')) {
@@ -790,7 +791,7 @@ function addSubjectValue(value, group, position) {
 	var td = $('<td>');
 	var a = $('<a>');
 	makeAttributes(a,
-				   'href', 'javascript:' + makeFunction('showColumn', group, position));
+				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
 	a.html(USER + '-' + value);
 	td.append(a);
 	tr.append(td);
@@ -804,12 +805,11 @@ function addSubjectValue(value, group, position) {
 				    'value', 'Remove ' + groupType[group-1]);
 	td.append(input);
 	tr.append(td);
-	var headerId = makeId(subjectId, position, 'header');
-	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
 }
 
 function addButtonValue(parent, value, group, position) {
 	var subjectId = makeId('Subject', group);
+	var headerId = makeId(subjectId, position, 'header');
 	var tr = $('<tr>');
 	makeAttributes(tr,
 				   'class', 'file-tag-list',
@@ -819,7 +819,7 @@ function addButtonValue(parent, value, group, position) {
 				   'class', 'file-tag multivalue');
 	var a = $('<a>');
 	makeAttributes(a,
-				   'href', 'javascript:' + makeFunction('showColumn', group, position));
+				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
 	a.html(value);
 	td.append(a);
 	tr.append(td);
@@ -996,8 +996,17 @@ var USER;
 var SVCPREFIX;
 var resourcePrefix;
 var allSubjects;
+var allSelectedSubjects;
+var allUpdatedSubjects;
+var allDeletedSubjects;
+var allNewSubjects;
 
 function init(home, user) {
+
+	allSelectedSubjects = new Object();
+	allNewSubjects = new Object();
+	allDeletedSubjects = new Object();
+	allUpdatedSubjects = new Object();
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
@@ -1019,7 +1028,7 @@ function init(home, user) {
 		select.append(option);
 	}
 	$('#psoc_progress_bar').css('display', '');
-	$('#Status').html('Loading the form. Please wait...');
+	$('#Status').html('Initializing the form. Please wait...');
 	totalRequests = selectArray.length;
 	sentRequests = 0;
 	drawProgressBar(0);
@@ -1078,7 +1087,6 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 }
 
 function getSubject() {
-	var PREFIX = HOME + '/tags/';
 	var subjectType = $('#tags option:selected').text();
 	var subjectGroupName = prompt('Enter ' + subjectType + ' name:');;
 	if (subjectGroupName != null) {
@@ -1094,12 +1102,118 @@ function getSubject() {
 	if (position == null || position.length == 0) {
 		return;
 	}
+	$('#Status').css('color', '#33cc33');
+	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectGroupName + ' ' + position +'". Please wait...');
+	setTimeout(function(){retrieveSubject(subjectGroupName, position)}, 1);
+}
+
+function retrieveSubject(subjectGroupName, position) {
+	var subjectType = $('#tags option:selected').text();
+	var PREFIX = HOME + '/tags/';
 	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + USER + '-' + subjectGroupName + '-' + subjectType + '-' + position;
 	var url = PREFIX + SUFFIX;
-	getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0);
+	var subject = getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0);
+	var group = subject.group;
+	var position = subject.position;
+	var headerId = makeId('Subject', group, position, 'header');
+	showColumn(group, position, headerId);
+	$('#Status').html('');
+	$('#Status').css('color', 'black');
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
 	$('#GetSubject').attr('disabled', 'disabled');
+	addSeletedSubjects(group);
+	//getAllSubjects();
+	//displaySubjects(allSelectedSubjects);
+}
+
+function compareTagValues(oldArray, newArray) {
+	var add = new Array();
+	var del = new Array();
+	var ret = new Object();
+	
+	$.each(oldArray, function(i, item) {
+		if (!newArray.contains(item)) {
+			del.push(item);
+		}
+	});
+	
+	$.each(newArray, function(i, item) {
+		if (!oldArray.contains(item)) {
+			add.push(item);
+		}
+	});
+	
+	if (del.length > 0) {
+		ret['del'] = del;
+	}
+	if (add.length > 0) {
+		ret['add'] = add;
+	}
+	
+	return ret;
+}
+
+function compareSubjects(oldSubjects, newSubjects) {
+	var mod = new Object();
+	
+	$.each(oldSubjects, function(key, val) {
+		if (newSubjects[key] == null) {
+			mod[key] = new Object();
+			mod[key]['del'] = val;
+		}
+		 else {
+			var res = compareTags(val['values'], newSubjects[key]['values']);
+			if (!$.isEmptyObject(res)) {
+				mod[key] = new Object();
+				mod[key]['mod'] = res;
+			}
+		}
+	});
+	
+	$.each(newSubjects, function(key, val) {
+		if (oldSubjects[key] == null) {
+			mod[key] = new Object();
+			mod[key]['add'] = val;
+		}
+	});
+	
+	return mod;
+}
+
+function compareTags(oldTags, newTags) {
+	var mod = new Object();
+
+	$.each(oldTags, function(tag, val) {
+		if (newTags[tag] == null) {
+			mod[tag] = new Object();
+			mod[tag]['del'] = val;
+		} else {
+			var res = compareTagValues(val, newTags[tag]);
+			if (!$.isEmptyObject(res)) {
+				mod[tag] = new Object();
+				if (multivalueArray[tag] == null) {
+					mod[tag]['add'] = res['add'];
+				} else {
+					if (res['del'] != null) {
+						mod[tag]['del'] = res['del'];
+					}
+					if (res['add'] != null) {
+						mod[tag]['add'] = res['add'];
+					}
+				}
+			}
+		}
+	});
+	
+	$.each(newTags, function(tag, val) {
+		if (oldTags[tag] == null) {
+			mod[tag] = new Object();
+			mod[tag]['add'] = val;
+		}
+	});
+	
+	return mod;
 }
 
 function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup) {
@@ -1117,9 +1231,11 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 		newSubject(parts[1], 'true');
 		group = parentGroup;
 	}
-	
 	var position = groupCounter[group-1];
 
+	// collapse the subject
+	$('#' + makeId('Subject', group, 'span')).click();
+	
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1165,7 +1281,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 												arrayGroup = parts[1];
 												arrayPosition = groupCounter[arrayGroup-1];
 											}
-											addButtonValue(arrayParent, value, arrayGroup, arrayPosition);
+											addButtonValue($('#' + makeId(id, 'button', 'entity')), value, arrayGroup, arrayPosition);
 										});
 									} else {
 										// multivalue
@@ -1180,15 +1296,8 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 											addValue(arrayParent, id, currentIndex, value);
 										});
 									}
-								} else {
-									if (td.is('SELECT')) {
-										td.val(val);
-									} else if (td.is('INPUT')) {
-										id = makeId(id, 'input');
-										$('#' + id).val(val);
-									} else if (td.is('TABLE')) {
-									} else {
-									}
+								} else if (td.is('SELECT') || td.is('INPUT')) {
+									td.val(val);
 								}
 							}
 						});
@@ -1196,13 +1305,64 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 				},
 		error: handleError
 	});
+	
+	return {group: group, position: position};
+}
+
+function getPredicate(subjects, subject) {
+	var values = subjects[subject].values;
+	var first = true;
+	var predicate;
+	$.each(values, function(tag, tagval) {
+		if (first) {
+			first = false;
+			predicate = tag + '=' + tagval;
+		}
+	});
+	
+	return predicate;
 }
 
 function submitForm() {
+///*
+	//displaySubjects(allSelectedSubjects);
+	//$('#AllBody').val($('#AllBody').val() + '\n\n*********************\n\n');
 	getAllSubjects();
+	displaySubjects(allSubjects);
+	var mod = compareSubjects(allSelectedSubjects, allSubjects);
+	$.each(mod, function(subject, value) {
+		$.each(value, function(action, tags) {
+			if (action == 'mod') {
+				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSubjects, subject) + '\n');
+				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+				$.each(tags, function(tag, tagActions) {
+					$('#AllBody').val($('#AllBody').val() + '\t\tTag: ' + tag + '\n');
+					$.each(tagActions, function(tagAction, values) {
+						$('#AllBody').val($('#AllBody').val() + '\t\t\t' + tagAction + ': ' + values.join(',') + '\n');
+					});
+				});
+			} else if (action == 'add') {
+				allNewSubjects[subject] = tags;
+				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSubjects, subject) + '\n');
+				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+				$.each(tags, function(key, items) {
+					$.each(items, function(tag, values) {
+						$('#AllBody').val($('#AllBody').val() + '\t\t' + tag + '=[' + values.join(',') + ']\n');
+					});
+				});
+			} else if (action == 'del') {
+				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSelectedSubjects, subject) + '\n');
+				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+			}
+		});
+	});
+//*/
+///*
+	//getAllSubjects();
 	resolveDependencies();
 	postSubjects();
 	expiration_warning = true;
+//*/
 }
 
 function getSubjectTags(group, position) {
@@ -1218,7 +1378,7 @@ function getSubjectTags(group, position) {
 }
 
 function getSubjectValues(group, position, tags) {
-	var result = new Array();
+	var result = new Object();
 	for (var i=0; i<tags.length; i++) {
 		var id = makeId('Subject', group, position, getId(tags[i]));
 		var tables = $('#' + id).children();
@@ -1273,7 +1433,7 @@ function getSubjectValues(group, position, tags) {
 }
 
 function getAllSubjects() {
-	allSubjects = new Array();
+	allSubjects = new Object();
 	var tags;
 	for (var i=0; i < groupCounter.length; i++) {
 		tags = null;
@@ -1283,38 +1443,55 @@ function getAllSubjects() {
 				if (tags == null) {
 					tags = getSubjectTags(i+1, j);
 				}
-				var subjectTags = new Array();
+				var subjectTags = new Object();
 				subjectTags['values'] = getSubjectValues(i+1, j, tags);
 				allSubjects[id] = subjectTags;
 				if (tagsIds[tags[0]] == null) {
-					tagsIds[tags[0]] = new Array();
+					tagsIds[tags[0]] = new Object();
 				}
-				
-				var idsArray = new Array();
-				idsArray[subjectTags['values'][tags[0]]] = id;
 				tagsIds[tags[0]][subjectTags['values'][tags[0]]] = id;
 			}
 		}
 	}
-	for (var subject in allSubjects) {
-		if (allSubjects.hasOwnProperty(subject)) {
-			var values = allSubjects[subject]['values'];
-			var bodyVal = $('#AllBody').val();
-			bodyVal += subject + '\n';
-			for (var value in values) {
-				if (values.hasOwnProperty(value)) {
-					bodyVal += value + ':\n';
-					var tagValues = values[value];
-					for (var i=0; i<tagValues.length; i++) {
-						bodyVal += '\t' + tagValues[i] + '\n';
-					}
+}
+
+function addSeletedSubjects(group) {
+	var tags;
+	for (var i=group-1; i < groupCounter.length; i++) {
+		tags = null;
+		for (var j=1; j<=groupCounter[i]; j++) {
+			var id = makeId('Subject', i+1, j);
+			if ($('#' + id).length != 0) {
+				if (tags == null) {
+					tags = getSubjectTags(i+1, j);
 				}
+				var subjectTags = new Object();
+				subjectTags['values'] = getSubjectValues(i+1, j, tags);
+				allSelectedSubjects[id] = subjectTags;
+				if (selectedTagsIds[tags[0]] == null) {
+					selectedTagsIds[tags[0]] = new Object();
+				}
+				selectedTagsIds[tags[0]][subjectTags['values'][tags[0]]] = id;
 			}
-			bodyVal += '\n';
-			$('#AllBody').val(bodyVal);
 		}
 	}
-	//$('#AllBody').css('display', '');
+}
+
+function displaySubjects(subjects) {
+	$.each(subjects, function(subject, val) {
+		var values = val['values'];
+		var bodyVal = $('#AllBody').val();
+		bodyVal += subject + '\n';
+		$.each(values, function(value, tagValues) {
+			bodyVal += '\t' + value + ':\n';
+			for (var i=0; i<tagValues.length; i++) {
+				bodyVal += '\t\t' + tagValues[i] + '\n';
+			}
+		});
+		bodyVal += '\n';
+		$('#AllBody').val(bodyVal);
+	});
+	$('#AllBody').css('display', '');
 }
 
 var totalRequests;
@@ -1322,7 +1499,7 @@ var sentRequests;
 
 function postSubjects() {
 	$('#psoc_progress_bar').css('display', '');
-	totalRequests = subjectsQueue.length;
+	totalRequests = newSubjectsQueue.length;
 	sentRequests = 0;
 	$('#Status').html('Saving the form. Please wait...');
 	$('#Error').html('');
@@ -1333,19 +1510,16 @@ function postSubject() {
 	// POST the subject
 	var success = false;
 	var url = HOME + '/subject/?incomplete&';
-	var values = allSubjects[subjectsQueue[sentRequests]]['values'];
+	var values = allNewSubjects[newSubjectsQueue[sentRequests]]['values'];
 	var tags = new Array();
-	for (var value in values) {
-		if (values.hasOwnProperty(value)) {
-			var tag = encodeURIComponent(value) + '=';
-			var tagVals = new Array();
-			var tagValues = values[value];
-			for (var i=0; i<tagValues.length; i++) {
-				tagVals.push(encodeURIComponent(tagValues[i]));
-			}
-			tags.push(encodeURIComponent(value) + '=' + tagVals.join(','));
+	$.each(values, function(value, tagValues) {
+		var tag = encodeURIComponent(value) + '=';
+		var tagVals = new Array();
+		for (var i=0; i<tagValues.length; i++) {
+			tagVals.push(encodeURIComponent(tagValues[i]));
 		}
-	}
+		tags.push(encodeURIComponent(value) + '=' + tagVals.join(','));
+	});
 	url += tags.join('&');
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	$.ajax({
@@ -1363,8 +1537,9 @@ function handleSubmitResponse(data, textStatus, jqXHR) {
 	if (++sentRequests >= totalRequests) {
 		$('#psoc_progress_bar').css('display', 'none');
 		$('#Status').html('');
-		subjectsQueue.length = 0;
-		listSubjects();
+		newSubjectsQueue.length = 0;
+		listCompleteSubjects();
+		listSubjects(allNewSubjects, 'Created');
 	} else {
 		displayStatus('postSubject()');
 	}
@@ -1383,50 +1558,36 @@ function handleSubmitError(jqXHR, textStatus, errorThrown) {
 }
 
 function resolveDependencies() {
-	for (var subject in allSubjects) {
-		if (allSubjects.hasOwnProperty(subject)) {
-			if (!subjectsQueue.contains(subject)) {
-				addToQueue(subject);
-			}
+	$.each(allNewSubjects, function(subject, val) {
+		if (!newSubjectsQueue.contains(subject)) {
+			addToNewSubjectsQueue(subject);
 		}
-	}
+	});
 }
 
-function addToQueue(subject) {
-	var values = allSubjects[subject]['values'];
+function addToNewSubjectsQueue(subject) {
+	var values = allNewSubjects[subject]['values'];
 	var first = true;
-	for (var value in values) {
-		if (values.hasOwnProperty(value)) {
-			if (first) {
-				first = false;
-				continue;
-			}
-			if (tagsMap[value] != null) {
-				var mapValue = tagsMap[value];
-				var tagValues = values[value];
-				for (var i=0; i<tagValues.length; i++) {
-					if (tagsIds[mapValue] != null && tagsIds[mapValue][tagValues[i]] != null) {
-						addToQueue(tagsIds[mapValue][tagValues[i]]);
-					}
+	$.each(values, function(value, tagValues) {
+		if (first) {
+			first = false;
+		} else if (tagsMap[value] != null) {
+			var mapValue = tagsMap[value];
+			for (var i=0; i<tagValues.length; i++) {
+				if (tagsIds[mapValue] != null && tagsIds[mapValue][tagValues[i]] != null) {
+					addToNewSubjectsQueue(tagsIds[mapValue][tagValues[i]]);
 				}
 			}
 		}
-	}
-	if (!subjectsQueue.contains(subject)) {
-		subjectsQueue.push(subject);
+	});
+	if (!newSubjectsQueue.contains(subject)) {
+		newSubjectsQueue.push(subject);
 	}
 }
 
-function listSubjects() {
-	var ul = $('<ul>');
+function listCompleteSubjects() {
+	var ul = $('<ul>').attr({id: 'completedSubjects'});
 	var psoc = $('#psoc');
-	for (var subject in allSubjects) {
-		if (allSubjects.hasOwnProperty(subject)) {
-			var li = $('<li>');
-			li.html($('#' + subject + '_header').html());
-			ul.append(li);
-		}
-	}
 	psoc.html('');
 	var h2 = $('<h2>');
 	psoc.append(h2);
@@ -1437,15 +1598,29 @@ function listSubjects() {
 	makeAttributes(b,
 				   'style', 'color:green');
 	p.append(b);
-	b.html('All subjects were successfully created.');
+	b.html('All subjects were successfully proceeded.');
 	p = $('<p>');
 	psoc.append(p);
 	p.html('See below for a summary of the subjects.');
 	psoc.append(ul);
+	return ul;
 }
 
-var subjectsQueue = new Array();
-var tagsIds = new Array();
+function listSubjects(subjects, title) {
+	var ul = $('<ul>');
+	$.each(subjects, function(subject, val) {
+		var li = $('<li>');
+		li.html(getPredicate(subjects, subject));
+		ul.append(li);
+	});
+	var li = $('<li>').html(title);
+	li.append(ul);
+	$('#completedSubjects').append(li);
+}
+
+var newSubjectsQueue = new Array();
+var tagsIds = new Object();
+var selectedTagsIds = new Object();
 
 var tagsMap = {
 	'experiment' : 'experimentID',
