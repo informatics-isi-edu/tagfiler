@@ -527,14 +527,14 @@ class Subject (Application):
 
         return (cfirst, clast, clen, flen, content_range)
 
-    def put_postWriteBody(self):
+    def put_postWriteBody(self, post_method=False):
         # this may repeat in case of database races
         if self.mustInsert:
             try:
                 self.client_content_type = web.ctx.env['CONTENT_TYPE'].lower()
             except:
                 self.client_content_type = None
-            return self.insertForStore()
+            return self.insertForStore(allow_blank=(post_method), post_method=post_method)
         else:
             # simplified path for in-place updates
             self.subject = self.subject_prewrite
@@ -556,7 +556,7 @@ class Subject (Application):
             res = ''
         return res
 
-    def PUT(self, uri):
+    def PUT(self, uri, post_method=False):
         self.uri = uri
         """process file content PUT from client"""
         cfirst, clast, clen, flen, self.content_range = self.put_prepareRequest()
@@ -571,7 +571,7 @@ class Subject (Application):
  
         self.bytes = flen
 
-        return self.dbtransact(lambda : self.put_postWriteBody(),
+        return self.dbtransact(lambda : self.put_postWriteBody(post_method=post_method),
                                lambda result : self.put_postWritePostCommit(result))
 
     def POST(self, uri):

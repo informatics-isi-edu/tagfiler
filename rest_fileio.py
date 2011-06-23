@@ -510,7 +510,7 @@ class FileIO (Subject):
             return self.put_postWritePostCommit([])
         else:
             try:
-                result = self.dbtransact(lambda : self.put_postWriteBody(),
+                result = self.dbtransact(lambda : self.put_postWriteBody(post_method=post_method),
                                          lambda result : self.put_postWritePostCommit(result))
                 return result
             except web.SeeOther:
@@ -586,7 +586,7 @@ class FileIO (Subject):
                 self.dtype = 'file'
                 self.bytes = bytes
 
-                result = self.dbtransact(lambda : self.insertForStore(allow_blank=False, post_method=False),
+                result = self.dbtransact(lambda : self.insertForStore(allow_blank=False, post_method=True),
                                          putPostCommit)
                 return result
             except web.SeeOther:
