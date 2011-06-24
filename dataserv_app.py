@@ -172,7 +172,7 @@ def urlquote(url, safe=""):
 def urlunquote(url):
     if type(url) not in [ str, unicode ]:
         url = str(url)
-    text = urllib.unquote_plus(url)
+    url = urllib.unquote_plus(url)
     if type(url) == str:
         url = unicode(url, 'utf8')
     elif type(url) == unicode:
