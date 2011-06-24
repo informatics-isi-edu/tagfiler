@@ -18,7 +18,6 @@
 import traceback
 import sys
 import web
-import urllib
 import re
 import os
 import webauthn
@@ -107,7 +106,7 @@ class TransmitNumber (Node):
         self.storage = web.input()
         
         try:
-            self.table = unicode(urllib.unquote_plus(self.storage.table), 'utf8')
+            self.table = urlunquote(self.storage.table)
         except:
             pass
         
@@ -139,22 +138,22 @@ class Study (Node):
 
     def GET(self, uri):
         try:
-            self.action = unicode(urllib.unquote_plus(self.storage.action), 'utf8')
+            self.action = urlunquote(self.storage.action)
         except:
             pass
 
         try:
-            self.study_type = unicode(urllib.unquote_plus(self.storage.type), 'utf8')
+            self.study_type = urlunquote(self.storage.type)
         except:
             pass
 
         try:
-            self.direction = unicode(urllib.unquote_plus(self.storage.direction), 'utf8')
+            self.direction = urlunquote(self.storage.direction)
         except:
             pass
 
         try:
-            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
+            self.status = urlunquote(self.storage.status)
         except:
             pass
 
@@ -230,27 +229,27 @@ class Study (Node):
     def PUT(self, uri):
         self.storage = web.input()
         try:
-            self.study_size = int(unicode(urllib.unquote_plus(self.storage.study_size), 'utf8'))
+            self.study_size = int(urlunquote(self.storage.study_size))
         except:
             pass
 
         try:
-            self.count = int(unicode(urllib.unquote_plus(self.storage.count), 'utf8'))
+            self.count = int(urlunquote(self.storage.count))
         except:
             pass
 
         try:
-            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
+            self.status = urlunquote(self.storage.status)
         except:
             pass
 
         try:
-            self.direction = unicode(urllib.unquote_plus(self.storage.direction), 'utf8')
+            self.direction = urlunquote(self.storage.direction)
         except:
             pass
 
         try:
-            self.key = unicode(urllib.unquote_plus(self.storage.key), 'utf8')
+            self.key = urlunquote(self.storage.key)
         except:
             pass
 
@@ -288,7 +287,7 @@ class AppletError (Node):
 
     def GET(self, uri):
         try:
-            self.status = unicode(urllib.unquote_plus(self.storage.status), 'utf8')
+            self.status = urlunquote(self.storage.status)
         except:
             pass
 
@@ -370,12 +369,12 @@ class FileList (Node):
         readers = None
         writers = None
         try:
-            action = unicode(urllib.unquote_plus(self.storage.action), 'utf8')
+            action = urlunquote(self.storage.action)
             try:
-                name = unicode(urllib.unquote_plus(self.storage.name), 'utf8')
-                filetype = unicode(urllib.unquote_plus(self.storage.type), 'utf8')
-                readers = unicode(urllib.unquote_plus(self.storage['read users']), 'utf8')
-                writers = unicode(urllib.unquote_plus(self.storage['write users']), 'utf8')
+                name = urlunquote(self.storage.name)
+                filetype = urlunquote(self.storage.type)
+                readers = urlunquote(self.storage['read users'])
+                writers = urlunquote(self.storage['write users'])
             except:
                 pass
         except:
@@ -407,7 +406,7 @@ class FileList (Node):
                 return self.dbtransact(body, postCommit)
         else:
             try:
-                self.globals['view'] = unicode(urllib.unquote_plus(self.storage.view), 'utf8')
+                self.globals['view'] = urlunquote(self.storage.view)
             except:
                 pass
             return self.dbtransact(body, postCommit)
@@ -567,10 +566,10 @@ class Tagdef (Node):
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 self.setNoCache()
                 return ('typestr=' + urlquote(tagdef.typestr) 
-                        + '&readpolicy=' + urlquote(unicode(tagdef.readpolicy))
-                        + '&writepolicy=' + urlquote(unicode(tagdef.writepolicy))
-                        + '&multivalue=' + urlquote(unicode(tagdef.multivalue))
-                        + '&owner=' + urlquote(unicode(tagdef.owner)))
+                        + '&readpolicy=' + urlquote(tagdef.readpolicy)
+                        + '&writepolicy=' + urlquote(tagdef.writepolicy)
+                        + '&multivalue=' + urlquote(tagdef.multivalue)
+                        + '&owner=' + urlquote(tagdef.owner))
             except:
                 raise NotFound(self, data='tag definition %s' % (self.tag_id))
 
@@ -878,17 +877,17 @@ class FileTags (Node):
         tagdefs = [ x for x in all if x.tagname in self.listtags ]
             
         if len(files) == 1:
-            return self.renderlist('Tag(s) for subject matching "%s"' % unicode(urllib.unquote_plus(path_linearize(simplepath)), 'utf8'),
+            return self.renderlist('Tag(s) for subject matching "%s"' % urlunquote(path_linearize(simplepath)),
                                    [self.render.FileTagExisting('', files[0], tagdefs)])
         else:
-            return self.renderlist('Tag(s) for subjects matching "%s"' % unicode(urllib.unquote_plus(path_linearize(simplepath)), 'utf8'),
+            return self.renderlist('Tag(s) for subjects matching "%s"' % urlunquote(path_linearize(simplepath)),
                                    [self.render.FileTagValExisting('', files, tagdefs)])
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
         self.globals['referer'] = self.config['home'] + uri
         try:
-            self.view_type = unicode(urllib.unquote_plus(self.storage.view), 'utf8')
+            self.view_type = urlunquote(self.storage.view)
         except:
             pass
 

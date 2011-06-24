@@ -28,9 +28,8 @@ import sys
 import time
 import datetime
 import pytz
-import urllib
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag
 
 myrand = random.Random()
 myrand.seed(os.getpid())
@@ -645,7 +644,7 @@ class Subject (Application):
                         if value == None:
                             return default
                     else:
-                        return unicode(urllib.unquote_plus(value), 'utf8')
+                        return unquote(value)
                 return value
 
             self.key = get_param('key')

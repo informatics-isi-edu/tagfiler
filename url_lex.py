@@ -62,9 +62,21 @@ tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())
 # plus ASTERISK because mozilla doesn't quote it properly
 # (consuming code must unescape after parsing)
 
+def urlunquote(url):
+    if type(url) not in [ str, unicode ]:
+        url = str(url)
+    text = urllib.unquote_plus(url)
+    if type(text) == str:
+        text = unicode(text, 'utf8')
+    elif type(text) == unicode:
+        pass
+    else:
+        raise RuntimeError('unexpected decode type %s in urllex.urlunquote()' % type(text))
+    return text
+
 def t_ESCAPESTRING(t):
     r'%[0-9A-Fa-f]+'
-    t.value = unicode(urllib.unquote_plus(t.value), 'utf8')
+    t.value = urlunquote(t.value)
     return t
 
 def t_NUMSTRING(t):

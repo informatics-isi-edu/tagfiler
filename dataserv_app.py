@@ -161,16 +161,25 @@ elif hasattr(json, 'dumps'):
 else:
     raise RuntimeError(ast=None, data='Could not configure JSON library.')
 
-def urlquote(url):
+def urlquote(url, safe=""):
     "define common URL quote mechanism for registry URL value embeddings"
-    if type(url) != type('text'):
+    if type(url) not in [ str, unicode ]:
         url = str(url)
-    return urllib.quote(url, safe="")
+    if type(url) == str:
+        url = unicode(url, 'utf8')
+    return urllib.quote(url, safe=safe)
 
 def urlunquote(url):
-    if type(url) != type('text'):
+    if type(url) not in [ str, unicode ]:
         url = str(url)
-    return unicode(urllib.unquote_plus(url), 'utf8')
+    text = urllib.unquote_plus(url)
+    if type(url) == str:
+        url = unicode(url, 'utf8')
+    elif type(url) == unicode:
+        pass
+    else:
+        raise RuntimeError('unexpected decode type %s in urlunquote()' % type(url))
+    return url
 
 def parseBoolString(theString):
     if theString.lower() in [ 'true', 't', 'yes', 'y' ]:
@@ -220,8 +229,8 @@ def buildPolicyRules(rules, fatal=False):
     remap = dict()
     for rule in rules:
         srcrole, dstrole, readers, writers, readok, writeok = rule.split(';', 6)
-        srcrole = unicode(urllib.unquote(srcrole.strip()), 'utf8')
-        dstrole = unicode(urllib.unquote(dstrole.strip()), 'utf8')
+        srcrole = urlunquote(srcrole.strip())
+        dstrole = urlunquote(dstrole.strip())
         readers = readers.strip()
         writers = writers.strip()
         readok = readok.strip().lower() in [ 'true', 'yes' ]
@@ -233,12 +242,12 @@ def buildPolicyRules(rules, fatal=False):
             else:
                 continue
         if readers != '':
-            readers = [ unicode(urllib.unquote(reader.strip()), 'utf8') for reader in readers.split(',') ]
+            readers = [ urlunquote(reader.strip()) for reader in readers.split(',') ]
             readers = [ reader for reader in readers if reader != '' ]
         else:
             readers = []
         if writers != '':
-            writers = [ unicode(urllib.unquote(writer.strip()), 'utf8') for writer in writers.split(',') ]
+            writers = [ urlunquote(writer.strip()) for writer in writers.split(',') ]
             writers = [ writer for writer in writers if writer != '' ]
         else:
             writers = []

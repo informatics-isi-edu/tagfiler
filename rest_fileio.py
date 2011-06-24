@@ -28,9 +28,8 @@ import sys
 import time
 import datetime
 import pytz
-import urllib
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred
 from subjects import Subject
 
 # build a map of mime type --> primary suffix
@@ -418,7 +417,7 @@ class FileIO (Subject):
         # make a psuedo-randomly balanced tree to optimize directory lookups for large catalogs
         # cannot use subject.id because we don't know it until postwrite phase
         
-        userparts = path_linearize(self.path, lambda x : urllib.quote(x, safe="/"))
+        userparts = path_linearize(self.path, lambda x : urlquote(x, safe="/"))
         userparts = [ part for part in userparts.split('/') if part ]
 
         if len(userparts) == 0:
