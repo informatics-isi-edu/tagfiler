@@ -1032,23 +1032,32 @@ class FileTags (Node):
 
             if not previewOnly:
                 for subject in self.subjects:
-                    if tagdef.typestr == 'empty' or not subject[tag]:
+                    self.enforce_tag_authz('write', subject, tagdef)
+                    if tagdef.typestr == 'empty' and subject[tag]:
                         vals = [None]
                     elif tagdef.multivalue:
-                        vals = subject[tag]
+                        if subject[tag]:
+                            vals = subject[tag]
+                        else:
+                            vals = None
+                    elif subject[tag] == None:
+                        vals = None
                     else:
                         vals = [subject[tag]]
-                    self.enforce_tag_authz('write', subject, tagdef)
-                    self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
-                    for val in vals:
-                        self.delete_tag(subject, tagdef, val)
+
+                    if vals:
+                        self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
+                        for val in vals:
+                            self.delete_tag(subject, tagdef, val)
             
-                    if tag in [ 'read users', 'write users' ]:
-                        for subfile in self.subfiles.values():
-                            self.enforce_tag_authz('write', subfile, tagdef)
-                            self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
-                            for val in vals:
-                                self.delete_tag(subfile, tagdef, val)
+                        if tag in [ 'read users', 'write users' ]:
+                            for subfile in self.subfiles.values():
+                                self.enforce_tag_authz('write', subfile, tagdef)
+                                self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
+                                for val in vals:
+                                    self.delete_tag(subfile, tagdef, val)
+                    else:
+                        self.txlog('DELETE NONE MATCH', dataset=self.subject2identifiers(subject)[0], tag=tag)
 
         if not previewOnly and not self.referer:
             if len(self.subjects) == 1:
