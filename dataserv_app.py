@@ -1404,7 +1404,8 @@ class Application:
         if owner == None:
             tagdef.owner = None
         tagdef.multivalue = self.multivalue
-
+        tagdef.unique = self.is_unique
+        
         self.deploy_tagdef(tagdef)
 
     def deploy_tagdef(self, tagdef):
@@ -1422,6 +1423,9 @@ class Application:
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             tabledef += ' NOT NULL'
+
+            if tagdef.unique:
+                tabledef += ' UNIQUE'
 
             tagref = type['typedef tagref']
                 
@@ -1449,6 +1453,7 @@ class Application:
             tabledef += ', UNIQUE(subject)'
             
         tabledef += " )"
+        #web.debug(tabledef)
         self.db.query(tabledef)
         if indexdef:
             self.db.query(indexdef)
