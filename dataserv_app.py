@@ -1219,7 +1219,8 @@ class Application:
 
     def classify_subject(self, subject):
         for dtype in [ 'url', 'tagdef', 'typedef', 'config', 'view', 'file', 'name' ] \
-                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname] :
+                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname if tagdef.tagname != 'id' ] \
+                + [ 'id' ] :
             keyv = subject.get(dtype, None)
             if keyv:
                 return dtype
