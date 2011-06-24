@@ -165,20 +165,26 @@ def urlquote(url, safe=""):
     "define common URL quote mechanism for registry URL value embeddings"
     if type(url) not in [ str, unicode ]:
         url = str(url)
+
+    if type(url) == unicode:
+        url = url.encode('utf8')
+
+    url = urllib.quote(url, safe=safe)
+        
     if type(url) == str:
         url = unicode(url, 'utf8')
-    return urllib.quote(url, safe=safe)
+        
+    return url
 
 def urlunquote(url):
     if type(url) not in [ str, unicode ]:
         url = str(url)
+        
     url = urllib.unquote_plus(url)
+    
     if type(url) == str:
         url = unicode(url, 'utf8')
-    elif type(url) == unicode:
-        pass
-    else:
-        raise RuntimeError('unexpected decode type %s in urlunquote()' % type(url))
+
     return url
 
 def parseBoolString(theString):
