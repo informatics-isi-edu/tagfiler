@@ -1359,7 +1359,7 @@ function submitForm() {
 					$.each(tagActions, function(tagAction, values) {
 						if (tagAction == 'add' && !addValuesQueue.contains(subject)) {
 							addValuesQueue.push(subject);
-						} else if (tagAction == 'del' && !deleteValuesQueue.contains(subject)) {
+						} else if (tagAction == 'del' && !multivalueSelectArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
 							deleteValuesQueue.push(subject);
 						}
 					});
@@ -1412,7 +1412,7 @@ function debugForm() {
 						$('#AllBody').val($('#AllBody').val() + '\t\t\t' + tagAction + ': ' + values.join(',') + '\n');
 						if (tagAction == 'add' && !addValuesQueue.contains(subject)) {
 							addValuesQueue.push(subject);
-						} else if (tagAction == 'del' && !deleteValuesQueue.contains(subject)) {
+						} else if (tagAction == 'del' && !multivalueSelectArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
 							deleteValuesQueue.push(subject);
 						}
 					});
@@ -1748,7 +1748,7 @@ function handleSubmitResponse(data, textStatus, jqXHR) {
 		if (newSubjectsQueue.length > 0) {
 			listSubjects(allNewSubjects, 'Created');
 		}
-		if (deleteValuesQueue.length + addValuesQueue.length > 0) {
+		if (!$.isEmptyObject(allUpdatedSubjects)) {
 			listSubjects(allUpdatedSubjects, 'Modified');
 		}
 	} else {
