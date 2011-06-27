@@ -801,7 +801,7 @@ class FileTags (Node):
 
         files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
         if len(files) == 0:
-            raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0]))
+            raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0], lambda x: x))
         else:
             subject = files[0]
             datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
@@ -875,12 +875,13 @@ class FileTags (Node):
         simplepath[-1] = simplepath[-1][0], [], []
 
         tagdefs = [ x for x in all if x.tagname in self.listtags ]
-            
+
+        title = u'Tag(s) for subject matching "' + urlunquote(path_linearize(simplepath, lambda x: x)) + u'"'
         if len(files) == 1:
-            return self.renderlist('Tag(s) for subject matching "%s"' % urlunquote(path_linearize(simplepath)),
+            return self.renderlist(title,
                                    [self.render.FileTagExisting('', files[0], tagdefs)])
         else:
-            return self.renderlist('Tag(s) for subjects matching "%s"' % urlunquote(path_linearize(simplepath)),
+            return self.renderlist(title,
                                    [self.render.FileTagValExisting('', files, tagdefs)])
 
     def GET(self, uri=None):
@@ -920,7 +921,7 @@ class FileTags (Node):
         
         results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
-            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath))
+            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
         elif len(results) > 1:
             raise Conflict(self, 'PUT tags to more than one subject is not supported.')
 
@@ -1017,7 +1018,7 @@ class FileTags (Node):
          
         results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
         if len(results) == 0:
-            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath))
+            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
         self.subjects = [ res for res in results ]
 
         # find subfiles of all subjects which are tagged Image Set
@@ -1298,14 +1299,16 @@ class Query (Node):
                         return
                     elif acceptType == 'text/html':
                         break
-                yield self.renderlist(self.title,
-                                       [self.render.QueryViewStatic(Application.ops, self.subjpreds),
-                                        self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
+                for r in self.renderlist(self.title,
+                                         [self.render.QueryViewStatic(Application.ops, self.subjpreds),
+                                          self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
+                    yield r
             else:
-                yield self.renderlist(self.title,
-                                       [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
-                                        self.render.QueryView(Application.ops, self.subjpreds),
-                                        self.render.FileList(files, showversions=self.showversions, limit=self.limit)])
+                for r in self.renderlist(self.title,
+                                         [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
+                                          self.render.QueryView(Application.ops, self.subjpreds),
+                                          self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
+                    yield r
 
         for res in self.dbtransact(body, postCommit):
             yield res

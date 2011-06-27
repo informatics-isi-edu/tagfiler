@@ -188,8 +188,9 @@ class FileIO (Subject):
         if render != None and self.subject['template mode'] == 'embedded':
             # render the template in the tagfiler GUI
             self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
-            yield self.renderlist(None,
-                                   [render()])
+            for r in self.renderlist(None,
+                                     [render()]):
+                yield r
             return
         elif render != None and self.subject['template mode'] == 'page':
             # render the template as a standalone page

@@ -57,6 +57,18 @@ import struct
 
 render = None
 
+def myunicode(v):
+    if type(v) == str:
+        return unicode(v, 'utf8')
+    else:
+        return v
+
+def myutf8(v):
+    if type(v) == unicode:
+        return v.encode('utf8')
+    else:
+        return v
+        
 def db_dbquery(db, query, vars={}):
     """Query wrapper to handle UTF-8 encoding issues.
     
@@ -66,18 +78,6 @@ def db_dbquery(db, query, vars={}):
     
     2. Convert query results in UTF-8 back to unicode.
     """
-
-    def myutf8(v):
-        if type(v) == unicode:
-            return v.encode('utf8')
-        else:
-            return v
-        
-    def myunicode(v):
-        if type(v) == str:
-            return unicode(v, 'utf8')
-        else:
-            return v
 
     def myunicode_storage(v):
         return web.Storage( [ (myunicode(key), myunicode(value)) for (key, value) in v.items() ] )
@@ -239,26 +239,26 @@ def parseBoolString(theString):
 
 def predlist_linearize(predlist, quotefunc=urlquote):
     def pred_linearize(pred):
-        vals = [ quotefunc(val) for val in pred.vals ]
+        vals = [ myunicode(quotefunc(val)) for val in pred.vals ]
         vals.sort()
-        vals = ','.join(vals)
+        vals = u','.join(vals)
         if pred.op:
-            return '%s%s%s' % (quotefunc(pred.tag), pred.op, vals)
+            return myunicode(quotefunc(pred.tag)) + myunicode(pred.op) + vals
         else:
-            return '%s' % (quotefunc(pred.tag))
+            return myunicode(quotefunc(pred.tag))
     predlist = [ pred_linearize(pred) for pred in predlist ]
     predlist.sort()
-    return ';'.join(predlist)
+    return u';'.join(predlist)
 
 def path_linearize(path, quotefunc=urlquote):
     def elem_linearize(elem):
         linear = predlist_linearize(elem[0], quotefunc)
         if elem[1]:
-            linear += '(%s)' % predlist_linearize(elem[1], quotefunc)
+            linear += u'(' + predlist_linearize(elem[1], quotefunc) + u')'
             if elem[2]:
-                linear += ','.join(quotefunc(elem[2]))
+                linear += u','.join(myunicode(quotefunc(elem[2])))
         return linear
-    return '/' + '/'.join([ elem_linearize(elem) for elem in path ])
+    return u'/' + u'/'.join([ elem_linearize(elem) for elem in path ])
 
 def reduce_name_pred(x, y):
     if x.tag == 'name' and x.op == '=' and len(x.vals) > 0:
@@ -643,6 +643,7 @@ class Application:
         self.globals['render'] = self.render # HACK: make render available to templates too
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote
+        self.globals['webdebug'] = web.debug
         self.globals['jsonWriter'] = jsonWriter
         self.globals['subject2identifiers'] = lambda subject, showversions=True: self.subject2identifiers(subject, showversions)
         self.globals['sq_path_linearize'] = sq_path_linearize
@@ -866,12 +867,14 @@ class Application:
             self.globals['pollmins'] = None
 
         self.globals['title'] = title
- 
-        return "".join([unicode(r) for r in 
-                        [self.render.Top()] 
-                        + renderlist
-                        + [self.render.Bottom()]])
 
+        yield self.render.Top()
+
+        for r in renderlist:
+            yield r
+
+        yield self.render.Bottom()
+ 
     def preDispatchFake(self, uri, app):
         self.db = app.db
         self.set_authn(app.authn)
