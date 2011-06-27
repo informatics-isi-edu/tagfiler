@@ -391,6 +391,10 @@ function deleteSubject(group, position) {
 		id = makeId('Subject', group, 1, 'container');
 		var div = $('#' + id);
 		div.remove();
+		if ($.isEmptyObject(allSelectedSubjects) && !existsNewSubjects()) {
+			$('#Submit').attr('disabled', 'disabled');
+			$('#Debug').attr('disabled', 'disabled');
+		}
 	} else {
 		enableNavigationButtons(group);
 	}
@@ -676,6 +680,10 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
 	showColumn(groupCounter.length, 1, headerId);
+	if ($('#Submit').attr('disabled') == 'disabled') {
+		$('#Submit').removeAttr('disabled');
+		$('#Debug').removeAttr('disabled');
+	}
 	return subjectGroupName + typeCode + firstSubject + suffix;
 }
 
@@ -1144,6 +1152,8 @@ function retrieveSubject(subjectGroupName, position) {
 	$('#NewSubject').attr('disabled', 'disabled');
 	$('#GetSubject').attr('disabled', 'disabled');
 	addSeletedSubjects(group);
+	$('#Submit').removeAttr('disabled');
+	$('#Debug').removeAttr('disabled');
 }
 
 function compareTagValues(oldArray, newArray) {
@@ -1548,6 +1558,18 @@ function getAllSubjects() {
 	}
 }
 
+function existsNewSubjects() {
+	for (var i=0; i < groupCounter.length; i++) {
+		for (var j=1; j<=groupCounter[i]; j++) {
+			var id = makeId('Subject', i+1, j);
+			if ($('#' + id).length != 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 function addSeletedSubjects(group) {
 	var tags;
 	for (var i=group-1; i < groupCounter.length; i++) {
@@ -1603,6 +1625,10 @@ function postSubjects(executeRequest) {
 		displayStatus('submitDeleteValues()');
 	} else if (addValuesQueue.length > 0) {
 		displayStatus('submitAddValues()');
+	} else {
+		alert('No changes. Nothing to do.');
+		$('#psoc_progress_bar').css('display', 'none');
+		$('#Status').html('');
 	}
 }
 
