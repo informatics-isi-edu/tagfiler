@@ -75,7 +75,7 @@ def urlunquote(url):
     return text
 
 def t_ESCAPESTRING(t):
-    r'%[0-9A-Fa-f]+'
+    r'(%[0-9A-Fa-f][0-9A-Fa-f])+'
     t.value = urlunquote(t.value)
     return t
 
