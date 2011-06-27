@@ -315,7 +315,6 @@ class FileList (Node):
 
     def GET(self, uri):
         
-        web.header('Content-Type', 'text/html;charset=ISO-8859-1')
         self.globals['referer'] = self.config['home'] + uri
         self.storage = web.input()
 
@@ -540,7 +539,6 @@ class Tagdef (Node):
             return (predefined, userdefined, types)
 
         def postCommit(defs):
-            web.header('Content-Type', 'text/html;charset=ISO-8859-1')
             self.setNoCache()
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
