@@ -45,8 +45,10 @@ def listOrStringMax(val, curmax=0):
 def mystr(val):
     if type(val) == type(1.0):
         return re.sub("0*e", "0e", "%.48e" % val)
-    else:
+    elif type(val) not in [ str, unicode ]:
         return str(val)
+    else:
+        return val
 
 def dictmerge(base, custom):
     custom.update(base)

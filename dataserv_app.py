@@ -57,6 +57,50 @@ import struct
 
 render = None
 
+def db_dbquery(db, query, vars={}):
+    """Query wrapper to handle UTF-8 encoding issues.
+    
+    PostgreSQL understands UTF-8, but web.db does not understand unicode.
+    
+    1. Convert unicode query strings and vars to UTF-8 encoded raw strings.
+    
+    2. Convert query results in UTF-8 back to unicode.
+    """
+
+    def myutf8(v):
+        if type(v) == unicode:
+            return v.encode('utf8')
+        else:
+            return v
+        
+    def myunicode(v):
+        if type(v) == str:
+            return unicode(v, 'utf8')
+        else:
+            return v
+
+    def myunicode_storage(v):
+        return web.Storage( [ (myunicode(key), myunicode(value)) for (key, value) in v.items() ] )
+
+    query = myutf8(query)
+    vars = myunicode_storage(vars)
+
+    results = db.query(query, vars=vars)
+
+    def iterwrapper(iter):
+        for r in iter:
+            yield r
+
+    if hasattr(results, '__iter__'):
+        # try to map results over iterator
+        length = len(results)
+        results = web.iterbetter(iterwrapper(itertools.imap(myunicode_storage, results)))
+        results.__len__ = lambda: length
+        return results
+    else:
+        # assume it is not an iterable result
+        return myunicode(results)
+    
 class DbCache:
     """A little helper to share state between web requests."""
 
@@ -71,13 +115,13 @@ class DbCache:
             # modified time is latest modification time of:
             #  identifying tag (tracked as "tag last modified" on its tagdef
             #  individual subjects (tracked as "subject last tagged" on each identified subject
-            results = db.query('SELECT max(txid) AS txid FROM ('
-                               + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
-                               + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
-                               + ' UNION '
-                               + 'SELECT value AS txid FROM %s' % wraptag('tag last modified txid')
-                               + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
-                               vars=dict(idtag=self.idtagname))
+            results = db_dbquery(db, 'SELECT max(txid) AS txid FROM ('
+                              + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
+                              + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
+                              + ' UNION '
+                              + 'SELECT value AS txid FROM %s' % wraptag('tag last modified txid')
+                              + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
+                              vars=dict(idtag=self.idtagname))
             return results[0].txid
 
         latest = latest_txid()
@@ -227,7 +271,7 @@ def reduce_name_pred(x, y):
 def make_filter(allowed):
     allchars = string.maketrans('', '')
     delchars = ''.join([c for c in allchars if c not in allowed])
-    return lambda s, a=allchars, d=delchars: (str(s)).translate(a, d)
+    return lambda s, a=allchars, d=delchars: type(s) == str and s.translate(a,d) or type(s) == unicode and s.translate(dict([ (c, None) for c in d])) or str(s).translate(a, d)
 
 idquote = make_filter(string.letters + string.digits + '_-:.' )
 
@@ -899,6 +943,9 @@ class Application:
         web.debug('exception "%s"' % context,
                   traceback.format_exception(et, ev, tb))
 
+    def dbquery(self, query, vars={}):
+        return db_dbquery(self.db, query, vars=vars)
+
     def dbtransact(self, body, postCommit):
         """re-usable transaction pattern
 
@@ -955,7 +1002,7 @@ class Application:
                             elif tagref:
                                 if tagref in tagnames:
                                     options = [ (value, value) for value in
-                                                set([ res.value for res in self.db.query('SELECT DISTINCT value FROM %s' % self.wraptag(tagref))])
+                                                set([ res.value for res in self.dbquery('SELECT DISTINCT value FROM %s' % self.wraptag(tagref))])
                                                 .difference(set(values)) ]
                                 else:
                                     options = None
@@ -1293,17 +1340,17 @@ class Application:
         vars = dict(name=name)
         query = 'SELECT n.subject AS id, n.value AS file, v.value AS version FROM "_name" AS n JOIN "_version" AS v USING (subject)' \
                  + ' WHERE n.value = $name'
-        return self.db.query(query, vars)
+        return self.dbquery(query, vars)
 
     def select_dataset_size(self, key, membertag='vcontains'):
         # return statistics aout the children of the dataset as referenced by its membertag
         query, values = self.build_files_by_predlist_path([ ([web.Storage(tag='key', op='=', vals=[key])], [web.Storage(tag=membertag,op=None,vals=[])], []),
                                                             ([], [ web.Storage(tag=tag,op=None,vals=[]) for tag in 'name', 'bytes' ], []) ])
         query = 'SELECT SUM(bytes) AS size, COUNT(*) AS count FROM (%s) AS q' % query
-        return self.db.query(query, values)
+        return self.dbquery(query, values)
 
     def insert_file(self, name, version, file=None):
-        newid = self.db.query("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
+        newid = self.dbquery("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)
 
         if version:
@@ -1324,7 +1371,7 @@ class Application:
 
     def update_latestfile_version(self, name, next_latest_id):
         vars=dict(name=name, id=next_latest_id)
-        self.db.query('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
+        self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
 
     def delete_file(self, subject):
         wheres = []
@@ -1339,12 +1386,12 @@ class Application:
                 # we're deleting the latest version and there are previous versions
                 self.update_latestfile_version(subject.name, versions[1].id)
 
-        results = self.db.query('SELECT * FROM subjecttags WHERE subject = $subject', vars=dict(subject=subject.id))
+        results = self.dbquery('SELECT * FROM subjecttags WHERE subject = $subject', vars=dict(subject=subject.id))
         for result in results:
             self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.tagname])
                 
         query = 'DELETE FROM resources WHERE subject = $id'
-        self.db.query(query, vars=dict(id=subject.id))
+        self.dbquery(query, vars=dict(id=subject.id))
 
     tagdef_listas =  { 'tagdef': 'tagname', 
                        'tagdef type': 'typestr', 
@@ -1461,9 +1508,9 @@ class Application:
             
         tabledef += " )"
         #web.debug(tabledef)
-        self.db.query(tabledef)
+        self.dbquery(tabledef)
         if indexdef:
-            self.db.query(indexdef)
+            self.dbquery(indexdef)
 
     def delete_tagdef(self, tagdef):
         self.undeploy_tagdef(tagdef)
@@ -1472,7 +1519,7 @@ class Application:
         self.delete_file( tagdef )
 
     def undeploy_tagdef(self, tagdef):
-        self.db.query('DROP TABLE %s' % (self.wraptag(tagdef.tagname)))
+        self.dbquery('DROP TABLE %s' % (self.wraptag(tagdef.tagname)))
 
     def select_tag_noauthn(self, subject, tagdef, value=None):
         wheres = []
@@ -1498,7 +1545,7 @@ class Application:
             query += '  ORDER BY value'
 
         #web.debug(query, vars)
-        return self.db.query(query, vars=vars)
+        return self.dbquery(query, vars=vars)
 
     def select_tag(self, subject, tagdef, value=None):
         # subject would not be found if read of subject is not OK
@@ -1539,7 +1586,7 @@ class Application:
                 + " ORDER BY id, tagname"
         
         #web.debug(query, vars)
-        return self.db.query(query, vars=vars)
+        return self.dbquery(query, vars=vars)
 
     def set_tag_lastmodified(self, subject, tagdef):
         if tagdef.tagname in [ 'tag last modified', 'tag last modified txid', 'subject last tagged', 'subject last tagged txid' ]:
@@ -1547,13 +1594,13 @@ class Application:
             return
 
         def insert_or_update(table, vars):
-            self.db.query('LOCK TABLE %s IN EXCLUSIVE MODE' % table)
-            results = self.db.query('SELECT value FROM %s WHERE subject = $subject'  % table, vars=vars)
+            self.dbquery('LOCK TABLE %s IN EXCLUSIVE MODE' % table)
+            results = self.dbquery('SELECT value FROM %s WHERE subject = $subject'  % table, vars=vars)
 
             if len(results) > 0:
                 value = results[0].value
                 if value < vars['now']:
-                    self.db.query('UPDATE %s SET value = $now WHERE subject = $subject' % table, vars=vars)
+                    self.dbquery('UPDATE %s SET value = $now WHERE subject = $subject' % table, vars=vars)
                     #web.debug('set %s from %s to %s' % (table, value, vars['now']))
                 elif value == vars['now']:
                     pass
@@ -1561,11 +1608,11 @@ class Application:
                     pass
                     #web.debug('refusing to set %s from %s to %s' % (table, value, vars['now']))
             else:
-                self.db.query('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % table, vars=vars)
+                self.dbquery('INSERT INTO %s (subject, value) VALUES ($subject, $now)' % table, vars=vars)
                 #web.debug('set %s to %s' % (table, vars['now']))
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
-        txid = self.db.query('SELECT txid_current() AS txid')[0].txid
+        txid = self.dbquery('SELECT txid_current() AS txid')[0].txid
 
         insert_or_update(self.wraptag('tag last modified'), dict(subject=tagdef.id, now=now))
         insert_or_update(self.wraptag('tag last modified txid'), dict(subject=tagdef.id, now=txid))
@@ -1593,14 +1640,14 @@ class Application:
 
         query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres + ' RETURNING subject'
         vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
-        deleted = self.db.query(query, vars=vars)
+        deleted = self.dbquery(query, vars=vars)
         if len(deleted) > 0:
             self.set_tag_lastmodified(subject, tagdef)
 
             results = self.select_tag_noauthn(subject, tagdef)
             if len(results) == 0:
                 query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
-                self.db.query(query, vars=vars)
+                self.dbquery(query, vars=vars)
 
             # update in-memory representation too for caller's sake
             if tagdef.multivalue:
@@ -1697,7 +1744,7 @@ class Application:
                             + ' WHERE subject = $subject' \
                             + ' RETURNING value'
 
-                results = self.db.query(query, vars=vars)
+                results = self.dbquery(query, vars=vars)
 
                 if len(results) > 0 or (tagdef.tagname == 'modified' and subject.has_key('modified')):
                     # (subject, value) updated in place, so we're almost done...
@@ -1713,7 +1760,7 @@ class Application:
             query = 'INSERT INTO %s' % self.wraptag(tagdef.tagname) \
                     + ' (subject) VALUES ($subject)'
 
-        self.db.query(query, vars=vars)
+        self.dbquery(query, vars=vars)
 
         # update in-memory representation too for caller's sake
         if tagdef.multivalue:
@@ -1725,7 +1772,7 @@ class Application:
         
         results = self.select_filetags_noauthn(subject, tagdef.tagname)
         if len(results) == 0:
-            results = self.db.query("INSERT INTO subjecttags (subject, tagname) VALUES ($subject, $tagname)", vars=vars)
+            results = self.dbquery("INSERT INTO subjecttags (subject, tagname) VALUES ($subject, $tagname)", vars=vars)
         else:
             # may already be reverse-indexed in multivalue case
             pass
@@ -1738,10 +1785,10 @@ class Application:
         vars = dict()
         # now, as we can set manually dataset names, make sure the new generated name is unique
         while True:
-            result = self.db.query(query)
+            result = self.dbquery(query)
             name = str(result[0].nextval).rjust(9, '0')
             vars['value'] = name
-            res = self.db.query('SELECT * FROM "_name" WHERE value = $value', vars)
+            res = self.dbquery('SELECT * FROM "_name" WHERE value = $value', vars)
             if len(res) == 0:
                 return name
 
@@ -1750,10 +1797,10 @@ class Application:
         vars = dict()
         # now, as we can set manually dataset names, make sure the new generated name is unique
         while True:
-            result = self.db.query(query)
+            result = self.dbquery(query)
             value = str(result[0].nextval).rjust(9, '0')
             vars['value'] = value
-            res = self.db.query('SELECT * FROM "_key" WHERE value = $value', vars)
+            res = self.dbquery('SELECT * FROM "_key" WHERE value = $value', vars)
             if len(res) == 0:
                 return value
 
@@ -2133,9 +2180,9 @@ class Application:
         #    web.debug (string)
         #web.debug(values)
         #web.debug('...end query')
-        #for r in self.db.query('EXPLAIN ANALYZE %s' % query, vars=values):
+        #for r in self.dbquery('EXPLAIN ANALYZE %s' % query, vars=values):
         #    web.debug(r)
-        return self.db.query(query, vars=values)
+        return self.dbquery(query, vars=values)
 
     def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, vprefix='', assume_roles=False):
         values = dict()
@@ -2197,7 +2244,7 @@ class Application:
 
     def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
-        return self.db.query(query, values)
+        return self.dbquery(query, values)
 
     
     def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'default'], list_prefix=None, extra_tags=[]):
