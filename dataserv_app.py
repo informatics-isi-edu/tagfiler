@@ -1376,8 +1376,11 @@ class Application:
         vars=dict(name=name, id=next_latest_id)
         self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
 
-    def delete_file(self, subject):
+    def delete_file(self, subject, allow_tagdef=False):
         wheres = []
+
+        if subject.get('tagdef', None) != None and not allow_tagdef:
+            raise Conflict(self, u'Delete of subject tagdef="' + subject.tagdef  + u'" not supported; use dedicated /tagdef/ API.')
 
         if subject.name and subject.version:
             versions = [ file for file in self.select_file_versions(subject.name) ]
@@ -1519,7 +1522,7 @@ class Application:
         self.undeploy_tagdef(tagdef)
         tagdef.name = None
         tagdef.version = None
-        self.delete_file( tagdef )
+        self.delete_file( tagdef, allow_tagdef=True)
 
     def undeploy_tagdef(self, tagdef):
         self.dbquery('DROP TABLE %s' % (self.wraptag(tagdef.tagname)))
