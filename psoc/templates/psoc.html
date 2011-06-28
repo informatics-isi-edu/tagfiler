@@ -19,9 +19,6 @@ $if None:
 <div id="psoc">
 <div id="all_subjects" style="display:none;">
 </div>
-<select id="tags" name="tags" onchange="enableSubjectButtons()">
-</select>
-<p>
 <div id="Error" class="error">
 </div>
 <table>
@@ -44,6 +41,9 @@ $if None:
 		</td>
 	</tr>
 </table>
+<select id="tags" name="tags" onchange="enableSubjectButtons()">
+</select>
+<p>
 <input type="button" id="NewSubject" name="NewSubject" onclick="selectTags();" disabled="disabled" value="New Subject"/>
 <input type="button" id="GetSubject" name="GetSubject" onclick="getSubject();" disabled="disabled" value="Retrieve Subject"/>
 <input type="button" id="Submit" name="Submit" onclick="submitForm();" disabled="disabled" value="Submit"/>

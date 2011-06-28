@@ -64,6 +64,7 @@ var multivalueSelectArray = 'mice	observations	samples'.split('\t');
 var groupTags = 'Experiment	Lab	Mouse	Observation	Researcher	Sample	Site	Supplier	Treatment'.split('\t').sort();
 
 var groupCounter = new Array();
+var groupContainer = new Array();
 var groupName = new Array();
 var groupType = new Array();
 
@@ -388,7 +389,7 @@ function deleteSubject(group, position) {
 	deleteColumn(id);
 	if (row.children().size() == 1) {
 		// the div that contains the table;
-		id = makeId('Subject', group, 1, 'container');
+		id = makeId('Subject', group, groupContainer[group-1], 'container');
 		var div = $('#' + id);
 		div.remove();
 		if ($.isEmptyObject(allSelectedSubjects) && !existsNewSubjects()) {
@@ -478,7 +479,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	if (suffix.length > 0) {
 		suffix = '-' + suffix;
 	}
-	groupName[groupName.length] = subjectGroupName;
+	groupName.push(subjectGroupName);
 	firstSubject = 0;
 	
 	// check if we have already such subjects
@@ -500,9 +501,10 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	}
 	
 	firstSubject += 1;
-	selectedTags[selectedTags.length] = new Array();
-	groupCounter[groupCounter.length] = firstSubject;
-	groupType[groupType.length] = value;
+	selectedTags.push(new Array());
+	groupCounter.push(firstSubject);
+	groupContainer.push(firstSubject);
+	groupType.push(value);
 	if (groupCounter.length == 1) {
 		$('#all_subjects').css('display', 'block');
 	}
@@ -679,7 +681,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	$('#' + makeId(id, 'input')).val(textValue);
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
-	showColumn(groupCounter.length, 1, headerId);
+	showColumn(groupCounter.length, firstSubject, headerId);
 	if ($('#Submit').attr('disabled') == 'disabled') {
 		$('#Submit').removeAttr('disabled');
 		$('#Debug').removeAttr('disabled');
