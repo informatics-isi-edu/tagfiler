@@ -62,6 +62,7 @@ $else:
 			</table>
 			<table>
 			<tr>
+		$if filerecord.writeok and dtype != 'tagdef':
 			<td colspan="2">
 				$:{render.DatasetForm(putpred, filerecord)}
 			</td>
