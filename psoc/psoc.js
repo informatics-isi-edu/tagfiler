@@ -69,8 +69,10 @@ var groupName = new Array();
 var groupType = new Array();
 
 var selectedTags = new Array();
-
 var multivalueIds = new Array();
+
+var newGroup = new Object();
+var retrievedGroup = new Object();
 
 var firstSubject;
 
@@ -392,6 +394,9 @@ function deleteSubject(group, position) {
 		id = makeId('Subject', group, groupContainer[group-1], 'container');
 		var div = $('#' + id);
 		div.remove();
+		if (newGroup[groupType[group-1]] != null && newGroup[groupType[group-1]][groupName[group-1]] != null) {
+			delete newGroup[groupType[group-1]][groupName[group-1]];
+		}
 		if ($.isEmptyObject(allSelectedSubjects) && !existsNewSubjects()) {
 			$('#Submit').attr('disabled', 'disabled');
 			$('#Debug').attr('disabled', 'disabled');
@@ -415,12 +420,18 @@ function selectTags() {
 		subjectGroupName = prompt(value + ' name:');
 		if (subjectGroupName == null) {
 			// cancel
-			$('#selectTag').selected = 'selected';
+			$('#selectTag').attr('selected', 'selected');
+			$('#NewSubject').attr('disabled', 'disabled');
+			$('#GetSubject').attr('disabled', 'disabled');
 			return;
 		}
 		subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
 		if (subjectGroupName.length > 0) {
-			break;
+			if (newGroup[value] != null && newGroup[value][subjectGroupName+ '-'] != null) {
+				alert(value + ' "' + subjectGroupName + '" is already defined.');
+			} else {
+				break;
+			}
 		} else {
 			alert(value + ' name can not be empty.');
 		}
@@ -429,6 +440,12 @@ function selectTags() {
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
 	$('#GetSubject').attr('disabled', 'disabled');
+	if (newGroup[value] == null) {
+		newGroup[value] = new Object();
+	}
+	if (newGroup[value][subjectGroupName + '-'] == null) {
+		newGroup[value][subjectGroupName + '-'] = groupCounter.length;
+	}
 }
 
 function enableSubjectButtons() {
@@ -1119,20 +1136,42 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 
 function getSubject() {
 	var subjectType = $('#tags option:selected').text();
-	var subjectGroupName = prompt('Enter ' + subjectType + ' name:');;
-	if (subjectGroupName != null) {
-		subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
+	var subjectGroupName;
+	var position;
+	while (true) {
+		subjectGroupName = prompt('Enter ' + subjectType + ' name:');
+		if (subjectGroupName != null) {
+			subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
+		}
+		if (subjectGroupName == null || subjectGroupName.length == 0) {
+			$('#selectTag').attr('selected', 'selected');
+			$('#NewSubject').attr('disabled', 'disabled');
+			$('#GetSubject').attr('disabled', 'disabled');
+			return;
+		}
+		position = prompt('Enter ' + subjectType + ' #:');
+		if (position != null) {
+			position = position.replace(/^\s*/, '').replace(/\s*$/, '');
+		}
+		if (position == null || position.length == 0) {
+			$('#selectTag').attr('selected', 'selected');
+			$('#NewSubject').attr('disabled', 'disabled');
+			$('#GetSubject').attr('disabled', 'disabled');
+			return;
+		}
+		if (retrievedGroup[subjectType] != null && retrievedGroup[subjectType][subjectGroupName] != null && retrievedGroup[subjectType][subjectGroupName].contains(position)) {
+			alert(subjectType + ' "' + subjectGroupName + ' ' + position + '" is already retrieved.');
+		} else {
+			break;
+		}
 	}
-	if (subjectGroupName == null || subjectGroupName.length == 0) {
-		return;
+	if (retrievedGroup[subjectType] == null) {
+		retrievedGroup[subjectType] = new Object();
 	}
-	var position = prompt('Enter ' + subjectType + ' #:');;
-	if (position != null) {
-		position = position.replace(/^\s*/, '').replace(/\s*$/, '');
+	if (retrievedGroup[subjectType][subjectGroupName] == null) {
+		retrievedGroup[subjectType][subjectGroupName] = new Array();
 	}
-	if (position == null || position.length == 0) {
-		return;
-	}
+	retrievedGroup[subjectType][subjectGroupName].push(position);
 	$('#Status').css('color', '#33cc33');
 	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectGroupName + ' ' + position +'". Please wait...');
 	setTimeout(function(){retrieveSubject(subjectGroupName, position)}, 1);
