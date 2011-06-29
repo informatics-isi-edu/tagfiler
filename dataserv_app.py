@@ -320,7 +320,7 @@ class WebException (web.HTTPError):
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
-        if m:
+        if m and False:
             status = '200 OK'
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
