@@ -312,11 +312,11 @@ def traceInChunks(seq):
 
 
 class WebException (web.HTTPError):
-    def __init__(self, ast, status, data='', headers={}, desc='%s'):
+    def __init__(self, ast, status, data=u'', headers={}, desc=u'%s'):
         self.detail = urlquote(desc % data)
-        #web.debug(self.detail, desc, data)
-        logger.info('%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
-                                        ast and ast.request_guid or '', desc % data))
+        #web.debug(self.detail, desc, data, desc % data)
+        logger.info(myutf8(u'%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
+                                                   ast and ast.request_guid or u'', desc % data)))
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
@@ -326,51 +326,51 @@ class WebException (web.HTTPError):
 
 class NotFound (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '404 Not Found'
-        desc = 'The requested %s could not be found.'
+        desc = u'The requested %s could not be found.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Forbidden (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '403 Forbidden'
-        desc = 'The requested %s is forbidden.'
+        desc = u'The requested %s is forbidden.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Unauthorized (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '401 Unauthorized'
-        desc = 'The requested %s requires authorization.'
+        desc = u'The requested %s requires authorization.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class BadRequest (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '400 Bad Request'
-        desc = 'The request is malformed. %s'
+        desc = u'The request is malformed. %s'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class Conflict (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '409 Conflict'
-        desc = 'The request conflicts with the state of the server. %s'
+        desc = u'The request conflicts with the state of the server. %s'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class IntegrityError (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '500 Internal Server Error'
-        desc = 'The request execution encountered a integrity error: %s.'
+        desc = u'The request execution encountered a integrity error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 class RuntimeError (WebException):
     "provide an exception we can catch in our own transactions"
-    def __init__(self, ast, data='', headers={}):
+    def __init__(self, ast, data=u'', headers={}):
         status = '500 Internal Server Error'
-        desc = 'The request execution encountered a runtime error: %s.'
+        desc = u'The request execution encountered a runtime error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
 # BUG: use locking to avoid assumption that global interpreter lock protects us?

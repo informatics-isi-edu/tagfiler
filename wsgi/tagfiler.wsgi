@@ -95,7 +95,8 @@ class Dispatcher:
                     return result
             except dataserv_app.WebException, e:
                 if hasattr(e, 'detail'):
-                    web.header('X-Error-Description', e.detail)
+                    detail = dataserv_app.myutf8(e.detail)
+                    web.header('X-Error-Description', detail)
                 raise e
 
         finally:

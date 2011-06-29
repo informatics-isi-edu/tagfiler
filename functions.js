@@ -1,4 +1,4 @@
-/* 
+</* 
  * Copyright 2010 University of Southern California
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -123,14 +123,14 @@ function getCookie(name) {
 	kv = cookies[c].split("=");
 	if (kv[0] == name) {
 	    //log ('getCookie: found ' + kv[1]);
-	    cookie = unescape(kv[1]);
+	    cookie = decodeURIComponent(kv[1]);
 	}
     }
     return cookie;
 }
 
 function setCookie(name, val) {
-    val = encodeURIComponent(unescape(val));
+    val = encodeURIComponent(decodeURIComponent(val));
     //log("setCookie: " + name + " = " + val);
     document.cookie = name + "=" + val + "; path=/";
 }
@@ -224,12 +224,12 @@ function processSessionRequest() {
       for(i=0; i < response_pairs.length; i++) {
 	  pair_fields = response_pairs[i].split("=");
 	  if(pair_fields[0] == 'until') {
-	      until = new Date(unescape(pair_fields[1]));
-	      log("processSessionRequest: until=" + unescape(pair_fields[1]));
+	      until = new Date(decodeURIComponent(pair_fields[1]));
+	      log("processSessionRequest: until=" + decodeURIComponent(pair_fields[1]));
 	      setLocaleDate("untiltime", until);
 	  }
 	  if(pair_fields[0] == 'secsremain') {
-	      secsremain = parseInt(unescape(pair_fields[1]));
+	      secsremain = parseInt(decodeURIComponent(pair_fields[1]));
 	      log("processSessionRequest: secsremain=" + secsremain);
 	  }
       }
@@ -600,7 +600,7 @@ function processDelete() {
 		} else {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
 			var status = 'Status: ' + ajax_client.status + '. ';
-			alert(status + (err != null ? unescape(err) : ajax_client.responseText));
+			alert(status + (err != null ? decodeURIComponent(err) : ajax_client.responseText));
 		}
 		document.body.style.cursor = "default";
 	}
@@ -831,7 +831,7 @@ function renderTagdefs(home, table) {
 	columnmap[columns[i]] = i;
 	var name = headers[i].getAttribute("name");
 	if ( name == "typestr") {
-	    typedescs = JSON.parse(unescape(headers[i].innerHTML));
+	    typedescs = JSON.parse(decodeURIComponent(headers[i].innerHTML));
 	    headers[i].innerHTML = "Tag type";
 	}
 	else {
