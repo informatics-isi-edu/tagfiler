@@ -396,6 +396,7 @@ function deleteSubject(group, position) {
 		div.remove();
 		if (newGroup[groupType[group-1]] != null && newGroup[groupType[group-1]][groupName[group-1]] != null) {
 			delete newGroup[groupType[group-1]][groupName[group-1]];
+			$('#' + groupType[group-1]).css('display', '');
 		}
 		if ($.isEmptyObject(allSelectedSubjects) && !existsNewSubjects()) {
 			$('#Submit').attr('disabled', 'disabled');
@@ -446,6 +447,7 @@ function selectTags() {
 	if (newGroup[value][subjectGroupName + '-'] == null) {
 		newGroup[value][subjectGroupName + '-'] = groupCounter.length;
 	}
+	$('#' + value).css('display', 'none');
 }
 
 function enableSubjectButtons() {
@@ -538,7 +540,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	container.append(dl);
 	var dt = $('<dt>');
 	makeAttributes(dt,
-				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? USER + '-' + header : header))),
+				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? value + 's' : header))),
 				   'id', makeId(subjectId, 'span'));
 	dl.append(dt);
 	var span = $('<span>');
@@ -563,7 +565,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	td.append(img);
 	td = $('<td>');
 	tr.append(td);
-	td.html(inner == 'false' ? USER + '-' + header : header);
+	td.html(inner == 'false' ? value + 's' : header);
 	var dd = $('<dd>');
 	dl.append(dd);
 	if (inner == 'false') {
@@ -1195,6 +1197,7 @@ function retrieveSubject(subjectGroupName, position) {
 	addSeletedSubjects(group);
 	$('#Submit').removeAttr('disabled');
 	$('#Debug').removeAttr('disabled');
+	$('#' + subjectType).css('display', 'none');
 }
 
 function compareTagValues(oldArray, newArray) {
