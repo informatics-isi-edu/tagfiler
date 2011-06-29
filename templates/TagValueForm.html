@@ -47,7 +47,7 @@ $else:
 		$if filerecord.get('Image Set', False):
 			<a href="${home}/study/${dataid}?action=download">(all&nbsp;parts)</a>
 		</td>
-		$if filerecord.writeok:
+		$if filerecord.writeok and dtype != 'tagdef':
 			<td>
 					<button type="button" name="Delete" id="Delete" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}')" >Delete</button>
 			</td>
