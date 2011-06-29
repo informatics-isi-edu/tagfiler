@@ -1107,7 +1107,7 @@ function sendSelectRequest() {
 
 function handleError(jqXHR, textStatus, errorThrown) {
 	var err = jqXHR.getResponseHeader('X-Error-Description');
-	alert(err != null ? unescape(err) : jqXHR.responseText);
+	alert(err != null ? decodeURIComponent(err) : jqXHR.responseText);
 	$('#psoc_progress_bar').css('display', 'none');
 	$('#Status').html('');
 }
@@ -1843,7 +1843,7 @@ function handleSubmitError(jqXHR, textStatus, errorThrown) {
 	var err = jqXHR.getResponseHeader('X-Error-Description');
 	p = $('<p>');
 	$('#Error').append(p);
-	p.html(err != null ? unescape(err) : jqXHR.responseText);
+	p.html(err != null ? decodeURIComponent(err) : jqXHR.responseText);
 	$('#psoc_progress_bar').css('display', 'none');
 	$('#Status').html('');
 }
