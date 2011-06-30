@@ -52,8 +52,8 @@ $if None:
 <input type="button" id="Submit" name="Submit" onclick="submitForm();" disabled="disabled" value="Submit"/>
 <input type="button" id="Debug" name="Debug" onclick="debugForm();" disabled="disabled" value="Debug"/>
 <p>
-<input type="button" onclick="alert(document.getElementById('all_subjects').innerHTML);" value="Test"/>
-<input type="button" onclick="var tags = document.getElementById('tags').innerHTML; var a = document.getElementById('all_subjects').innerHTML; if (document.getElementById('AllBody').style.display == '') {document.getElementById('AllBody').style.display = 'none';} else {document.getElementById('AllBody').value = tags + '\n' + a; document.getElementById('AllBody').style.display = '';}" value="TestBody"/>
+<input type="button" id="viewBody" onclick="viewBody()" value="View Source"/>
+<input type="button" id="hideBody" onclick="hideBody()" disabled="disabled" value="Hide Source"/>
 <p>
 <textarea id="AllBody" style="display:none" cols="200" rows="50" >
 </textarea>

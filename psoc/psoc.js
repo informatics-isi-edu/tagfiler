@@ -475,9 +475,12 @@ function enableSubjectButtons() {
 		$('#NewSubject').attr('disabled', 'disabled');
 		$('#SelectSubjects').attr('disabled', 'disabled');
 		$('#GetSubject').attr('disabled', 'disabled');
-		$('#subjectsList').empty();
-		$('#subjectsList').css('display', 'none');
+		$('#GetSubject').val('Retrieve Subject');
+		$('#NewSubject').val('New Subject');
+		$('#SelectSubjects').val('Get Subjects List');
 	}
+	$('#subjectsList').empty();
+	$('#subjectsList').css('display', 'none');
 }
 
 function enableRetrieveButton() {
@@ -1170,9 +1173,17 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 
 function getSubject() {
 	var subjectType = $('#tags option:selected').text();
-	var parts = $('#subjectsList option:selected').text().split('-');
-	var subjectGroupName = parts[1];
-	var position = parts[3];
+	var subjectId = $('#subjectsList option:selected').text();
+	var parts = subjectId.split('-');
+	var position = parts.pop();
+	
+	// remove the subjectType
+	parts.pop();
+	
+	// remove the user
+	parts.splice(0, 1);
+	
+	var subjectGroupName = parts.join('-');
 	$('#subjectsList').empty();
 	$('#subjectsList').css('display', 'none');
 	if (retrievedGroup[subjectType] == null) {
@@ -1183,7 +1194,7 @@ function getSubject() {
 	}
 	retrievedGroup[subjectType][subjectGroupName].push(position);
 	$('#Status').css('color', '#33cc33');
-	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectGroupName + ' ' + position +'". Please wait...');
+	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectId +'". Please wait...');
 	setTimeout(function(){retrieveSubject(subjectGroupName, position)}, 1);
 }
 
@@ -1338,6 +1349,8 @@ function selectSubjects() {
 		select.append(option);
 	}
 	$('#subjectsList').css('display', '');
+	$('#NewSubject').attr('disabled', 'disabled');
+	$('#SelectSubjects').attr('disabled', 'disabled');
 }
 
 function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup) {
@@ -1989,4 +2002,18 @@ function validateDate(value) {
 	catch (e) {
 	}
 	return OK;
+}
+
+function viewBody() {
+	$('#AllBody').val($('body').html());
+	$('#AllBody').css('display', '');
+	$('#viewBody').attr('disabled', 'disabled');
+	$('#hideBody').removeAttr('disabled');
+	window.scrollTo(0, $('body').height());
+}
+
+function hideBody() {
+	$('#AllBody').css('display', 'none');
+	$('#hideBody').attr('disabled', 'disabled');
+	$('#viewBody').removeAttr('disabled');
 }
