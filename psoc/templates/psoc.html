@@ -43,8 +43,11 @@ $if None:
 </table>
 <select id="tags" name="tags" onchange="enableSubjectButtons()">
 </select>
+<select id="subjectsList" name="subjectsList"  onchange="enableRetrieveButton()" style="display:none;">
+</select>
 <p>
 <input type="button" id="NewSubject" name="NewSubject" onclick="selectTags();" disabled="disabled" value="New Subject"/>
+<input type="button" id="SelectSubjects" name="SelectSubjects" onclick="selectSubjects();" disabled="disabled" value="Get Subjects List"/>
 <input type="button" id="GetSubject" name="GetSubject" onclick="getSubject();" disabled="disabled" value="Retrieve Subject"/>
 <input type="button" id="Submit" name="Submit" onclick="submitForm();" disabled="disabled" value="Submit"/>
 <input type="button" id="Debug" name="Debug" onclick="debugForm();" disabled="disabled" value="Debug"/>
@@ -52,7 +55,7 @@ $if None:
 <input type="button" onclick="alert(document.getElementById('all_subjects').innerHTML);" value="Test"/>
 <input type="button" onclick="var tags = document.getElementById('tags').innerHTML; var a = document.getElementById('all_subjects').innerHTML; if (document.getElementById('AllBody').style.display == '') {document.getElementById('AllBody').style.display = 'none';} else {document.getElementById('AllBody').value = tags + '\n' + a; document.getElementById('AllBody').style.display = '';}" value="TestBody"/>
 <p>
-<textarea id="AllBody" style="display:none" cols="200" rows="500" >
+<textarea id="AllBody" style="display:none" cols="200" rows="50" >
 </textarea>
 </p>
 </div>

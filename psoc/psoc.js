@@ -80,6 +80,11 @@ function str(value) {
 	return '\'' + value + '\'';
 }
 
+function getTagTitle(tag) {
+	var title = (tag == 'Mouse' ? 'Mice' : tag + 's');
+	return title;
+}
+
 function getId(tag) {
 	var tagId = tagMap[tag];
 	return (tagId != null ? tagId : tag);
@@ -423,6 +428,7 @@ function selectTags() {
 			// cancel
 			$('#selectTag').attr('selected', 'selected');
 			$('#NewSubject').attr('disabled', 'disabled');
+			$('#SelectSubjects').attr('disabled', 'disabled');
 			$('#GetSubject').attr('disabled', 'disabled');
 			return;
 		}
@@ -437,10 +443,14 @@ function selectTags() {
 			alert(value + ' name can not be empty.');
 		}
 	}
-	selectSubject(value, subjectGroupName + '-', null, $('#all_subjects'), subjectGroupName);
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
+	$('#SelectSubjects').attr('disabled', 'disabled');
 	$('#GetSubject').attr('disabled', 'disabled');
+	$('#GetSubject').val('Retrieve Subject');
+	$('#NewSubject').val('New Subject');
+	$('#SelectSubjects').val('Get Subjects List');
+	selectSubject(value, subjectGroupName + '-', null, $('#all_subjects'), subjectGroupName);
 	if (newGroup[value] == null) {
 		newGroup[value] = new Object();
 	}
@@ -448,12 +458,37 @@ function selectTags() {
 		newGroup[value][subjectGroupName + '-'] = groupCounter.length;
 	}
 	$('#' + value).css('display', 'none');
+	if ($('#Submit').attr('disabled') == 'disabled') {
+		$('#Submit').removeAttr('disabled');
+		$('#Debug').removeAttr('disabled');
+	}
 }
 
 function enableSubjectButtons() {
 	if ($('#tags').children('option:selected').index() > 0) {
 		$('#NewSubject').removeAttr('disabled');
+		$('#SelectSubjects').removeAttr('disabled');
+		$('#GetSubject').val('Retrieve ' + $('#tags option:selected').text());
+		$('#NewSubject').val('New ' + $('#tags option:selected').text());
+		$('#SelectSubjects').val('Get ' + getTagTitle($('#tags option:selected').text()) + ' List');
+	} else {
+		$('#NewSubject').attr('disabled', 'disabled');
+		$('#SelectSubjects').attr('disabled', 'disabled');
+		$('#GetSubject').attr('disabled', 'disabled');
+		$('#subjectsList').empty();
+		$('#subjectsList').css('display', 'none');
+	}
+}
+
+function enableRetrieveButton() {
+	if ($('#subjectsList').children('option:selected').index() > 0) {
+		$('#NewSubject').attr('disabled', 'disabled');
+		$('#SelectSubjects').attr('disabled', 'disabled');
 		$('#GetSubject').removeAttr('disabled');
+	} else {
+		$('#NewSubject').removeAttr('disabled');
+		$('#SelectSubjects').removeAttr('disabled');
+		$('#GetSubject').attr('disabled', 'disabled');
 	}
 }
 
@@ -540,7 +575,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	container.append(dl);
 	var dt = $('<dt>');
 	makeAttributes(dt,
-				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? value + 's' : header))),
+				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? getTagTitle(value) : header))),
 				   'id', makeId(subjectId, 'span'));
 	dl.append(dt);
 	var span = $('<span>');
@@ -565,7 +600,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	td.append(img);
 	td = $('<td>');
 	tr.append(td);
-	td.html(inner == 'false' ? value + 's' : header);
+	td.html(inner == 'false' ? getTagTitle(value) : header);
 	var dd = $('<dd>');
 	dl.append(dd);
 	if (inner == 'false') {
@@ -701,10 +736,6 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
 	showColumn(groupCounter.length, firstSubject, headerId);
-	if ($('#Submit').attr('disabled') == 'disabled') {
-		$('#Submit').removeAttr('disabled');
-		$('#Debug').removeAttr('disabled');
-	}
 	return subjectGroupName + typeCode + firstSubject + suffix;
 }
 
@@ -1036,6 +1067,7 @@ var addValuesQueue;
 var deleteValuesQueue;
 var tagsIds;
 var isDebug;
+var traceBuffer;
 var allSelectedSubjects = new Object();
 var selectedTagsIds = new Object();
 
@@ -1138,35 +1170,11 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 
 function getSubject() {
 	var subjectType = $('#tags option:selected').text();
-	var subjectGroupName;
-	var position;
-	while (true) {
-		subjectGroupName = prompt('Enter ' + subjectType + ' name:');
-		if (subjectGroupName != null) {
-			subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
-		}
-		if (subjectGroupName == null || subjectGroupName.length == 0) {
-			$('#selectTag').attr('selected', 'selected');
-			$('#NewSubject').attr('disabled', 'disabled');
-			$('#GetSubject').attr('disabled', 'disabled');
-			return;
-		}
-		position = prompt('Enter ' + subjectType + ' #:');
-		if (position != null) {
-			position = position.replace(/^\s*/, '').replace(/\s*$/, '');
-		}
-		if (position == null || position.length == 0) {
-			$('#selectTag').attr('selected', 'selected');
-			$('#NewSubject').attr('disabled', 'disabled');
-			$('#GetSubject').attr('disabled', 'disabled');
-			return;
-		}
-		if (retrievedGroup[subjectType] != null && retrievedGroup[subjectType][subjectGroupName] != null && retrievedGroup[subjectType][subjectGroupName].contains(position)) {
-			alert(subjectType + ' "' + subjectGroupName + ' ' + position + '" is already retrieved.');
-		} else {
-			break;
-		}
-	}
+	var parts = $('#subjectsList option:selected').text().split('-');
+	var subjectGroupName = parts[1];
+	var position = parts[3];
+	$('#subjectsList').empty();
+	$('#subjectsList').css('display', 'none');
 	if (retrievedGroup[subjectType] == null) {
 		retrievedGroup[subjectType] = new Object();
 	}
@@ -1184,6 +1192,13 @@ function retrieveSubject(subjectGroupName, position) {
 	var PREFIX = HOME + '/tags/';
 	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + USER + '-' + subjectGroupName + '-' + subjectType + '-' + position;
 	var url = PREFIX + SUFFIX;
+	$('#selectTag').attr('selected', 'selected');
+	$('#NewSubject').attr('disabled', 'disabled');
+	$('#SelectSubjects').attr('disabled', 'disabled');
+	$('#GetSubject').attr('disabled', 'disabled');
+	$('#GetSubject').val('Retrieve Subject');
+	$('#NewSubject').val('New Subject');
+	$('#SelectSubjects').val('Get Subjects List');
 	var subject = getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0);
 	var group = subject.group;
 	var position = subject.position;
@@ -1191,9 +1206,6 @@ function retrieveSubject(subjectGroupName, position) {
 	showColumn(group, position, headerId);
 	$('#Status').html('');
 	$('#Status').css('color', 'black');
-	$('#selectTag').attr('selected', 'selected');
-	$('#NewSubject').attr('disabled', 'disabled');
-	$('#GetSubject').attr('disabled', 'disabled');
 	addSeletedSubjects(group);
 	$('#Submit').removeAttr('disabled');
 	$('#Debug').removeAttr('disabled');
@@ -1287,6 +1299,45 @@ function compareTags(oldTags, newTags) {
 	});
 	
 	return mod;
+}
+
+function selectSubjects() {
+	var subjectType = $('#tags option:selected').text();
+	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
+	var PREFIX = HOME + '/query/';
+	var SUFFIX = encodeURIComponent(idTag) + ':like:' + encodeURIComponent(USER + '-%-' + subjectType + '-%') + '(' + encodeURIComponent(idTag) + ')';
+	var url = PREFIX + SUFFIX;
+	var subjects = new Array();
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			$.each(data, function(i, object) {
+				subjects.push(object[idTag]);
+			});
+		},
+		error: handleError
+	});
+	subjects.sort();
+	var select = $('#subjectsList');
+	var option = $('<option>');
+	makeAttributes(option,
+				   'id', 'selectSubject',
+				   'value', 'Choose a Subject');
+	option.text('Choose ' + $('#tags option:selected').text());
+	select.append(option);
+	for (var i=0; i < subjects.length; i++) {
+		option = $('<option>');
+		makeAttributes(option,
+					   'id', 'selectSubject' + (i + 1),
+					   'value', subjects[i]);
+		option.text(subjects[i]);
+		select.append(option);
+	}
+	$('#subjectsList').css('display', '');
 }
 
 function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup) {
@@ -1439,31 +1490,30 @@ function submitForm() {
 }
 
 function debugForm() {
-	$('#AllBody').val('\n********************\n');
-	$('#AllBody').val($('#AllBody').val() + 'Retrieved subjects *\n');
-	$('#AllBody').val($('#AllBody').val() + '********************\n\n');
+	traceBuffer = '\n********************\n';
+	traceBuffer += 'Retrieved subjects *\n';
+	traceBuffer += '********************\n\n';
 	displaySubjects(allSelectedSubjects);
-	
-	$('#AllBody').val($('#AllBody').val() + '\n****************\n');
-	$('#AllBody').val($('#AllBody').val() + 'Saved subjects *\n');
-	$('#AllBody').val($('#AllBody').val() + '****************\n\n');
+	traceBuffer += '\n****************\n';
+	traceBuffer += 'Saved subjects *\n';
+	traceBuffer += '****************\n\n';
 	getAllSubjects();
 	displaySubjects(allSubjects);
 	
-	$('#AllBody').val($('#AllBody').val() + '\n*********\n');
-	$('#AllBody').val($('#AllBody').val() + 'Actions *\n');
-	$('#AllBody').val($('#AllBody').val() + '*********\n\n');
+	traceBuffer += '\n*********\n';
+	traceBuffer += 'Actions *\n';
+	traceBuffer += '*********\n\n';
 	
 	var mod = compareSubjects(allSelectedSubjects, allSubjects);
 	$.each(mod, function(subject, value) {
 		$.each(value, function(action, tags) {
 			if (action == 'mod') {
-				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSubjects, subject) + '\n');
-				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+				traceBuffer += 'Subject: ' + getPredicate(allSubjects, subject) + '\n';
+				traceBuffer += '\tAction: ' + action + '\n';
 				$.each(tags, function(tag, tagActions) {
-					$('#AllBody').val($('#AllBody').val() + '\t\tTag: ' + tag + '\n');
+					traceBuffer += '\t\tTag: ' + tag + '\n';
 					$.each(tagActions, function(tagAction, values) {
-						$('#AllBody').val($('#AllBody').val() + '\t\t\t' + tagAction + ': ' + values.join(',') + '\n');
+						traceBuffer += '\t\t\t' + tagAction + ': ' + values.join(',') + '\n';
 						if (tagAction == 'add' && !addValuesQueue.contains(subject)) {
 							addValuesQueue.push(subject);
 						} else if (tagAction == 'del' && !multivalueSelectArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
@@ -1478,16 +1528,16 @@ function debugForm() {
 				allUpdatedSubjects[subject]['values'][predicate.tag] = predicate.val;
 			} else if (action == 'add') {
 				allNewSubjects[subject] = tags;
-				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSubjects, subject) + '\n');
-				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+				traceBuffer += 'Subject: ' + getPredicate(allSubjects, subject) + '\n';
+				traceBuffer += '\tAction: ' + action + '\n';
 				$.each(tags, function(key, items) {
 					$.each(items, function(tag, values) {
-						$('#AllBody').val($('#AllBody').val() + '\t\t' + tag + '=[' + values.join(',') + ']\n');
+						traceBuffer += '\t\t' + tag + '=[' + values.join(',') + ']\n';
 					});
 				});
 			} else if (action == 'del') {
-				$('#AllBody').val($('#AllBody').val() + 'Subject: ' + getPredicate(allSelectedSubjects, subject) + '\n');
-				$('#AllBody').val($('#AllBody').val() + '\tAction: ' + action + '\n');
+				traceBuffer += 'Subject: ' + getPredicate(allSelectedSubjects, subject) + '\n';
+				traceBuffer += '\tAction: ' + action + '\n';
 				deleteSubjectsQueue.push(subject);
 				var predicate = getPredicateParts(allSelectedSubjects, subject);
 				allDeletedSubjects[subject] = new Object();
@@ -1497,9 +1547,9 @@ function debugForm() {
 		});
 	});
 	
-	$('#AllBody').val($('#AllBody').val() + '\n***************\n');
-	$('#AllBody').val($('#AllBody').val() + 'HTTP Requests *\n');
-	$('#AllBody').val($('#AllBody').val() + '***************\n\n');
+	traceBuffer += '\n***************\n';
+	traceBuffer += 'HTTP Requests *\n';
+	traceBuffer += '***************\n\n';
 	
 	postSubjects(false);
 }
@@ -1639,16 +1689,14 @@ function addSeletedSubjects(group) {
 function displaySubjects(subjects) {
 	$.each(subjects, function(subject, val) {
 		var values = val['values'];
-		var bodyVal = $('#AllBody').val();
-		bodyVal += subject + '\n';
+		traceBuffer += subject + '\n';
 		$.each(values, function(value, tagValues) {
-			bodyVal += '\t' + value + ':\n';
+			traceBuffer += '\t' + value + ':\n';
 			for (var i=0; i<tagValues.length; i++) {
-				bodyVal += '\t\t' + tagValues[i] + '\n';
+				traceBuffer += '\t\t' + tagValues[i] + '\n';
 			}
 		});
-		bodyVal += '\n';
-		$('#AllBody').val(bodyVal);
+		traceBuffer += '\n';
 	});
 	$('#AllBody').css('display', '');
 }
@@ -1692,7 +1740,7 @@ function submitDelete() {
 	url += tags.join('&');
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + 'DELETE ' + url + '\n');
+		traceBuffer += 'DELETE ' + url + '\n';
 		handleSubmitResponse();
 	} else {
 		$.ajax({
@@ -1722,7 +1770,7 @@ function submitCreate() {
 	url += tags.join('&');
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + 'POST ' + url + '\n');
+		traceBuffer += 'POST ' + url + '\n';
 		handleSubmitResponse();
 	} else {
 		$.ajax({
@@ -1758,7 +1806,7 @@ function submitDeleteValues() {
 	url += '(' + tags.join(';') + ')';
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + 'DELETE ' + url + '\n');
+		traceBuffer += 'DELETE ' + url + '\n';
 		handleSubmitResponse();
 	} else {
 		$.ajax({
@@ -1793,7 +1841,7 @@ function submitAddValues() {
 	url += '(' + tags.join(';') + ')';
 	drawProgressBar(Math.ceil((sentRequests + 1) * 100 / totalRequests));
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + 'PUT ' + url + '\n');
+		traceBuffer += 'PUT ' + url + '\n';
 		handleSubmitResponse();
 	} else {
 		$.ajax({
@@ -1821,6 +1869,9 @@ function handleSubmitResponse(data, textStatus, jqXHR) {
 		if (!$.isEmptyObject(allUpdatedSubjects)) {
 			listSubjects(allUpdatedSubjects, 'Modified');
 		}
+		$('#AllBody').val(traceBuffer);
+		$('#AllBody').prop('scrollTop',  $('#AllBody').prop('scrollHeight'));
+		window.scrollTo(0, $('body').height());
 	} else {
 		var code;
 		if (sentRequests < deleteSubjectsQueue.length) {
@@ -1878,9 +1929,9 @@ function addToNewSubjectsQueue(subject) {
 
 function listCompleteSubjects() {
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + '\n***********************************\n');
-		$('#AllBody').val($('#AllBody').val() + 'Summary of the subjects proceeded *\n');
-		$('#AllBody').val($('#AllBody').val() + '***********************************\n\n');
+		traceBuffer += '\n***********************************\n';
+		traceBuffer += 'Summary of the subjects proceeded *\n';
+		traceBuffer += '***********************************\n\n';
 	} else {
 		var ul = $('<ul>').attr({id: 'completedSubjects'});
 		var psoc = $('#psoc');
@@ -1904,9 +1955,9 @@ function listCompleteSubjects() {
 
 function listSubjects(subjects, title) {
 	if (isDebug) {
-		$('#AllBody').val($('#AllBody').val() + title + '\n');
+		traceBuffer += title + '\n';
 		$.each(subjects, function(subject, val) {
-			$('#AllBody').val($('#AllBody').val() + '\t' + getPredicate(subjects, subject) + '\n');
+			traceBuffer += '\t' + getPredicate(subjects, subject) + '\n';
 		});
 	} else {
 		var ul = $('<ul>');
