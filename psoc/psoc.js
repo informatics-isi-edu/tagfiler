@@ -14,22 +14,15 @@
  * limitations under the License.
  */
 
-var tagsArray = new Array();
-tagsArray['Experiment'] = 'experimentID	principal	lab	start	mice	observations'.split('\t');
-tagsArray['Lab'] = 'labID	site'.split('\t');
-tagsArray['Mouse'] = 'mouseID	dob	dos	litter	cage	start age	mouse strain	lot#	supplier	treatment	samples	observations	cancer type	start	performer	#cells	weight'.split('\t');
-tagsArray['Observation'] = 'observationID	start	weight	performer	samples'.split('\t');
-tagsArray['Researcher'] = 'researcherID	email	lab'.split('\t');
-tagsArray['Sample'] = 'sampleID	start	performer	freezer	shelf	sample type	serum sample type	observations'.split('\t');
-tagsArray['Site'] = 'siteID	address'.split('\t');
-tagsArray['Supplier'] = 'supplierID	address	email'.split('\t');
-tagsArray['Treatment'] = 'treatmentID	drug	dose	lot#	performer'.split('\t');
+var tagsArray;
+var allTags;
 
 var tagMap = {
 	'start age' : 'startAge',
 	'mouse strain' : 'mouseStrain',
 	'lot#' : 'lot',
 	'cancer type' : 'cancerType',
+	'cell type' : 'cellType',
 	'#cells' : 'cells',
 	'sample type' : 'sampleType',
 	'serum sample type' : 'serumSampleType'
@@ -39,29 +32,14 @@ var selectArray = 'lab	researcher	site	supplier	treatment'.split('\t');
 var sharedId = new Array();
 sharedId['researcher'] = 'performer	principal'.split('\t');
 
-var enumArray = new Array();
-enumArray['mouse strain'] = 'C57 black 6	nude	skid	other strain'.split('\t').sort();
-enumArray['sample type'] = 'serum	tumor	spleen	other sample'.split('\t').sort();
-enumArray['cancer type'] = 'lymphoma	prostate	breast	naive'.split('\t').sort();
-enumArray['serum sample type'] = 'terminal bleed	other'.split('\t').sort();
-
-var linkArray = new Array();
-linkArray['mice'] = new Array();
-linkArray['samples'] = new Array();
-linkArray['observations'] = new Array();
-
-var tagMapArray = new Array();
-tagMapArray['mice'] = 'Mouse';
-tagMapArray['samples'] = 'Sample';
-tagMapArray['observations'] = 'Observation';
-
-var dateArray = 'dob	dos	start'.split('\t');
+var enumArray;
+var linkArray;
+var tagMapArray;
+var dateArray;
+var multivalueArray;
+var groupTags;
 
 var subjectArray = new Array();
-var multivalueArray = 'address	email	mice	observations	samples'.split('\t');
-var multivalueSelectArray = 'mice	observations	samples'.split('\t');
-
-var groupTags = 'Experiment	Lab	Mouse	Observation	Researcher	Sample	Site	Supplier	Treatment'.split('\t').sort();
 
 var groupCounter = new Array();
 var groupContainer = new Array();
@@ -336,6 +314,9 @@ function newTags(group, value) {
 }
 
 function newSubject(group, inner) {
+	var tags = getSubjectTags(group, groupCounter[group-1]);	
+	var tagsValues = getSubjectValues(group, groupCounter[group-1], tags);
+	
 	var typeCode = groupType[group-1] + '-';
 	if (inner == 'true') {
 		typeCode = '-' + groupType[group-1] + '-';
@@ -374,7 +355,20 @@ function newSubject(group, inner) {
 	td.append(input);
 	values.push(td);
 	appendColumn(subjectsId, values);
-	var id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
+	
+	// copy the values from the previous
+	var id = makeId('Subject', group, groupCounter[group-1]);
+	$.each(tagsValues, function(tag, values) {
+		if (!multivalueArray.contains(tag)) {
+			if (enumArray[tag] == null) {
+				$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
+			} else {
+				$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
+			}
+		}
+	});
+	
+	id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
 	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
 	var textValue = (inner == 'false' ? USER + '-' + subjectName : subjectName);
 	$('#' + makeId(id, 'input')).val(textValue);
@@ -942,7 +936,7 @@ function tagCell(group, tagname, index) {
 	tr.append(td);
 	var options = enumArray[tagname];
 	if (options == null) {
-		if (linkArray[tagname] != null) {
+		if (linkArray.contains(tagname)) {
 			type = 'button';
 			var tdTable = $('<table>');
 			makeAttributes(tdTable,
@@ -1095,6 +1089,10 @@ function init(home, user) {
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
+	$('#psoc_progress_bar').css('display', '');
+	$('#Status').html('Initializing the form. Please wait...');
+	initTypedef();
+	initTagdef();
 	SVCPREFIX = home.substring(home.lastIndexOf('/') + 1);
 	resourcePrefix = '/' + SVCPREFIX + '/static/';
 	var select = $('#tags');
@@ -1112,12 +1110,102 @@ function init(home, user) {
 		option.text(groupTags[i]);
 		select.append(option);
 	}
-	$('#psoc_progress_bar').css('display', '');
-	$('#Status').html('Initializing the form. Please wait...');
+	$('#tags').css('display', '');
 	totalRequests = selectArray.length;
 	sentRequests = 0;
 	drawProgressBar(0);
 	displayStatus('sendSelectRequest()');
+}
+
+function initTypedef() {
+	var url = HOME + '/tags/typedef(typedef;' + encodeURIComponent('typedef values') + ')';
+	enumArray = new Object();
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			$.each(data, function(i, object) {
+				var typedefValues = object['typedef values'];
+				if (typedefValues != null) {
+					var values = new Array();
+					$.each(typedefValues, function(i, item) {
+						var index = item.indexOf(' ') + 1;
+						values.push(item.substr(index));
+					});
+					values.sort();
+					enumArray[object.typedef] = values;
+				}
+			});
+		},
+		error: handleError
+	});
+}
+
+function initTagdef() {
+	var url = HOME + '/query/view:like:' + encodeURIComponent('%ID') + '(view;' + encodeURIComponent('_cfg_file list tags') + ')';
+	allTags = new Array();
+	linkArray = new Array();
+	dateArray = new Array();
+	groupTags = new Array();
+	multivalueArray = new Array();
+	tagMapArray = new Object();
+	tagsArray = new Object();
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			$.each(data, function(i, object) {
+				var tags = object['_cfg_file list tags'];
+				$.each(tags, function(i, item) {
+					if (!allTags.contains(item)) {
+						allTags.push(item);
+					}
+				});
+				var view = object.view;
+				var entity = view[0].toUpperCase() + view.substr(1, view.length - 3);
+				tagsArray[entity] = tags;
+				groupTags.push(entity);
+			});
+		},
+		error: handleError
+	});
+	
+	groupTags.sort();
+	
+	url = HOME + '/tags/tagdef(tagdef;' + encodeURIComponent('tagdef type') + ';' + encodeURIComponent('tagdef multivalue') + ')?limit=none';
+	var temp = new Array();
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			$.each(data, function(i, object) {
+				if (allTags.contains(object.tagdef)) {
+					if (object['tagdef multivalue']) {
+						multivalueArray.push(object.tagdef);
+					}
+					if (object['tagdef type'] == 'date') {
+						dateArray.push(object.tagdef);
+					} else if (object.tagdef != object['tagdef type'] && object.tagdef + 'ID' != object['tagdef type']) {
+						if (allTags.contains(object['tagdef type'])) {
+							linkArray.push(object.tagdef);
+							var entity = object['tagdef type'];
+							tagMapArray[object.tagdef] = entity[0].toUpperCase() + entity.substr(1, entity.length - 3);
+						}
+					}
+				}
+			});
+		},
+		error: handleError
+	});
 }
 
 function displayStatus(request) {
@@ -1477,7 +1565,7 @@ function submitForm() {
 					$.each(tagActions, function(tagAction, values) {
 						if (tagAction == 'add' && !addValuesQueue.contains(subject)) {
 							addValuesQueue.push(subject);
-						} else if (tagAction == 'del' && !multivalueSelectArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
+						} else if (tagAction == 'del' && !linkArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
 							deleteValuesQueue.push(subject);
 						}
 					});
@@ -1529,7 +1617,7 @@ function debugForm() {
 						traceBuffer += '\t\t\t' + tagAction + ': ' + values.join(',') + '\n';
 						if (tagAction == 'add' && !addValuesQueue.contains(subject)) {
 							addValuesQueue.push(subject);
-						} else if (tagAction == 'del' && !multivalueSelectArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
+						} else if (tagAction == 'del' && !linkArray.contains(tag) && !deleteValuesQueue.contains(subject)) {
 							deleteValuesQueue.push(subject);
 						}
 					});
