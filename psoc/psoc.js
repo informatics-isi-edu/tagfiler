@@ -50,9 +50,11 @@ var selectedTags = new Array();
 var multivalueIds = new Array();
 
 var newGroup = new Object();
-var retrievedGroup = new Object();
+var subjectMax = new Object();
+var subjectTemplates = new Object();
 
 var firstSubject;
+var firstMouseId;
 
 function str(value) {
 	return '\'' + value + '\'';
@@ -314,13 +316,20 @@ function newTags(group, value) {
 }
 
 function newSubject(group, inner) {
-	var tags = getSubjectTags(group, groupCounter[group-1]);	
-	var tagsValues = getSubjectValues(group, groupCounter[group-1], tags);
-	
-	var typeCode = groupType[group-1] + '-';
-	if (inner == 'true') {
-		typeCode = '-' + groupType[group-1] + '-';
+	var tags;	
+	var tagsValues;
+	var position = groupCounter[group-1];
+	var id = makeId('Subject', group, position, 'header');
+	var tagId = groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID';
+	while ($('#' + id).length == 0 && position >= 1) {
+		position--;
 	}
+	if (position >= 1) {
+		tags = getSubjectTags(group, position);	
+		tagsValues = getSubjectValues(group, position, tags);
+	}
+	
+	var typeCode = '#';
 	var subjectsId = makeId('subjects', group);
 	var suffix = $('#' + subjectsId).attr('suffix');
 	var values = new Array();
@@ -331,10 +340,10 @@ function newSubject(group, inner) {
 	makeAttributes(th,
 				   'class', 'file-tag',
 				   'id', makeId(subjectId, 'header'));
-	th.html((inner == 'false' ? USER + '-' : '') + groupName[group-1] + typeCode + countIndex + suffix);
+	th.html(groupType[group-1] + ' ' + groupName[group-1] + typeCode + countIndex + suffix);
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
-		var id = makeId(subjectId, getId(selectedTags[group-1][i]));
+		id = makeId(subjectId, getId(selectedTags[group-1][i]));
 		var td = $('<td>');
 		makeAttributes(td,
 					   'nowrap', 'nowrap',
@@ -357,23 +366,31 @@ function newSubject(group, inner) {
 	appendColumn(subjectsId, values);
 	
 	// copy the values from the previous
-	var id = makeId('Subject', group, groupCounter[group-1]);
-	$.each(tagsValues, function(tag, values) {
-		if (!multivalueArray.contains(tag)) {
-			if (enumArray[tag] == null) {
-				$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
-			} else {
-				$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
+	if (tags != null) {
+		id = makeId('Subject', group, groupCounter[group-1]);
+		$.each(tagsValues, function(tag, values) {
+			if (!multivalueArray.contains(tag)) {
+				if (enumArray[tag] == null) {
+					$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
+				} else {
+					$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
+				}
 			}
-		}
-	});
+		});
+	}
 	
-	id = makeId(subjectId, groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID');
+	id = makeId(subjectId, tagId);
 	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
-	var textValue = (inner == 'false' ? USER + '-' + subjectName : subjectName);
+	var textValue = subjectName;
 	$('#' + makeId(id, 'input')).val(textValue);
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
+	if (groupType[group-1] == 'Mouse') {
+		var id = makeId('Subject', group, groupCounter[group-1]);
+		var tag = 'lot#';
+		var lot = countIndex - firstMouseId + 1;
+		$('#' + makeId(id, getId(tag), 'input')).val(lot);
+	}
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
 	showColumn(group, countIndex, headerId);
@@ -415,28 +432,7 @@ function hideSubject(group, position) {
 
 function selectTags() {
 	var value = $('#tags option:selected').text();
-	var subjectGroupName;
-	while (true) {
-		subjectGroupName = prompt(value + ' name:');
-		if (subjectGroupName == null) {
-			// cancel
-			$('#selectTag').attr('selected', 'selected');
-			$('#NewSubject').attr('disabled', 'disabled');
-			$('#SelectSubjects').attr('disabled', 'disabled');
-			$('#GetSubject').attr('disabled', 'disabled');
-			return;
-		}
-		subjectGroupName = subjectGroupName.replace(/^\s*/, '').replace(/\s*$/, '');
-		if (subjectGroupName.length > 0) {
-			if (newGroup[value] != null && newGroup[value][subjectGroupName+ '-'] != null) {
-				alert(value + ' "' + subjectGroupName + '" is already defined.');
-			} else {
-				break;
-			}
-		} else {
-			alert(value + ' name can not be empty.');
-		}
-	}
+	var subjectGroupName = 'PSOC';
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
 	$('#SelectSubjects').attr('disabled', 'disabled');
@@ -519,10 +515,7 @@ function tog(dt, header) {
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	var inner = (subjectGroupName == header + '-') ? 'false' : 'true';
-	var typeCode = value + '-';
-	if (inner == 'true') {
-		typeCode = '-' + value + '-';
-	}
+	var typeCode ='#';
 	if (suffix == null) {
 		suffix = '';
 	}
@@ -530,28 +523,16 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	if (suffix.length > 0) {
 		suffix = '-' + suffix;
 	}
-	groupName.push(subjectGroupName);
-	firstSubject = 0;
-	
-	// check if we have already such subjects
+	groupName.push('PSOC');
 	if (inner == 'false') {
-		var PREFIX = HOME + '/query/';
-		var LIKE = 'ID:like:';
-		var SUFFIX = '?limit=none&versions=latest';
-		var data_id = USER + '-' + subjectGroupName + value + '-' + '%';
-		var url = PREFIX + value.substr(0,1).toLowerCase() + value.substr(1) + LIKE + encodeURIComponent(data_id) + SUFFIX;
-		$.ajax({
-			url: url,
-			accepts: {text: 'text/uri-list'},
-			dataType: 'text',
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: false,
-			success: handleSubjectResponse,
-			error: handleError
-		});
+		var parts = subjectGroupName.split('#');
+		if (parts.length > 1) {
+			parts = parts[1].split('-');
+			firstSubject = parseInt(parts[0]);
+		} else {
+			checkForNextSubjectId(value);
+		}
 	}
-	
-	firstSubject += 1;
 	selectedTags.push(new Array());
 	groupCounter.push(firstSubject);
 	groupContainer.push(firstSubject);
@@ -559,7 +540,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	if (groupCounter.length == 1) {
 		$('#all_subjects').css('display', 'block');
 	}
-	var index = groupCounter.length;
+	index = groupCounter.length;
 
 	var subjectId = makeId('Subject', index);
 	var subjectId1 = makeId(subjectId, firstSubject);
@@ -614,7 +595,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		var a = $('<a>');
 		makeAttributes(a,
 					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject, str(headerId)));
-		a.html(USER + '-' + subjectGroupName + typeCode + firstSubject);
+		a.html(value + ' ' + header + typeCode + firstSubject);
 		td.append(a);
 		td = $('<td>');
 		makeAttributes(td,
@@ -678,7 +659,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	makeAttributes(th,
 				   'id', headerId,
 				   'class', 'file-tag');
-	th.html((inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix);
+	var val = (inner == 'false' ? header + typeCode + firstSubject : subjectGroupName);
+	th.html(value + ' ' + val + suffix);
 	tr.append(th);
 	tr = $('<tr>');
 	makeAttributes(tr,
@@ -728,31 +710,103 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	$('#selectTag').attr('selected', 'selected');
 	newTags(groupCounter.length, value);
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
-	var textValue = (inner == 'false' ? USER + '-' : '') + subjectGroupName + typeCode + firstSubject + suffix;
+	var textValue = val + suffix;
 	$('#' + makeId(id, 'input')).val(textValue);
 	makeAttributes($('#' + makeId(id, 'input')),
 				   'size', textValue.length);
 	showColumn(groupCounter.length, firstSubject, headerId);
-	return subjectGroupName + typeCode + firstSubject + suffix;
+	return val + suffix;
+}
+
+function checkForNextSubjectId(subjectType) {
+	firstSubject = 0;
+	
+	// check if we have already such subjects
+	var PREFIX = HOME + '/query/';
+	var LIKE = ':like:';
+	var SUFFIX = '?limit=none&versions=latest';
+	var data_id = 'PSOC#' + '%';
+	var subjectId = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
+	var url = PREFIX + subjectId + LIKE + encodeURIComponent(data_id) + '(' + subjectId + ')' + SUFFIX;
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: handleSubjectResponse,
+		error: handleError
+	});
+	
+	firstSubject += 1;
+	subjectMax[subjectType] = firstSubject;
+	if (subjectType == 'Mouse') {
+		firstMouseId = firstSubject;
+	}
 }
 
 function handleSubjectResponse(data, textStatus, jqXHR) {
-	var rows = jqXHR.responseText.split('\n');
-	for (var j=0; j<rows.length; j++) {
-		if (rows[j].length > 0) {
-			var index = rows[j].lastIndexOf('-') + 1;
-			var val = parseInt(rows[j].substr(index));
+	$.each(data, function(i, object) {
+		$.each(object, function(key, value) {
+			var index = value.indexOf('#') + 1;
+			var val = parseInt(value.substr(index));
 			if (val > firstSubject) {
 				firstSubject = val;
 			}
-		}
-	}
+		});
+	});
 }
 
 function addTags(group) {
 	var value = $('#' + makeId('addtags', group) + ' option:selected').text();
 	$('#' + makeId('addTag', group)).attr('selected', 'selected');
 	newTags(group, value);
+}
+
+function copySubjectTemplate(group, name) {
+	var subjectType = groupType[group-1];
+	var tagId = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID'
+	var groupsArray = subjectTemplates[subjectType];
+	var tags;
+	var tagsValues;
+	for (var i=groupsArray.length-1; i>=0; i--) {
+		var subjectGroup = groupsArray[i];
+		if (subjectGroup == group) {
+			continue;
+		}
+		var position = groupCounter[subjectGroup-1];
+		var id = makeId('Subject', subjectGroup, position, 'header');
+		while ($('#' + id).length == 0 && position >= 1) {
+			position--;
+		}
+		if (position >= 1) {
+			tags = getSubjectTags(subjectGroup, position);	
+			tagsValues = getSubjectValues(subjectGroup, position, tags);
+			break;
+		}
+	}
+	
+	// copy the values from the last template
+	if (tags != null) {
+		var id = makeId('Subject', group, groupCounter[group-1]);
+		$.each(tagsValues, function(tag, values) {
+			if (!multivalueArray.contains(tag) && tag != tagId) {
+				if (enumArray[tag] == null) {
+					$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
+				} else {
+					$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
+				}
+			}
+		});
+	}
+	if (subjectType == 'Mouse') {
+		var id = makeId('Subject', group, groupCounter[group-1]);
+		var tag = 'lot#';
+		var mouseId = $('#' + makeId(id, getId(tagId), 'input')).val();
+		var index = mouseId.indexOf('#') + 1;
+		var lot = parseInt(mouseId.substr(index)) - firstMouseId + 1;
+		$('#' + makeId(id, getId(tag), 'input')).val(lot);
+	}
 }
 
 function setValue(id, type) {
@@ -774,21 +828,38 @@ function setValue(id, type) {
 		position = groupCounter[group-1];
 	}
 	else if (type == 'button') {
+		// get the # for tagMapArray[tagname] 
+		if (subjectMax[tagMapArray[tagname]] == null) {
+			checkForNextSubjectId(tagMapArray[tagname]);
+		} else {
+			firstSubject = parseInt(subjectMax[tagMapArray[tagname]]) + 1;
+			subjectMax[tagMapArray[tagname]] = firstSubject;
+		}
+		var name = 'PSOC#' + firstSubject;
 		var parent = $('#' + makeId(id, 'button'));
 		if (parent.children().size() == 0) {
 			var parts = id.split('_');
 			var subjectType = groupType[parts[1] - 1];
 			var subjectID = makeId('Subject', parts[1], parts[2], subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID', 'input');
-			var name = $('#' + subjectID).val();
+			
 			value = selectSubject(tagMapArray[tagname], name, '', parent, 'All ' + tagname);
 			group = getChild(parent, 1).attr('id').split('_')[1];
-			position = 1;
+			position = firstSubject;
 		} else {
 			var parts = getChild(parent, 1).attr('id').split('_');
 			group = parts[1];
+			groupCounter[group-1] = firstSubject-1;
 			value = newSubject(group, 'true');
 			position = groupCounter[group-1];
+			subjectMax[tagMapArray[tagname]] = position;
 		}
+		if (subjectTemplates[tagMapArray[tagname]] == null) {
+			subjectTemplates[tagMapArray[tagname]] = new Array();
+		}
+		if (!subjectTemplates[tagMapArray[tagname]].contains(group)) {
+			subjectTemplates[tagMapArray[tagname]].push(group);
+		}
+		copySubjectTemplate(group, name);
 	} else if (type == 'select') {
 		if ($('#' + elemId).val() > 1) {
 			value = $('#' + elemId +' option:selected').text();
@@ -849,7 +920,7 @@ function addSubjectValue(value, group, position) {
 	var a = $('<a>');
 	makeAttributes(a,
 				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
-	a.html(USER + '-' + value);
+	a.html(groupType[group-1] + ' ' + value);
 	td.append(a);
 	tr.append(td);
 	td = $('<td>');
@@ -877,7 +948,7 @@ function addButtonValue(parent, value, group, position) {
 	var a = $('<a>');
 	makeAttributes(a,
 				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
-	a.html(value);
+	a.html(groupType[group-1] + ' ' + value);
 	td.append(a);
 	tr.append(td);
 	td = $('<td>');
@@ -1261,35 +1332,18 @@ function handleSelectResponse(data, textStatus, jqXHR) {
 
 function getSubject() {
 	var subjectType = $('#tags option:selected').text();
-	var subjectId = $('#subjectsList option:selected').text();
-	var parts = subjectId.split('-');
-	var position = parts.pop();
-	
-	// remove the subjectType
-	parts.pop();
-	
-	// remove the user
-	parts.splice(0, 1);
-	
-	var subjectGroupName = parts.join('-');
+	var subjectGroupName = $('#subjectsList option:selected').text();
 	$('#subjectsList').empty();
 	$('#subjectsList').css('display', 'none');
-	if (retrievedGroup[subjectType] == null) {
-		retrievedGroup[subjectType] = new Object();
-	}
-	if (retrievedGroup[subjectType][subjectGroupName] == null) {
-		retrievedGroup[subjectType][subjectGroupName] = new Array();
-	}
-	retrievedGroup[subjectType][subjectGroupName].push(position);
 	$('#Status').css('color', '#33cc33');
-	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectId +'". Please wait...');
-	setTimeout(function(){retrieveSubject(subjectGroupName, position)}, 1);
+	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectGroupName +'". Please wait...');
+	setTimeout(function(){retrieveSubject(subjectGroupName)}, 1);
 }
 
-function retrieveSubject(subjectGroupName, position) {
+function retrieveSubject(subjectGroupName) {
 	var subjectType = $('#tags option:selected').text();
 	var PREFIX = HOME + '/tags/';
-	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + USER + '-' + subjectGroupName + '-' + subjectType + '-' + position;
+	var SUFFIX = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID=' + encodeURIComponent(subjectGroupName);
 	var url = PREFIX + SUFFIX;
 	$('#selectTag').attr('selected', 'selected');
 	$('#NewSubject').attr('disabled', 'disabled');
@@ -1404,7 +1458,7 @@ function selectSubjects() {
 	var subjectType = $('#tags option:selected').text();
 	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
 	var PREFIX = HOME + '/query/';
-	var SUFFIX = encodeURIComponent(idTag) + ':like:' + encodeURIComponent(USER + '-%-' + subjectType + '-%') + '(' + encodeURIComponent(idTag) + ')';
+	var SUFFIX = encodeURIComponent(idTag) + ':like:' + encodeURIComponent('PSOC%') + '(' + encodeURIComponent(idTag) + ')';
 	var url = PREFIX + SUFFIX;
 	var subjects = new Array();
 	$.ajax({
@@ -1474,12 +1528,12 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 							if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
 								if (key == idTag) {
 									var id = makeId('Subject', group, position, 'header');
-									$('#' + id).html(val);
+									$('#' + id).html(subjectType + ' ' + val);
 									id = makeId('Subject', group, 'val', position);
 									var tr = $('#' + id);
 									var td = getChild(tr, 1);
 									var a = getChild(td, 1);
-									a.html(val);
+									a.html(subjectType + ' ' + val);
 								}
 								var id = makeId('Subject', group, position, getId(key));
 								var tables = $('#' + id).children();
@@ -1712,7 +1766,8 @@ function getSubjectValues(group, position, tags) {
 						var table = getChild(td, j);
 						var row = getChild(table, 1);
 						var value = getChild(row, 1).html();
-						values.push(value);
+						var index = value.indexOf(' ') + 1;
+						values.push(value.substr(index));
 					}
 					result[tags[i]] = values;
 				}
