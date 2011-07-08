@@ -497,7 +497,7 @@ tagdef version               int8        ""         anonymous   system       fal
 tagdef name                  text        ""         anonymous   system       false
 tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
 tagdef vname                 text        ""         anonymous   system       false      ""         true
-tagdef parentof              text        ""         subject     subject      true       id
+tagdef parentof              int8        ""         subject     subject      true       id
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
 tagdef content-type          text        ""         anonymous   subject      false
