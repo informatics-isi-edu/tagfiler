@@ -46,17 +46,12 @@ def p_start(p):
              | log
              | contact
              | querypathroot
-             | idroot
 """
     p[0] = p[1]
 
 def p_querypathroot(p):
     """querypathroot : querypath"""
     p[0] = url_ast.Subquery(path=p[1])
-
-def p_idroot(p):
-    """idroot : NUMSTRING"""
-    p[0] = int(p[1])
 
 def p_filelist(p):
     """filelist : slash string

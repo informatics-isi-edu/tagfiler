@@ -690,15 +690,19 @@ class Application:
 
     def validateSubjectQuery(self, query, tagdef=None, subject=None):
         if type(query) in [ int, long ]:
-            return
+            return query
+        if query in [ None, [] ]:
+            return query
         if type(query) in [ type('string'), unicode ]:
             ast = self.url_parse_func(query)
-            if hasattr(ast, 'is_subquery') and ast.is_subquery:
-                # this holds a subquery expression to evaluate
-                return [ subject.id for subject in self.select_files_by_predlist_path(path=ast.path) ]
-            elif type(ast) in [ int, long ]:
+            if type(ast) in [ int, long ]:
                 # this is a bare subject identifier
                 return ast
+            elif hasattr(ast, 'is_subquery'):
+                query = ast
+        if hasattr(query, 'is_subquery') and query.is_subquery:
+            # this holds a subquery expression to evaluate
+            return [ subject.id for subject in self.select_files_by_predlist_path(path=query.path) ]
         raise BadRequest(self, 'Sub-query expression "%s" not a valid expression.' % query)
         
     def validateFilename(self, file, tagdef='', subject=None):        
@@ -1044,6 +1048,9 @@ class Application:
                         raise te
                     except (psycopg2.DataError, psycopg2.ProgrammingError), te:
                         t.rollback()
+                        et, ev, tb = sys.exc_info()
+                        web.debug('got exception "%s" during dbtransact' % str(ev),
+                                  traceback.format_exception(et, ev, tb))
                         raise BadRequest(self, data='Logical error: %s.' % str(te))
                     except TypeError, te:
                         t.rollback()
@@ -1703,11 +1710,17 @@ class Application:
                     # validator converted user-supplied value to internal form to use instead
                     value = results
 
-            try:
-                if value:
-                    value = self.downcast_value(dbtype, value)
-            except:
-                raise BadRequest(self, data='The value "%s" cannot be converted to stored type "%s".' % (value, dbtype))
+            def convert(v):
+                try:
+                    return self.downcast_value(dbtype, v)
+                except:
+                    raise BadRequest(self, data='The value "%s" cannot be converted to stored type "%s".' % (v, dbtype))
+
+            if value:
+                if type(value) in [ list, set ]:
+                    value = [ convert(v) for v in value ]
+                else:
+                    value = convert(value)
 
         if type(value) in [ list, set ]:
             # validatator generated a set of values, recursively try to set these instead
@@ -1949,7 +1962,10 @@ class Application:
                                 q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sv%s_%s_%d__" % (vprefix, p, v, qd))
                                 sq = "SELECT DISTINCT \"%s\" FROM (%s) AS sq_%s%s_%s_%d" % (sq_project, q, vprefix, p, v, qd)
                                 values.update(qvs)
-                                valpreds.append("t%s%s.value IN (%s)" % (vprefix, p, sq))
+                                if tag != 'id':
+                                    valpreds.append("t%s%s.value IN (%s)" % (vprefix, p, sq))
+                                else:
+                                    valpreds.append("subject IN (%s)" % (sq))
                             else:
                                 if tag != 'id':
                                     valpreds.append("t%s%s.value %s $val%s%s_%s_%d" % (vprefix, p, Application.opsDB[op], vprefix, p, v, qd))
