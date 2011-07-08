@@ -1417,6 +1417,12 @@ function compareTagValues(oldArray, newArray) {
 	return ret;
 }
 
+function compareSubjectIds(left, right) {
+	var leftId = parseInt(left.split('#')[1]);
+	var rightId = parseInt(right.split('#')[1]);
+	return leftId - rightId;
+}
+
 function compareSubjects(oldSubjects, newSubjects) {
 	var mod = new Object();
 	
@@ -1571,6 +1577,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 									var tag = tagMapArray[key];
 									if (tag != null) {
 										// inner subjects
+										val.sort(compareSubjectIds);
 										var arrayParent = $('#' + makeId(id, 'button'));
 										var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
 										var arrayGroup = group;
