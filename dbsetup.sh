@@ -28,6 +28,8 @@ grader="$7"
 
 echo args: "$@"
 
+shift 7
+
 # this script will recreate all tables, but only on a clean database
 
 echo "create core tables..."
@@ -772,3 +774,8 @@ cmddir=$(dirname "$0")
 
 #. ${cmddir}/dbsetup-psoc-demo.sh
 
+while [ "$1" ]
+do
+	. ${cmddir}/dbsetup-$1-demo.sh
+	shift 1
+done

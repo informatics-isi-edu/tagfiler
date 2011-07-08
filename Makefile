@@ -77,9 +77,17 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
-#	make --no-print-directory -f psoc/Makefile install
 
 restart: force install
+	service httpd restart
+
+deployPSOC: $(HOME)/.tagfiler.predeploy installPSOC
+	./deploy.sh $(INSTALLSVC) $(APPLETBUILD) psoc-pilot
+
+installPSOC: install
+	make --no-print-directory -f psoc/Makefile install
+
+restartPSOC: force installPSOC
 	service httpd restart
 
 clean: force

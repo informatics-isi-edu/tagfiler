@@ -245,7 +245,10 @@ function showColumn(group, index, headerId) {
 	var columnIndex = getColumnIndex(id);
 	displayColumn(group, columnIndex);
 	enableNavigationButtons(group);
-	window.scrollTo(getLeftOffset(headerId), getTopOffset(headerId));
+	var parts = headerId.split('_');
+	var group = parts[1];
+	var spanId = makeId('Subject', group, 'span');
+	window.scrollTo(getLeftOffset(spanId), getTopOffset(spanId));
 }
 
 function enableNavigationButtons(group) {
@@ -502,7 +505,7 @@ function tog(dt, header) {
 	tr.append(td);
 	var img = $('<img>');
 	makeAttributes(img,
-				   'src', resourcePrefix + (toOpen ? 'minus.png' : 'plus.png'),
+				   'src', resourcePrefix + 'images/' + (toOpen ? 'minus.png' : 'plus.png'),
 				   'width', '16',
 				   'height', '16',
 				   'border', '0',
@@ -511,6 +514,8 @@ function tog(dt, header) {
 	td = $('<td>');
 	tr.append(td);
 	td.html(header);
+	var dtId = dt.attr('id');
+	window.scrollTo(getLeftOffset(dtId), getTopOffset(dtId));
 }
 
 function selectSubject(value, subjectGroupName, suffix, parent, header) {
@@ -570,7 +575,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	tr.append(td);
 	var img = $('<img>');
 	makeAttributes(img,
-				   'src', resourcePrefix + 'minus.png',
+				   'src', resourcePrefix + 'images/' + 'minus.png',
 				   'width', '16',
 				   'height', '16',
 				   'border', '0',
@@ -1138,6 +1143,7 @@ var isDebug;
 var traceBuffer;
 var allSelectedSubjects = new Object();
 var selectedTagsIds = new Object();
+var confirmDeleteSubjectsDialog = $('<div></div>');
 
 var tagsMap = {
 	'experiment' : 'experimentID',
@@ -1157,6 +1163,25 @@ var tagsMap = {
 
 function init(home, user) {
 
+confirmDeleteSubjectsDialog.dialog({
+	autoOpen: false,
+	title: 'Do you want to delete the following subject(s)?',
+	buttons: {
+		"Cancel": function() {
+				$(this).dialog('close');
+			},
+		"OK": function() {
+				$(this).dialog('close');
+				postSubjects(true);
+				expiration_warning = true;
+			}
+	},
+	draggable: true,
+	height: 300,
+	modal: true,
+	resizable: true,
+	width: 600
+});
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
@@ -1640,8 +1665,7 @@ function submitForm() {
 			}
 		});
 	});
-	postSubjects(true);
-	expiration_warning = true;
+	confirmPostSubjects();
 }
 
 function debugForm() {
@@ -2125,6 +2149,20 @@ function listSubjects(subjects, title) {
 		var li = $('<li>').html(title);
 		li.append(ul);
 		$('#completedSubjects').append(li);
+	}
+}
+
+function confirmPostSubjects() {
+	var deletedSubjects = new Array();
+	$.each(allDeletedSubjects, function(subject, val) {
+		deletedSubjects.push('\t' + getPredicate(allDeletedSubjects, subject));
+	});
+	if (deletedSubjects.length > 0) {
+		confirmDeleteSubjectsDialog.html(deletedSubjects.join('<br/>'));
+		confirmDeleteSubjectsDialog.dialog('open');
+	} else {
+		postSubjects(true);
+		expiration_warning = true;
 	}
 }
 

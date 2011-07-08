@@ -21,15 +21,30 @@ INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconf
 WEBROOTDIR=/var/www
 WEBSTATICDIR=$(WEBROOTDIR)/html/$(INSTALLSVC)/static
 
-SCRIPTBASES=psoc.js minus.png plus.png
+SCRIPTBASES=psoc.js \
+	jquery-ui.js \
+	jquery-ui.css
 
 SCRIPTFILES=$(SCRIPTBASES:%=psoc/%)
 
-WEBBASES=psoc.js \
-	minus.png \
-	plus.png
+IMAGEBASES=minus.png \
+	plus.png \
+	ui-bg_diagonals-thick_18_b81900_40x40.png \
+	ui-bg_diagonals-thick_20_666666_40x40.png \
+	ui-bg_flat_10_000000_40x100.png \
+	ui-bg_glass_100_f6f6f6_1x400.png \
+	ui-bg_glass_100_fdf5ce_1x400.png \
+	ui-bg_glass_65_ffffff_1x400.png \
+	ui-bg_gloss-wave_35_f6a828_500x100.png \
+	ui-bg_highlight-soft_100_eeeeee_1x100.png \
+	ui-bg_highlight-soft_75_ffe45c_1x100.png \
+	ui-icons_222222_256x240.png \
+	ui-icons_228ef1_256x240.png \
+	ui-icons_ef8c08_256x240.png \
+	ui-icons_ffd27a_256x240.png \
+	ui-icons_ffffff_256x240.png
 
-WEBSTATICFILES=$(WEBBASES:%=psoc/%)
+IMAGEFILES=$(IMAGEBASES:%=psoc/images/%)
 
 TEMPLATEBASES=psoc.html
 
@@ -46,9 +61,10 @@ PSOCFILE=$(PSOCDIR)/admin-psoctemplate
 .SUFFIXES:
 
 install: $(TEMPLATES)
+	mkdir -p /var/www/html/$(INSTALLSVC)/static/images
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
-	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
+	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
 	rm -fR $(PSOCDIR)
 	mkdir -p $(PSOCDIR)
 	cp $(INSTALLDIR)/templates/psoc.html $(PSOCFILE)
