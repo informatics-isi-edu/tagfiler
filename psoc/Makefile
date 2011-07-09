@@ -29,6 +29,7 @@ SCRIPTFILES=$(SCRIPTBASES:%=psoc/%)
 
 IMAGEBASES=minus.png \
 	plus.png \
+	template.png \
 	ui-bg_diagonals-thick_18_b81900_40x40.png \
 	ui-bg_diagonals-thick_20_666666_40x40.png \
 	ui-bg_flat_10_000000_40x100.png \

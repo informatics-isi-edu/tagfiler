@@ -60,6 +60,10 @@ function str(value) {
 	return '\'' + value + '\'';
 }
 
+function setCursorStyle(style) {
+	document.body.style.cursor = style;
+}
+
 function getTagTitle(tag) {
 	var title = (tag == 'Mouse' ? 'Mice' : tag + 's');
 	return title;
@@ -319,19 +323,7 @@ function newTags(group, value) {
 }
 
 function newSubject(group, inner) {
-	var tags;	
-	var tagsValues;
-	var position = groupCounter[group-1];
-	var id = makeId('Subject', group, position, 'header');
 	var tagId = groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID';
-	while ($('#' + id).length == 0 && position >= 1) {
-		position--;
-	}
-	if (position >= 1) {
-		tags = getSubjectTags(group, position);	
-		tagsValues = getSubjectValues(group, position, tags);
-	}
-	
 	var typeCode = '#';
 	var subjectsId = makeId('subjects', group);
 	var suffix = $('#' + subjectsId).attr('suffix');
@@ -346,7 +338,7 @@ function newSubject(group, inner) {
 	th.html(groupType[group-1] + ' ' + groupName[group-1] + typeCode + countIndex + suffix);
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
-		id = makeId(subjectId, getId(selectedTags[group-1][i]));
+		var id = makeId(subjectId, getId(selectedTags[group-1][i]));
 		var td = $('<td>');
 		makeAttributes(td,
 					   'nowrap', 'nowrap',
@@ -365,24 +357,21 @@ function newSubject(group, inner) {
 				   'onclick', makeFunction('hideSubject', group, countIndex),
 				   'value', 'Hide ' + groupType[group-1]);
 	td.append(input);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', group, countIndex),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
 	values.push(td);
 	appendColumn(subjectsId, values);
 	
-	// copy the values from the previous
-	if (tags != null) {
-		id = makeId('Subject', group, groupCounter[group-1]);
-		$.each(tagsValues, function(tag, values) {
-			if (!multivalueArray.contains(tag)) {
-				if (enumArray[tag] == null) {
-					$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
-				} else {
-					$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
-				}
-			}
-		});
-	}
-	
-	id = makeId(subjectId, tagId);
+	var id = makeId(subjectId, tagId);
 	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
 	var textValue = subjectName;
 	$('#' + makeId(id, 'input')).val(textValue);
@@ -545,7 +534,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	if (groupCounter.length == 1) {
 		$('#all_subjects').css('display', 'block');
 	}
-	index = groupCounter.length;
+	var index = groupCounter.length;
 
 	var subjectId = makeId('Subject', index);
 	var subjectId1 = makeId(subjectId, firstSubject);
@@ -689,6 +678,17 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'onclick', makeFunction('hideSubject', index, firstSubject),
 				   'value', 'Hide ' + value);
 	td.append(input);
+	img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', index, firstSubject),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
 	dd.append(subject);
 	var div = $('<div>');
 	makeAttributes(div,
@@ -768,42 +768,39 @@ function addTags(group) {
 	newTags(group, value);
 }
 
-function copySubjectTemplate(group, name) {
+function saveTemplate(group, position) {
+	var id = makeId('Subject', group, position, 'header');
+	subjectTemplates[groupType[group-1]] = id;
 	var subjectType = groupType[group-1];
 	var tagId = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID'
-	var groupsArray = subjectTemplates[subjectType];
-	var tags;
-	var tagsValues;
-	for (var i=groupsArray.length-1; i>=0; i--) {
-		var subjectGroup = groupsArray[i];
-		if (subjectGroup == group) {
-			continue;
-		}
-		var position = groupCounter[subjectGroup-1];
-		var id = makeId('Subject', subjectGroup, position, 'header');
-		while ($('#' + id).length == 0 && position >= 1) {
-			position--;
-		}
-		if (position >= 1) {
-			tags = getSubjectTags(subjectGroup, position);	
-			tagsValues = getSubjectValues(subjectGroup, position, tags);
-			break;
+	var val = '"' + subjectType + ' ' + $('#' + makeId('Subject', group, position, getId(tagId), 'input')).val() + '".';
+	alert('Saved template ' + val);
+}
+
+function copySubjectTemplate(group) {
+	var subjectType = groupType[group-1];
+	var tagId = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID'
+	if (subjectTemplates[subjectType] != null) {
+		var id = subjectTemplates[subjectType];
+		if ($('#' + id).length > 0) {
+			var parts = id.split('_');
+			var templateGroup = parts[1];
+			var templatePosition = parts[2];
+			var tags = getSubjectTags(templateGroup, templatePosition);	
+			var tagsValues = getSubjectValues(templateGroup, templatePosition, tags);
+			id = makeId('Subject', group, groupCounter[group-1]);
+			$.each(tagsValues, function(tag, values) {
+				if (!multivalueArray.contains(tag) && tag != tagId) {
+					if (enumArray[tag] == null) {
+						$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
+					} else {
+						$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
+					}
+				}
+			});
 		}
 	}
 	
-	// copy the values from the last template
-	if (tags != null) {
-		var id = makeId('Subject', group, groupCounter[group-1]);
-		$.each(tagsValues, function(tag, values) {
-			if (!multivalueArray.contains(tag) && tag != tagId) {
-				if (enumArray[tag] == null) {
-					$('#' + makeId(id, getId(tag), 'input')).val(values[0]);
-				} else {
-					$('#' + makeId(id, getId(tag), 'select')).val(values[0]);
-				}
-			}
-		});
-	}
 	if (subjectType == 'Mouse') {
 		var id = makeId('Subject', group, groupCounter[group-1]);
 		var tag = 'lot#';
@@ -831,6 +828,7 @@ function setValue(id, type) {
 		group = parts[1];
 		value = newSubject(group, 'false');
 		position = groupCounter[group-1];
+		copySubjectTemplate(group);
 	}
 	else if (type == 'button') {
 		// get the # for tagMapArray[tagname] 
@@ -858,13 +856,7 @@ function setValue(id, type) {
 			position = groupCounter[group-1];
 			subjectMax[tagMapArray[tagname]] = position;
 		}
-		if (subjectTemplates[tagMapArray[tagname]] == null) {
-			subjectTemplates[tagMapArray[tagname]] = new Array();
-		}
-		if (!subjectTemplates[tagMapArray[tagname]].contains(group)) {
-			subjectTemplates[tagMapArray[tagname]].push(group);
-		}
-		copySubjectTemplate(group, name);
+		copySubjectTemplate(group);
 	} else if (type == 'select') {
 		if ($('#' + elemId).val() > 1) {
 			value = $('#' + elemId +' option:selected').text();
