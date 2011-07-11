@@ -1526,7 +1526,19 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 							if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
 								if (key == idTag) {
 									var id = makeId('Subject', group, position, 'header');
+									var img = $('<img>');
+									makeAttributes(img,
+													'src', resourcePrefix + 'images/' + 'template.png',
+													'class', 'pattern',
+													'width', '16',
+													'height', '16',
+													'border', '0',
+													'alt', 'Set template',
+													'onclick', makeFunction('saveTemplate', group, position),
+													'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+													'onmouseout', makeFunction('setCursorStyle', str('default')));
 									$('#' + id).html(subjectType + ' ' + val);
+									$('#' + id).append(img);
 									id = makeId('Subject', group, 'val', position);
 									var tr = $('#' + id);
 									var td = getChild(tr, 1);
