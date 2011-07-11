@@ -219,7 +219,6 @@ function displayCollapseColumn(group) {
 		}
 		hideColumn(group, position);
 	}
-	enableNavigationButtons(group);
 }
 
 function displayExpandColumn(group) {
@@ -230,7 +229,6 @@ function displayExpandColumn(group) {
 		}
 		displayColumn(group, position);
 	}
-	enableNavigationButtons(group);
 }
 
 function showColumn(group, index, headerId) {
@@ -243,34 +241,16 @@ function showColumn(group, index, headerId) {
 		var row = getChild(tbody, 1);
 		var td = getChild(row, 2);
 		var header = td.html();
-		tog(dt, header);
+		tog(dt, group, header, false);
 	}
 	displayCollapseColumn(group);
 	var id = makeId('Subject', group, index);
 	var columnIndex = getColumnIndex(id);
 	displayColumn(group, columnIndex);
-	enableNavigationButtons(group);
 	var parts = headerId.split('_');
 	var group = parts[1];
 	var spanId = makeId('Subject', group, 'span');
 	window.scrollTo(getLeftOffset(spanId), getTopOffset(spanId));
-}
-
-function enableNavigationButtons(group) {
-	var id = makeId('subjects', group);
-	var expandId = makeId(id, 'Expand');
-	var collapseId = makeId(id, 'Collapse');
-	$('#' + expandId).css('display', 'none');
-	$('#' + collapseId).css('display', 'none');
-
-	var count = getVisibleColumnCount(group);
-	var subjects = $('#' + id).parent().children().size()-1;
-	if (count > 0) {
-		$('#' + collapseId).css('display', '');
-	}
-	if (count < subjects) {
-		$('#' + expandId).css('display', '');
-	}
 }
 
 function appendColumn(id, values) {
@@ -384,7 +364,6 @@ function newSubject(group, inner) {
 		var localId = countIndex - firstMouseId + 1;
 		$('#' + makeId(id, getId(tag), 'input')).val(localId);
 	}
-	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
 	showColumn(group, countIndex, headerId);
 	return subjectName;
@@ -421,6 +400,13 @@ function hideSubject(group, position) {
 	var index = getColumnIndex(id);
 	hideColumn(group, index);
 	enableNavigationButtons(group);
+}
+
+function enableNavigationButtons(group) {
+	var count = getVisibleColumnCount(group);
+	if (count == 0) {
+		$('#' + makeId('Subject', group, 'span')).click();
+	}
 }
 
 function selectTags() {
@@ -478,7 +464,8 @@ function enableRetrieveButton() {
 	}
 }
 
-function tog(dt, header) {
+function tog(dt, group, header, showAll) {
+	var parts = header.split(' ');
 	var dd = dt.next();
 	var toOpen = (dd.css('display') == 'none');
 	dd.css('display', toOpen ? '' : 'none');
@@ -503,8 +490,15 @@ function tog(dt, header) {
 	td.append(img);
 	td = $('<td>');
 	tr.append(td);
-	td.html(header);
+	td.html((toOpen ? 'Hide ' : 'Show ') + parts[1]);
 	var dtId = dt.attr('id');
+	if (toOpen) {
+		if (showAll) {
+			displayExpandColumn(group);
+		}
+	} else {
+		displayCollapseColumn(group);
+	}
 	window.scrollTo(getLeftOffset(dtId), getTopOffset(dtId));
 }
 
@@ -548,7 +542,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	container.append(dl);
 	var dt = $('<dt>');
 	makeAttributes(dt,
-				   'onclick', makeFunction('tog', '$(this)', str((inner == 'false' ? getTagTitle(value) : header))),
+				   'onclick', makeFunction('tog', '$(this)', index, str('Hide ' + (inner == 'false' ? getTagTitle(value) : header)), true),
 				   'id', makeId(subjectId, 'span'));
 	dl.append(dt);
 	var span = $('<span>');
@@ -573,7 +567,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	td.append(img);
 	td = $('<td>');
 	tr.append(td);
-	td.html(inner == 'false' ? getTagTitle(value) : header);
+	td.html('Hide ' + (inner == 'false' ? getTagTitle(value) : header));
 	var dd = $('<dd>');
 	dl.append(dd);
 	if (inner == 'false') {
@@ -691,28 +685,6 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					'onmouseout', makeFunction('setCursorStyle', str('default')));
 	td.append(img);
 	dd.append(subject);
-	var div = $('<div>');
-	makeAttributes(div,
-				   'id', makeId(subjectId1, 'Buttons'));
-	var buttons = $('<input>');
-	makeAttributes(buttons,
-					'id', makeId(subjectsId, 'Expand'),
-					'type', 'button',
-					'name', 'Expand',
-					'onclick', makeFunction('displayExpandColumn', index),
-					'style', 'display:none',
-					'value', 'Show All');
-	div.append(buttons);
-	buttons = $('<input>');
-	makeAttributes(buttons,
-					'id', makeId(subjectsId, 'Collapse'),
-					'type', 'button',
-					'name', 'Collapse',
-					'onclick', makeFunction('displayCollapseColumn', index),
-					'value', 'Hide All');
-	div.append(buttons);
-	dd.append(div);
-	dd.append($('<p>'));
 	$('#selectTag').attr('selected', 'selected');
 	newTags(groupCounter.length, value);
 	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
@@ -846,7 +818,7 @@ function setValue(id, type) {
 			var subjectType = groupType[parts[1] - 1];
 			var subjectID = makeId('Subject', parts[1], parts[2], subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID', 'input');
 			
-			value = selectSubject(tagMapArray[tagname], name, '', parent, 'All ' + tagname);
+			value = selectSubject(tagMapArray[tagname], name, '', parent, tagname);
 			group = getChild(parent, 1).attr('id').split('_')[1];
 			position = firstSubject;
 		} else {
@@ -1575,7 +1547,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 										var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
 										var arrayGroup = group;
 										$.each(val, function(j, value) {
-											getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, 'All ' + key, j, arrayGroup);
+											getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, key, j, arrayGroup);
 											var arrayPosition;
 											if (j == 0) {
 												arrayGroup = getChild(arrayParent, 1).attr('id').split('_')[1];
