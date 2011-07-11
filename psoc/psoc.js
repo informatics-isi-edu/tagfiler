@@ -20,6 +20,7 @@ var allTags;
 var tagMap = {
 	'start age' : 'startAge',
 	'mouse strain' : 'mouseStrain',
+	'mouse label' : 'mouseLabel',
 	'lot#' : 'lot',
 	'cancer type' : 'cancerType',
 	'cell type' : 'cellType',
@@ -379,9 +380,9 @@ function newSubject(group, inner) {
 				   'size', textValue.length);
 	if (groupType[group-1] == 'Mouse') {
 		var id = makeId('Subject', group, groupCounter[group-1]);
-		var tag = 'lot#';
-		var lot = countIndex - firstMouseId + 1;
-		$('#' + makeId(id, getId(tag), 'input')).val(lot);
+		var tag = 'mouse label';
+		var localId = countIndex - firstMouseId + 1;
+		$('#' + makeId(id, getId(tag), 'input')).val(localId);
 	}
 	enableNavigationButtons(group);
 	var headerId = makeId(subjectId, 'header');
@@ -803,11 +804,11 @@ function copySubjectTemplate(group) {
 	
 	if (subjectType == 'Mouse') {
 		var id = makeId('Subject', group, groupCounter[group-1]);
-		var tag = 'lot#';
+		var tag = 'mouse label';
 		var mouseId = $('#' + makeId(id, getId(tagId), 'input')).val();
 		var index = mouseId.indexOf('#') + 1;
-		var lot = parseInt(mouseId.substr(index)) - firstMouseId + 1;
-		$('#' + makeId(id, getId(tag), 'input')).val(lot);
+		var localId = parseInt(mouseId.substr(index)) - firstMouseId + 1;
+		$('#' + makeId(id, getId(tag), 'input')).val(localId);
 	}
 }
 

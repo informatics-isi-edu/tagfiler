@@ -59,6 +59,7 @@ demotagdef litter    int8 false "" false
 demotagdef cage      int8 false "" false
 demotagdef "start age"    int8 false "" false
 demotagdef "mouse strain" text false "mouse strain" false
+demotagdef "mouse label"    int8 false "" false
 demotagdef "cancer type"  text false "cancer type" false
 demotagdef "#cells"  float8 false "" false
 demotagdef "cell type"  text false "cell type" false
@@ -151,7 +152,7 @@ view()
     done
 }
 
-view mouseID mouseID "lot#" cage start "mouse strain" dob "cell type" "#cells" dos treatment samples
+view mouseID mouseID "mouse label" cage start "mouse strain" dob "cell type" "#cells" dos treatment samples
 view experimentID experimentID start mice
 view treatmentID treatmentID drug dose start
 view observationID observationID start comment
