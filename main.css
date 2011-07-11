@@ -127,6 +127,9 @@ table.table-wrapper {
     margin-left: auto;
     margin-right: auto;
 }
+img.pattern {
+  background-color: #fffff2;
+}
 .applet {
   vertical-align: bottom;
 }

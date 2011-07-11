@@ -317,6 +317,18 @@ function newSubject(group, inner) {
 				   'class', 'file-tag',
 				   'id', makeId(subjectId, 'header'));
 	th.html(groupType[group-1] + ' ' + groupName[group-1] + typeCode + countIndex + suffix);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', group, countIndex),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	th.append(img);
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
 		var id = makeId(subjectId, getId(selectedTags[group-1][i]));
@@ -338,17 +350,6 @@ function newSubject(group, inner) {
 				   'onclick', makeFunction('hideSubject', group, countIndex),
 				   'value', 'Hide ' + groupType[group-1]);
 	td.append(input);
-	var img = $('<img>');
-	makeAttributes(img,
-					'src', resourcePrefix + 'images/' + 'template.png',
-					'width', '16',
-					'height', '16',
-					'border', '0',
-					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', group, countIndex),
-					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
-					'onmouseout', makeFunction('setCursorStyle', str('default')));
-	td.append(img);
 	values.push(td);
 	appendColumn(subjectsId, values);
 	
@@ -650,6 +651,18 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'class', 'file-tag');
 	var val = (inner == 'false' ? header + typeCode + firstSubject : subjectGroupName);
 	th.html(value + ' ' + val + suffix);
+	img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', index, firstSubject),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	th.append(img);
 	tr.append(th);
 	tr = $('<tr>');
 	makeAttributes(tr,
@@ -673,17 +686,6 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'onclick', makeFunction('hideSubject', index, firstSubject),
 				   'value', 'Hide ' + value);
 	td.append(input);
-	img = $('<img>');
-	makeAttributes(img,
-					'src', resourcePrefix + 'images/' + 'template.png',
-					'width', '16',
-					'height', '16',
-					'border', '0',
-					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', index, firstSubject),
-					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
-					'onmouseout', makeFunction('setCursorStyle', str('default')));
-	td.append(img);
 	dd.append(subject);
 	$('#selectTag').attr('selected', 'selected');
 	newTags(groupCounter.length, value);
