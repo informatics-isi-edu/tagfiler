@@ -33,6 +33,13 @@ var selectArray = 'lab	researcher	site	supplier	treatment'.split('\t');
 var sharedId = new Array();
 sharedId['researcher'] = 'performer	principal'.split('\t');
 
+var joinTags = new Object();
+joinTags.Treatment = new Object();
+joinTags.Treatment.input = ['drug', 'dose', 'start'];
+
+var tagUnit = new Object();
+tagUnit.dose = 'mg/kg';
+
 var enumArray;
 var linkArray;
 var tagMapArray;
@@ -266,6 +273,56 @@ function appendColumn(id, values) {
 	}
 }
 
+function joinId(group, position) {
+	var tagId = groupType[group-1].substr(0,1).toLowerCase() + groupType[group-1].substr(1) + 'ID';
+	var tags = joinTags[groupType[group-1]];
+	var id = makeId('Subject', group, position);
+	var vals = new Array();
+	var values = tags.input;
+	if (values != null) {
+		$.each(values, function(i, item) {
+			var val = $('#' + makeId(id, item, 'input')).val().replace(/^\s*/, "").replace(/\s*$/, "");
+			if (val.length != 0) {
+				vals.push(val + (tagUnit[item] != null ? tagUnit[item] : ''));
+			}
+		});
+	}
+	values = tags.select;
+	if (values != null) {
+		$.each(values, function(i, item) {
+			if ($('#' + makeId(id, item, 'select')).children('option:selected').index() > 0) {
+				vals.push($('#' + makeId(id, item, 'select')).val() + (tagUnit[item] != null ? tagUnit[item] : ''));
+			}
+		});
+	}
+	var textValue = vals.join(':');
+	var img = getChild($('#' + makeId(id, 'header')), 1);
+	$('#' + makeId(id, 'header')).html(groupType[group-1] + ' ' + textValue).append(img);
+	$('#' + makeId(id, tagId, 'input')).attr('size', textValue.length);
+	$('#' + makeId(id, tagId, 'input')).val(textValue);
+	$('#' + makeId(id, 'href')).html(groupType[group-1] + ' ' + textValue);
+}
+
+function setOnChange(group, position) {
+	var tags = joinTags[groupType[group-1]];
+	if (tags != null) {
+		var id = makeId('Subject', group, position);
+		var values = tags.input;
+		if (values != null) {
+			$.each(values, function(i, item) {
+				$('#' + makeId(id, item, 'input')).attr('onkeyup', makeFunction('joinId', group, position));
+				$('#' + makeId(id, item, 'input')).attr('onmouseover', makeFunction('joinId', group, position));
+			});
+		}
+		values = tags.select;
+		if (values != null) {
+			$.each(values, function(i, item) {
+				$('#' + makeId(id, item, 'select')).attr('onchange', makeFunction('joinId', group, position));
+			});
+		}
+	}
+}
+
 function newTags(group, value) {
 	var newTags = new Array();
 	for (var i=0; i<tagsArray[value].length; i++) {
@@ -303,6 +360,7 @@ function newTags(group, value) {
 		}
 		row.insertBefore(table.children(':last-child'));
 	}
+	setOnChange(group, 1);
 	makeAttributes(table.children(':last-child'),
 				   'class', 'file-footer ' + rowClass);
 }
@@ -320,7 +378,8 @@ function newSubject(group, inner) {
 	makeAttributes(th,
 				   'class', 'file-tag',
 				   'id', makeId(subjectId, 'header'));
-	th.html(groupType[group-1] + ' ' + groupName[group-1] + typeCode + countIndex + suffix);
+	th.html(groupType[group-1] + 
+				(joinTags[groupType[group-1]] == null ? ' ' + groupName[group-1] + typeCode + countIndex + suffix : ''));
 	var img = $('<img>');
 	makeAttributes(img,
 					'src', resourcePrefix + 'images/' + 'template.png',
@@ -356,13 +415,15 @@ function newSubject(group, inner) {
 	td.append(input);
 	values.push(td);
 	appendColumn(subjectsId, values);
-	
-	var id = makeId(subjectId, tagId);
+	setOnChange(group, countIndex);
 	var subjectName = groupName[group-1] + typeCode + countIndex + suffix;
-	var textValue = subjectName;
-	$('#' + makeId(id, 'input')).val(textValue);
-	makeAttributes($('#' + makeId(id, 'input')),
-				   'size', textValue.length);
+	if (joinTags[groupType[group-1]] == null) {
+		var id = makeId(subjectId, tagId);
+		var textValue = subjectName;
+		$('#' + makeId(id, 'input')).val(textValue);
+		makeAttributes($('#' + makeId(id, 'input')),
+					   'size', textValue.length);
+	}
 	if (groupType[group-1] == 'Mouse') {
 		var id = makeId('Subject', group, groupCounter[group-1]);
 		var tag = 'mouse label';
@@ -591,8 +652,9 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		tr.append(td);
 		var a = $('<a>');
 		makeAttributes(a,
+					   'id', makeId('Subject', index, firstSubject, 'href'),
 					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject, str(headerId)));
-		a.html(value + ' ' + header + typeCode + firstSubject);
+		a.html(value + (joinTags[value] == null ? ' ' + header + typeCode + firstSubject : ''));
 		td.append(a);
 		td = $('<td>');
 		makeAttributes(td,
@@ -657,7 +719,7 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'id', headerId,
 				   'class', 'file-tag');
 	var val = (inner == 'false' ? header + typeCode + firstSubject : subjectGroupName);
-	th.html(value + ' ' + val + suffix);
+	th.html(value + (joinTags[value] == null ? ' ' + val + suffix : ''));
 	img = $('<img>');
 	makeAttributes(img,
 					'src', resourcePrefix + 'images/' + 'template.png',
@@ -696,11 +758,13 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 	dd.append(subject);
 	$('#selectTag').attr('selected', 'selected');
 	newTags(groupCounter.length, value);
-	var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
-	var textValue = val + suffix;
-	$('#' + makeId(id, 'input')).val(textValue);
-	makeAttributes($('#' + makeId(id, 'input')),
-				   'size', textValue.length);
+	if (joinTags[value] == null) {
+		var id = makeId(subjectId1, value.substr(0,1).toLowerCase() + value.substr(1) + 'ID');
+		var textValue = val + suffix;
+		$('#' + makeId(id, 'input')).val(textValue);
+		makeAttributes($('#' + makeId(id, 'input')),
+					   'size', textValue.length);
+	}
 	showColumn(groupCounter.length, firstSubject, headerId);
 	return val + suffix;
 }
@@ -780,6 +844,9 @@ function copySubjectTemplate(group) {
 					}
 				}
 			});
+			if (joinTags[groupType[group-1]] != null) {
+				joinId(group, groupCounter[group-1]);
+			}
 		}
 	}
 	
@@ -810,7 +877,6 @@ function setValue(id, type) {
 		group = parts[1];
 		value = newSubject(group, 'false');
 		position = groupCounter[group-1];
-		copySubjectTemplate(group);
 	}
 	else if (type == 'button') {
 		// get the # for tagMapArray[tagname] 
@@ -853,6 +919,7 @@ function setValue(id, type) {
 	if (value != null) {
 		if (type == 'subject') {
 			addSubjectValue(value, group, position);
+			copySubjectTemplate(group);
 		}
 		else if (type == 'button') {
 			var parent = $('#' + makeId(elemId, 'entity'));
@@ -898,8 +965,9 @@ function addSubjectValue(value, group, position) {
 	var td = $('<td>');
 	var a = $('<a>');
 	makeAttributes(a,
+				   'id', makeId('Subject', group, position, 'href'),
 				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
-	a.html(groupType[group-1] + ' ' + value);
+	a.html(groupType[group-1] + (joinTags[groupType[group-1]] == null ? ' ' + value : ''));
 	td.append(a);
 	tr.append(td);
 	td = $('<td>');
