@@ -164,6 +164,13 @@ function getVisibleColumn(group) {
 	return position;
 }
 
+function getColumnCount(group) {
+	var id = makeId('subjects', group);
+	var row = $('#' + id).parent();
+	var count = row.children().size();
+	return count;
+}
+
 function getHideColumn(group) {
 	var id = makeId('subjects', group);
 	var row = $('#' + id).parent();
@@ -212,12 +219,9 @@ function displayColumn(group, position) {
 }
 
 function displayCollapseColumn(group) {
-	while (true) {
-		var position = getVisibleColumn(group);
-		if (position == -1) {
-			break;
-		}
-		hideColumn(group, position);
+	var count = getColumnCount(group);
+	for (var i=2; i <= count; i++) {
+		hideColumn(group, i);
 	}
 }
 
@@ -469,6 +473,9 @@ function tog(dt, group, header, showAll) {
 	var parts = header.split(' ');
 	var dd = dt.next();
 	var toOpen = (dd.css('display') == 'none');
+	if (!toOpen) {
+		displayCollapseColumn(group);
+	}
 	dd.css('display', toOpen ? '' : 'none');
 	var spans = dt.children('span');
 	var span = getChild(spans, 1);
@@ -497,8 +504,6 @@ function tog(dt, group, header, showAll) {
 		if (showAll) {
 			displayExpandColumn(group);
 		}
-	} else {
-		displayCollapseColumn(group);
 	}
 	window.scrollTo(getLeftOffset(dtId), getTopOffset(dtId));
 }
