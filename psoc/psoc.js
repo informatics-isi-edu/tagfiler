@@ -527,6 +527,8 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		} else {
 			checkForNextSubjectId(value);
 		}
+	} else {
+		firstSubject = 1;
 	}
 	selectedTags.push(new Array());
 	groupCounter.push(firstSubject);
