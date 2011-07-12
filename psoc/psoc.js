@@ -1597,6 +1597,13 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 										});
 									}
 								} else if (td.is('SELECT') || td.is('INPUT')) {
+									if (key == '#cells') {
+										val = (new Number(val)).toExponential();
+										var parts = val.split('+');
+										var subparts = parts[0].split('e');
+										var coefficient = subparts[0] / 10;
+										val = coefficient + 'e' + (parseInt(parts[1]) + 1);
+									}
 									td.val(val);
 								}
 							}
