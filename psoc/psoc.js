@@ -233,12 +233,9 @@ function displayCollapseColumn(group) {
 }
 
 function displayExpandColumn(group) {
-	while (true) {
-		var position = getHideColumn(group);
-		if (position == -1) {
-			break;
-		}
-		displayColumn(group, position);
+	var count = getColumnCount(group);
+	for (var i=2; i <= count; i++) {
+		displayColumn(group, i);
 	}
 }
 
@@ -1180,9 +1177,11 @@ var newSubjectsQueue;
 var deleteSubjectsQueue;
 var addValuesQueue;
 var deleteValuesQueue;
+var retrieveSubjectQueue;
 var tagsIds;
 var isDebug;
 var traceBuffer;
+var retrievedSubject;
 var allSelectedSubjects = new Object();
 var selectedTagsIds = new Object();
 var confirmDeleteSubjectsDialog = $('<div></div>');
@@ -1204,26 +1203,25 @@ var tagsMap = {
 }
 
 function init(home, user) {
-
-confirmDeleteSubjectsDialog.dialog({
-	autoOpen: false,
-	title: 'Do you want to delete the following subject(s)?',
-	buttons: {
-		"Cancel": function() {
-				$(this).dialog('close');
-			},
-		"OK": function() {
-				$(this).dialog('close');
-				postSubjects(true);
-				expiration_warning = true;
-			}
-	},
-	draggable: true,
-	height: 300,
-	modal: true,
-	resizable: true,
-	width: 600
-});
+	confirmDeleteSubjectsDialog.dialog({
+		autoOpen: false,
+		title: 'Do you want to delete the following subject(s)?',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"OK": function() {
+					$(this).dialog('close');
+					postSubjects(true);
+					expiration_warning = true;
+				}
+		},
+		draggable: true,
+		height: 300,
+		modal: true,
+		resizable: true,
+		width: 600
+	});
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
@@ -1402,8 +1400,6 @@ function getSubject() {
 	var subjectGroupName = $('#subjectsList option:selected').text();
 	$('#subjectsList').empty();
 	$('#subjectsList').css('display', 'none');
-	$('#Status').css('color', '#33cc33');
-	$('#Status').html('Retrieving ' + subjectType + ' "' + subjectGroupName +'". Please wait...');
 	setTimeout(function(){retrieveSubject(subjectGroupName)}, 1);
 }
 
@@ -1419,17 +1415,8 @@ function retrieveSubject(subjectGroupName) {
 	$('#GetSubject').val('Retrieve Subject');
 	$('#NewSubject').val('New Subject');
 	$('#SelectSubjects').val('Get Subjects List');
-	var subject = getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0);
-	var group = subject.group;
-	var position = subject.position;
-	var headerId = makeId('Subject', group, position, 'header');
-	showColumn(group, position, headerId);
-	$('#Status').html('');
-	$('#Status').css('color', 'black');
-	addSeletedSubjects(group);
-	$('#Submit').removeAttr('disabled');
-	$('#Debug').removeAttr('disabled');
-	$('#' + subjectType).css('display', 'none');
+	retrieveSubjectQueue = new Array();
+	getSubjectEntity(subjectType, subjectGroupName + '-', url, null, $('#all_subjects'), subjectGroupName, 0, 0, null, null);
 }
 
 function compareTagValues(oldArray, newArray) {
@@ -1531,7 +1518,9 @@ function selectSubjects() {
 	var subjectType = $('#tags option:selected').text();
 	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
 	var PREFIX = HOME + '/query/';
-	var SUFFIX = encodeURIComponent(idTag) + ':like:' + encodeURIComponent('PSOC%') + '(' + encodeURIComponent(idTag) + ')';
+	var SUFFIX = encodeURIComponent(idTag) +
+					(joinTags[subjectType] == null ? ':like:' + encodeURIComponent('PSOC%') : '') +
+					'(' + encodeURIComponent(idTag) + ')';
 	var url = PREFIX + SUFFIX;
 	var subjects = new Array();
 	$.ajax({
@@ -1568,7 +1557,8 @@ function selectSubjects() {
 	$('#SelectSubjects').attr('disabled', 'disabled');
 }
 
-function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup) {
+function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, header, index, parentGroup, subjectValue, subjectId) {
+	$('#Status').html('Please wait. Retrieving ' + subjectType + ' "' + (subjectValue != null ? subjectValue : header) + '"...');
 	var idTag = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID';
 	var objId;
 	var group;
@@ -1581,7 +1571,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 		// extend existing group
 		var parts = getChild(parent, 1).attr('id').split('_');
 		newSubject(parts[1], 'true');
-		group = parentGroup;
+		group = parts[1];
 	}
 	var position = groupCounter[group-1];
 
@@ -1635,24 +1625,23 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 										var arrayParent = $('#' + makeId(id, 'button'));
 										var urlRoot = HOME + '/tags/' + tag.substr(0,1).toLowerCase() + tag.substr(1) + 'ID=';
 										var arrayGroup = group;
+										var tempArray = new Array();
 										$.each(val, function(j, value) {
-											getSubjectEntity(tag, objId, urlRoot + encodeURIComponent(value), '', arrayParent, key, j, arrayGroup);
-											var arrayPosition;
-											if (j == 0) {
-												arrayGroup = getChild(arrayParent, 1).attr('id').split('_')[1];
-												arrayPosition = 1;
-											} else {
-												var parts = getChild(arrayParent, 1).attr('id').split('_');
-												arrayGroup = parts[1];
-												arrayPosition = groupCounter[arrayGroup-1];
-											}
-											var parts = value.split('-');
-											var countIndex = parseInt(parts[parts.length-1]);
-											if (countIndex > arrayPosition) {
-												groupCounter[arrayGroup-1] = countIndex;
-											}
-											addButtonValue($('#' + makeId(id, 'button', 'entity')), value, arrayGroup, arrayPosition);
+											tempArray.push( { subjectType: tag,
+																 subjectGroupName: objId,
+																 url: urlRoot + encodeURIComponent(value),
+																 suffix: '',
+																 parent: arrayParent,
+																 header: key,
+																 index: j,
+																 parentGroup: arrayGroup,
+																 subjectValue: value,
+																 subjectId: id
+															  });
 										});
+										while (tempArray.length > 0) {
+											retrieveSubjectQueue.push(tempArray.pop());
+										}
 									} else {
 										// multivalue
 										var valId = makeId(id, 'val');
@@ -1683,7 +1672,54 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 		error: handleError
 	});
 	
-	return {group: group, position: position};
+	if (subjectValue != null) {
+		var arrayPosition;
+		var arrayGroup;
+		if (index == 0) {
+			arrayGroup = getChild(parent, 1).attr('id').split('_')[1];
+			arrayPosition = 1;
+		} else {
+			var parts = getChild(parent, 1).attr('id').split('_');
+			arrayGroup = parts[1];
+			arrayPosition = groupCounter[arrayGroup-1];
+		}
+		var parts = subjectValue.split('-');
+		var countIndex = parseInt(parts[parts.length-1]);
+		if (countIndex > arrayPosition) {
+			groupCounter[arrayGroup-1] = countIndex;
+		}
+		addButtonValue($('#' + makeId(subjectId, 'button', 'entity')), subjectValue, arrayGroup, arrayPosition);
+	} else {
+		retrievedSubject = {group: group, position: position};
+	}
+	setTimeout('retrieveNextSubject()', 1);
+}
+
+function retrieveNextSubject() {
+	if (retrieveSubjectQueue.length == 0) {
+		var group = retrievedSubject.group;
+		var position = retrievedSubject.position;
+		var headerId = makeId('Subject', group, position, 'header');
+		showColumn(group, position, headerId);
+		$('#Status').html('');
+		addSeletedSubjects(group);
+		$('#Submit').removeAttr('disabled');
+		$('#Debug').removeAttr('disabled');
+		$('#' + subjectType).css('display', 'none');
+	} else {
+		var subject = retrieveSubjectQueue.pop();
+		setTimeout(function() { getSubjectEntity(subject.subjectType, 
+									subject.subjectGroupName, 
+									subject.url, 
+									subject.suffix, 
+									subject.parent, 
+									subject.header, 
+									subject.index, 
+									subject.parentGroup, 
+									subject.subjectValue, 
+									subject.subjectId)
+								}, 1);
+	}
 }
 
 function getPredicate(subjects, subject) {
