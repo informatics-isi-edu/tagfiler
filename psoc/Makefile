@@ -27,7 +27,8 @@ SCRIPTBASES=psoc.js \
 
 SCRIPTFILES=$(SCRIPTBASES:%=psoc/%)
 
-IMAGEBASES=minus.png \
+IMAGEBASES=separator.gif \
+	minus.png \
 	delete.jpg \
 	plus.png \
 	template.png \

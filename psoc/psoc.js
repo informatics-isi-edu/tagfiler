@@ -377,18 +377,6 @@ function newSubject(group, inner) {
 				   'id', makeId(subjectId, 'header'));
 	th.html(groupType[group-1] + 
 				(joinTags[groupType[group-1]] == null ? ' ' + groupName[group-1] + typeCode + countIndex + suffix : ''));
-	var img = $('<img>');
-	makeAttributes(img,
-					'src', resourcePrefix + 'images/' + 'template.png',
-					'class', 'pattern',
-					'width', '16',
-					'height', '16',
-					'border', '0',
-					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', group, countIndex),
-					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
-					'onmouseout', makeFunction('setCursorStyle', str('default')));
-	th.append(img);
 	values.push(th);
 	for (var i=0; i<selectedTags[group-1].length; i++) {
 		var id = makeId(subjectId, getId(selectedTags[group-1][i]));
@@ -642,6 +630,31 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					   'id', makeId(subjectId, 'val', firstSubject));
 		valuesTable.append(tr);
 		var td = $('<td>');
+		tr.append(td);
+		img = $('<img>');
+		makeAttributes(img,
+						'src', resourcePrefix + 'images/' + 'template.png',
+						'class', 'pattern',
+						'width', '16',
+						'height', '16',
+						'border', '0',
+						'alt', 'Set template',
+						'onclick', makeFunction('saveTemplate', index, firstSubject),
+						'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+						'onmouseout', makeFunction('setCursorStyle', str('default')));
+		td.append(img);
+		td = $('<td>');
+		img = $('<img>');
+		makeAttributes(img,
+						'src', resourcePrefix + 'images/' + 'separator.gif',
+						'class', 'pattern',
+						'width', '4',
+						'height', '16',
+						'border', '0',
+						'alt', ' ');
+		td.append(img);
+		tr.append(td);
+		td = $('<td>');
 		makeAttributes(td,
 					   'id', makeId(subjectId1, 'removeValue'));
 		tr.append(td);
@@ -719,18 +732,6 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 				   'class', 'file-tag');
 	var val = (inner == 'false' ? header + typeCode + firstSubject : subjectGroupName);
 	th.html(value + (joinTags[value] == null ? ' ' + val + suffix : ''));
-	img = $('<img>');
-	makeAttributes(img,
-					'src', resourcePrefix + 'images/' + 'template.png',
-					'class', 'pattern',
-					'width', '16',
-					'height', '16',
-					'border', '0',
-					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', index, firstSubject),
-					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
-					'onmouseout', makeFunction('setCursorStyle', str('default')));
-	th.append(img);
 	tr.append(th);
 	tr = $('<tr>');
 	makeAttributes(tr,
@@ -962,10 +963,35 @@ function addSubjectValue(value, group, position) {
 				   'class', 'odd');
 	table.append(tr);
 	var td = $('<td>');
+	tr.append(td);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', group, position),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
+	td = $('<td>');
+	img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'separator.gif',
+					'class', 'pattern',
+					'width', '4',
+					'height', '16',
+					'border', '0',
+					'alt', ' ');
+	td.append(img);
+	tr.append(td);
+	td = $('<td>');
 	makeAttributes(td,
 				   'id', makeId(subjectId, 'removeValue'));
 	tr.append(td);
-	var img = $('<img>');
+	img = $('<img>');
 	makeAttributes(img,
 					'src', resourcePrefix + 'images/' + 'delete.jpg',
 					'class', 'pattern',
@@ -995,6 +1021,28 @@ function addButtonValue(parent, value, group, position) {
 				   'class', 'file-tag-list',
 				   'id', makeId(subjectId, 'val', position));
 	var td = $('<td>');
+	tr.append(td);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'template.png',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Set template',
+					'onclick', makeFunction('saveTemplate', group, position),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
+	img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'separator.gif',
+					'class', 'pattern',
+					'width', '4',
+					'height', '16',
+					'border', '0',
+					'alt', ' ');
+	td.append(img);
 	makeAttributes(td,
 				   'id', makeId(subjectId, 'removeValue'));
 	var img = $('<img>');
@@ -1600,22 +1648,10 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 							if ($.type(val) != 'null' && ($.type(val) != 'string' || val != 'None')) {
 								if (key == idTag) {
 									var id = makeId('Subject', group, position, 'header');
-									var img = $('<img>');
-									makeAttributes(img,
-													'src', resourcePrefix + 'images/' + 'template.png',
-													'class', 'pattern',
-													'width', '16',
-													'height', '16',
-													'border', '0',
-													'alt', 'Set template',
-													'onclick', makeFunction('saveTemplate', group, position),
-													'onmouseover', makeFunction('setCursorStyle', str('pointer')),
-													'onmouseout', makeFunction('setCursorStyle', str('default')));
 									$('#' + id).html(subjectType + ' ' + val);
-									$('#' + id).append(img);
 									id = makeId('Subject', group, 'val', position);
 									var tr = $('#' + id);
-									var td = getChild(tr, 2);
+									var td = getChild(tr, 4);
 									var a = getChild(td, 1);
 									a.html(subjectType + ' ' + val);
 								}
