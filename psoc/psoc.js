@@ -633,13 +633,14 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		tr.append(td);
 		img = $('<img>');
 		makeAttributes(img,
+						'id', makeId('Template', index, firstSubject),
 						'src', resourcePrefix + 'images/' + 'template.png',
 						'class', 'pattern',
 						'width', '16',
 						'height', '16',
 						'border', '0',
 						'alt', 'Set template',
-						'onclick', makeFunction('saveTemplate', index, firstSubject),
+						'onclick', makeFunction('saveTemplate', index, firstSubject, str('subject')),
 						'onmouseover', makeFunction('setCursorStyle', str('pointer')),
 						'onmouseout', makeFunction('setCursorStyle', str('default')));
 		td.append(img);
@@ -814,13 +815,21 @@ function addTags(group) {
 	newTags(group, value);
 }
 
-function saveTemplate(group, position) {
+function saveTemplate(group, position, type) {
 	var id = makeId('Subject', group, position, 'header');
 	subjectTemplates[groupType[group-1]] = id;
-	var subjectType = groupType[group-1];
-	var tagId = subjectType.substr(0,1).toLowerCase() + subjectType.substr(1) + 'ID'
-	var val = '"' + subjectType + ' ' + $('#' + makeId('Subject', group, position, getId(tagId), 'input')).val() + '".';
-	alert('Saved template ' + val);
+	var buttonId;
+	if (type == 'button') {
+		var parentId = $('#' + makeId('Template', group, position)).parent().parent().parent().attr('id');
+		var parts = parentId.split('_');
+		parts.pop();
+		parts.pop();
+		buttonId = makeId(parts.join('_'), 'new');
+	} else {
+		buttonId = makeId('Subject', group, 'subject');
+	}
+	$('#' + buttonId).click();
+	delete subjectTemplates[groupType[group-1]];
 }
 
 function copySubjectTemplate(group) {
@@ -966,13 +975,14 @@ function addSubjectValue(value, group, position) {
 	tr.append(td);
 	var img = $('<img>');
 	makeAttributes(img,
+					'id', makeId('Template', group, position),
 					'src', resourcePrefix + 'images/' + 'template.png',
 					'class', 'pattern',
 					'width', '16',
 					'height', '16',
 					'border', '0',
 					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', group, position),
+					'onclick', makeFunction('saveTemplate', group, position, str('subject')),
 					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
 					'onmouseout', makeFunction('setCursorStyle', str('default')));
 	td.append(img);
@@ -1024,13 +1034,14 @@ function addButtonValue(parent, value, group, position) {
 	tr.append(td);
 	var img = $('<img>');
 	makeAttributes(img,
+					'id', makeId('Template', group, position),
 					'src', resourcePrefix + 'images/' + 'template.png',
 					'class', 'pattern',
 					'width', '16',
 					'height', '16',
 					'border', '0',
 					'alt', 'Set template',
-					'onclick', makeFunction('saveTemplate', group, position),
+					'onclick', makeFunction('saveTemplate', group, position, str('button')),
 					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
 					'onmouseout', makeFunction('setCursorStyle', str('default')));
 	td.append(img);
@@ -1123,6 +1134,7 @@ function tagCell(group, tagname, index) {
 			tr.append(td);
 			var input = $('<input>');
 			makeAttributes(input,
+							'id', makeId('Subject', group, index, tagname, 'new'),
 							'type', 'button',
 						    'onclick', makeFunction('setValue', str(id), str(type)),
 						    'value', 'New ' + tagMapArray[tagname]);
