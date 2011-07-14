@@ -453,8 +453,6 @@ function deleteSubject(group, position) {
 			$('#Submit').attr('disabled', 'disabled');
 			$('#Debug').attr('disabled', 'disabled');
 		}
-	} else {
-		enableNavigationButtons(group);
 	}
 }
 
@@ -645,7 +643,21 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 		valuesTable.append(tr);
 		var td = $('<td>');
 		makeAttributes(td,
-					   'class', 'file-tag multivalue');
+					   'id', makeId(subjectId1, 'removeValue'));
+		tr.append(td);
+		img = $('<img>');
+		makeAttributes(img,
+						'src', resourcePrefix + 'images/' + 'delete.jpg',
+						'class', 'pattern',
+						'width', '16',
+						'height', '16',
+						'border', '0',
+						'alt', 'Delete subject',
+						'onclick', makeFunction('deleteSubject', index, firstSubject),
+						'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+						'onmouseout', makeFunction('setCursorStyle', str('default')));
+		td.append(img);
+		td = $('<td>');
 		tr.append(td);
 		var a = $('<a>');
 		makeAttributes(a,
@@ -653,22 +665,12 @@ function selectSubject(value, subjectGroupName, suffix, parent, header) {
 					   'href', 'javascript:' + makeFunction('showColumn', index, firstSubject, str(headerId)));
 		a.html(value + (joinTags[value] == null ? ' ' + header + typeCode + firstSubject : ''));
 		td.append(a);
-		td = $('<td>');
-		makeAttributes(td,
-					   'id', makeId(subjectId1, 'removeValue'));
-		tr.append(td);
-		var input = $('<input>');
-		makeAttributes(input,
-					   'type', 'button',
-				       'onclick', makeFunction('deleteSubject', index, firstSubject),
-				       'value', 'Remove ' + value);
-		td.append(input);
 		var newSubjectTable = $('<table>');
 		tr = $('<tr>');
 		newSubjectTable.append(tr);
 		td = $('<td>');
 		tr.append(td);
-		input = $('<input>');
+		var input = $('<input>');
 		makeAttributes(input,
 					   'id', makeId(subjectId, 'subject'),
 				       'tagname', value,
@@ -960,22 +962,28 @@ function addSubjectValue(value, group, position) {
 				   'class', 'odd');
 	table.append(tr);
 	var td = $('<td>');
+	makeAttributes(td,
+				   'id', makeId(subjectId, 'removeValue'));
+	tr.append(td);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'delete.jpg',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Delete subject',
+					'onclick', makeFunction('deleteSubject', group, position),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
+	td = $('<td>');
 	var a = $('<a>');
 	makeAttributes(a,
 				   'id', makeId('Subject', group, position, 'href'),
 				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
 	a.html(groupType[group-1] + (joinTags[groupType[group-1]] == null ? ' ' + value : ''));
 	td.append(a);
-	tr.append(td);
-	td = $('<td>');
-	makeAttributes(td,
-				   'id', makeId(subjectId, 'removeValue'));
-	var input = $('<input>');
-	makeAttributes(input,
-					'type', 'button',
-				    'onclick', makeFunction('deleteSubject', group, position),
-				    'value', 'Remove ' + groupType[group-1]);
-	td.append(input);
 	tr.append(td);
 }
 
@@ -988,23 +996,24 @@ function addButtonValue(parent, value, group, position) {
 				   'id', makeId(subjectId, 'val', position));
 	var td = $('<td>');
 	makeAttributes(td,
-				   'class', 'file-tag multivalue');
+				   'id', makeId(subjectId, 'removeValue'));
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', resourcePrefix + 'images/' + 'delete.jpg',
+					'class', 'pattern',
+					'width', '16',
+					'height', '16',
+					'border', '0',
+					'alt', 'Delete subject',
+					'onclick', makeFunction('deleteSubject', group, position),
+					'onmouseover', makeFunction('setCursorStyle', str('pointer')),
+					'onmouseout', makeFunction('setCursorStyle', str('default')));
+	td.append(img);
 	var a = $('<a>');
 	makeAttributes(a,
 				   'href', 'javascript:' + makeFunction('showColumn', group, position, str(headerId)));
 	a.html(groupType[group-1] + ' ' + value);
 	td.append(a);
-	tr.append(td);
-	td = $('<td>');
-	makeAttributes(td,
-				   'class', 'file-tag multivalue delete',
-				   'id', makeId(subjectId, 'removeValue'));
-	var input = $('<input>');
-	makeAttributes(input,
-					'type', 'button',
-				    'onclick', makeFunction('deleteSubject', group, position),
-				    'value', 'Remove ' + groupType[group-1]);
-	td.append(input);
 	tr.append(td);
 	tr.insertBefore(parent.children(':last-child'));
 }
@@ -1606,7 +1615,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 									$('#' + id).append(img);
 									id = makeId('Subject', group, 'val', position);
 									var tr = $('#' + id);
-									var td = getChild(tr, 1);
+									var td = getChild(tr, 2);
 									var a = getChild(td, 1);
 									a.html(subjectType + ' ' + val);
 								}
@@ -1690,7 +1699,7 @@ function getSubjectEntity(subjectType, subjectGroupName, url, suffix, parent, he
 		}
 		addButtonValue($('#' + makeId(subjectId, 'button', 'entity')), subjectValue, arrayGroup, arrayPosition);
 	} else {
-		retrievedSubject = {group: group, position: position};
+		retrievedSubject = {group: group, position: position, subjectType: subjectType};
 	}
 	setTimeout('retrieveNextSubject()', 1);
 }
@@ -1702,10 +1711,10 @@ function retrieveNextSubject() {
 		var headerId = makeId('Subject', group, position, 'header');
 		showColumn(group, position, headerId);
 		$('#Status').html('');
-		addSeletedSubjects(group);
+		addSelectedSubjects(group);
 		$('#Submit').removeAttr('disabled');
 		$('#Debug').removeAttr('disabled');
-		$('#' + subjectType).css('display', 'none');
+		$('#' + retrievedSubject.subjectType).css('display', 'none');
 	} else {
 		var subject = retrieveSubjectQueue.pop();
 		setTimeout(function() { getSubjectEntity(subject.subjectType, 
@@ -1948,7 +1957,7 @@ function existsNewSubjects() {
 	return false;
 }
 
-function addSeletedSubjects(group) {
+function addSelectedSubjects(group) {
 	var tags;
 	for (var i=group-1; i < groupCounter.length; i++) {
 		tags = null;

@@ -28,6 +28,7 @@ SCRIPTBASES=psoc.js \
 SCRIPTFILES=$(SCRIPTBASES:%=psoc/%)
 
 IMAGEBASES=minus.png \
+	delete.jpg \
 	plus.png \
 	template.png \
 	ui-bg_diagonals-thick_18_b81900_40x40.png \
