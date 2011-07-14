@@ -424,7 +424,6 @@ function deleteSubject(group, position) {
 	var elemId = makeId('Subject', group, 'val', position);
 	deleteElementById(elemId);
 	var id = makeId('Subject', group, position);
-	var count = getVisibleColumnCount(group);
 	var index = getColumnIndex(id);
 	var row = $('#' + id).parent();
 	deleteColumn(id);
@@ -441,6 +440,8 @@ function deleteSubject(group, position) {
 			$('#Submit').attr('disabled', 'disabled');
 			$('#Debug').attr('disabled', 'disabled');
 		}
+	} else {
+		enableNavigationButtons(group);
 	}
 }
 
