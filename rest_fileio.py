@@ -127,8 +127,8 @@ class FileIO (Subject):
     """
     __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
-    def __init__(self):
-        Subject.__init__(self)
+    def __init__(self, parser=None):
+        Subject.__init__(self, parser=parser)
         self.api = 'file'
         self.action = None
         self.key = None
@@ -151,6 +151,40 @@ class FileIO (Subject):
                 f = None
                 render = None
                 if self.subject['template mode'] in ['embedded', 'page']:
+                    if self.subject['template query']:
+                        # execute each query specified as tags on this template file
+                        resultsdict = {}
+                        for tq in self.subject['template query']:
+                            try:
+                                # interpolate query params into query string prior to evaluation
+                                # every interpolated key MUST appear in self.storage (query params)
+                                # NOTE: this is hackish and has ugly quoting rules:
+                                #  1. components of query may be URL-quoted as per normal Tagfiler rules
+                                #  2. percent signs are escaped according to Python formatting rules or represent interpolation points
+                                #  3. whole value is URL-quoted in REST API, FORM input, etc.
+                                itq = tq % self.storage
+                                ast = self.url_parse_func(itq)
+                                if type(ast) in [ int, long ]:
+                                    result = ast
+                                elif hasattr(ast, 'is_subquery') and ast.is_subquery:
+                                    result = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
+                                else:
+                                    raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
+                                                   % (self.subject2identifiers(self.subject)[2], tq))
+                                resultsdict[tq] = result
+                            except (BadRequest), te:
+                                raise te
+                            except (KeyError), te:
+                                raise BadRequest(self, 'File "%s" requires query parameter: %s'
+                                                 % (self.subject2identifiers(self.subject)[2], str(te)))
+                            #except:
+                            #    et, ev, tb = sys.exc_info()
+                            #    web.debug('got exception "%s" during template query evaluation' % str(ev),
+                            #              traceback.format_exception(et, ev, tb))
+                        # put query results where template rendering pass can find them
+                        self.globals['template_query_results'] = resultsdict
+                    else:
+                        self.globals['template_query_results'] = None
                     # use the file as a web template
                     render = web.template.frender(filename, globals=self.globals)
                 else:

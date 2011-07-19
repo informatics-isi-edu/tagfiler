@@ -513,6 +513,7 @@ tagdef "Image Set"           empty       "${admin}" subject     subject      fal
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
+tagdef 'template query'      text        "${admin}" subjectowner tag         true       ""
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs

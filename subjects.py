@@ -99,8 +99,8 @@ class Subject (Application):
     """
     __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
-    def __init__(self):
-        Application.__init__(self)
+    def __init__(self, parser=None):
+        Application.__init__(self, parser=parser)
         self.api = 'subject'
         self.action = None
         self.key = None
@@ -159,7 +159,7 @@ class Subject (Application):
             self.versions = 'latest'
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'Image Set', 'incomplete', 'template mode']
+                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'Image Set', 'incomplete', 'template mode', 'template query']
                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]

@@ -315,7 +315,7 @@ class WebException (web.HTTPError):
     def __init__(self, ast, status, data=u'', headers={}, desc=u'%s'):
         self.detail = urlquote(desc % data)
         #web.debug(self.detail, desc, data, desc % data)
-        logger.info(myutf8(u'%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
+        logger.info(myutf8(u'%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
                                                    ast and ast.request_guid or u'', desc % data)))
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',

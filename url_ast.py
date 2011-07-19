@@ -474,7 +474,7 @@ class FileId(Node, FileIO):
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
     def __init__(self, parser, appname, path, queryopts={}, versions='any', storage=None):
         Node.__init__(self, parser, appname)
-        FileIO.__init__(self)
+        FileIO.__init__(self, parser=parser)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         self.queryopts = queryopts
         self.versions = versions
