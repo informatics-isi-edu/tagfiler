@@ -323,7 +323,7 @@ if grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
 then
     # disable old, conflicting entry
     TMPF=$(mktemp syslog.conf.XXXXXXXXXX)
-    cat /etc/syslog.conf | sed -e 's:^\( *local1\..*|/var/log/${SVCPREFIX}\):# \1:' > $TMPF && cat $TMPF > /etc/syslog.conf
+    cat /etc/syslog.conf | sed -e 's:^\( *# *\)\(.*local1\..*|/var/log/${SVCPREFIX}\):# \2:' > $TMPF && cat $TMPF > /etc/syslog.conf
     rm $TMPF
     service syslog restart
 fi
@@ -331,7 +331,7 @@ fi
 
 
 # enable new logging entry
-if ! grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
+if ! grep -q "^ *local1\..*/var/log/${SVCPREFIX}" /etc/syslog.conf
 then
     cat >> /etc/syslog.conf <<EOF
 

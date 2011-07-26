@@ -35,7 +35,7 @@ demotypedef()
 }
 
 demotypedef "mouse strain" text "Mouse strain"   "C57b6 C57 black 6" "nude nude" "skid skid" "other other strain"
-demotypedef "sample type"  text "Sample type"    "t0 t0" "t1 t1"  "t2 t2" "t3 t3" "t4 t4" "t5 t5" "t6 t6"
+demotypedef "sample type"  text "Sample type"
 demotypedef "cancer type"  text "Cancer type"    "lymphoma lymphoma" "prostate prostate" "breast breast" "naive naive"
 demotypedef "cell type"  text "Cell type"    "Arf-/- Arf-/-" "Arf-/-Luc+ Arf-/- Luc+" "Arf-/-Luc- Arf-/- Luc-" "control control" "p53-/- p53-/-"
 demotypedef "weight"       int8 "Weight (g)"
@@ -152,8 +152,8 @@ view()
     done
 }
 
-view mouseID mouseID "mouse label" cage start "mouse strain" dob "cell type" "#cells" dos treatment samples
-view experimentID experimentID start mice
+view mouseID mouseID "mouse label" cage start "mouse strain" dob "cell type" "#cells" dos treatment samples observations
+view experimentID experimentID start mice principal
 view treatmentID treatmentID drug dose start
 view observationID observationID start comment
 view sampleID sampleID start "sample type" observations
