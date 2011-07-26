@@ -112,7 +112,7 @@ class Subject (Application):
         self.update = False
         self.subject = None
         self.mergeSubjpredsTags = False
-        self.needed_db_globals = ['tagdefsdict', 'typeinfo', 'typesdict']  # turn off expensive roleinfo query we don't need
+        #self.needed_db_globals = ['tagdefsdict', 'typeinfo', 'typesdict']  # turn off expensive roleinfo query we don't need
 
     def populate_subject_cached(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False):
         if len(self.path) == 0:
