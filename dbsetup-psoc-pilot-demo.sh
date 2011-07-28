@@ -116,7 +116,7 @@ entityref1 "experimentID" "experiment"
 entityrefN "experimentID" "experiments"
 
 entity     "treatmentID"
-entityref1 "treatmentID" "treatment"
+entityrefN "treatmentID" "treatments"
 
 entity     "observationID"
 entityrefN "observationID" "observations"
@@ -152,11 +152,11 @@ view()
     done
 }
 
-view mouseID mouseID "mouse label" cage start "mouse strain" dob "cell type" "#cells" dos treatment samples observations
+view mouseID mouseID "mouse label" cage start "mouse strain" dob "cell type" "#cells" dos treatments samples observations supplier
 view experimentID experimentID start mice principal
-view treatmentID treatmentID drug dose start
-view observationID observationID start comment
-view sampleID sampleID start "sample type" observations
+view treatmentID treatmentID drug dose start performer mouse
+view observationID observationID start comment performer mouse
+view sampleID sampleID start "sample type" observations performer mouse
 view researcherID researcherID email lab
 view labID labID site
 view siteID siteID address
