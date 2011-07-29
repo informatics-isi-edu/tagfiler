@@ -1,0 +1,152 @@
+$def with ()
+$ q_experiment = 'experimentID(experimentID;start;mice;principal;write%%20users)'
+$ q_mouse = 'mouseID(mouseID;experiment;cage;%%23cells;cell%%20type;dob;dos;start;mouse%%20label;mouse%%20strain;samples;treatments;observations;write%%20users)'
+$ q_sample = 'sampleID(sampleID;experiment;mouse;sample%%20type;serum%%20sample%%20type;start;observations;performer;write%%20users)'
+$ q_observation = 'observationID(observationID;experiment;mouse;start;comment;performer;write%%20users)'
+$ q_treatment = 'treatmentID(treatmentID;experiment;mouse;dose;drug;start;performer;write%%20users)'
+$ experiments = dict([ (exp.experimentID, exp) for exp in template_query_results[q_experiment] ])
+$ mice = dict([ (mouse.mouseID, mouse) for mouse in template_query_results[q_mouse] ])
+$ samples = dict([ (samp.sampleID, samp) for samp in template_query_results[q_sample] ])
+$ observations = dict([ (obsv.observationID, obsv) for obsv in template_query_results[q_observation] ])
+$ treatments = dict([ (treat.treatmentID, treat) for treat in template_query_results[q_treatment] ])
+
+$# weird bug workaround for template engine
+$for x in [ 0 ]:
+$code
+	def showent(storage, keys=None):
+            s = ''
+            if keys == None:
+                keys = storage.keys()
+            s += '<ul>'
+            for key in keys:
+                s += '<li>%s: %s</li>' % (key, storage[key])
+            s += '</ul>'
+            return s
+        # maintain indent level
+        def style(key, hidden=[]):
+            if key in hidden:
+                return 'style="display: none" '
+            else:
+                return 'style="white-space: normal"'
+        # maintain indent level
+        def showval(storage, key):
+            if key == 'id':
+                return '%s' % storage.id
+            elif key == 'treatments' and storage[key]:
+                treats = [ treatments[treatmentID] for treatmentID in storage[key] ]
+                treats.sort(key=lambda treatment: (treatment.start))
+                return ',\n'.join([ "%s" % treatment.treatmentID for treatment in treats ])
+            elif key == 'observations' and storage[key]:
+                obsvs = [ observations[observationID] for observationID in storage[key] ]
+                obsvs.sort(key=lambda observation: (observation.start))
+                return ',\n'.join([ "%s" % observation.observationID for observation in obsvs ])
+            elif key == 'samples' and storage.samples:
+                samps = [ samples[sampleID] for sampleID in storage.samples  ]
+                samps.sort(key=lambda sample: (sample.start))
+                return ', '.join([ "%s" % sample.sampleID for sample in samps ])
+            elif storage[key]:
+                return "%s" % storage[key]
+            else:
+                return ''
+
+<h2>Experiments</h2>
+$ keys = ['experimentID', 'start', 'principal', 'mice' ]
+$ hidden = [ 'mice' ]
+$ odd = True
+<table class="file-list">
+        <tr>
+                $for key in keys:
+                        <th class="file-tag ${idquote(key)}" ${style(key, hidden)}>$:{key.replace(" ", "&nbsp;")}</th>
+        </tr>
+$ experimentslist = experiments.values()
+$ experimentslist.sort(key=lambda experiment: experiment.experimentID)
+$for experiment in experimentslist:
+        <tr>
+                $for key in keys:
+                        <td class="file-tag ${idquote(key)}" ${style(key, hidden)}>
+                        $:{showval(experiment, key)}
+                        </td>
+        </tr>
+</table>
+
+<h2>Mice</h2>
+$ mouse_keys = ['experiment', 'mouseID', 'mouse label', 'cage', 'dob', 'dos', 'start', 'mouse strain', 'cell type', '#cells', 'treatments', 'samples', 'observations' ]
+$ hidden = [ 'samples', 'observations', 'treatments' ]
+$ odd = True
+<table class="file-list" width="100%">
+        <tr>
+                $for key in mouse_keys:
+                        <th class="file-tag ${idquote(key)}" ${style(key, hidden)}>$:{key.replace(" ", "&nbsp;")}</th>
+        </tr>
+$ micelist = mice.values()
+$ micelist.sort(key=lambda mouse: (mouse.experiment, mouse.mouseID))
+$for mouse in micelist:
+        <tr>
+                $for key in mouse_keys:
+                        <td class="file-tag ${idquote(key)}" ${style(key, hidden)}>
+                        $:{showval(mouse, key)}
+                        </td>
+            </td>
+        </tr>
+</table>
+
+<h2>Treatments</h2>
+$ keys = ['experiment', 'mouse', 'treatmentID', 'start', 'drug', 'dose', 'performer' ]
+$ hidden = [ ]
+$ odd = True
+<table class="file-list">
+        <tr>
+                $for key in keys:
+                        <th class="file-tag ${idquote(key)}" ${style(key, hidden)}>$:{key.replace(" ", "&nbsp;")}</th>
+        </tr>
+$ treatmentslist = treatments.values()
+$ treatmentslist.sort(key=lambda treatment: (treatment.experiment, treatment.mouse, treatment.start))
+$for treatment in treatmentslist:
+        <tr>
+                $for key in keys:
+                        <td class="file-tag ${idquote(key)}" ${style(key, hidden)}>
+                        $:{showval(treatment, key)}
+                        </td>
+        </tr>
+</table>
+
+<h2>Samples</h2>
+$ keys = ['experiment', 'mouse', 'sampleID', 'start', 'sample type', 'serum sample type', 'performer' ]
+$ hidden = [ ]
+$ odd = True
+<table class="file-list">
+        <tr>
+                $for key in keys:
+                        <th class="file-tag ${idquote(key)}" ${style(key, hidden)}>$:{key.replace(" ", "&nbsp;")}</th>
+        </tr>
+$ sampleslist = samples.values()
+$ sampleslist.sort(key=lambda sample: (sample.experiment, sample.mouse, sample.start))
+$for sample in samples.values():
+        <tr>
+                $for key in keys:
+                        <td class="file-tag ${idquote(key)}" ${style(key, hidden)}>
+                        $:{showval(sample, key)}
+                        </td>
+        </tr>
+</table>
+
+<h2>Observations</h2>
+$ keys = ['experiment', 'mouse', 'observationID', 'start', 'comment', 'performer' ]
+$ hidden = [ ]
+$ odd = True
+<table class="file-list">
+        <tr>
+                $for key in keys:
+                        <th class="file-tag ${idquote(key)}" ${style(key, hidden)}>$:{key.replace(" ", "&nbsp;")}</th>
+        </tr>
+$ observationslist = observations.values()
+$ observationslist.sort(key=lambda observation: (observation.experiment, observation.mouse, observation.start))
+$for observation in observations.values():
+        <tr>
+                $for key in keys:
+                        <td class="file-tag ${idquote(key)}" ${style(key, hidden)}>
+                        $:{showval(observation, key)}
+                        </td>
+        </tr>
+</table>
+
