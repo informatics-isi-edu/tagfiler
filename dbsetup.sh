@@ -43,26 +43,6 @@ CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELE
 CLUSTER subjecttags USING subjecttags_subject_key;
 EOF
 
-# insert/get normalized datum id
-dim_datum_id()
-{
-    # args: dimtype datum
-    local id=$(psql -A -t -q <<EOF
-SELECT id FROM "dim_${1}" WHERE "dim_${1}".value = '$2';
-EOF
-    )
-
-    if [[ -z "$id" ]]
-    then
-	id=$(psql -A -t -q <<EOF
-INSERT INTO "dim_${1}" (value) VALUES ($datum) RETURNING id;
-EOF
-	)
-    fi
-
-    echo "$id"
-}
-
 # pre-established stored data
 # MUST NOT be called more than once with same name during deploy 
 # e.g. only deploys version 1 properly
