@@ -68,6 +68,30 @@ tagsubject()
     mycurl -X PUT "$uri"
 }
 
+tagsubjects()
+{
+    # querypath [tag val]...
+    local uri
+
+    uri="https://${TARGET}/tagfiler/tags/$1("
+    shift
+
+    local sep=''
+    while [[ $# -gt 0 ]]
+    do
+	uri+="${sep}$(urlquote "$1")"
+	sep=';'
+	if [[ -n "$2" ]]
+	then
+	    uri+="=$(urlquote "$2")"
+	fi
+	shift 2
+    done
+    uri+=")?ignorenotfound=true"
+    
+    mycurl -s -X PUT "$uri"
+}
+
 cleanup()
 {
     rm -f $COOKIEJAR
@@ -125,7 +149,7 @@ e1m()
     if [[ "$(f treatp)" = "y" ]]
     then
 	newsubject treatmentID "$(f mouse)" start "$(f ttdate)" drug "$(f drug)" dose "$(f dose)" # create treatment record
-	margs=( "${margs[@]}" treatment "$(f mouse)" )
+	margs=( "${margs[@]}" treatments "$(f mouse)" )
     fi
 
     for obsv in {0..6}
@@ -158,6 +182,10 @@ e1m()
 
     newsubject "${margs[@]}" # create mouse record
     mice=( "${mice[@]}" "$(f mouse)" )
+
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(treatments)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(samples)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(observations)/" mouse "$(f mouse)"
 }
 
 e1()
@@ -199,13 +227,18 @@ IFS="${IFS_save}"
 
 declare -a args
 
-args=(experimentID "PSOC serium 2011-01-11" start "2011-01-11" )
+args=(experimentID "PSOC serum 2011-01-11" start "2011-01-11" )
 shift 2
 for mouse in "${mice[@]}"
 do
     args=( "${args[@]}" mice "$mouse" )
 done
 newsubject "${args[@]}" # create experiment record
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-01-11")(mice)/" experiment "PSOC serum 2011-01-11"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-01-11")(mice)/(treatments)/" experiment "PSOC serum 2011-01-11"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-01-11")(mice)/(samples)/" experiment "PSOC serum 2011-01-11"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-01-11")(mice)/(observations)/" experiment "PSOC serum 2011-01-11"
+
 }
 
 e1
@@ -227,7 +260,7 @@ e2m()
     if [[ "$(f treatp)" = "y" ]]
     then
 	newsubject treatmentID "$(f mouse)" start "$(f ttdate)" drug "$(f drug)" dose "$(f dose)" # create treatment record
-	margs=( "${margs[@]}" treatment "$(f mouse)" )
+	margs=( "${margs[@]}" treatments "$(f mouse)" )
     fi
 
     for obsv in 1 2  4 5
@@ -274,6 +307,10 @@ e2m()
 
     newsubject "${margs[@]}" # create mouse record
     mice=( "${mice[@]}" "$(f mouse)" )
+
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(treatments)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(samples)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(observations)/" mouse "$(f mouse)"
 }
 
 e2()
@@ -322,6 +359,11 @@ do
     args=( "${args[@]}" mice "$mouse" )
 done
 newsubject "${args[@]}" # create experiment record
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-03-25")(mice)/" experiment "PSOC serum 2011-03-25"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-03-25")(mice)/(treatments)/" experiment "PSOC serum 2011-03-25"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-03-25")(mice)/(samples)/" experiment "PSOC serum 2011-03-25"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2011-03-25")(mice)/(observations)/" experiment "PSOC serum 2011-03-25"
+
 }
 
 e2
@@ -349,7 +391,7 @@ e3m()
     if [[ "$(f treatp)" = "y" ]]
     then
 	newsubject treatmentID "$(f mouse)" start "$(f ttdate)" drug "$(f drug)" dose "$(f dose)" # create treatment record
-	margs=( "${margs[@]}" treatment "$(f mouse)" )
+	margs=( "${margs[@]}" treatments "$(f mouse)" )
     fi
 
     for sample in 0 1 2 3
@@ -378,6 +420,10 @@ e3m()
 
     newsubject "${margs[@]}" # create mouse record
     mice=( "${mice[@]}" "$(f mouse)" )
+
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(treatments)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(samples)/" mouse "$(f mouse)"
+    tagsubjects "mouseID=$(urlquote "$(f mouse)")(observations)/" mouse "$(f mouse)"
 }
 
 IFS=","
@@ -449,6 +495,11 @@ do
     args=( "${args[@]}" mice "$mouse" )
 done
 newsubject "${args[@]}" # create experiment record
+tagsubjects "experimentID=$(urlquote "PSOC serum 2010-09-15")(mice)/" experiment "PSOC serum 2010-09-15"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2010-09-15")(mice)/(treatments)/" experiment "PSOC serum 2010-09-15"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2010-09-15")(mice)/(samples)/" experiment "PSOC serum 2010-09-15"
+tagsubjects "experimentID=$(urlquote "PSOC serum 2010-09-15")(mice)/(observations)/" experiment "PSOC serum 2010-09-15"
+
 
 mycurl -d action=logout https://${TARGET}/webauthn/logout
 
