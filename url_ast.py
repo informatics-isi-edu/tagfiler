@@ -926,6 +926,13 @@ class FileTags (Node):
             raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
 
         for subject in results:
+            if not self.referer:
+                # set updated referer based on updated subject(s), unless client provided a referer
+                if len(results) != 1:
+                    self.referer = '/tags/' + path_linearize(self.path)
+                else:
+                    self.referer = '/tags/' + self.subject2identifiers(subject)[0]
+            
             # custom DEI EIU hack, proxy tag ops on Image Set to all member files
             if subject['Image Set']:
                 path = [ ( [ web.Storage(tag='id', op='=', vals=[subject.id]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
@@ -956,12 +963,6 @@ class FileTags (Node):
                             self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)
                             self.set_tag(subfile, tagdef)
 
-        if not self.referer:
-            # set updated referer based on updated subject(s), unless client provided a referer
-            if len(results) != 1:
-                self.referer = '/tags/' + path_linearize(self.path)
-            else:
-                self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
             
         return None
 
