@@ -918,49 +918,50 @@ class FileTags (Node):
 
         self.path_modified = [ x for x in self.path ]
         self.path_modified[-1] = (subjpreds, listpreds, ordertags)
-        
+
+        ignorenotfound = parseBoolString(self.storage.get('ignorenotfound', 'false'))
+
         results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
-        if len(results) == 0:
+        if len(results) == 0 and not ignorenotfound:
             raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
-        elif len(results) > 1:
-            raise Conflict(self, 'PUT tags to more than one subject is not supported.')
 
-        self.subject = results[0]
-        self.id = self.subject.id
+        for subject in results:
+            # custom DEI EIU hack, proxy tag ops on Image Set to all member files
+            if subject['Image Set']:
+                path = [ ( [ web.Storage(tag='id', op='=', vals=[subject.id]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
+                         ( [], [], [] ) ]
+                subfiles = self.select_files_by_predlist_path(path=path)
+            else:
+                subfiles = []
 
-        # custom DEI EIU hack, proxy tag ops on Image Set to all member files
-        if self.subject['Image Set']:
-            path = [ ( [ web.Storage(tag='id', op='=', vals=[self.id]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
-                     ( [], [], [] ) ]
-            subfiles = self.select_files_by_predlist_path(path=path)
-        else:
-            subfiles = []
-
-        for tag_id in self.tagvals.keys():
-            tagdef = self.globals['tagdefsdict'].get(tag_id, None)
-            if tagdef == None:
-                raise NotFound(self, data='tag definition "%s"' % tag_id)
-            self.enforce_tag_authz('write', self.subject, tagdef)
-            self.txlog('SET', dataset=self.subject2identifiers(self.subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
-            if self.tagvals[tag_id]:
-                for value in self.tagvals[tag_id]:
-                    self.set_tag(self.subject, tagdef, value)
+            for tag_id in self.tagvals.keys():
+                tagdef = self.globals['tagdefsdict'].get(tag_id, None)
+                if tagdef == None:
+                    raise NotFound(self, data='tag definition "%s"' % tag_id)
+                self.enforce_tag_authz('write', subject, tagdef)
+                self.txlog('SET', dataset=self.subject2identifiers(subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
+                if self.tagvals[tag_id]:
+                    for value in self.tagvals[tag_id]:
+                        self.set_tag(subject, tagdef, value)
+                        if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ] and not tagdef.unique:
+                            for subfile in subfiles:
+                                self.enforce_tag_authz('write', subfile, tagdef)
+                                self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
+                                self.set_tag(subfile, tagdef, value)
+                else:
+                    self.set_tag(subject, tagdef)
                     if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ] and not tagdef.unique:
                         for subfile in subfiles:
                             self.enforce_tag_authz('write', subfile, tagdef)
-                            self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
-                            self.set_tag(subfile, tagdef, value)
-            else:
-                self.set_tag(self.subject, tagdef)
-                if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ] and not tagdef.unique:
-                    for subfile in subfiles:
-                        self.enforce_tag_authz('write', subfile, tagdef)
-                        self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)
-                        self.set_tag(subfile, tagdef)
+                            self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)
+                            self.set_tag(subfile, tagdef)
 
         if not self.referer:
-            # set updated referer based on updated subject, unless client provided a referer
-            self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
+            # set updated referer based on updated subject(s), unless client provided a referer
+            if len(results) != 1:
+                self.referer = '/tags/' + path_linearize(self.path)
+            else:
+                self.referer = '/tags/' + self.subject2identifiers(self.subject)[0]
             
         return None
 
