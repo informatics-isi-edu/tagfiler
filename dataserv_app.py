@@ -2027,10 +2027,10 @@ class Application:
                     clauses = []
                     if constants:
                         constants = ', '.join(constants)
-                        clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, pred.op, constants, dbtype) )
+                        clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, dbtype) )
                     if vqueries:
                         vqueries = ' UNION '.join(vqueries)
-                        clauses.append( '%s %s ANY (%s)' % (valcol, pred.op, vqueries) )
+                        clauses.append( '%s %s ANY (%s)' % (valcol, Application.opsDB[pred.op], vqueries) )
                     wheres.append( ' OR '.join(clauses) )
 
             if used_not_op:
