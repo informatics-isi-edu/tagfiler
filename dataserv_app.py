@@ -2092,6 +2092,7 @@ class Application:
                 selects = ['resources.subject AS id',
                            'resources.readok AS readok',
                            'resources.writeok AS writeok',
+                           'resources.owner AS owner',
                            'resources.txid AS txid']
             else:
                 selects = []
