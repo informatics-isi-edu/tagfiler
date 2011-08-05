@@ -167,6 +167,7 @@ class FileIO (Subject):
                                 if type(ast) in [ int, long ]:
                                     result = ast
                                 elif hasattr(ast, 'is_subquery') and ast.is_subquery:
+                                    self.txlog('QUERY', dataset=path_linearize(ast.path))
                                     result = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
                                 else:
                                     raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
