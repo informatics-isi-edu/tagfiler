@@ -2026,7 +2026,7 @@ class Application:
                         
                         path[-1] = (spreds, lpreds, [])
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
-                        return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag), vq)
+                        return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
                     constants = [ '$%s' % values.add(v, dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
