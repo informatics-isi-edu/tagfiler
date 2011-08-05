@@ -1219,13 +1219,14 @@ class Query (Node):
 
             path, self.listtags, writetags, self.limit, self.versions = \
                   self.prepare_path_query(self.path,
-                                          list_priority=['path', 'list', 'view', 'all'],
+                                          list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
                                           extra_tags=[ 'id', 'file','name', 'version','Image Set',
-                                                       'write users', 'modified', 'url' ]
+                                                       'write users', 'owner', 'modified', 'url' ]
                                           + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
-            self.txlog('QUERY', dataset=path_linearize(self.path))
+            txid = self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit)
+            self.txlog('QUERY', dataset=path_linearize(self.path), txid=txid)
 
             if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
                 try_default_view = True
