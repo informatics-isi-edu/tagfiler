@@ -2107,7 +2107,13 @@ class Application:
 
             finals = []
             for tag, preds in lpreds.items():
-                if spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final:
+                if tag == 'owner':
+                    # owner is restricted, since it MUST appear unfiltered in all results
+                    if len(set([p.op for p in preds]).difference(set([None]))) > 0:
+                        raise Conflict(self, 'The tag "owner" cannot be filtered in projection list predicates.')
+                    # skip this iteration since it's already in the base results
+                    continue
+                elif spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final:
                     # this projection does not further filter triples relative to the spred so optimize it away
                     td = tagdefs[tag]
                     lq = None
