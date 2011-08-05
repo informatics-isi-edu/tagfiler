@@ -545,7 +545,7 @@ psql -e -t <<EOF
 ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 DROP TABLE "_id";
 CREATE FUNCTION 
-  resources_authzinfo ( roles text[], ignore_read_authz boolean = False ) RETURNS TABLE ( subject int8, txid int8, readok boolean, writeok boolean ) AS \$\$
+  resources_authzinfo ( roles text[], ignore_read_authz boolean = False ) RETURNS TABLE ( subject int8, txid int8, owner text, readok boolean, writeok boolean ) AS \$\$
   SELECT r.subject AS subject, 
          t.value AS txid,
          o.value AS owner,
