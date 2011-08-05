@@ -103,6 +103,7 @@ class TransmitNumber (Node):
         def postCommit(results):
             uri = self.config['home'] + '/transmitnumber/' + results
             web.header('Location', results)
+            self.emit_headers()
             return results
 
         self.storage = web.input()
@@ -197,6 +198,7 @@ class Study (Node):
             return files
     
         def postCommit(files):
+            self.emit_headers()
             if self.action == 'upload':
                 return self.renderlist("Study Upload",
                                        [self.render.TreeUpload()])
@@ -297,6 +299,7 @@ class AppletError (Node):
         # since it may be active while the html page is idle
         target = self.config['home'] + web.ctx.homepath
         self.setNoCache()
+        self.emit_headers()
         return self.renderlist("Study Transfer Applet",
                                [self.render.AppletError(self.status)])
 
@@ -356,6 +359,7 @@ class FileList (Node):
         def postCommit(files):
             target = self.config['home'] + web.ctx.homepath
             self.setNoCache()
+            self.emit_headers()
             if self.homepage:
                 return self.renderlist(None,
                                        [self.render.Homepage(files)])
@@ -447,6 +451,9 @@ class LogList (Node):
                 return self.render.LogUriList(lognames)
             elif acceptType == 'text/html':
                 break
+
+        self.http_vary.add('Accept')
+        self.emit_headers()
         return self.renderlist("Archived logs",
                                [self.render.LogList(lognames)])
 
@@ -462,6 +469,7 @@ class Contact (Node):
     def GET(self, uri):
         
         self.setNoCache()
+        self.emit_headers()
         return self.renderlist("Contact Us",
                                [self.render.Contact()])
 
@@ -542,6 +550,7 @@ class Tagdef (Node):
 
         def postCommit(defs):
             self.setNoCache()
+            self.emit_headers()
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
             return self.renderlist("Tag definitions",
@@ -565,6 +574,7 @@ class Tagdef (Node):
             try:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
                 self.setNoCache()
+                self.emit_headers()
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&readpolicy=' + urlquote(tagdef.readpolicy)
                         + '&writepolicy=' + urlquote(tagdef.writepolicy)
@@ -835,6 +845,8 @@ class FileTags (Node):
             return tagvals
 
         self.setNoCache()
+        self.http_vary.add('Accept')
+        self.emit_headers()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
                 web.header('Content-Type', 'text/uri-list')
@@ -1275,6 +1287,8 @@ class Query (Node):
                 return tagvals
 
             self.setNoCache()
+            self.http_vary.add('Accept')
+            self.emit_headers()
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )

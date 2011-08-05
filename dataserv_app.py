@@ -643,7 +643,8 @@ class Application:
 
         def long2str(x):
             s = ''
-            
+
+        self.http_vary = set(['Cookie'])
 
         self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
 
@@ -756,6 +757,11 @@ class Application:
             self.storage = web.storage([ parsekv(kv.split('=', 1)) for kv in uri.split('?', 1)[1].replace(';', '&').split('&') ])
         except:
             self.storage = web.storage([]) 
+
+    def emit_headers(self):
+        """Emit any automatic headers prior to body beginning."""
+        if self.http_vary:
+            web.header('Vary', ', '.join(self.http_vary))
 
     def validateSubjectQuery(self, query, tagdef=None, subject=None):
         if type(query) in [ int, long ]:

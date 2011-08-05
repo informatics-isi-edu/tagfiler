@@ -214,6 +214,7 @@ class Subject (Application):
 
     def get_postCommit(self, ignore, sendBody=True):
         datapred, dataid, dataname, dtype = self.subject2identifiers(self.subject)
+        self.emit_headers()
         raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
 
     def GET(self, uri, sendBody=True):

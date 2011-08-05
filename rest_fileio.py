@@ -212,10 +212,13 @@ class FileIO (Subject):
                         querystr = '?' + querystr
                 else:
                     querystr = ''
+                self.emit_headers()
                 raise web.seeother(self.subject.url + querystr)
             elif self.subject.dtype == 'file':
+                self.emit_headers()
                 return f, render
             else:
+                # this emits headers for us
                 Subject.get_postCommit(self, f, sendBody)
 
         f, render = self.dbtransact(body, postCommit)
