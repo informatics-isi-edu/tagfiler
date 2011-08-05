@@ -2269,10 +2269,14 @@ class Application:
             """Find the most recent txid at which any relevant tag was updated."""
             def relevant_tags(path):
                 """Find the relevant tags involved in computing a query path result."""
-                tags = set()
+                tags = set(['owner', 'read users', 'latest with name'])
                 for elem in path:
                     spreds, lpreds, otags = elem
-                    tags.update(set([ p.tag for p in spreds + lpreds ] + ['latest with name']))
+                    tags.update(set([ p.tag for p in spreds + lpreds ] + otags))
+                    for vals in [ p.vals for p in (spreds + lpreds) if p.vals ]:
+                        for v in vals:
+                            if hasattr(v, 'is_subquery'):
+                                tags.update(relevant_tags(v.path))
                 return tags
 
             tags = relevant_tags(path)
