@@ -1926,11 +1926,11 @@ class Application:
         if listas == None:
             listas = dict()
 
-        prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid']))
+        prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner']))
         if len(prohibited) > 0:
             raise BadRequest(self, 'Use of %s as list tag alias is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
-        prohibited = set(listas.iterkeys()).intersection(set(['id', 'readok', 'writeok', 'txid']))
+        prohibited = set(listas.iterkeys()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner']))
         if len(prohibited) > 0:
             raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 

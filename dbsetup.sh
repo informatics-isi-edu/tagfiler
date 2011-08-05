@@ -548,15 +548,16 @@ CREATE FUNCTION
   resources_authzinfo ( roles text[], ignore_read_authz boolean = False ) RETURNS TABLE ( subject int8, txid int8, readok boolean, writeok boolean ) AS \$\$
   SELECT r.subject AS subject, 
          t.value AS txid,
+         o.value AS owner,
          bool_or(ru.value = ANY (\$1) OR o.value = ANY (\$1)) AS readok, 
          bool_or(wu.value = ANY (\$1) OR o.value = ANY (\$1)) AS writeok
   FROM resources r
   LEFT OUTER JOIN "_subject last tagged txid" t ON (r.subject = t.subject)
-  LEFT OUTER JOIN "_owner" o ON (r.subject = o.subject AND o.value = ANY (\$1))
+  LEFT OUTER JOIN "_owner" o ON (r.subject = o.subject)
   LEFT OUTER JOIN "_read users" ru ON (r.subject = ru.subject AND ru.value = ANY (\$1))
   LEFT OUTER JOIN "_write users" wu ON (r.subject = wu.subject AND wu.value = ANY (\$1))
-  WHERE \$2 or o.value IS NOT NULL OR ru.value IS NOT NULL
-  GROUP BY r.subject, txid
+  WHERE \$2 or o.value = ANY (\$1) OR ru.value IS NOT NULL
+  GROUP BY r.subject, txid, o.value
 \$\$ LANGUAGE SQL;
 EOF
 
