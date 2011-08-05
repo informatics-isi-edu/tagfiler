@@ -57,6 +57,22 @@ import struct
 
 render = None
 
+def downcast_value(dbtype, value):
+    if dbtype == 'int8':
+        value = int(value)
+    elif dbtype == 'float8':
+        value = float(value)
+    elif dbtype in [ 'date', 'timestamptz' ]:
+        if value == 'now':
+            value = datetime.datetime.now(pytz.timezone('UTC'))
+        elif type(value) == str:
+            value = dateutil.parser.parse(value)
+    elif dbtype == 'text':
+        value = '%s' % value
+    else:
+        pass
+    return value
+
 def myunicode(v):
     if type(v) == str:
         return unicode(v, 'utf8')
@@ -101,6 +117,20 @@ def db_dbquery(db, query, vars={}):
         # assume it is not an iterable result
         return myunicode(results)
     
+class Values:
+    """Simple helper class to build up a set of values and return keys suitable for web.db.query."""
+    def __init__(self):
+        self.va = []
+
+    def add(self, v, dbtype='text'):
+        i = len(self.va)
+        v = downcast_value(dbtype, v)
+        self.va.append(v)
+        return 'v%d' % i
+
+    def pack(self):
+        return dict([ ('v%d' % i, self.va[i]) for i in range(0, len(self.va)) ])
+
 class DbCache:
     """A little helper to share state between web requests."""
 
@@ -416,6 +446,8 @@ class Application:
                                     ('webauthn require', 'False') ]
 
         results = self.select_files_by_predlist(subjpreds=[pred],
+                                                tagdefs=Application.static_tagdefs,
+                                                typedefs=Application.static_typedefs,
                                                 listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged'],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
@@ -521,8 +553,8 @@ class Application:
                        ('version', 'int8', False, 'system', False),
                        ('latest with name', 'text', False, 'system', True),
                        ('_cfg_applet custom properties', 'text', True, 'subject', False),
-                       ('_cfg_applet tags', 'tagname', True, 'subject', False),
-                       ('_cfg_applet tags require', 'tagname', True, 'subject', False),
+                       ('_cfg_applet tags', 'tagdef', True, 'subject', False),
+                       ('_cfg_applet tags require', 'tagdef', True, 'subject', False),
                        ('_cfg_applet test log', 'text', False, 'subject', False),
                        ('_cfg_applet test properties', 'text', True, 'subject', False),
                        ('_cfg_bugs', 'text', False, 'subject', False),
@@ -535,8 +567,8 @@ class Application:
                        ('_cfg_client retry count', 'int8', False, 'subject', False),
                        ('_cfg_client upload chunks', 'empty', False, 'subject', False),
                        ('_cfg_contact', 'text', False, 'subject', False),
-                       ('_cfg_file list tags', 'tagname', True, 'subject', False),
-                       ('_cfg_file list tags write', 'tagname', True, 'subject', False),
+                       ('_cfg_file list tags', 'tagdef', True, 'subject', False),
+                       ('_cfg_file list tags write', 'tagdef', True, 'subject', False),
                        ('_cfg_file write users', 'rolepat', True, 'subject', False),
                        ('_cfg_help', 'text', False, 'subject', False),
                        ('_cfg_home', 'text', False, 'subject', False),
@@ -545,7 +577,7 @@ class Application:
                        ('_cfg_policy remappings', 'text', True, 'subject', False),
                        ('_cfg_store path', 'text', False, 'subject', False),
                        ('_cfg_subtitle', 'text', False, 'subject', False),
-                       ('_cfg_tag list tags', 'tagname', True, 'subject', False),
+                       ('_cfg_tag list tags', 'tagdef', True, 'subject', False),
                        ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
                        ('_cfg_template path', 'text', False, 'subject', False),
                        ('_cfg_webauthn home', 'text', False, 'subject', False),
@@ -564,6 +596,43 @@ class Application:
                                           tagwriters=[]))
 
     static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
+
+    static_typedefs = []
+    for prototype in [ ('empty', '', 'No Content', None, []),
+                       ('int8', 'int8', 'Integer', None, []),
+                       ('float8', 'float8', 'Floating point', None, []),
+                       ('date', 'date', 'Date', None, []),
+                       ('timestamptz', 'timestamptz', 'Date and time with timezone', None, []),
+                       ('text', 'text', 'Text', None, []),
+                       ('role', 'text', 'Role', None, []),
+                       ('rolepat', 'text', 'Role pattern', None, []),
+                       ('dtype', 'text', 'Dataset type', None, ['blank Dataset node for metadata-only',
+                                                                'file Named dataset for locally stored file',
+                                                                'url Named dataset for URL redirecting']),
+                       ('url', 'text', 'URL', None, []),
+                       ('id', 'int8', 'Subject ID or subquery', None, []),
+                       ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
+                                                                        'subject Subject authorization is observed',
+                                                                        'subjectowner Subject owner may access',
+                                                                        'tag Tag authorization is observed',
+                                                                        'tagorsubject Tag or subject authorization is sufficient',
+                                                                        'tagandsubject Tag and subject authorization are required',
+                                                                        'system No client can access']),
+                       ('type', 'text', 'Scalar value type', 'typedef', []),
+                       ('tagdef', 'text', 'Tag definition', 'tagdef', []),
+                       ('name', 'text', 'Subject name', 'latest with name', []),
+                       ('vname', 'text', 'Subject name@version', 'vname', []),
+                       ('view', 'text', 'View name', 'view', []),
+                       ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
+                                                                                   'page Standalone document']) ]:
+        typedef, dbtype, desc, tagref, enum = prototype
+        static_typedefs.append(web.Storage({'typedef' : typedef,
+                                            'typedef description' : desc,
+                                            'typedef dbtype' : dbtype,
+                                            'typedef tagref' : tagref,
+                                            'typedef values' : enum}))
+
+    static_typedefs = dict( [ (typedef.typedef, typedef) for typedef in static_typedefs ] )
 
     rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
@@ -779,7 +848,7 @@ class Application:
             type = results[0]
             dbtype = type['typedef dbtype']
             try:
-                key = self.downcast_value(dbtype, key)
+                key = downcast_value(dbtype, key)
             except:
                 raise BadRequest(self, data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
 
@@ -831,7 +900,7 @@ class Application:
         elif len(srcroles) > 1:
             raise Conflict(self, "Ambiguous remap rules encountered.")
 
-    def logfmt_old(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+    def logfmt_old(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
         parts = []
         if dataset:
             parts.append('dataset "%s"' % dataset)
@@ -841,21 +910,23 @@ class Application:
             parts.append('value "%s"' % value)
         if mode:
             parts.append('mode "%s"' % mode)
+        if txid:
+            parts.append('last changed "%s"' % txid)
 
         return ('%s ' % action) + ', '.join(parts)
 
     def lograw(self, msg):
         logger.info(msg)
 
-    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
+    def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
         return '%s%s req=%s -- %s' % (web.ctx.ip, self.authn.role and ' user=%s' % urlquote(self.authn.role) or '', 
-                                      self.request_guid, self.logfmt_old(action, dataset, tag, mode, user, value))
+                                      self.request_guid, self.logfmt_old(action, dataset, tag, mode, user, value, txid))
 
-    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
-        self.lograw(self.logfmt(action, dataset, tag, mode, user, value))
+    def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
+        self.lograw(self.logfmt(action, dataset, tag, mode, user, value, txid))
 
-    def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None):
-        self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value))
+    def txlog(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
+        self.logmsgs.append(self.logfmt(action, dataset, tag, mode, user, value, txid))
 
     def set_authn(self, authn):
         if not hasattr(self, 'authn'):
@@ -1325,7 +1396,7 @@ class Application:
                     key, desc = val.split(" ", 1)
                     key = urlunquote(key)
                     dbtype = res['typedef dbtype']
-                    key = self.downcast_value(dbtype, key)
+                    key = downcast_value(dbtype, key)
                     vals.append( (key, desc) )
                 res['typedef values'] = dict(vals)
             return res
@@ -1334,7 +1405,7 @@ class Application:
         else:
             subjpreds = [ web.Storage(tag='typedef', op=None, vals=[]) ]
         listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values', 'typedef tagref' ]
-        return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags) ]
+        return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs) ]
 
     def select_file_members(self, subject, membertag='vcontains'):
         # return the children of the dataset as referenced by its membertag, e.g. vcontains or contains
@@ -1437,7 +1508,7 @@ class Application:
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
 
@@ -1712,7 +1783,7 @@ class Application:
 
             def convert(v):
                 try:
-                    return self.downcast_value(dbtype, v)
+                    return downcast_value(dbtype, v)
                 except:
                     raise BadRequest(self, data='The value "%s" cannot be converted to stored type "%s".' % (v, dbtype))
 
@@ -1823,18 +1894,324 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, assume_roles=False, listpreds=None, vprefix=''):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, rolekeys=None):
+        """Build SQL query expression and values map implementing path query.
 
-        #web.debug(subjpreds, listtags, ordertags, listas)
+           'path = []'    equivalent to path = [ ([], [], []) ]
+
+           'path[-1]'     describes final resulting type/structure... 
+                          of form [ web.storage{'id'=N, 'list tag 1'=val, 'list tag 2'=[val...]}... ]
+
+           'path[0:-1]'   contextually constraints set of subjects which can be matched by path[-1]
+
+           'path'         defaults to self.path if not supplied
+           'tagdefs'      defaults to self.globals['tagdefsdict'] if not supplied
+           'typedefs'     defaults to self.globals['typesdict'] if not supplied
+           'listas'       provides an optional relabeling of list tags (projected result attributes)
+
+           Optional args 'values' and 'rolekeys' are used for recursive calls, not client calls.
+        """
+        if path == None:
+            path = self.path
+
+        if not path:
+            path = [ ( [], [], [] ) ]
+
+        if tagdefs == None:
+            tagdefs = self.globals['tagdefsdict']
+
+        if typedefs == None:
+            typedefs = self.globals['typesdict']
 
         if listas == None:
             listas = dict()
 
+        prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid']))
+        if len(prohibited) > 0:
+            raise BadRequest(self, 'Use of %s as list tag alias is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
+
+        prohibited = set(listas.iterkeys()).intersection(set(['id', 'readok', 'writeok', 'txid']))
+        if len(prohibited) > 0:
+            raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
+
+        def mergepreds(predlist):
+            """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
+
+               Resulting map has a key for each tag referenced in a
+               predicate, but drops op==None predicates. The keyed
+               list of predicates should then be compiled into a
+               conjunction of value constraints on that tag.
+            """
+            pd = dict()
+            for pred in [ p for p in predlist ]:
+                pl = pd.get(pred.tag, [])
+                pd[pred.tag] = pl
+                pl.append(pred)
+            return pd
+        
+        def tag_query(tagdef, dbtype, preds, values, rolekeys, final=True, tprefix='_'):
+            """Compile preds for one tag into a query fetching all satisfactory triples.
+
+               Returns (tagdef, querystring, subject_wheres)
+                 -- tagdef is pass through for convenience
+                 -- querystring is compiled query
+                 -- subject_wheres is list of additional WHERE
+                    clauses, which caller should apply for subject
+                    queries; when non-empty, caller should use LEFT
+                    OUTER JOIN to combine querystring with resources
+                    table.
+
+               final=True means projection is one column per ltag.
+               final=False means projection is a single-column UNION of all ltags.
+
+               values is used to produce a query parameter mapping
+               with keys unique across a set of compiled queries.
+            """
+            typedef = typedefs[tagdef.typestr]
+            subject_wheres = []
+            
+            if final:
+                q = '(SELECT subject%(value)s FROM %(table)s %(where)s %(group)s) AS %(alias)s'
+            else:
+                q = 'SELECT subject%(value)s FROM %(table)s %(where)s %(group)s'
+
+            m = dict(value='', where='', group='', table=wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
+
+            wheres = []
+
+            valcol = 'value'
+            if tagdef.tagname == 'id':
+                m['table'] = 'resources'
+                m['value'] = ', subject AS value'
+                valcol = 'subject'
+            elif tagdef.multivalue and final:
+                m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
+                m['group'] = 'GROUP BY subject'
+            elif tagdef.typestr != 'empty':
+                m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
+
+            used_not_op = False
+            used_other_op = False
+            for pred in preds:
+                if pred.op == ':not:':
+                    used_not_op = True
+                else:
+                    used_other_op = True
+
+                if pred.op == 'IN':
+                    wheres.append( '%s IN (SELECT context FROM (%s) AS c)' % (valcol, pred.vals) )
+                elif pred.op != ":not:" and pred.op:
+                    if tagdef.typestr == 'empty':
+                        raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
+
+                    def vq_compile(ast):
+                        """Compile a querypath supplied as a predicate value into a SQL sub-query."""
+                        path = [ x for x in ast.path ]
+                        spreds, lpreds, otags = path[-1]
+                        lpreds = [ x for x in lpreds ]
+                        
+                        projtag = typedef['typedef tagref']
+                        if projtag:
+                            lpreds.append( web.Storage(tag=projtag, op=None, vals=[]) )
+                        elif tagdef.tagname == 'id':
+                            projtag = 'id'
+                        else:
+                            raise BadRequest(self, 'Subquery as predicate value not supported for tag "%s".' % tagdef.tagname)
+                        
+                        path[-1] = (spreds, lpreds, [])
+                        vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
+                        return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag), vq)
+                        
+                    constants = [ '$%s' % values.add(v, dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
+                    vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
+                    clauses = []
+                    if constants:
+                        constants = ', '.join(constants)
+                        clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, pred.op, constants, dbtype) )
+                    if vqueries:
+                        vqueries = ' UNION '.join(vqueries)
+                        clauses.append( '%s %s ANY (%s)' % (valcol, pred.op, vqueries) )
+                    wheres.append( ' OR '.join(clauses) )
+
+            if used_not_op:
+                # we need to enforce absence of (readable) triples
+                subject_wheres.append('%s.subject IS NULL' % wraptag(tagdef.tagname, prefix=tprefix))
+                if used_other_op:
+                    # we also need to enforce presence of (readable) triples! (will always be False)
+                    subject_wheres.append('%s.subject IS NOT NULL' % wraptag(tagdef.tagname, prefix=tprefix))
+                    
+            if enforce_read_authz:
+                if tagdef.readok == False:
+                    wheres = [ 'False' ]
+                elif tagdef.readpolicy == 'subjectowner':
+                    m['table'] += ' LEFT OUTER JOIN %s o USING (subject)' % wraptag('owner')
+                    wheres.append( 'o.value = ANY (ARRAY[%s]::text[])' % rolekeys )
+
+            w = ' AND '.join([ '(%s)' % w for w in wheres ])
+            if w:
+                m['where'] = 'WHERE ' + w
+
+            return (tagdef, q % m, subject_wheres)
+
+        def elem_query(spreds, lpreds, values, rolekeys, final=True):
+            """Compile a query finding subjects by spreds and projecting by lpreds.
+
+               final=True means projection is one column per ltag.
+               final=False means projection is a single-column UNION of all ltags.
+
+               values is used to produce a query parameter mapping
+               with keys unique across a set of compiled queries.
+            """
+            spreds = mergepreds(spreds)
+            lpreds = mergepreds(lpreds)
+
+            #web.debug(spreds, lpreds, listas)
+            subject_wheres = []
+
+            for tag, preds in lpreds.items():
+                if tag == 'id':
+                    if len([ p for p in preds if p.op]) != 0:
+                        raise BadRequest(self, 'Tag "id" cannot be filtered in a list-predicate.')
+                    del lpreds[tag]
+            
+            needed_tagdefs = [ tagdefs[tag] for tag in spreds.keys() + lpreds.keys() ]
+
+            inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
+            outer = [ ]
+
+            versions_test_added = []
+            if versions == 'latest':
+                subject_wheres.append( '%s.subject IS NULL OR %s.subject IS NOT NULL'
+                                       % (wraptag('name', prefix='s_'), wraptag('latest with name', prefix='s_')) )
+                for tag in ['name', 'latest with name']:
+                    if not spreds.has_key(tag):
+                        spreds[tag] = []
+                        versions_test_added.append(tag)
+
+            if final:
+                selects = ['resources.subject AS id',
+                           'resources.readok AS readok',
+                           'resources.writeok AS writeok',
+                           'resources.txid AS txid']
+            else:
+                selects = []
+
+            for tag, preds in spreds.items():
+                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, rolekeys, tprefix='s_')
+                if swheres or tag in versions_test_added:
+                    outer.append(sq)
+                    subject_wheres.extend(swheres)
+                else:
+                    inner.append(sq)
+
+            finals = []
+            for tag, preds in lpreds.items():
+                if spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final:
+                    # this projection does not further filter triples relative to the spred so optimize it away
+                    td = tagdefs[tag]
+                    lq = None
+                else:
+                    td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, rolekeys, final, tprefix='l_')
+                    if swheres:
+                        raise BadRequest(self, 'Operator ":not:" not supported in projection list predicates.')
+                if final:
+                    if lq:
+                        outer.append(lq)
+                        tprefix = 'l_'
+                    else:
+                        tprefix = 's_'
+                    if td.typestr != 'empty':
+                        selects.append('%s.value AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                    else:
+                        selects.append('%s.subject IS NOT NULL AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                else:
+                    finals.append(lq)
+
+            if not final:
+                outer.append( '(%s) AS context' % ' UNION '.join([ sq for sq in finals ]) )
+                selects.append('context.value AS context')
+
+            if subject_wheres:
+                where = 'WHERE ' + ' AND '.join([ '(%s)' % w for w in subject_wheres ])
+            else:
+                where = ''
+            q = ('SELECT %(selects)s FROM %(tables)s %(where)s' 
+                 % dict(selects=', '.join([ s for s in selects ]),
+                        tables=' LEFT OUTER JOIN ' \
+                            .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
+                                  + [ '%s USING (subject)' % o for o in outer ]),
+                        where=where))
+            return q
+
+        if not values:
+            values = Values()
+
+        if not rolekeys:
+            roles = [ r for r in self.authn.roles ]
+            roles.append('*')
+            roles = set(roles)
+            rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])
+
+        cq = None
+        order = None
+        for i in range(0, len(path)):
+            spreds, lpreds, otags = path[i]
+            if i > 0:
+                cpreds = path[i-1][1]
+                tagtypes = set([ tagdefs[pred.tag].typestr for pred in cpreds ])
+                tagrefs = set([ typedefs[t]['typedef tagref'] for t in tagtypes ])
+                if len(tagrefs) > 1:
+                    raise BadRequest(self, 'Path element %d has %d disjoint projection tag-references when at most 1 is supported.' % (i-1, len(tagrefs)))
+                elif len(tagrefs) == 1:
+                    context_attr = tagrefs.pop()
+                elif len(tagtypes) == 1:
+                    context_attr = dict(text='name', id='id')[tagtypes.pop()]
+                else:
+                    raise BadRequest(self, 'Path element %d has %d disjoint projection types when exactly 1 is required' % (i-1, len(tagtypes)))
+                spreds = [ p for p in spreds ]
+                spreds.append( web.storage(tag=context_attr, op='IN', vals=cq) )
+
+            if i == len(path) - 1:
+                lpreds = [ p for p in lpreds ]
+                lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag in otags ])
+                order_suffix = []
+                for tag in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
+                    if tag in set([p.tag for p in lpreds]):
+                        orderstmt = wraptag(listas.get(tag, tag), prefix='')
+                        if tag in [ 'modified' ]:
+                            orderstmt += ' DESC'
+                        else:
+                            orderstmt += ' ASC'
+                        orderstmt += ' NULLS LAST'
+                        order_suffix.append(orderstmt)
+                if otags != None and (len(otags) > 0 or len(order_suffix) > 0):
+                    order = ' ORDER BY %s' % ', '.join([ wraptag(listas.get(t, t), prefix='') for t in otags] + order_suffix)
+            cq = elem_query(spreds, lpreds, values, rolekeys, i==len(path)-1)
+
+        if order:
+            cq += order
+
+        if limit:
+            cq += ' LIMIT %d' % limit
+
         def dbquote(s):
             return s.replace("'", "''")
         
+        #web.debug(cq, values.pack())
+        #traceInChunks(cq)
+        #web.debug('values', values.pack())
+
+        return (cq, values.pack())
+
+
+    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, qd=0, versions='latest', listas=None, tagdefs=None, typedefs=None, enforce_read_authz=True, limit=None, listpreds=None, vprefix=''):
+        """Backwards compatibility interface, pass to general predlist path function."""
+
         if subjpreds == None:
             subjpreds = self.subjpreds
+
+        if id != None:
+            subjpreds.append( web.Storage(tag='id', op='=', vals=[id]) )
 
         if listpreds == None:
             if listtags == None:
@@ -1846,355 +2223,12 @@ class Application:
         else:
             listpreds = [ x for x in listpreds ]
 
-        if ordertags:
-            listpreds = listpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in ordertags ]
+        return self.build_files_by_predlist_path(path=[ (subjpreds, listpreds, ordertags) ], versions=versions, limit=limit, enforce_read_authz=enforce_read_authz, tagdefs=tagdefs, typedefs=typedefs, listas=listas)
 
-        for tag in [ 'id', 'owner' ]:
-            listpreds.append( web.Storage(tag=tag, op=None, vals=[]) )
 
-        listpredsdict = dict()
-        for pred in listpreds:
-            preds = listpredsdict.get(pred.tag, [])
-            listpredsdict[pred.tag] = preds + [ pred ]
+    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, typedefs=None, enforce_read_authz=True, limit=None, listpreds=None):
 
-        roles = [ r for r in self.authn.roles ]
-        roles.append('*')
-
-        if tagdefs == None:
-            tagdefs = self.globals['tagdefsdict']
-
-        tags_needed = set([ pred.tag for pred in subjpreds ])
-        tags_needed = tags_needed.union(set(listpredsdict.iterkeys()))
-        tagdefs_needed = []
-        for tagname in tags_needed:
-            try:
-                tagdefs_needed.append(tagdefs[tagname])
-            except KeyError:
-                #web.debug(tagname)
-                raise BadRequest(self, data='The tag "%s" is not defined on this server.' % tagname)
-
-        innertables = []  # (table, alias)
-        innertables_special = []
-        outer_prepend_owner = True
-        outertables = []
-        outertables_special = []
-        selects = ['subject AS subject', '_owner.value AS owner']
-        wheres = []
-        values = dict()
-
-        need_subjectowner_test = False
-
-        with_prefix = 'WITH rawroles (role) AS ( VALUES %s )' % ','.join(["('%s')" % dbquote(role) for role in roles] + [ '( NULL )'])
-        with_prefix += ', roles (role) AS ( SELECT role FROM rawroles WHERE role IS NOT NULL ) '
-
-        for p in range(0, len(subjpreds)):
-            pred = subjpreds[p]
-            tag = pred.tag
-            op = pred.op
-            vals = pred.vals
-            tagdef = tagdefs[tag]
-
-            if op == ':not:':
-                # not matches if tag column is null
-                if tag == 'id':
-                    raise Conflict(self, 'The "id" tag is bound for all catalog entries and is non-sensical to use with the :not: operator.')
-                outertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p) ))
-                if tagdef.readok == False and enforce_read_authz:
-                    # this tag cannot be read so act like it is absent
-                    wheres.append('True')
-                elif tagdef.readpolicy == 'subjectowner' and enforce_read_authz:
-                    # this tag rule is more restrictive than file or static checks already done
-                    # act like it is NULL if user isn't allowed to read this tag
-                    outertables_special.append( 'roles AS ownerrole_%d ON (_owner.value = ownerrole_%d.role)' % (p, p) )
-                    wheres.append('t%s%s.subject IS NULL OR (ownerrole_%d.role IS NULL)' % (vprefix, p, p))
-                else:
-                    # covers all cases where tag is more or equally permissive to file or static checks already done
-                    # e.g. read policy in [ 'subject', 'tagandsubject', 'tag', 'tagorsubject', 'anonymous' ]
-                    wheres.append('t%s%s.subject IS NULL' % (vprefix, p))
-            elif op == 'IN':
-                # special internal operation to restrict by sub-query, doesn't need to be sanity checked
-                if tag == 'id':
-                    wheres.append('subject IN (%s)' % (vals))
-                else:
-                    innertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p)))
-                    wheres.append('t%s%s.value IN (%s)' % (vprefix, p, vals))
-            else:
-                # all others match if and only if tag column is not null and we have read access
-                # ...and any value constraints are met
-                if tagdef.readok == False and enforce_read_authz:
-                    # this predicate is conjunctive with access denial
-                    wheres.append('False')
-                else:
-                    if tagdef.readpolicy == 'subjectowner' and enforce_read_authz:
-                        # this predicate is conjunctive with more restrictive access check, which we only need to add once
-                        need_subjectowner_test = True
-                    else:
-                        # covers all cases where tag is more or equally permissive to file or static checks already done
-                        # e.g. read policy in [ 'subject', 'tagandsubject', 'tag', 'tagorsubject', 'anonymous' ]
-                        pass
-                                    
-                    if tag != 'id':
-                        innertables.append((self.wraptag(tag), 't%s%s' % (vprefix, p)))
-
-                    if op and vals and len(vals) > 0:
-                        valpreds = []
-                        for v in range(0, len(vals)):
-                            if hasattr(vals[v], 'is_subquery'):
-                                typedef = self.globals['typesdict'][tagdef.typestr]
-                                if op != '=':
-                                    raise BadRequest(self, 'Operator "%s" not allowed with subquery for subject predicate values.' % op)
-                                
-                                sq_path = [ x for x in vals[v].path ]
-                                sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
-                                sq_listpreds = [ x for x in sq_listpreds ]
-                                
-                                if typedef['typedef tagref']:
-                                    # subquery needs to generate results by tagref tagname
-                                    sq_listpreds.append( web.Storage(tag=typedef['typedef tagref'], op=None, vals=[]) )
-                                    sq_project = typedef['typedef tagref']
-                                elif tagdef.tagname == 'id':
-                                    # subquery just needs to generate results w/ ID
-                                    sq_project = 'id'
-                                else:
-                                    raise BadRequest(self, 'Subquery predicate not supported for tag "%s".' % tagdef.tagname)
-                                
-                                sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
-                                q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sv%s_%s_%d__" % (vprefix, p, v, qd))
-                                sq = "SELECT DISTINCT \"%s\" FROM (%s) AS sq_%s%s_%s_%d" % (sq_project, q, vprefix, p, v, qd)
-                                values.update(qvs)
-                                if tag != 'id':
-                                    valpreds.append("t%s%s.value IN (%s)" % (vprefix, p, sq))
-                                else:
-                                    valpreds.append("subject IN (%s)" % (sq))
-                            else:
-                                if tag != 'id':
-                                    valpreds.append("t%s%s.value %s $val%s%s_%s_%d" % (vprefix, p, Application.opsDB[op], vprefix, p, v, qd))
-                                else:
-                                    valpreds.append("subject %s $val%s%s_%s_%d" % (Application.opsDB[op], vprefix, p, v, qd))
-                                values["val%s%s_%s_%d" % (vprefix, p, v, qd)] = vals[v]
-                        wheres.append(" OR ".join(valpreds))
-                    
-
-        outertables_special.append( 'roles AS readerrole ON ("_read users".value = readerrole.role)' )
-        if enforce_read_authz:
-            if need_subjectowner_test:
-                # at least one predicate test requires subjectowner-based read access rights
-                outer_prepend_owner = False # need to suppress normal placement of owner and get it before we use it
-                innertables.append( ( '_owner', None ) )
-                innertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
-            else:
-                outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
-
-            # all results are filtered by file read access rights
-            wheres.append('ownerrole.role IS NOT NULL OR readerrole.role IS NOT NULL')
-            # compute read access rights for later consumption
-            selects.append('bool_or(True) AS readok')
-        else:
-            # compute read access rights for later consumption
-            outertables_special.append( 'roles AS ownerrole ON (_owner.value = ownerrole.role)' )
-            selects.append('bool_or(ownerrole.role IS NOT NULL OR readerrole.role IS NOT NULL) AS readok')
-
-        if outer_prepend_owner:
-            outertables = [ ( '_owner', None ) ] + outertables
-
-        # compute file write access rights for later consumption
-        outertables_special.append( 'roles AS writerrole ON ("_write users".value = writerrole.role)' )
-        selects.append('bool_or(ownerrole.role IS NOT NULL OR writerrole.role IS NOT NULL) AS writeok')
-
-        # retain summary of ownership for later consumption by read-enforced tag projection
-        selects.append('bool_or(ownerrole.role IS NOT NULL) AS is_owner')
-
-        if id:
-            # special single-entry lookup
-            values['id_%s%d' % (vprefix, qd)] = id
-            wheres.append("subject = $id_%s%d" % (vprefix, qd))
-
-        # constrain to latest named files ONLY
-        if versions == 'latest':
-            outertables.append(('"_latest with name"', None))
-            outertables.append(('_name', None))
-            wheres.append('"_name".value IS NULL OR "_latest with name".value IS NOT NULL')
-
-        outertables = outertables \
-                      + [('"_read users"', None),
-                         ('"_write users"', None)]
-
-        # idempotent insertion of (table, alias)
-        joinset = set()
-        innertables2 = []
-        outertables2 = []
-
-        if len(innertables) == 0:
-            innertables.append( ('resources', None) ) # make sure we have at least one entry for 'subject'
-
-        for tablepair in innertables:
-            if tablepair not in joinset:
-                innertables2.append(tablepair)
-                joinset.add(tablepair)
-
-        for tablepair in outertables:
-            if tablepair not in joinset:
-                outertables2.append(tablepair)
-                joinset.add(tablepair)
-
-        def rewrite_tablepair(tablepair, suffix=''):
-            table, alias = tablepair
-            if alias:
-                table += ' AS %s' % alias
-            return table + suffix
-
-        innertables2 = [ rewrite_tablepair(innertables2[0]) ] \
-                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables2[1:] ] \
-                       + innertables_special
-        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables2 ] \
-                       + outertables_special
-
-        # this query produces a set of (subject, owner, readok, writeok, is_owner) rows that match the query result set
-        subject_query = 'SELECT %s' % ','.join(selects) \
-                        + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
-                        + ' WHERE %s' % ' AND '.join([ '(%s)' % where for where in wheres ]) \
-                        + ' GROUP BY subject, owner'
-
-        # now build the outer query that attaches listtags metadata to results
-        core_tags = dict(owner='subjects.owner',
-                         id='subjects.subject')
-        
-        selects = [ 'subjects.readok AS readok', 'subjects.writeok AS writeok', 'subjects.is_owner AS is_owner' ]
-        innertables = [('(%s)' % subject_query, 'subjects')]
-        outertables = []
-        groupbys = [ 'subjects.readok', 'subjects.writeok', 'subjects.is_owner' ]
-
-        def make_listwhere(t, vref, preds, tagdef):
-            listwheres = []
-            for p in range(0, len(preds)):
-                pred = preds[p]
-                if pred.op == ':not:':
-                    # non-sensical listpred cannot ever select a triple
-                    listwheres.append( 'False' )
-                elif pred.op == 'IN':
-                    # don't support this yet (or ever?)
-                    raise ValueError
-                elif pred.op and pred.vals:
-                    if tagdef.typestr == 'empty':
-                        raise BadRequest(self, 'Inappropriate operator "%s" for tag "%s".' % (pred.op, pred.tag))
-                    valpreds = []
-                    for v in range(0, len(pred.vals)):
-                        if hasattr(pred.vals[v], 'is_subquery'):
-                            typedef = self.globals['typesdict'][tagdef.typestr]
-                            if pred.op not in [ '=', 'IN' ]:
-                                raise BadRequest(self, 'Operator "%s" not allowed with subquery for list predicate values.' % op)
-                            
-                            sq_path = [ x for x in pred.vals[v].path ]
-                            sq_subjpreds, sq_listpreds, sq_ordertags = sq_path[-1]
-                            sq_listpreds = [ x for x in sq_listpreds ]
-                            
-                            if typedef['typedef tagref']:
-                                # subquery needs to generate results by tagref tagname
-                                sq_listpreds.append( web.Storage(tag=typedef['typedef tagref'], op=None, vals=[]) )
-                                sq_project = typedef['typedef tagref']
-                            elif tagdef.tagname == 'id':
-                                # subquery just needs to generate results w/ ID
-                                sq_project = 'id'
-                            else:
-                                raise BadRequest(self, 'Subquery predicate not supported for tag "%s".' % tagdef.tagname)
-
-                            sq_path[-1] = ( sq_subjpreds, sq_listpreds, sq_ordertags )
-                            q, qvs = self.build_files_by_predlist_path(path=sq_path, versions=versions, assume_roles=True, vprefix="%sp%s_%s_%d__" % (vprefix, p, v, qd))
-                            sq = "SELECT DISTINCT \"%s\" FROM (%s) AS sq_%s%s_%s_%d" % (sq_project, q, vprefix, p, v, qd)
-                            values.update(qvs)
-                            valpreds.append("%s IN (%s)" % (vref, sq))
-                        else:
-                            valpreds.append( '%s %s $listval_%s%s_%d_%d_%d' % (vref, Application.opsDB[pred.op], vprefix, t, p, v, qd) )
-                            values['listval_%s%s_%d_%d_%d' % (vprefix, t, p, v, qd)] = pred.vals[v]
-                    listwheres.append( ' OR '.join([ '(%s)' % valpred for valpred in valpreds ]) )
-                        
-            return ' AND '.join([ '(%s)' % listwhere for listwhere in listwheres])
-           
-        # build custom projection of matching subjects
-        listtags = [ t for t in listpredsdict.iterkeys() if t not in ['readok', 'writeok'] ]
-        for t in range(0, len(listtags)):
-            tag = listtags[t]
-            tagdef = tagdefs[tag]
-            preds = listpredsdict[tag]
-
-            if tagdef.multivalue:
-                listwhere = make_listwhere(t, '%s.value' % self.wraptag(tag), preds, tagdef)
-                if listwhere:
-                    listwhere = 'WHERE ' + listwhere
-
-                outertables.append(('(SELECT subject, array_agg(value) AS value FROM %s %s GROUP BY subject)' % (self.wraptag(tag), listwhere), self.wraptag(tag)))
-                expr = '%s.value' % self.wraptag(tag)
-                groupbys.append(expr)
-            else:
-                if tag not in core_tags:
-                    outertables.append((self.wraptag(tag), None))
-                if tagdef.typestr == 'empty':
-                    expr = '%s.subject' % self.wraptag(tag)
-                    groupbys.append(expr)
-                    expr += ' IS NOT NULL'
-                    listwhere = make_listwhere(t, None, preds, tagdef)
-                else:
-                    expr = core_tags.get(tag, '%s.value' % self.wraptag(tag))
-                    groupbys.append(expr)
-                    listwhere = make_listwhere(t, expr, preds, tagdef)
-
-                if listwhere:
-                    expr = 'CASE WHEN %s THEN %s ELSE NULL END' % (listwhere, expr)
-
-            if enforce_read_authz:
-                if tagdef.readok == False:
-                    expr = 'NULL'
-                elif tagdef.readok:
-                    # we can read this tag for any subject we can find
-                    pass
-                elif tagdef.readpolicy in [ 'subject', 'tagorsubject', 'tagandsubject' ]:
-                    # we can read this tag for any subject we can read
-                    # which is all subjects being read, when we are enforcing
-                    pass
-                elif tagdef.readpolicy == 'subjectowner':
-                    # need to condition read on subjectowner test
-                    expr = 'CASE WHEN subjects.is_owner THEN %s ELSE NULL END' % expr
-                else:
-                    raise RuntimeError(self, 'Unimplemented list-tags authorization scenario in query by predlist for tag "%s".', tagdef.tagname)
-                
-            selects.append('%s AS %s' % (expr, self.wraptag(listas.get(tag, tag), prefix='')))
-                
-        innertables2 = [ rewrite_tablepair(innertables[0]) ] \
-                       + [ rewrite_tablepair(table, ' USING (subject)') for table in innertables[1:] ]
-        outertables2 = [ rewrite_tablepair(table, ' USING (subject)') for table in outertables ]
-
-        # this query produces a set of (subject, owner, readok, writeok, other tags...) rows that match the query result set
-        value_query = 'SELECT %s' % ','.join(selects) \
-                        + ' FROM %s' % ' LEFT OUTER JOIN '.join([' JOIN '.join(innertables2)] + outertables2 ) \
-                        + ' GROUP BY %s' % ','.join(groupbys)
-
-        if not assume_roles:
-            value_query = with_prefix + value_query
-
-        # set up reasonable default sort order to use as minor sort criteria after major user-supplied ordering(s)
-        order_suffix = []
-        for tagname in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
-            if tagname in listpredsdict:
-                orderstmt = self.wraptag(listas.get(tagname, tagname), prefix='')
-                if tagname in [ 'modified' ]:
-                    orderstmt += ' DESC'
-                else:
-                    orderstmt += ' ASC'
-                orderstmt += ' NULLS LAST'
-                order_suffix.append(orderstmt)
-
-        if ordertags != None and (len(ordertags) > 0 or len(order_suffix) > 0):
-            value_query += " ORDER BY " + ", ".join([self.wraptag(listas.get(tag, tag), prefix='') for tag in ordertags] + order_suffix)
-
-        if limit:
-            value_query += ' LIMIT %d' % limit
-
-        #web.debug(value_query)
-        return (value_query, values)
-
-    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, version=None, versions='latest', listas=None, tagdefs=None, enforce_read_authz=True, limit=None, listpreds=None):
-
-        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit, listpreds=None)
+        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, version=version, versions=versions, listas=listas, tagdefs=tagdefs, typedefs=typedefs, enforce_read_authz=enforce_read_authz, limit=limit, listpreds=None)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -2206,68 +2240,70 @@ class Application:
         #    web.debug(r)
         return self.dbquery(query, vars=values)
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, vprefix='', assume_roles=False):
-        values = dict()
-        tagdefs = self.globals['tagdefsdict']
-        typedefs = self.globals['typesdict']
-        
-        def build_query_recursive(stack, qd, limit):
-            subjpreds, listpreds, ordertags = stack[0]
-            subjpreds = [ p for p in subjpreds ]
-            if len(stack) == 1:
-                # this query element is not contextualized
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=assume_roles or qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz, vprefix=vprefix)
-                values.update(v)
-                return q
-            else:
-                # this query element is contextualized
-                cstack = stack[1:]
-                csubjpreds, clistpreds, cordertags = cstack[0]
-                
-                if len(clistpreds) != 1:
-                    raise BadRequest(self, "Path context %d has ambiguous projection with %d elements." % (len(cstack)-1, len(clistpreds)))
-                projection = clistpreds[0].tag
-
-                tagref = typedefs[tagdefs[projection].typestr]['typedef tagref']
-                if tagref == None and tagdefs[projection].typestr not in [ 'text', 'id' ]:
-                    raise BadRequest(self, 'Projection tag "%s" does not have a valid type to be used as a file context.' % projection)
-                
-                if tagref != None:
-                    context_attr = tagref
-                else:
-                    context_attr = dict(text='name', id='id')[tagdefs[projection].typestr]
-                if tagdefs[projection].multivalue:
-                    projectclause = 'unnest("%s")' % projection
-                else:
-                    projectclause = '"%s"' % projection
-                    
-                cstack[0] = csubjpreds, clistpreds, None # don't bother sorting context more than necessary
-                cq = build_query_recursive(cstack, qd + 1, limit=None)
-                cq = "SELECT DISTINCT %s FROM (%s) AS context_%d" % (projectclause, cq, qd) # gives set of context values
-                
-                subjpreds.append( web.Storage(tag=context_attr, op='IN', vals=cq) )  # use special predicate IN with sub-query expression
-                q, v = self.build_select_files_by_predlist(subjpreds, ordertags, qd=qd, versions=versions, tagdefs=tagdefs, limit=limit, assume_roles=assume_roles or qd!=0, listpreds=listpreds, enforce_read_authz=enforce_read_authz, vprefix=vprefix)
-                values.update(v)
-                return q
-        
-        if path == None:
-            path = [ ([], [], []) ]
-
-        # query stack is path in reverse... final result element in front, projected context behind
-        stack = [ e for e in path ]
-        stack.reverse()
-
-        query = build_query_recursive(stack, qd=0, limit=limit)
-
-        #web.debug(query, values)
-        #traceInChunks(query)
-        #web.debug('values', values)
-        return (query, values)
-
     def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
         return self.dbquery(query, values)
 
+    def select_predlist_path_txid(self, path=None, prev_txid=None, versions='latest', limit=None, enforce_read_authz=True):
+        """Determine last-modified txid for query path dataset, optionally testing previous txid as shortcut.
+
+           The value prev_txid is trusted to be an accurate value, if it is provided.
+        """
+        if not path:
+            path = [ ( [], [], [] ) ]
+
+        def relevant_tags_txid(path):
+            """Find the most recent txid at which any relevant tag was updated."""
+            def relevant_tags(path):
+                """Find the relevant tags involved in computing a query path result."""
+                tags = set()
+                for elem in path:
+                    spreds, lpreds, otags = elem
+                    tags.update(set([ p.tag for p in spreds + lpreds ] + ['latest with name']))
+                return tags
+
+            tags = relevant_tags(path)
+            path = [ ( [ web.Storage(tag='tagdef', op='=', vals=[ t for t in tags ]) ],
+                       [ web.Storage(tag='tag last modified txid', op=None, vals=[]) ],
+                       [] ) ]
+            query, values = self.build_files_by_predlist_path(path)
+            query = 'SELECT max(txid) AS txid FROM (%s) AS sq' % query
+            return self.dbquery(query, vars=values)[0].txid
+
+        def subjects_txid(path):
+            """Find the most recent txid at which any subject was updated."""
+            spreds, lpreds, otags = path[-1]
+            path[-1] = (spreds, [], otags)
+            query, values = self.build_files_by_predlist_path(path, limit=limit)
+            query = 'SELECT max(txid) AS txid FROM (%s) AS sq' % query
+            return self.dbquery(query, vars=values)[0].txid
+
+        upper_bound = relevant_tags_txid(path)
+
+        if False:
+            # for debugging
+            better_bound = subjects_txid(path)
+            return web.Storage({'id' : prev_txid, 'tag last modified txid' : upper_bound, 'subject last tagged txid' : better_bound })
+
+        if prev_txid == None:
+            # use the cheapest, conservative guess if we don't have an existing value to work with
+            return upper_bound
+        elif prev_txid >= upper_bound:
+            # trust the existing value if it beats our upper bound
+            return prev_txid
+        else:
+            # compute the more expensive approximation
+            better_bound = subjects_txid(path)
+            if better_bound:
+                if prev_txid >= better_bound:
+                    # trust the existing value if it beats our better bound
+                    return prev_txid
+                else:
+                    # it is possible that the existing value is stale
+                    return better_bound
+            else:
+                # it is possible that the existing value is stale and better_bound is ill-defined
+                return upper_bound
     
     def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'default'], list_prefix=None, extra_tags=[]):
         """Prepare (path, listtags, writetags, limit, versions) from input path, web environment, and input policies.
