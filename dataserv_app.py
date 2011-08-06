@@ -1439,6 +1439,8 @@ class Application:
     def insert_file(self, name, version, file=None):
         newid = self.dbquery("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)
+        
+        self.set_tag_lastmodified(subject, self.globals['tagdefsdict']['id'])
 
         if version:
             self.set_tag(subject, self.globals['tagdefsdict']['version'], version)
@@ -1479,7 +1481,8 @@ class Application:
         results = self.dbquery('SELECT * FROM subjecttags WHERE subject = $subject', vars=dict(subject=subject.id))
         for result in results:
             self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.tagname])
-                
+        self.set_tag_lastmodified(None, self.globals['tagdefsdict']['id'])
+        
         query = 'DELETE FROM resources WHERE subject = $id'
         self.dbquery(query, vars=dict(id=subject.id))
 
@@ -2188,10 +2191,10 @@ class Application:
                 lpreds = [ p for p in lpreds ]
                 lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag in otags ])
                 order_suffix = []
-                for tag in ['modified', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
-                    if tag in set([p.tag for p in lpreds]):
+                for tag in ['txid', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
+                    if tag in set([p.tag for p in lpreds] + ['txid', 'id']):
                         orderstmt = wraptag(listas.get(tag, tag), prefix='')
-                        if tag in [ 'modified' ]:
+                        if tag in [ 'modified', 'txid', 'id' ]:
                             orderstmt += ' DESC'
                         else:
                             orderstmt += ' ASC'
@@ -2266,12 +2269,35 @@ class Application:
             path = [ ( [], [], [] ) ]
 
         def relevant_tags_txid(path):
-            """Find the most recent txid at which any relevant tag was updated."""
+            """Find the most recent txid at which any relevant tag was updated.
+
+               This test is a conservative upper bound, taking into
+               account result sets which could change due to changes in:
+
+               -- read authz affecting visible result members
+
+               -- tags affecting subject predicate sets
+
+               -- tags affecting list predicate sets
+
+               -- resource addition/deletion affecting unconstrained
+                  listings, handled via implicit usage of 'id' virtual
+                  tag in this case.
+
+               Unfortunately, adding or removing a subject will always
+               advance the txid in practice, because it always effects
+               the tag-last-modified time of the 'owner' tag if
+               nothing else.
+            """
+            
             def relevant_tags(path):
                 """Find the relevant tags involved in computing a query path result."""
                 tags = set(['owner', 'read users', 'latest with name'])
                 for elem in path:
                     spreds, lpreds, otags = elem
+                    if not spreds:
+                        # without tag constraints, we have an implicit result set defined by the resources table a.k.a. 'id' tag
+                        tags.add('id')
                     tags.update(set([ p.tag for p in spreds + lpreds ] + otags))
                     for vals in [ p.vals for p in (spreds + lpreds) if p.vals ]:
                         for v in vals:
@@ -2280,48 +2306,17 @@ class Application:
                 return tags
 
             tags = relevant_tags(path)
+            web.debug('relevant tags', tags)
+            
             path = [ ( [ web.Storage(tag='tagdef', op='=', vals=[ t for t in tags ]) ],
                        [ web.Storage(tag='tag last modified txid', op=None, vals=[]) ],
                        [] ) ]
             query, values = self.build_files_by_predlist_path(path)
-            query = 'SELECT max(txid) AS txid FROM (%s) AS sq' % query
+            query = 'SELECT max("tag last modified txid") AS txid FROM (%s) AS sq' % query
             return self.dbquery(query, vars=values)[0].txid
 
-        def subjects_txid(path):
-            """Find the most recent txid at which any subject was updated."""
-            spreds, lpreds, otags = path[-1]
-            path[-1] = (spreds, [], otags)
-            query, values = self.build_files_by_predlist_path(path, limit=limit)
-            query = 'SELECT max(txid) AS txid FROM (%s) AS sq' % query
-            return self.dbquery(query, vars=values)[0].txid
+        return relevant_tags_txid(path)
 
-        upper_bound = relevant_tags_txid(path)
-
-        if False:
-            # for debugging
-            better_bound = subjects_txid(path)
-            return web.Storage({'id' : prev_txid, 'tag last modified txid' : upper_bound, 'subject last tagged txid' : better_bound })
-
-        if prev_txid == None:
-            # use the cheapest, conservative guess if we don't have an existing value to work with
-            return upper_bound
-        elif prev_txid >= upper_bound:
-            # trust the existing value if it beats our upper bound
-            return prev_txid
-        else:
-            # compute the more expensive approximation
-            better_bound = subjects_txid(path)
-            if better_bound:
-                if prev_txid >= better_bound:
-                    # trust the existing value if it beats our better bound
-                    return prev_txid
-                else:
-                    # it is possible that the existing value is stale
-                    return better_bound
-            else:
-                # it is possible that the existing value is stale and better_bound is ill-defined
-                return upper_bound
-    
     def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'default'], list_prefix=None, extra_tags=[]):
         """Prepare (path, listtags, writetags, limit, versions) from input path, web environment, and input policies.
 
