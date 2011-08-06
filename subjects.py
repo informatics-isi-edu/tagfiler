@@ -250,18 +250,23 @@ class Subject (Application):
             return self.delete_postCommit(result)
         return self.dbtransact(body, postCommit)
 
-    def insertForStore_contentType(self):
+    def insertForStore_contentType(self, newfile):
         """Extension point for revising content-type metadata..."""
         if self.subject:
             return self.subject.get('content-type', None)
         else:
-            return None
+            return newfile.subject.get('content-type', None)
     
     def insertForStore(self, allow_blank=False, post_method=False):
         """Create or update a catalog subject w/ or w/o file body..."""
         content_type = None
         junk_files = []
 
+        newfile = web.Storage()
+        newfile.bytes = self.bytes
+        newfile.dtype = self.dtype
+        newfile.file = self.file
+        newfile.url = self.url
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         self.mergeSubjpredsTags = False
         status = web.ctx.status
@@ -284,60 +289,47 @@ class Subject (Application):
         if self.unique == False:
             # this is the case where we are using name/version semantics for files
             if self.subject:
-                self.version = self.subject.version + 1
-                self.name = self.subject.name
+                newfile.version = self.subject.version + 1
+                newfile.name = self.subject.name
             else:
-                self.version = 1
-                self.name = reduce(reduce_name_pred, self.path[-1][0] + [ web.Storage(tag='', op='', vals=[]) ] )
+                newfile.version = 1
+                newfile.name = reduce(reduce_name_pred, self.path[-1][0] + [ web.Storage(tag='', op='', vals=[]) ] )
         else:
-            self.name = None
-            self.version = None
+            newfile.name = None
+            newfile.version = None
 
         # determine content_type with extensible callout for subtypes
-        content_type = self.insertForStore_contentType()
+        content_type = self.insertForStore_contentType(newfile)
 
         if self.subject:
             if self.unique == False:
                 # this is the case where we create a new version of an existing named file
                 self.txlog('UPDATE', dataset=path_linearize(self.path))
-                self.id = self.insert_file(self.name, self.version, self.file)
+                newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
             elif self.unique:
                 # this is the case where we update an existing uniquely tagged file in place
                 self.txlog('UPDATE', dataset=path_linearize(self.path))
-                self.id = None
+                newfile.id = None
                 if self.subject.file:
                     junk_files.append(self.subject.file)
-                if self.file:
-                    self.set_tag(self.subject, self.globals['tagdefsdict']['file'], self.file)
+                if newfile.file:
+                    self.set_tag(self.subject, self.globals['tagdefsdict']['file'], newfile.file)
                 elif self.subject.file:
                     self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
             else:
                 # this is the case where we create a new blank node similar to an existing blank node
                 self.txlog('CREATE', dataset=path_linearize(self.path))
-                self.id = self.insert_file(self.name, self.version, self.file)
+                newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
         else:
             # anybody is free to insert new uniquely named file
             self.txlog('CREATE', dataset=path_linearize(self.path))
             #web.debug(self.file)
-            self.id = self.insert_file(self.name, self.version, self.file)
+            newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
 
-        if self.id != None:
-            newfile = web.Storage(id=self.id,
-                                  dtype=self.dtype,
-                                  name=self.name,
-                                  version=self.version,
-                                  bytes=self.bytes,
-                                  file=self.file,
-                                  owner=self.authn.role,
-                                  writeok=True,
-                                  url=self.url,
-                                  incomplete=False)
-
-        else:
-            # we are updating an existing (unique) object rather than inserting a new one
-            newfile = web.Storage(self.subject)
-            newfile.bytes = self.bytes
-            newfile.dtype = self.dtype
+        if newfile.id != None:
+            newfile.owner=self.authn.role
+            newfile.writeok=True
+            newfile.incomplete=False
         
         newfile['content-type'] = content_type
         
@@ -582,8 +574,8 @@ class Subject (Application):
             if junk_files:
                 self.deletePrevious(junk_files)
             view = ''
-            if self.dtype:
-                view = '?view=%s' % urlquote('%s' % self.dtype)
+            if self.subject.dtype:
+                view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             if web.ctx.env.get('HTTP_REFERER', None) != None:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
                 raise web.seeother(url)

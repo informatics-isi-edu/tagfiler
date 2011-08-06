@@ -392,12 +392,12 @@ class FileIO (Subject):
 
         return (boundary1, boundaryN)
 
-    def insertForStore_contentType(self):
+    def insertForStore_contentType(self, newfile):
         """For file bodies, try guessing content-type to refine choice..."""
-        tagged_content_type = Subject.insertForStore_contentType(self)
-        if self.bytes != None:
+        tagged_content_type = Subject.insertForStore_contentType(self, newfile)
+        if newfile.bytes != None:
             try:
-                filename = self.config['store path'] + '/' + self.file
+                filename = self.config['store path'] + '/' + newfile.file
                 p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                 line = p.stdout.readline()
                 guessed_content_type = line.strip()
@@ -407,7 +407,7 @@ class FileIO (Subject):
             content_type = choose_content_type(self.client_content_type,
                                                guessed_content_type,
                                                tagged_content_type,
-                                               name=self.name)
+                                               name=newfile.name)
             return content_type
         else:
             return tagged_content_type
@@ -572,8 +572,8 @@ class FileIO (Subject):
             if junk_files:
                 self.deletePrevious(junk_files)
             view = ''
-            if self.dtype:
-                view = '?view=%s' % urlquote('%s' % self.dtype)
+            if self.subject.dtype:
+                view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             if web.ctx.env.get('HTTP_REFERER', None) != None:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
                 raise web.seeother(url)

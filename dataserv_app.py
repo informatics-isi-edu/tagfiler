@@ -1131,6 +1131,9 @@ class Application:
                         raise BadRequest(self, data='Logical error: %s.' % str(te))
                     except TypeError, te:
                         t.rollback()
+                        et, ev, tb = sys.exc_info()
+                        web.debug('got exception "%s" during dbtransact' % str(ev),
+                                  traceback.format_exception(et, ev, tb))
                         raise RuntimeError(self, data=str(te))
                     except (psycopg2.IntegrityError, psycopg2.extensions.TransactionRollbackError), te:
                         t.rollback()
