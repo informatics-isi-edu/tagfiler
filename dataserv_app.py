@@ -1399,7 +1399,7 @@ class Application:
                     # tags weren't projected, so treat as 'id' as fallback
                     dtype = 'id'
 
-            if display_dtype == 'id':
+            if dtype == 'id':
                 datapred = 'id=%s' % subject.id
                 dataid = datapred
                 dataname = datapred
