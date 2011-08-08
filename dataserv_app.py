@@ -636,6 +636,58 @@ class Application:
 
     rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
+    def set_http_etag(self, txid):
+        """Set an ETag from txid as main version key.
+
+        """
+        etag = []
+        if 'Cookie' in self.http_vary:
+            etag.append( '%s' % self.authn.role )
+        else:
+            etag.append( '*' )
+            
+        if 'Accept' in self.http_vary:
+            etag.append( '%s' % web.ctx.env.get('HTTP_ACCEPT', '') )
+        else:
+            etag.append( '*' )
+
+        etag.append( '%s' % txid )
+
+        self.http_etag = '"%s"' % ';'.join(etag).replace('"', '\\"')
+
+    def http_is_cached(self):
+        """Determine whether a request is cached and the request can return 304 Not Modified.
+           Currently only considers ETags via HTTP "If-None-Match" header, if caller set self.http_etag.
+        """
+        def etag_parse(s):
+            strong = True
+            if s[0:2] == 'W/':
+                strong = False
+                s = s[2:]
+            return (s, strong)
+
+        def etags_parse(s):
+            etags = []
+            while s:
+                s = s.strip()
+                m = re.match('^,? *(?P<first>(W/)?"(.|\\")*")(?P<rest>.*)', s)
+                if m:
+                    g = m.groupdict()
+                    etags.append(etag_parse(g['first']))
+                    s = g['rest']
+                else:
+                    s = None
+            return dict(etags)
+        
+        client_etags = etags_parse( web.ctx.env.get('HTTP_IF_NONE_MATCH', ''))
+        
+        if client_etags.has_key('"*"'):
+            return True
+        if client_etags.has_key('%s' % self.http_etag):
+            return True
+
+        return False
+
     def __init__(self, parser=None):
         "store common configuration data for all service classes"
         global render
@@ -645,6 +697,7 @@ class Application:
             s = ''
 
         self.http_vary = set(['Cookie'])
+        self.http_etag = None
 
         self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
 
@@ -762,6 +815,8 @@ class Application:
         """Emit any automatic headers prior to body beginning."""
         if self.http_vary:
             web.header('Vary', ', '.join(self.http_vary))
+        if self.http_etag:
+            web.header('ETag', '%s' % self.http_etag)
 
     def validateSubjectQuery(self, query, tagdef=None, subject=None):
         if type(query) in [ int, long ]:
@@ -2320,7 +2375,7 @@ class Application:
                 return tags
 
             tags = relevant_tags(path)
-            web.debug('relevant tags', tags)
+            #web.debug('relevant tags', tags)
             
             path = [ ( [ web.Storage(tag='tagdef', op='=', vals=[ t for t in tags ]) ],
                        [ web.Storage(tag='tag last modified txid', op=None, vals=[]) ],

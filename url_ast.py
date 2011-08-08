@@ -1228,6 +1228,7 @@ class Query (Node):
             self.path[-1] = (self.subjpreds, listtags, ordertags)
 
         def body():
+            self.http_vary.add('Accept')
 
             path, self.listtags, writetags, self.limit, self.versions = \
                   self.prepare_path_query(self.path,
@@ -1237,34 +1238,44 @@ class Query (Node):
                                                        'write users', 'owner', 'modified', 'url' ]
                                           + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
-            txid = self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit)
-            self.txlog('QUERY', dataset=path_linearize(self.path), txid=txid)
+            self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))
+            cached = self.http_is_cached()
+            self.txlog('QUERY', dataset=path_linearize(self.path), txid=self.http_etag)
 
-            if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
-                try_default_view = True
+            if cached:
+                web.ctx.status = '304 Not Modified'
+                return None
             else:
-                try_default_view = False
+                if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
+                    try_default_view = True
+                else:
+                    try_default_view = False
 
-            files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
+                files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
 
-            if len(files) > 0:
-                subject = files[0]
-                datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
+                if len(files) > 0:
+                    subject = files[0]
+                    datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
 
-                if try_default_view and subject.dtype:
-                    view = self.select_view(subject.dtype)
-                    if view:
-                        if view['file list tags']:
-                            self.listtags = view['file list tags']
-                        if view['file list tags write']:
-                            writetags = view['file list tags write']
+                    if try_default_view and subject.dtype:
+                        view = self.select_view(subject.dtype)
+                        if view:
+                            if view['file list tags']:
+                                self.listtags = view['file list tags']
+                            if view['file list tags write']:
+                                writetags = view['file list tags write']
 
-            self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
-            self.globals['filelisttagswrite'] = writetags
+                self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
+                self.globals['filelisttagswrite'] = writetags
 
-            return files
+                return files
 
         def postCommit(files):
+            self.emit_headers()
+            if files == None:
+                # caching short cut
+                return
+            
             if self.versions == 'any':
                 self.showversions = True
             else:
@@ -1285,10 +1296,6 @@ class Query (Node):
                     except:
                         pass
                 return tagvals
-
-            self.setNoCache()
-            self.http_vary.add('Accept')
-            self.emit_headers()
 
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )
