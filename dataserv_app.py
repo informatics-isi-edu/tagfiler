@@ -1369,31 +1369,41 @@ class Application:
                 return dtype
 
     def subject2identifiers(self, subject, showversions=True):
-        dtype = self.classify_subject(subject)
-        # [ 'tagdef', 'typedef', 'config', 'view' ]
-        if dtype in  set([ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ]).difference(set(['file'])):
-            keyv = subject.get(dtype, None)
-            if self.globals['tagdefsdict'][dtype].multivalue:
-                keyv = keyv[0]
-            datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
-            dataid = datapred
-            dataname = '%s=%s' % (dtype, keyv)
-        else:
-            name = subject.get('name', None)
-            version = subject.get('version', None)
-            if name != None:
-                if version != None and showversions:
-                    datapred = 'name=%s;version=%s' % (urlquote(name), version) 
-                    dataid = datapred
-                    dataname = '%s;version=%s' % (name, version)
-                else:
-                    datapred = 'name=%s' % urlquote(name)
-                    dataid = datapred
-                    dataname = name
+        try:
+            # try to follow dtype from DB
+            dtype = subject.dtype
+        except:
+            dtype = self.classify_subject(subject)
+
+        name = subject.get('name', None)
+        version = subject.get('version', None)
+        if name != None:
+            if version != None and showversions:
+                datapred = 'name=%s;version=%s' % (urlquote(name), version) 
+                dataid = datapred
+                dataname = '%s;version=%s' % (name, version)
             else:
+                datapred = 'name=%s' % urlquote(name)
+                dataid = datapred
+                dataname = name
+        else:
+            if dtype not in [ 'url', 'file' ]:
+                keyv = subject.get(dtype, None)
+                if keyv:
+                    if self.globals['tagdefsdict'][dtype].multivalue:
+                        keyv = keyv[0]
+                    datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
+                    dataid = datapred
+                    dataname = '%s=%s' % (dtype, keyv)
+                else:
+                    # tags weren't projected, so treat as 'id' as fallback
+                    dtype = 'id'
+
+            if display_dtype == 'id':
                 datapred = 'id=%s' % subject.id
                 dataid = datapred
                 dataname = datapred
+
         return (datapred, dataid, dataname, dtype)
 
     def get_type(self, typename=None):
@@ -1938,11 +1948,11 @@ class Application:
         if listas == None:
             listas = dict()
 
-        prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner']))
+        prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner', 'dtype']))
         if len(prohibited) > 0:
             raise BadRequest(self, 'Use of %s as list tag alias is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
-        prohibited = set(listas.iterkeys()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner']))
+        prohibited = set(listas.iterkeys()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner', 'dtype']))
         if len(prohibited) > 0:
             raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
@@ -2102,6 +2112,7 @@ class Application:
 
             if final:
                 selects = ['resources.subject AS id',
+                           'resources.dtype AS dtype',
                            'resources.readok AS readok',
                            'resources.writeok AS writeok',
                            'resources.owner AS owner',
