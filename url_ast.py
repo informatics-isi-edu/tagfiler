@@ -339,28 +339,37 @@ class FileList (Node):
             self.globals['filelisttagswrite'] = writetags
             
             if self.globals['tagdefsdict'].has_key('list on homepage'):
-                self.subjpreds = [ web.Storage(tag='list on homepage', op=None, vals=[]) ]
+                subjpreds = [ web.Storage(tag='list on homepage', op=None, vals=[]) ]
                 self.homepage = True
             else:
-                self.subjpreds=[]
+                subjpreds=[]
                 self.homepage = False
 
-            if self.globals['tagdefsdict'].has_key('homepage order'):
+            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['Image Set', 'id',
+                                                                                                                     'name', 'version',
+                                                                                                                     'tagdef', 'typedef',
+                                                                                                                     'config', 'view', 'url'])) ]
+
+            if self.globals['tagdefsdict'].has_key('homepage order') and self.homepage:
                 ordertags = ['homepage order']
             else:
                 ordertags = []
 
-            return self.select_files_by_predlist(listtags=set(self.globals['filelisttags']).union(set(['Image Set', 'id',
-                                                                                                       'name', 'version',
-                                                                                                       'tagdef', 'typedef',
-                                                                                                       'config', 'view', 'url'])),
-                                                 ordertags=ordertags)
-
+            querypath = [ ( subjpreds, listpreds, ordertags ) ]
+            self.set_http_etag(self.select_predlist_path_txid(querypath))
+            if self.http_is_cached():
+                return None
+            else:
+                return self.select_files_by_predlist_path(querypath)
+        
         def postCommit(files):
             target = self.config['home'] + web.ctx.homepath
-            self.setNoCache()
+            if files == None:
+                web.ctx.status = '304 Not Modified'
             self.emit_headers()
-            if self.homepage:
+            if files == None:
+                return ''
+            elif self.homepage:
                 return self.renderlist(None,
                                        [self.render.Homepage(files)])
             else:
@@ -549,7 +558,6 @@ class Tagdef (Node):
             return (predefined, userdefined, types)
 
         def postCommit(defs):
-            self.setNoCache()
             self.emit_headers()
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
@@ -573,7 +581,6 @@ class Tagdef (Node):
         def postCommit(tagdef):
             try:
                 web.header('Content-Type', 'application/x-www-form-urlencoded')
-                self.setNoCache()
                 self.emit_headers()
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&readpolicy=' + urlquote(tagdef.readpolicy)
@@ -799,6 +806,10 @@ class FileTags (Node):
                                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
+        self.http_vary.add('Accept')
+        self.set_http_etag(self.select_predlist_path_txid(self.path_modified, versions=self.versions))
+        if self.http_is_cached():
+            return None, None, None
         
         if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
             try_default_view = True
@@ -832,6 +843,10 @@ class FileTags (Node):
     def get_postCommit(self, results):
         files, all, length = results
 
+        if files == None:
+            web.ctx.status = '304 Not Modified'
+            return ''
+
         jsonMungeTags = set( [ tagdef.tagname for tagdef in all if tagdef.typestr in jsonMungeTypes ] )
 
         def dictFile(file):
@@ -844,8 +859,6 @@ class FileTags (Node):
                     pass
             return tagvals
 
-        self.setNoCache()
-        self.http_vary.add('Accept')
         self.emit_headers()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
@@ -1244,7 +1257,7 @@ class Query (Node):
 
             if cached:
                 web.ctx.status = '304 Not Modified'
-                return None
+                return ''
             else:
                 if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
                     try_default_view = True
