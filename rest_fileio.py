@@ -187,7 +187,7 @@ class FileIO (Subject):
                         self.set_http_etag(max(txids))
                         if self.http_is_cached():
                             # signal cache hit
-                            web.debug('template cached')
+                            #web.debug('template cached')
                             return None, None, True
 
                         # compute and save results for each template query
