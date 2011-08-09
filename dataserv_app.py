@@ -1434,6 +1434,9 @@ class Application:
 
         name = subject.get('name', None)
         version = subject.get('version', None)
+        datapred = None
+        dataid = None
+        dataname = None
         if name != None:
             if version != None and showversions:
                 datapred = 'name=%s;version=%s' % (urlquote(name), version) 
