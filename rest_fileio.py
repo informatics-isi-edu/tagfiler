@@ -145,6 +145,7 @@ class FileIO (Subject):
 
         def body():
             Subject.get_body(self)
+            txids = [ self.path_txid ]
             # read authz implied by finding subject
             if self.subject.dtype == 'file':
                 filename = self.config['store path'] + '/' + self.subject.file
@@ -154,7 +155,6 @@ class FileIO (Subject):
                     if self.subject['template query']:
                         # execute each query specified as tags on this template file
                         resultsdict = {}
-                        txids = []
                         for tq in self.subject['template query']:
                             try:
                                 # interpolate query params into query string prior to evaluation
@@ -186,8 +186,7 @@ class FileIO (Subject):
 
                         self.set_http_etag(max(txids))
                         if self.http_is_cached():
-                            # signal cache hit
-                            #web.debug('template cached')
+                            # skip the template queries and render
                             return None, None, True
 
                         # compute and save results for each template query
@@ -201,10 +200,18 @@ class FileIO (Subject):
                         self.globals['template_query_results'] = resultsdict
                     else:
                         self.globals['template_query_results'] = None
+                        self.set_http_etag(max(txids))
+                        if self.http_is_cached():
+                            # skip the template render
+                            return None, None, True
                     # use the file as a web template
                     render = web.template.frender(filename, globals=self.globals)
                 else:
                     # use the file as raw bytes
+                    self.set_http_etag(max(txids))
+                    if self.http_is_cached():
+                        # skip the file handling
+                        return None, None, True
                     f = open(filename, "rb", 0)
                     if self.subject.get('content-type', None) == None:
                         p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
@@ -212,6 +219,10 @@ class FileIO (Subject):
                         self.subject['content-type'] = line.strip().split(' ', 1)[0]
                 return f, render, False
             else:
+                self.set_http_etag(max(txids))
+                if self.http_is_cached():
+                    # skip the redirect
+                    return None, None, True
                 return None, None, False
 
         def postCommit(results):

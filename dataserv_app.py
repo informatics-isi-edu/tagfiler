@@ -2331,7 +2331,7 @@ class Application:
         query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
         return self.dbquery(query, values)
 
-    def select_predlist_path_txid(self, path=None, prev_txid=None, versions='latest', limit=None, enforce_read_authz=True):
+    def select_predlist_path_txid(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         """Determine last-modified txid for query path dataset, optionally testing previous txid as shortcut.
 
            The value prev_txid is trusted to be an accurate value, if it is provided.

@@ -178,6 +178,7 @@ class Subject (Application):
         if post_method and self.unique == None:
             results = []
         else:
+            self.path_txid = self.select_predlist_path_txid(querypath, versions=self.versions, enforce_read_authz=enforce_read_authz)
             results = self.select_files_by_predlist_path(path=querypath, versions=self.versions, enforce_read_authz=enforce_read_authz)
 
         if len(results) == 0:
@@ -255,7 +256,7 @@ class Subject (Application):
         if self.subject:
             return self.subject.get('content-type', None)
         else:
-            return newfile.subject.get('content-type', None)
+            return newfile.get('content-type', None)
     
     def insertForStore(self, allow_blank=False, post_method=False):
         """Create or update a catalog subject w/ or w/o file body..."""
