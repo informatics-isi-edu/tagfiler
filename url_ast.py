@@ -805,12 +805,13 @@ class FileTags (Node):
                                         'write users', 'modified' ] 
                                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
-        self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
         self.http_vary.add('Accept')
         self.set_http_etag(self.select_predlist_path_txid(self.path_modified, versions=self.versions))
         if self.http_is_cached():
             return None, None, None
         
+        self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
+
         if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
             try_default_view = True
         else:
@@ -1253,12 +1254,12 @@ class Query (Node):
 
             self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))
             cached = self.http_is_cached()
-            self.txlog('QUERY', dataset=path_linearize(self.path), txid=self.http_etag)
 
             if cached:
                 web.ctx.status = '304 Not Modified'
-                return ''
+                return None
             else:
+                self.txlog('QUERY', dataset=path_linearize(self.path))
                 if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
                     try_default_view = True
                 else:

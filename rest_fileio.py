@@ -168,7 +168,6 @@ class FileIO (Subject):
                                 if type(ast) in [ int, long ]:
                                     pass
                                 elif hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                    self.txlog('QUERY', dataset=path_linearize(ast.path))
                                     txids.append(self.select_predlist_path_txid(ast.path))
                                 else:
                                     raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
@@ -193,7 +192,7 @@ class FileIO (Subject):
                         for item in resultsdict.items():
                             tq, ast = item
                             if hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                # query already logged above when we checked the cache
+                                self.txlog('QUERY', dataset=path_linearize(ast.path))
                                 resultsdict[tq] = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
                         
                         # put query results where template rendering pass can find them
