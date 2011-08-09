@@ -154,6 +154,7 @@ class FileIO (Subject):
                     if self.subject['template query']:
                         # execute each query specified as tags on this template file
                         resultsdict = {}
+                        txids = []
                         for tq in self.subject['template query']:
                             try:
                                 # interpolate query params into query string prior to evaluation
@@ -165,14 +166,14 @@ class FileIO (Subject):
                                 itq = tq % self.storage
                                 ast = self.url_parse_func(itq)
                                 if type(ast) in [ int, long ]:
-                                    result = ast
+                                    pass
                                 elif hasattr(ast, 'is_subquery') and ast.is_subquery:
                                     self.txlog('QUERY', dataset=path_linearize(ast.path))
-                                    result = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
+                                    txids.append(self.select_predlist_path_txid(ast.path))
                                 else:
                                     raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
                                                    % (self.subject2identifiers(self.subject)[2], tq))
-                                resultsdict[tq] = result
+                                resultsdict[tq] = ast
                             except (BadRequest), te:
                                 raise te
                             except (KeyError), te:
@@ -182,6 +183,20 @@ class FileIO (Subject):
                             #    et, ev, tb = sys.exc_info()
                             #    web.debug('got exception "%s" during template query evaluation' % str(ev),
                             #              traceback.format_exception(et, ev, tb))
+
+                        self.set_http_etag(max(txids))
+                        if self.http_is_cached():
+                            # signal cache hit
+                            web.debug('template cached')
+                            return None, None, True
+
+                        # compute and save results for each template query
+                        for item in resultsdict.items():
+                            tq, ast = item
+                            if hasattr(ast, 'is_subquery') and ast.is_subquery:
+                                # query already logged above when we checked the cache
+                                resultsdict[tq] = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
+                        
                         # put query results where template rendering pass can find them
                         self.globals['template_query_results'] = resultsdict
                     else:
@@ -195,14 +210,18 @@ class FileIO (Subject):
                         p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                         line = p.stdout.readline()
                         self.subject['content-type'] = line.strip().split(' ', 1)[0]
-                return f, render
+                return f, render, False
             else:
-                return None, None
+                return None, None, False
 
         def postCommit(results):
-            f, render = results
+            f, render, cached = results
             # if the dataset is a remote URL, just redirect client
-            if self.subject.dtype == 'url':
+            if cached:
+                web.ctx.status = '304 Not Modified'
+                self.emit_headers()
+                return results
+            elif self.subject.dtype == 'url':
                 opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
                 if len(opts) > 0:
                     querystr = '&'.join(opts)
@@ -215,23 +234,29 @@ class FileIO (Subject):
                 self.emit_headers()
                 raise web.seeother(self.subject.url + querystr)
             elif self.subject.dtype == 'file':
-                self.emit_headers()
-                return f, render
+                return results
             else:
                 # this emits headers for us
                 Subject.get_postCommit(self, f, sendBody)
+                return results
 
-        f, render = self.dbtransact(body, postCommit)
+        f, render, cached = self.dbtransact(body, postCommit)
+
+        if cached:
+            # short out here
+            return
 
         if render != None and self.subject['template mode'] == 'embedded':
             # render the template in the tagfiler GUI
             self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
+            self.emit_headers()
             for r in self.renderlist(None,
                                      [render()]):
                 yield r
             return
         elif render != None and self.subject['template mode'] == 'page':
             # render the template as a standalone page
+            self.emit_headers()
             yield render()
             return
 
@@ -320,6 +345,7 @@ class FileIO (Subject):
                     # range not satisfiable
                     web.ctx.status = '416 Requested Range Not Satisfiable'
                     web.header("Content-Range", "bytes */%s" % length)
+                    self.emit_headers()
                     return
                 elif len(rangeset) == 1:
                     # result is a single Content-Range body
@@ -329,6 +355,7 @@ class FileIO (Subject):
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+                    self.emit_headers()
                     for res in yieldBytes(f, first, last, self.config['chunk bytes']):
                         self.midDispatch()
                         yield res
@@ -338,6 +365,7 @@ class FileIO (Subject):
                                            random.randrange(0, 0xFFFFFFFFL),
                                            random.randrange(0, 0xFFFFFFFFL))
                     web.header('Content-Type', 'multipart/byteranges; boundary=%s' % boundary)
+                    self.emit_headers()
 
                     for r in range(0,len(rangeset)):
                         first, last = rangeset[r]
@@ -355,6 +383,7 @@ class FileIO (Subject):
                 web.header('Content-type', content_type)
                 web.header('Content-Length', length)
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+                self.emit_headers()
                 
                 for buf in yieldBytes(f, 0, length - 1, self.config['chunk bytes']):
                     self.midDispatch()
@@ -364,6 +393,7 @@ class FileIO (Subject):
             # we only send headers (for HTTP HEAD)
             web.header('Content-type', content_type)
             web.header('Content-Length', length)
+            self.emit_headers()
             pass
 
         f.close()

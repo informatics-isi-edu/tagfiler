@@ -654,6 +654,7 @@ class Application:
         etag.append( '%s' % txid )
 
         self.http_etag = '"%s"' % ';'.join(etag).replace('"', '\\"')
+        #web.debug(self.http_etag)
 
     def http_is_cached(self):
         """Determine whether a request is cached and the request can return 304 Not Modified.
@@ -680,6 +681,7 @@ class Application:
             return dict(etags)
         
         client_etags = etags_parse( web.ctx.env.get('HTTP_IF_NONE_MATCH', ''))
+        #web.debug(client_etags)
         
         if client_etags.has_key('"*"'):
             return True
