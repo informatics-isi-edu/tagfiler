@@ -120,13 +120,13 @@ class Subject (Application):
 
         def searchfunc():
             self.populate_subject(enforce_read_authz, allow_blank, allow_multiple, enforce_parent)
-            return self.subjects
+            return (self.subjects, self.path_txid)
 
         subjpreds, listpreds, ordertags = self.path[-1]
         self.unique = self.validate_subjpreds_unique(acceptName=True, subjpreds=subjpreds)
         
         if self.unique != None:
-            self.subjects = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.authn.role)
+            self.subjects, self.path_txid = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.authn.role)
             self.subject = self.subjects[0]
             self.datapred, self.dataid, self.dataname, self.dtype = self.subject2identifiers(self.subject)
         else:
