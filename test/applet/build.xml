@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Copyright 2010 University of Southern California
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<project name="DEI Applet Test" default="jar" basedir=".">
+	<property name="user.name" value="whoami"/>
+	<property name="host.name" value="localhost"/>
+	<property name="bin.dir" value="bin"/>
+	<property name="jar.dir" value="/home/${user.name}/.icedteaplugin/cache/https/${host.name}/tagfiler/static"/>
+	<property name="lib.dir" value="lib"/>
+	<property name="source.dir" value="src"/>
+	<property name="jar.name" value="TagfilerClient"/>
+
+	<target name="prepare">
+		  <delete dir="${bin.dir}" />
+		  <delete dir="${lib.dir}" />
+		  <mkdir dir="${bin.dir}"/>
+		  <mkdir dir="${lib.dir}"/>
+	</target>
+	<target name="build" depends="prepare">
+		<javac srcdir="${source.dir}" destdir="${bin.dir}" debug="true"
+			target="1.5">
+			<classpath>
+			  <fileset dir="${jar.dir}">
+			    <include name="**/*.jar"/>
+			  </fileset>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+	</target>
+	<target name="jar" depends="build">
+		<jar destfile="${lib.dir}/${jar.name}.jar"
+			basedir="${bin.dir}"/>
+	</target>
+</project>
