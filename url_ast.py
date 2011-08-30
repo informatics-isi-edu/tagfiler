@@ -1134,7 +1134,10 @@ class FileTags (Node):
                     tagvals[storage.tag] = vals
                     
             for tag, vals in tagvals.items():
-                listpreds.append( web.Storage(tag=tag, op='=', vals=vals) )
+                op = '='
+                if len(vals) == 0:
+                    op = None
+                listpreds.append( web.Storage(tag=tag, op=op, vals=vals) )
             try:
                 self.referer = storage.referer
             except:
