@@ -385,7 +385,24 @@ function setFiles(files) {
 		tree.style.height = node.style.height = node.clientHeight+'px';
 		hasSize = true;
 	}
-    document.getElementById("Files").innerHTML = files;
+	var names = files.split('<br/>');
+	names.sort(compareIgnoreCase);
+    document.getElementById("Files").innerHTML = names.join('<br/>');
+}
+
+/**
+ * Compares two strings lexicographically, ignoring case differences.
+ */
+function compareIgnoreCase(str1, str2) {
+	var val1 = str1.toLowerCase();
+	var val2 = str2.toLowerCase();
+	if (val1 == val2) {
+		return 0;
+	} else if (val1 < val2) {
+		return -1;
+	} else {
+		return 1;
+	}
 }
 
 /**
