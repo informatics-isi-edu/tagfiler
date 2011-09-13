@@ -1449,17 +1449,20 @@ class Application:
                 dataid = datapred
                 dataname = name
         else:
-            if dtype not in [ 'url', 'file' ]:
+            if dtype not in [ 'file', 'url' ]:
                 keyv = subject.get(dtype, None)
-                if keyv:
-                    if self.globals['tagdefsdict'][dtype].multivalue:
-                        keyv = keyv[0]
-                    datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
-                    dataid = datapred
-                    dataname = '%s=%s' % (dtype, keyv)
-                else:
-                    # tags weren't projected, so treat as 'id' as fallback
-                    dtype = 'id'
+            else:
+                keyv = None
+
+            if keyv:
+                if self.globals['tagdefsdict'][dtype].multivalue:
+                    keyv = keyv[0]
+                datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
+                dataid = datapred
+                dataname = '%s=%s' % (dtype, keyv)
+            else:
+                # tags weren't projected, so treat as 'id' as fallback
+                dtype = 'id'
 
             if dtype == 'id':
                 datapred = 'id=%s' % subject.id
