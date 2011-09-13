@@ -1050,7 +1050,7 @@ class FileTags (Node):
         self.subjects = [ res for res in results ]
 
         # find subfiles of all subjects which are tagged Image Set
-        path = [ ( self.subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
+        path = [ ( subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
                  ( [], [web.Storage(tag='id',op=None,vals=[])], [] ) ]
         self.subfiles = dict([ (res.id, res) for res in self.select_files_by_predlist_path(path=path) ])
 
