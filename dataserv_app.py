@@ -267,17 +267,19 @@ def parseBoolString(theString):
     else:
         return False
 
-def predlist_linearize(predlist, quotefunc=urlquote):
+def predlist_linearize(predlist, quotefunc=urlquote, sort=True):
     def pred_linearize(pred):
         vals = [ myunicode(quotefunc(val)) for val in pred.vals ]
-        vals.sort()
+        if sort:
+            vals.sort()
         vals = u','.join(vals)
         if pred.op:
             return myunicode(quotefunc(pred.tag)) + myunicode(pred.op) + vals
         else:
             return myunicode(quotefunc(pred.tag))
     predlist = [ pred_linearize(pred) for pred in predlist ]
-    predlist.sort()
+    if sort:
+        predlist.sort()
     return u';'.join(predlist)
 
 def path_linearize(path, quotefunc=urlquote):

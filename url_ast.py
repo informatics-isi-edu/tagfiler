@@ -1178,11 +1178,11 @@ class Query (Node):
                 if len(listpreds) == 1 and listpreds[0].tag in [ 'contains', 'vcontains' ] and listpreds[0].op == None:
                     listpart = ''
                 else:
-                    listpart = '(%s)' % predlist_linearize(listpreds)
+                    listpart = '(%s)' % predlist_linearize(listpreds, sort=False)
             else:
                 listpart = ''
 
-            qpath.append( predlist_linearize(subjpreds) + listpart )
+            qpath.append( predlist_linearize(subjpreds, sort=False) + listpart )
         return self.config['home'] + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
