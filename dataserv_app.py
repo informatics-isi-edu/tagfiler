@@ -1460,11 +1460,12 @@ class Application:
                 datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
                 dataid = datapred
                 dataname = '%s=%s' % (dtype, keyv)
+                effective_dtype = dtype
             else:
                 # tags weren't projected, so treat as 'id' as fallback
-                dtype = 'id'
+                effective_dtype = 'id'
 
-            if dtype == 'id':
+            if effective_dtype == 'id':
                 datapred = 'id=%s' % subject.id
                 dataid = datapred
                 dataname = datapred
