@@ -298,6 +298,7 @@ then
     cat > /etc/logrotate.d/${SVCPREFIX} <<EOF
 /var/log/${SVCPREFIX} {
     missingok
+    nocompress
     dateext
     daily
     rotate 31
