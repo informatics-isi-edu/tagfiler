@@ -131,7 +131,7 @@ cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 # need this for some of the RESTful URIs we can generate
 AllowEncodedSlashes On
 
-WSGIDaemonProcess ${SVCPREFIX} processes=32 threads=4 user=${SVCUSER}
+WSGIDaemonProcess ${SVCPREFIX} processes=32 threads=4 user=${SVCUSER} maximum-requests=200
 
 WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
@@ -289,6 +289,9 @@ else
     exec "\$@"
 fi
 EOF
+
+chmod a+x /usr/sbin/runuser-rsh
+
 
 if [[ -d /etc/logrotate.d/ ]]
 then
