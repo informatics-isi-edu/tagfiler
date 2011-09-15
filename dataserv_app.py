@@ -347,9 +347,9 @@ class WebException (web.HTTPError):
     def __init__(self, ast, status, data=u'', headers={}, desc=u'%s'):
         self.detail = urlquote(desc % data)
         #web.debug(self.detail, desc, data, desc % data)
-        if ast and ast.last_log_time:
+        if ast and ast.start_time:
             now = datetime.datetime.now(pytz.timezone('UTC'))
-            elapsed = '%d.%3.3d' % ( (now - ast.last_log_time).seconds, (now - ast.last_log_time).microseconds / 1000 )
+            elapsed = '%d.%3.3d' % ( (now - ast.start_time).seconds, (now - ast.start_time).microseconds / 1000 )
             ast.last_log_time = now
         else:
             elapsed = '-.---'
@@ -995,9 +995,9 @@ class Application:
         logger.info(msg)
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
-        if self.last_log_time:
+        if self.start_time:
             now = datetime.datetime.now(pytz.timezone('UTC'))
-            elapsed = '%d.%3.3d' % ( (now - self.last_log_time).seconds, (now - self.last_log_time).microseconds / 1000 )
+            elapsed = '%d.%3.3d' % ( (now - self.start_time).seconds, (now - self.start_time).microseconds / 1000 )
             self.last_log_time = now
         else:
             elapsed = '-.---'
