@@ -21,6 +21,8 @@ import os
 import traceback
 import itertools
 import urllib
+import datetime
+import pytz
 
 # Uncomment the below line in case of a RPM installation
 from tagfiler import url_lex, url_parse, dataserv_app
@@ -72,9 +74,13 @@ class Dispatcher:
             raise web.BadRequest()
 
     def METHOD(self, methodname):
+        start_time = datetime.datetime.now(pytz.timezone('UTC'))
+        
         uri, ast = self.prepareDispatch()
         if not hasattr(ast, methodname):
             raise web.NoMethod()
+        ast.start_time = start_time
+        ast.last_log_time = start_time
         ast.preDispatch(uri)
         astmethod = getattr(ast, methodname)
 
@@ -101,9 +107,11 @@ class Dispatcher:
 
         finally:
             # log after we force iterator, to flush any deferred transaction log messages
-            ast.lograw('%s%s req=%s (%s) %s %s://%s%s %s' % (web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
-                                                             ast and ast.request_guid or '', web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri,
-                                                             ast and ast.content_range and ('%s/%s' % ast.content_range) or ''))
+            end_time = datetime.datetime.now(pytz.timezone('UTC'))
+            ast.lograw('%d.%3.3ds %s%s req=%s (%s) %s %s://%s%s %s' % ((end_time - start_time).seconds, (end_time - start_time).microseconds / 1000, 
+                                                                         web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
+                                                                         ast and ast.request_guid or '', web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri,
+                                                                         ast and ast.content_range and ('%s/%s' % ast.content_range) or ''))
 
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         # return result

@@ -347,8 +347,15 @@ class WebException (web.HTTPError):
     def __init__(self, ast, status, data=u'', headers={}, desc=u'%s'):
         self.detail = urlquote(desc % data)
         #web.debug(self.detail, desc, data, desc % data)
-        logger.info(myutf8(u'%s%s req=%s -- %s' % (web.ctx.ip, ast and ast.authn and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
-                                                   ast and ast.request_guid or u'', desc % data)))
+        if ast and ast.last_log_time:
+            now = datetime.datetime.now(pytz.timezone('UTC'))
+            elapsed = '%d.%3.3d' % ( (now - ast.last_log_time).seconds, (now - ast.last_log_time).microseconds / 1000 )
+            ast.last_log_time = now
+        else:
+            elapsed = '-.---'
+        logger.info(myutf8(u'%ss %s%s req=%s -- %s' % (elapsed,
+                                                       web.ctx.ip, ast and ast.authn and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
+                                                       ast and ast.request_guid or u'', desc % data)))
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
@@ -701,6 +708,8 @@ class Application:
             s = ''
 
         self.content_range = None
+        self.last_log_time = 0
+        self.start_time = 0
 
         self.http_vary = set(['Cookie'])
         self.http_etag = None
@@ -986,7 +995,13 @@ class Application:
         logger.info(msg)
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
-        return '%s%s req=%s -- %s' % (web.ctx.ip, self.authn.role and ' user=%s' % urlquote(self.authn.role) or '', 
+        if self.last_log_time:
+            now = datetime.datetime.now(pytz.timezone('UTC'))
+            elapsed = '%d.%3.3d' % ( (now - self.last_log_time).seconds, (now - self.last_log_time).microseconds / 1000 )
+            self.last_log_time = now
+        else:
+            elapsed = '-.---'
+        return '%ss %s%s req=%s -- %s' % (elapsed, web.ctx.ip, self.authn.role and ' user=%s' % urlquote(self.authn.role) or '', 
                                       self.request_guid, self.logfmt_old(action, dataset, tag, mode, user, value, txid))
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
