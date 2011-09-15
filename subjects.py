@@ -537,7 +537,7 @@ class Subject (Application):
             return []
 
     def put_postWritePostCommit(self, junk_files):
-        if not self.content_range and junk_files:
+        if not self.partial_content and junk_files:
             self.deletePrevious(junk_files)
         uri = self.config['home'] + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
         web.header('Location', uri)
@@ -552,7 +552,7 @@ class Subject (Application):
     def PUT(self, uri, post_method=False):
         self.uri = uri
         """process file content PUT from client"""
-        cfirst, clast, clen, flen, self.content_range = self.put_prepareRequest()
+        cfirst, clast, clen, flen, self.partial_content = self.put_prepareRequest()
 
         result = self.dbtransact(lambda : self.put_preWriteBody(),
                                  lambda result : result)

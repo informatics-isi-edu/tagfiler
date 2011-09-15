@@ -700,6 +700,8 @@ class Application:
         def long2str(x):
             s = ''
 
+        self.content_range = None
+
         self.http_vary = set(['Cookie'])
         self.http_etag = None
 

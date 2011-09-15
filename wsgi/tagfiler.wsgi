@@ -101,8 +101,9 @@ class Dispatcher:
 
         finally:
             # log after we force iterator, to flush any deferred transaction log messages
-            ast.lograw('%s%s req=%s (%s) %s %s://%s%s' % (web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
-                                                          ast and ast.request_guid or '', web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri))
+            ast.lograw('%s%s req=%s (%s) %s %s://%s%s %s' % (web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
+                                                             ast and ast.request_guid or '', web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri,
+                                                             ast and ast.content_range and ('%s/%s' % ast.content_range) or ''))
 
         # ast.postDispatch(uri) # disable since preDispatch/midDispatch are sufficient
         # return result

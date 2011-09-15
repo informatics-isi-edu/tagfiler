@@ -363,6 +363,7 @@ class FileIO (Subject):
                     web.ctx.status = '206 Partial Content'
                     web.header('Content-Length', last - first + 1)
                     web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
+                    self.content_range = ( last - first, length )
                     web.header('Content-Type', content_type)
                     web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                     self.emit_headers()
@@ -377,8 +378,10 @@ class FileIO (Subject):
                     web.header('Content-Type', 'multipart/byteranges; boundary=%s' % boundary)
                     self.emit_headers()
 
+                    xmit_length = 0
                     for r in range(0,len(rangeset)):
                         first, last = rangeset[r]
+                        xmit_length += last - first
                         yield '\r\n--%s\r\nContent-type: %s\r\nContent-range: bytes %s-%s/%s\r\nContent-Disposition: attachment; filename="%s"\r\n\r\n' \
                               % (boundary, content_type, first, last, length, disposition_name)
                         for res in yieldBytes(f, first, last, self.config['chunk bytes']):
@@ -386,12 +389,14 @@ class FileIO (Subject):
                             yield res
                         if r == len(rangeset) - 1:
                             yield '\r\n--%s--\r\n' % boundary
-                    
+
+                    self.content_range = ( xmit_length, length )
             else:
                 # result is whole body
                 web.ctx.status = '200 OK'
                 web.header('Content-type', content_type)
                 web.header('Content-Length', length)
+                self.content_range = ( length, length )
                 web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 self.emit_headers()
                 
@@ -403,6 +408,7 @@ class FileIO (Subject):
             # we only send headers (for HTTP HEAD)
             web.header('Content-type', content_type)
             web.header('Content-Length', length)
+            self.content_range = ( 0, length )
             self.emit_headers()
             pass
 
@@ -487,6 +493,8 @@ class FileIO (Subject):
             f.seek(0,2)
             flen = f.tell()
 
+        self.content_range = ( bytes, flen )
+
         #web.debug('stored %d of %d bytes' %( bytes, flen))
         return (bytes, flen)
 
@@ -548,7 +556,7 @@ class FileIO (Subject):
     def PUT(self, uri, post_method=False):
         """store file content from client"""
         self.uri = uri
-        cfirst, clast, clen, flen, self.content_range = self.put_prepareRequest()
+        cfirst, clast, clen, flen, self.partial_content = self.put_prepareRequest()
 
         inf = web.ctx.env['wsgi.input']
         f = self.dbtransact(lambda : self.put_preWriteBody(post_method=post_method),
