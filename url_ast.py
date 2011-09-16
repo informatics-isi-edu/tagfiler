@@ -1168,6 +1168,7 @@ class Query (Node):
         self.queryopts = queryopts
         self.action = 'query'
         self.globals['view'] = None
+        #self.log('TRACE', 'Query() constructor exiting')
 
     def qtarget(self):
         qpath = []
@@ -1186,6 +1187,7 @@ class Query (Node):
         return self.config['home'] + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
+        #self.log('TRACE', value='Query::GET() entered')
         # this interface has both REST and form-based functions
         
         # test if user predicate equals a predicate from subjpreds
@@ -1245,6 +1247,7 @@ class Query (Node):
             self.path[-1] = (self.subjpreds, listtags, ordertags)
 
         def body():
+            #self.txlog('TRACE', value='Query::body entered')
             self.http_vary.add('Accept')
 
             path, self.listtags, writetags, self.limit, self.versions = \
@@ -1255,7 +1258,9 @@ class Query (Node):
                                                        'write users', 'owner', 'modified', 'url' ]
                                           + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
+            #self.txlog('TRACE', value='Query::body query prepared')
             self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))
+            #self.txlog('TRACE', value='Query::body txid computed')
             cached = self.http_is_cached()
 
             if cached:
@@ -1269,6 +1274,7 @@ class Query (Node):
                     try_default_view = False
 
                 files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
+                #self.txlog('TRACE', value='Query::body query returned')
 
                 if len(files) > 0:
                     subject = files[0]
@@ -1323,6 +1329,7 @@ class Query (Node):
                 else:
                     self.title = "Query by Tags"
 
+            #self.log('TRACE', value='Query::body postCommit dispatching on content type')
             if self.action == 'query':
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
@@ -1354,4 +1361,5 @@ class Query (Node):
         for res in self.dbtransact(body, postCommit):
             yield res
 
+        #self.log('TRACE', value='Query::GET exiting')
 

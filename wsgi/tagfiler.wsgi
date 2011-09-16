@@ -77,13 +77,14 @@ class Dispatcher:
         start_time = datetime.datetime.now(pytz.timezone('UTC'))
         
         uri, ast = self.prepareDispatch()
+        prepare_time = datetime.datetime.now(pytz.timezone('UTC'))
         if not hasattr(ast, methodname):
             raise web.NoMethod()
         ast.start_time = start_time
         ast.last_log_time = start_time
         ast.preDispatch(uri)
         astmethod = getattr(ast, methodname)
-
+        #ast.log('TRACE', value='Dispatcher::METHOD() after preDispatch')
         try:
 
             try:

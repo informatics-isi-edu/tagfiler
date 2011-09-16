@@ -709,7 +709,7 @@ class Application:
 
         self.content_range = None
         self.last_log_time = 0
-        self.start_time = 0
+        self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
 
         self.http_vary = set(['Cookie'])
         self.http_etag = None
@@ -751,9 +751,9 @@ class Application:
 
         # BEGIN: get runtime parameters from database
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
-
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
+        #self.log('TRACE', 'Application() constructor after static defaults')
 
         def fill_config():
             config = self.select_config()
@@ -762,6 +762,7 @@ class Application:
 
         # get full config
         self.config = config_cache.select(self.db, fill_config, self.authn.role, 'tagfiler')
+        #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
         
         #self.config = self.select_config()
@@ -813,6 +814,7 @@ class Application:
         self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
         
         # END: get runtime parameters from database
+        #self.log('TRACE', 'Application() config unpacked')
 
         try:
             def parsekv(kv):
@@ -825,6 +827,7 @@ class Application:
             self.storage = web.storage([ parsekv(kv.split('=', 1)) for kv in uri.split('?', 1)[1].replace(';', '&').split('&') ])
         except:
             self.storage = web.storage([]) 
+        #self.log('TRACE', 'Application() constructor exiting')
 
     def emit_headers(self):
         """Emit any automatic headers prior to body beginning."""
@@ -1044,9 +1047,16 @@ class Application:
         if self.globals['webauthnhome']:
             if not self.db:
                 self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-            self.set_authn(webauthn.session.test_and_update_session(self.db,
-                                                                    referer=self.config.home + uri,
-                                                                    setcookie=setcookie))
+            t = self.db.transaction()
+            try:
+                self.set_authn(webauthn.session.test_and_update_session(self.db,
+                                                                        referer=self.config.home + uri,
+                                                                        setcookie=setcookie))
+                t.commit()
+            except:
+                t.rollback()
+                raise
+
             self.middispatchtime = datetime.datetime.now()
             if not self.authn.role and self.globals['webauthnrequire']:
                 raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.config.home + uri))
@@ -1115,6 +1125,8 @@ class Application:
         if not self.db:
             self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
 
+        #self.log('TRACE', value='dbtransact() entered')
+
         try:
             count = 0
             limit = 8
@@ -1137,10 +1149,14 @@ class Application:
                                                typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role)],
                                                typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
                                                tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef(), self.authn.role) ]) )
+                        #self.log('TRACE', value='preparing needed_db_globals')
                         for key in self.needed_db_globals:
                             if not self.globals.has_key(key):
                                 self.globals[key] = db_globals_dict[key]()
+                                #self.log('TRACE', value='prepared %s' % key)
 
+                        #self.log('TRACE', 'needed_db_globals loaded')
+                        
                         def tagOptions(tagname, values=[]):
                             tagdef = self.globals['tagdefsdict'][tagname]
                             tagnames = self.globals['tagdefsdict'].keys()
@@ -1173,6 +1189,7 @@ class Application:
                             return options
 
                         self.globals['tagOptions'] = tagOptions
+                        #self.log('TRACE', 'dbtransact() tagOptions loaded')
 
                         # and set defaults if they weren't overridden by caller
                         for globalname, default in [ ('view', None),
@@ -1185,6 +1202,7 @@ class Application:
                             if not current:
                                 self.globals[globalname] = default
 
+                        #self.log('TRACE', 'dbtransact() all globals loaded')
                         bodyval = body()
                         t.commit()
                         break
@@ -2354,8 +2372,12 @@ class Application:
         return self.dbquery(query, vars=values)
 
     def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
+        #self.txlog('TRACE', value='select_files_by_predlist_path entered')
         query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
-        return self.dbquery(query, values)
+        #self.txlog('TRACE', value='select_files_by_predlist_path query built')
+        result = self.dbquery(query, values)
+        #self.txlog('TRACE', value='select_files_by_predlist_path exiting')
+        return result
 
     def select_predlist_path_txid(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
         """Determine last-modified txid for query path dataset, optionally testing previous txid as shortcut.
