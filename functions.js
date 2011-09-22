@@ -1119,3 +1119,113 @@ function dateFormat(date)
 }
 Calendar.prototype.dateFormat = dateFormat;	
 
+var tagSelectOptions = new Object();
+var typedefSelectValues = null;
+
+/**
+ * Compares two text options lexicographically, ignoring case differences.
+ */
+function compareOptions(option1, option2) {
+	var val1 = option1.text.toLowerCase();
+	var val2 = option2.text.toLowerCase();
+	return compareIgnoreCase(val1, val2)
+}
+
+function handleError(jqXHR, textStatus, errorThrown) {
+	var err = jqXHR.getResponseHeader('X-Error-Description');
+	alert(err != null ? decodeURIComponent(err) : jqXHR.responseText);
+}
+
+function initTypedefSelectValues(home) {
+	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			typedefSelectValues = new Array();
+			$.each(data, function(i, object) {
+				typedefSelectValues.push(object['typedef']);
+			});
+		},
+		error: handleError
+	});
+}
+
+function initTagSelectOptions(home, webauthnhome, typestr) {
+	if (typestr == 'role') {
+		url = webauthnhome + '/role';
+	} else if (typedefSelectValues.contains(typestr)) {
+		url = home + '/tags/typedef=' + encodeURIComponent(typestr) + '(' + encodeURIComponent('typedef values') + ')';
+	} else {
+		url = home + '/query/' + encodeURIComponent(typestr) + '(' + encodeURIComponent(typestr) + ')' + encodeURIComponent(typestr);
+	}
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			$.each(data, function(i, object) {
+				if (typestr == 'role') {
+					var option = new Object();
+					option.value = object;
+					option.text = object;
+					tagSelectOptions[typestr].push(option);
+				} else if (typedefSelectValues.contains(typestr)) {
+					$.each(object['typedef values'], function(j, item) {
+						var option = new Object();
+						var index = item.indexOf(' ');
+						if (index != -1) {
+							option.value = item.substring(0, index++);
+							option.text = decodeURIComponent(item.substring(0, index)) + '(' + item.substr(index) + ')';
+						} else {
+							option.value = item;
+							option.text = item;
+						}
+						tagSelectOptions[typestr].push(option);
+					});
+				} else {
+					var option = new Object();
+					option.value = object[typestr];
+					option.text = object[typestr];
+					tagSelectOptions[typestr].push(option);
+				}
+			});
+			//tagSelectOptions[typestr].sort(compareOptions);
+		},
+		error: handleError
+	});
+}
+
+function chooseOptions(home, webauthnhome, typestr, id) {
+	if (typedefSelectValues == null) {
+		initTypedefSelectValues(home);
+	}
+	var pattern = null;
+	if (typestr == 'rolepat') {
+		pattern = '*';
+		typestr = 'role'
+	}
+	if (tagSelectOptions[typestr] == null) {
+		tagSelectOptions[typestr] = new Array();
+		initTagSelectOptions(home, webauthnhome, typestr);
+	}
+	document.getElementById(id).removeAttribute('onclick');
+	var select = $(document.getElementById(id));
+	if (pattern != null) {
+		var option = $('<option>');
+		option.text(pattern);
+		option.attr('value', pattern);
+		select.append(option);
+	}
+	$.each(tagSelectOptions[typestr], function(i, value) {
+		var option = $('<option>');
+		option.text(value.text);
+		option.attr('value', value.value);
+		select.append(option);
+	});
+}

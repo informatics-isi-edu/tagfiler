@@ -32,7 +32,7 @@ $else:
 	<td>
 $if options:
 	$ options.sort(key=lambda x: x[0])
-	<select name="${name}" id="${tagname}_id" typestr="${typestr}"
+	<select name="${name}" id="${tagname}_id" onclick="chooseOptions('${home}', '${webauthnhome}', '${typestr}', '${tagname}_id')" typestr="${typestr}"
 	$if required:
 		required="${required}"
 	>
@@ -41,8 +41,6 @@ $if options:
 	$else:
 		$ article = 'a'
 	<option value="">Choose ${article} ${typename}</option>
-	$for option in options:
-		<option value="${option[0]}">${option[1]}</option>
 	</select>
 $else:
 	<input type="text" name="${name}"  id="${tagname}_id" typestr="${typestr}" 
