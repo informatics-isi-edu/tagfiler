@@ -454,7 +454,7 @@ class Application:
         results = self.select_files_by_predlist(subjpreds=[pred],
                                                 tagdefs=Application.static_tagdefs,
                                                 typedefs=Application.static_typedefs,
-                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged'],
+                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged', 'subject last tagged txid' ],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
         if len(results) == 1:
             config = results[0]
@@ -554,6 +554,7 @@ class Application:
                        ('owner', 'role', False, 'subjectowner', False),
                        ('modified', 'timestamptz', False, 'system', False),
                        ('subject last tagged', 'timestamptz', False, 'system', False),
+                       ('subject last tagged txid', 'int8', False, 'system', False),
                        ('tag last modified', 'timestamptz', False, 'system', False),
                        ('name', 'text', False, 'system', False),
                        ('version', 'int8', False, 'system', False),
@@ -2429,7 +2430,7 @@ class Application:
                        [] ) ]
             query, values = self.build_files_by_predlist_path(path)
             query = 'SELECT max("tag last modified txid") AS txid FROM (%s) AS sq' % query
-            return self.dbquery(query, vars=values)[0].txid
+            return max(self.dbquery(query, vars=values)[0].txid, self.config['subject last tagged txid'])
 
         return relevant_tags_txid(path)
 
