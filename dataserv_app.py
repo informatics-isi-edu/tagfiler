@@ -1148,7 +1148,7 @@ class Application:
 
                         # build up globals useful to almost all classes, to avoid redundant coding
                         # this is fragile to make things fast and simple
-                        db_globals_dict = dict(roleinfo=lambda : self.buildroleinfo(),
+                        db_globals_dict = dict(roleinfo=lambda : [],
                                                typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role)],
                                                typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
                                                tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef(), self.authn.role) ]) )
@@ -1166,18 +1166,11 @@ class Application:
                             type = self.globals['typesdict'][tagdef.typestr]
                             typevals = type['typedef values']
                             tagref = type['typedef tagref']
-                            roleinfo = self.globals['roleinfo']
 
                             if typevals:
                                 options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
                             elif tagdef.typestr in [ 'role', 'rolepat' ]:
-                                if roleinfo != None:
-                                    if tagdef.typestr == 'rolepat':
-                                        options = [ (role, role) for role in set(roleinfo).union(set(['*'])).difference(set(values)) ]
-                                    else:
-                                        options = [ (role, role) for role in set(roleinfo).difference(set(values)) ]
-                                else:
-                                    options = None
+                                options = None
                             elif tagref:
                                 if tagref in tagnames:
                                     options = [ (value, value) for value in
@@ -1295,14 +1288,6 @@ class Application:
 
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
-
-    def buildroleinfo(self):
-        if self.authn.roleProvider:
-            try:
-                roleinfo = [ role for role in self.authn.roleProvider.listRoles(self.db) ]
-                return roleinfo
-            except NotImplemented, AttributeError:
-                return None
 
     def validate_subjpreds_unique(self, acceptName=False, acceptBlank=False, restrictSchema=False, subjpreds=None):
         """Evaluate subjpreds (default self.subjpreds) for subject-identifying uniqueness.
