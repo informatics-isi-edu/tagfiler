@@ -666,6 +666,7 @@ cfgtagdef 'applet tags require'       text  ""      subject     subject       tr
 cfgtagdef 'applet custom properties'  text  ""      subject     subject       true
 cfgtagdef 'applet test log'           text  ""      subject     subject       false
 cfgtagdef 'applet test properties'    text  ""      subject     subject       true
+cfgtagdef 'system software'           text  ""      anonymous   system        false
 
 #      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
 

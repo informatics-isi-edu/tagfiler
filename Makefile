@@ -66,6 +66,7 @@ $(HOME)/.tagfiler.predeploy:
 
 deploy: $(HOME)/.tagfiler.predeploy install
 	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
+	./register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
@@ -77,6 +78,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
+	./register-software-version.sh $(INSTALLSVC)
 
 restart: force install
 	service httpd restart
