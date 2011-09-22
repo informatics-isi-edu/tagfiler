@@ -412,9 +412,6 @@ class RuntimeError (WebException):
         desc = u'The request execution encountered a runtime error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
-# BUG: use locking to avoid assumption that global interpreter lock protects us?
-configDataCache = dict()
-
 class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
