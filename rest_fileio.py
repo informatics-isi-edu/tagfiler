@@ -260,6 +260,7 @@ class FileIO (Subject):
             # render the template in the tagfiler GUI
             self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
             self.emit_headers()
+            self.header('Content-Type', 'text/html')
             for r in self.renderlist(None,
                                      [render()]):
                 yield r
@@ -267,6 +268,7 @@ class FileIO (Subject):
         elif render != None and self.subject['template mode'] == 'page':
             # render the template as a standalone page
             self.emit_headers()
+            self.header('Content-Type', 'text/html')
             yield render()
             return
 
@@ -299,7 +301,7 @@ class FileIO (Subject):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        #web.header('Content-Location', self.globals['homepath'] + '/file/%s@%d' % (urlquote(self.subject.name), self.subject.version))
+        #self.header('Content-Location', self.globals['homepath'] + '/file/%s@%d' % (urlquote(self.subject.name), self.subject.version))
         if sendBody:
 
             try:
@@ -354,18 +356,18 @@ class FileIO (Subject):
                 if len(rangeset) == 0:
                     # range not satisfiable
                     web.ctx.status = '416 Requested Range Not Satisfiable'
-                    web.header("Content-Range", "bytes */%s" % length)
+                    self.header("Content-Range", "bytes */%s" % length)
                     self.emit_headers()
                     return
                 elif len(rangeset) == 1:
                     # result is a single Content-Range body
                     first, last = rangeset[0]
                     web.ctx.status = '206 Partial Content'
-                    web.header('Content-Length', last - first + 1)
-                    web.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
+                    self.header('Content-Length', last - first + 1)
+                    self.header('Content-Range', "bytes %s-%s/%s" % (first, last, length))
                     self.content_range = ( last - first, length )
-                    web.header('Content-Type', content_type)
-                    web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+                    self.header('Content-Type', content_type)
+                    self.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                     self.emit_headers()
                     for res in yieldBytes(f, first, last, self.config['chunk bytes']):
                         self.midDispatch()
@@ -375,7 +377,7 @@ class FileIO (Subject):
                     boundary = "%s%s%s" % (random.randrange(0, 0xFFFFFFFFL),
                                            random.randrange(0, 0xFFFFFFFFL),
                                            random.randrange(0, 0xFFFFFFFFL))
-                    web.header('Content-Type', 'multipart/byteranges; boundary=%s' % boundary)
+                    self.header('Content-Type', 'multipart/byteranges; boundary=%s' % boundary)
                     self.emit_headers()
 
                     xmit_length = 0
@@ -394,11 +396,11 @@ class FileIO (Subject):
             else:
                 # result is whole body
                 web.ctx.status = '200 OK'
-                web.header('Content-type', content_type)
-                web.header('Content-Length', length)
-                self.content_range = ( length, length )
-                web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 self.emit_headers()
+                self.header('Content-type', content_type)
+                self.header('Content-Length', length)
+                self.content_range = ( length, length )
+                self.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
                 
                 for buf in yieldBytes(f, 0, length - 1, self.config['chunk bytes']):
                     self.midDispatch()
@@ -406,10 +408,10 @@ class FileIO (Subject):
 
         else: # not sendBody...
             # we only send headers (for HTTP HEAD)
-            web.header('Content-type', content_type)
-            web.header('Content-Length', length)
-            self.content_range = ( 0, length )
             self.emit_headers()
+            self.header('Content-type', content_type)
+            self.header('Content-Length', length)
+            self.content_range = ( 0, length )
             pass
 
         f.close()
@@ -617,6 +619,7 @@ class FileIO (Subject):
             return None
         
         def putPostCommit(junk_files):
+            self.emit_headers()
             if junk_files:
                 self.deletePrevious(junk_files)
             view = ''
@@ -627,7 +630,7 @@ class FileIO (Subject):
                 raise web.seeother(url)
             else:
                 url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
-                web.header('Location', uri)
+                self.header('Location', uri)
                 web.ctx.status = '204 No Content'
                 return ''
 
@@ -718,15 +721,15 @@ class LogFileIO (FileIO):
 
             web.ctx.status = '200 OK'
             if disposition_name:
-                web.header('Content-type', "text/plain")
-                web.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-                web.header('Content-Length', length)
+                self.header('Content-type', "text/plain")
+                self.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
+                self.header('Content-Length', length)
             else:
                 pollmins = 1
                 top = "<pre>"
                 bottom = "</pre>"
-                web.header('Content-type', "text/html")
-                web.header('Content-Length', len(top) + length + len(bottom))
+                self.header('Content-type', "text/html")
+                self.header('Content-Length', len(top) + length + len(bottom))
                     
             if sendBody:
                 if not disposition_name:

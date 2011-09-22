@@ -540,7 +540,7 @@ class Subject (Application):
         if not self.partial_content and junk_files:
             self.deletePrevious(junk_files)
         uri = self.config['home'] + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
-        web.header('Location', uri)
+        self.header('Location', uri)
         if self.subject_prewrite == None or self.subject.id != self.subject_prewrite.id:
             web.ctx.status = '201 Created'
             res = uri + '\n'
@@ -582,7 +582,7 @@ class Subject (Application):
                 raise web.seeother(url)
             else:
                 url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
-                web.header('Location', url)
+                self.header('Location', url)
                 web.ctx.status = '201 Created'
                 return '%s\n' % url
 

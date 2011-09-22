@@ -709,6 +709,7 @@ class Application:
         self.last_log_time = 0
         self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
 
+        self.emitted_headers = dict()
         self.http_vary = set(['Cookie'])
         self.http_etag = None
 
@@ -827,12 +828,16 @@ class Application:
             self.storage = web.storage([]) 
         #self.log('TRACE', 'Application() constructor exiting')
 
+    def header(self, name, value):
+        web.header(name, value)
+        self.emitted_headers[name.lower()] = value
+
     def emit_headers(self):
         """Emit any automatic headers prior to body beginning."""
         if self.http_vary:
-            web.header('Vary', ', '.join(self.http_vary))
+            self.header('Vary', ', '.join(self.http_vary))
         if self.http_etag:
-            web.header('ETag', '%s' % self.http_etag)
+            self.header('ETag', '%s' % self.http_etag)
 
     def validateSubjectQuery(self, query, tagdef=None, subject=None):
         if type(query) in [ int, long ]:
@@ -1101,8 +1106,8 @@ class Application:
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))
         now_rfc1123 = now.strftime(Application.rfc1123)
-        web.header('Cache-control', 'no-cache')
-        web.header('Expires', now_rfc1123)
+        self.header('Cache-control', 'no-cache')
+        self.header('Expires', now_rfc1123)
 
     def logException(self, context=None):
         if context == None:

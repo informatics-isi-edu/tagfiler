@@ -102,8 +102,9 @@ class TransmitNumber (Node):
 
         def postCommit(results):
             uri = self.config['home'] + '/transmitnumber/' + results
-            web.header('Location', results)
             self.emit_headers()
+            self.header('Location', results)
+            self.header('Content-Type', 'text/plain')
             return results
 
         self.storage = web.input()
@@ -200,10 +201,12 @@ class Study (Node):
         def postCommit(files):
             self.emit_headers()
             if self.action == 'upload':
+                self.header('Content-Type', 'text/html')
                 return self.renderlist("Study Upload",
                                        [self.render.TreeUpload()])
             elif self.action == 'download':
                 self.globals['version'] = self.version
+                self.header('Content-Type', 'text/html')
                 return self.renderlist("Study Download",
                                        [self.render.TreeDownload(self.name)])
             elif self.action == 'get':
@@ -218,6 +221,7 @@ class Study (Node):
     
                 if self.name:
                     self.globals['version'] = self.version
+                    self.header('Content-Type', 'text/html')
                     return self.renderlist(None,
                                            [self.render.TreeStatus(self.name, self.direction, success, error, files)])
                 else:
@@ -273,6 +277,7 @@ class Study (Node):
         def postCommit(result):
             if not result:
                 raise Conflict(self, 'The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.name))
+            return ''
 
         return self.dbtransact(body, postCommit)
 
@@ -370,9 +375,11 @@ class FileList (Node):
             if files == None:
                 return ''
             elif self.homepage:
+                self.header('Content-Type', 'text/html')
                 return self.renderlist(None,
                                        [self.render.Homepage(files)])
             else:
+                self.header('Content-Type', 'text/html')
                 return self.renderlist(None,
                                        [self.render.Commands(),
                                         self.render.FileList(files)])
@@ -415,6 +422,7 @@ class FileList (Node):
                 def body():
                     return None
                 def postCommit(ignore):
+                    self.header('Content-Type', 'text/html')
                     return self.renderlist("Define a dataset",
                                            [self.render.NameForm()])
                 return self.dbtransact(body, postCommit)
@@ -454,15 +462,18 @@ class LogList (Node):
         
         target = self.config['home'] + web.ctx.homepath
         
+        self.http_vary.add('Accept')
+        self.emit_headers()
+
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
                 # return raw results for REST client
+                self.header('Content-Type', 'text/uri-list')
                 return self.render.LogUriList(lognames)
             elif acceptType == 'text/html':
                 break
 
-        self.http_vary.add('Accept')
-        self.emit_headers()
+        self.header('Content-Type', 'text/html')
         return self.renderlist("Archived logs",
                                [self.render.LogList(lognames)])
 
@@ -479,6 +490,7 @@ class Contact (Node):
         
         self.setNoCache()
         self.emit_headers()
+        self.header('Content-Type', 'text/html')
         return self.renderlist("Contact Us",
                                [self.render.Contact()])
 
@@ -559,6 +571,7 @@ class Tagdef (Node):
 
         def postCommit(defs):
             self.emit_headers()
+            self.header('Content-Type', 'text/html')
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
             return self.renderlist("Tag definitions",
@@ -580,8 +593,8 @@ class Tagdef (Node):
 
         def postCommit(tagdef):
             try:
-                web.header('Content-Type', 'application/x-www-form-urlencoded')
                 self.emit_headers()
+                self.header('Content-Type', 'application/x-www-form-urlencoded')
                 return ('typestr=' + urlquote(tagdef.typestr) 
                         + '&readpolicy=' + urlquote(tagdef.readpolicy)
                         + '&writepolicy=' + urlquote(tagdef.writepolicy)
@@ -606,6 +619,7 @@ class Tagdef (Node):
             return ''
 
         def postCommit(results):
+            self.emit_headers()
             return ''
 
         if len(self.queryopts) > 0:
@@ -750,6 +764,8 @@ class Tagdef (Node):
             if self.action == 'delete':
                 self.globals['name'] = self.tag_id
                 self.globals['version'] = None
+                self.emit_headers()
+                self.header('Content-Type', 'text/html')
                 return self.renderlist("Delete Confirmation",
                                        [self.render.ConfirmForm('tagdef')])
             else:
@@ -863,11 +879,11 @@ class FileTags (Node):
         self.emit_headers()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
-                web.header('Content-Type', 'text/uri-list')
+                self.header('Content-Type', 'text/uri-list')
                 self.globals['str'] = str 
                 return self.render.FileTagUriList(files, all)
             elif acceptType == 'application/x-www-form-urlencoded' and len(files) == 1:
-                web.header('Content-Type', 'application/x-www-form-urlencoded')
+                self.header('Content-Type', 'application/x-www-form-urlencoded')
                 body = []
                 file = files[0]
                 for tagdef in all:
@@ -881,10 +897,10 @@ class FileTags (Node):
                             body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 return '&'.join(body)
             elif acceptType == 'application/json':
-                web.header('Content-Type', 'application/json')
+                self.header('Content-Type', 'application/json')
                 return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
             elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
-                web.header('Content-Type', 'text/plain')
+                self.header('Content-Type', 'text/plain')
                 val = files[0][self.listtags[0]]
                 if type(val) == list:
                     return '\n'.join(val) + '\n'
@@ -894,6 +910,7 @@ class FileTags (Node):
                 break
                 
         # render HTML result
+        self.header('Content-Type', 'text/html')
         if self.queryopts.get('values', None) == 'basic':
             self.globals['smartTagValues'] = False
 
@@ -993,6 +1010,7 @@ class FileTags (Node):
         return None
 
     def put_postCommit(self, results):
+        self.emit_headers()
         return ''
 
     def PUT(self, uri):
@@ -1099,6 +1117,7 @@ class FileTags (Node):
         return None
 
     def delete_postCommit(self, results):
+        self.emit_headers()
         return ''
 
     def DELETE(self, uri):
@@ -1334,9 +1353,11 @@ class Query (Node):
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
                         # return raw results for REST client
+                        self.header('Content-Type', 'text/uri-list')
                         yield self.render.FileUriList(files)
                         return
                     elif acceptType == 'application/json':
+                        self.header('Content-Type', 'application/json')
                         yield '['
                         if len(files) > 0:
                             yield jsonWriter(dictFile(files[0])) + '\n'
@@ -1347,11 +1368,13 @@ class Query (Node):
                         return
                     elif acceptType == 'text/html':
                         break
+                self.header('Content-Type', 'text/html')
                 for r in self.renderlist(self.title,
                                          [self.render.QueryViewStatic(Application.ops, self.subjpreds),
                                           self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
                     yield r
             else:
+                self.header('Content-Type', 'text/html')
                 for r in self.renderlist(self.title,
                                          [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
                                           self.render.QueryView(Application.ops, self.subjpreds),
