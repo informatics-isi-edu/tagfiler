@@ -1130,6 +1130,7 @@ function handleError(jqXHR, textStatus, errorThrown) {
 
 function initTypedefSelectValues(home) {
 	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)?limit=none';
+	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1141,13 +1142,16 @@ function initTypedefSelectValues(home) {
 			$.each(data, function(i, object) {
 				typedefSelectValues.push(object['typedef']);
 			});
+			success = true;
 		},
 		error: handleError
 	});
+	return success;
 }
 
 function initTypedefTagrefs(home) {
 	var url = home + '/query/' + encodeURIComponent('typedef tagref') + '(typedef;' + encodeURIComponent('typedef tagref') + ')?limit=none';
+	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1159,12 +1163,15 @@ function initTypedefTagrefs(home) {
 			$.each(data, function(i, object) {
 				typedefTagrefs[object['typedef']] = object['typedef tagref'];
 			});
+			success = true;
 		},
 		error: handleError
 	});
+	return success;
 }
 
 function initTagSelectOptions(home, webauthnhome, typestr) {
+	var success = false;
 	if (typestr == 'role') {
 		url = webauthnhome + '/role';
 	} else if (typedefSelectValues.contains(typestr)) {
@@ -1173,6 +1180,7 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 		url = home + '/query/' + encodeURIComponent(typedefTagrefs[typestr]) + '(' + encodeURIComponent(typedefTagrefs[typestr]) + ')' + encodeURIComponent(typedefTagrefs[typestr]) + '?limit=none';
 	} else {
 		alert('Invalid typestr: "' + typestr + '"');
+		return success;
 	}
 	$.ajax({
 		url: url,
@@ -1207,15 +1215,16 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 					tagSelectOptions[typestr].push(option);
 				}
 			});
+			success = true;
 		},
 		error: handleError
 	});
+	return success;
 }
 
 function chooseOptions(home, webauthnhome, typestr, id) {
-	if (typedefSelectValues == null) {
-		initTypedefSelectValues(home);
-		initTypedefTagrefs(home);
+	if (typedefSelectValues == null && (!initTypedefSelectValues(home) || !initTypedefTagrefs(home))) {
+		return;
 	}
 	var pattern = null;
 	if (typestr == 'rolepat') {
@@ -1224,7 +1233,9 @@ function chooseOptions(home, webauthnhome, typestr, id) {
 	}
 	if (tagSelectOptions[typestr] == null) {
 		tagSelectOptions[typestr] = new Array();
-		initTagSelectOptions(home, webauthnhome, typestr);
+		if (!initTagSelectOptions(home, webauthnhome, typestr)) {
+			delete tagSelectOptions[typestr];
+		}
 	}
 	document.getElementById(id).removeAttribute('onclick');
 	var select = $(document.getElementById(id));
@@ -1246,6 +1257,7 @@ var typedefTags = null;
 
 function initTypedefTags(home) {
 	var url = home + '/query/typedef(typedef;' + encodeURIComponent('typedef description') + ')' + encodeURIComponent('typedef description') + '?limit=none';
+	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1257,14 +1269,16 @@ function initTypedefTags(home) {
 			$.each(data, function(i, object) {
 				typedefTags.push(object);
 			});
+			success = true;
 		},
 		error: handleError
 	});
+	return success;
 }
 
 function chooseTypedefs(home, id) {
-	if (typedefTags == null) {
-		initTypedefTags(home);
+	if (typedefTags == null && !initTypedefTags(home)) {
+		return;
 	}
 	document.getElementById(id).removeAttribute('onclick');
 	var select = $(document.getElementById(id));
