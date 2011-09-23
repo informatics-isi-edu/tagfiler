@@ -31,7 +31,6 @@ $if filerecord:
 $else:
 	<td>
 $if options:
-	$ options.sort(key=lambda x: x[0])
 	<select name="${name}" id="${tagname}_id" onclick="chooseOptions('${home}', '${webauthnhome}', '${typestr}', '${tagname}_id')" typestr="${typestr}"
 	$if required:
 		required="${required}"

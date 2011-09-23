@@ -1168,18 +1168,16 @@ class Application:
                             tagref = type['typedef tagref']
 
                             if typevals:
-                                options = [ ( typeval[0], '%s (%s)' % typeval ) for typeval in typevals.items() ]
+                                options = True
                             elif tagdef.typestr in [ 'role', 'rolepat' ]:
-                                options = None
+                                options = True
                             elif tagref:
                                 if tagref in tagnames:
-                                    options = [ (value, value) for value in
-                                                set([ res.value for res in self.dbquery('SELECT DISTINCT value FROM %s' % self.wraptag(tagref))])
-                                                .difference(set(values)) ]
+                                    options = True
                                 else:
                                     options = None
                             elif tagdef.typestr == 'tagname' and tagnames:
-                                options = [ (tag, tag) for tag in set(tagnames).difference(set(values)) ]
+                                options = True
                             else:
                                 options = None
                             return options
