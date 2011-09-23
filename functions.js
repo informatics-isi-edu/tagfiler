@@ -1123,15 +1123,6 @@ var tagSelectOptions = new Object();
 var typedefSelectValues = null;
 var typedefTagrefs = null;
 
-/**
- * Compares two text options lexicographically, ignoring case differences.
- */
-function compareOptions(option1, option2) {
-	var val1 = option1.text.toLowerCase();
-	var val2 = option2.text.toLowerCase();
-	return compareIgnoreCase(val1, val2)
-}
-
 function handleError(jqXHR, textStatus, errorThrown) {
 	var err = jqXHR.getResponseHeader('X-Error-Description');
 	alert(err != null ? decodeURIComponent(err) : jqXHR.responseText);
@@ -1216,7 +1207,6 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 					tagSelectOptions[typestr].push(option);
 				}
 			});
-			//tagSelectOptions[typestr].sort(compareOptions);
 		},
 		error: handleError
 	});
@@ -1249,5 +1239,41 @@ function chooseOptions(home, webauthnhome, typestr, id) {
 		option.text(value.text);
 		option.attr('value', value.value);
 		select.append(option);
+	});
+}
+
+var typedefTags = null;
+
+function initTypedefTags(home) {
+	var url = home + '/query/typedef(typedef;' + encodeURIComponent('typedef description') + ')' + encodeURIComponent('typedef description') + '?limit=none';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			typedefTags = new Array();
+			$.each(data, function(i, object) {
+				typedefTags.push(object);
+			});
+		},
+		error: handleError
+	});
+}
+
+function chooseTypedefs(home, id) {
+	if (typedefTags == null) {
+		initTypedefTags(home);
+	}
+	document.getElementById(id).removeAttribute('onclick');
+	var select = $(document.getElementById(id));
+	$.each(typedefTags, function(i, item) {
+		if (item['typedef'] != 'empty') {
+			var option = $('<option>');
+			option.text(item['typedef description']);
+			option.attr('value', item['typedef']);
+			select.append(option);
+		}
 	});
 }

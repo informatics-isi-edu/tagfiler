@@ -35,12 +35,9 @@ $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config[
 	<form enctype="application/x-www-form-urlencoded" action="${target}" method="post">
 	<tr class="tagdefcreate">
 	<td><input name="tag-1" type="text" /></td>
-	<td><select name="type-1">
+	<td><select name="type-1" id="type-1" onclick="chooseTypedefs('${home}', 'type-1')" >
 	$ deftypestr = 'empty'
 	<option value="${deftypestr}">${typedict[deftypestr]}</option>
-	$for type in [ type for type in typenames if type[0] != deftypestr ]:
-	    $ typestr = type[0]
-	    <option value="${typestr}">${typedict[typestr]}</option>
 	</select></td>
 	<td><select name="multivalue-1">
 	<option value="false">0 or 1</option>
