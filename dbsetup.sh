@@ -698,7 +698,6 @@ cfgtag "file write users" text "*" "admin"
 cfgtag "tagdef write users" text "*" "admin"
 
 cfgtag "file list tags" text bytes owner 'read users' 'write users'
-cfgtag "tag list tags" text bytes owner 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'name' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
 #cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 
 #cfgtag "applet tags" text ...
@@ -718,6 +717,10 @@ do
    tag "$typedeftags" "_cfg_file list tags" tagdef "$tagname"
    tag "$typedeftags" "_cfg_tag list tags" tagdef "$tagname"
 done
+
+filetags=$(dataset "file" view "${admin}" "*")
+tag "$filetags" "_cfg_file list tags" tagdef 'bytes' 'owner' 'read users' 'write users'
+tag "$filetags" "_cfg_tag list tags" tagdef 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'name' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
 
 viewtags=$(dataset "view" view "${admin}" "*")
 for tagname in "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
