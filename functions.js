@@ -1121,6 +1121,7 @@ Calendar.prototype.dateFormat = dateFormat;
 
 var tagSelectOptions = new Object();
 var typedefSelectValues = null;
+var typedefTagrefs = null;
 
 /**
  * Compares two text options lexicographically, ignoring case differences.
@@ -1137,7 +1138,7 @@ function handleError(jqXHR, textStatus, errorThrown) {
 }
 
 function initTypedefSelectValues(home) {
-	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)';
+	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1154,13 +1155,33 @@ function initTypedefSelectValues(home) {
 	});
 }
 
+function initTypedefTagrefs(home) {
+	var url = home + '/query/' + encodeURIComponent('typedef tagref') + '(typedef;' + encodeURIComponent('typedef tagref') + ')?limit=none';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			typedefTagrefs = new Object();
+			$.each(data, function(i, object) {
+				typedefTagrefs[object['typedef']] = object['typedef tagref'];
+			});
+		},
+		error: handleError
+	});
+}
+
 function initTagSelectOptions(home, webauthnhome, typestr) {
 	if (typestr == 'role') {
 		url = webauthnhome + '/role';
 	} else if (typedefSelectValues.contains(typestr)) {
-		url = home + '/tags/typedef=' + encodeURIComponent(typestr) + '(' + encodeURIComponent('typedef values') + ')';
+		url = home + '/tags/typedef=' + encodeURIComponent(typestr) + '(' + encodeURIComponent('typedef values') + ')?limit=none';
+	} else if (typedefTagrefs[typestr] != null) {
+		url = home + '/query/' + encodeURIComponent(typedefTagrefs[typestr]) + '(' + encodeURIComponent(typedefTagrefs[typestr]) + ')' + encodeURIComponent(typedefTagrefs[typestr]) + '?limit=none';
 	} else {
-		url = home + '/query/' + encodeURIComponent(typestr) + '(' + encodeURIComponent(typestr) + ')' + encodeURIComponent(typestr);
+		alert('Invalid typestr: "' + typestr + '"');
 	}
 	$.ajax({
 		url: url,
@@ -1190,8 +1211,8 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 					});
 				} else {
 					var option = new Object();
-					option.value = object[typestr];
-					option.text = object[typestr];
+					option.value = object[typedefTagrefs[typestr]];
+					option.text = object[typedefTagrefs[typestr]];
 					tagSelectOptions[typestr].push(option);
 				}
 			});
@@ -1204,6 +1225,7 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 function chooseOptions(home, webauthnhome, typestr, id) {
 	if (typedefSelectValues == null) {
 		initTypedefSelectValues(home);
+		initTypedefTagrefs(home);
 	}
 	var pattern = null;
 	if (typestr == 'rolepat') {
