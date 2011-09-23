@@ -954,7 +954,8 @@ class FileTags (Node):
                 raise BadRequest(self, 'Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
             self.tagvals[pred.tag] = pred.vals
         
-        listpreds =  subjpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'owner', 'write users', 'Image Set', 'url', 'incomplete'] ]
+        listpreds =  [ web.Storage(tag=tag,op=None,vals=[])
+                       for tag in ['id', 'owner', 'write users', 'Image Set', 'url', 'incomplete'] + [p.tag for p in subjpreds]  ]
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
