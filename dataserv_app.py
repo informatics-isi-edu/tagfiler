@@ -143,8 +143,8 @@ class DbCache:
     def select(self, db, fillfunc, idtagval=None):
         def latest_txid():
             # modified time is latest modification time of:
-            #  identifying tag (tracked as "tag last modified" on its tagdef
-            #  individual subjects (tracked as "subject last tagged" on each identified subject
+            #  identifying tag (tracked as "tag last modified txid" on its tagdef
+            #  individual subjects (tracked as "subject last tagged txid" on each identified subject
             results = db_dbquery(db, 'SELECT max(txid) AS txid FROM ('
                               + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
                               + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
@@ -164,8 +164,10 @@ class DbCache:
                 self.cache = dict( [ (res[self.idtagname], res) for res in fillfunc() ] )
             self.fill_txid = latest
 
-            #web.debug(self.cache)
             #web.debug('DbCache: filled %s cache txid = %s' % (self.idtagname, self.fill_txid))
+        else:
+            pass
+            #web.debug('DbCache: cache hit %s cache' % self.idtagname)
             
         if idtagval != None:
             return self.cache.get(idtagval, None)
@@ -760,7 +762,7 @@ class Application:
             return [ config ]
 
         # get full config
-        self.config = config_cache.select(self.db, fill_config, self.authn.role, 'tagfiler')
+        self.config = config_cache.select(self.db, fill_config, None, 'tagfiler')
         #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
         
@@ -2174,7 +2176,7 @@ class Application:
             spreds = mergepreds(spreds)
             lpreds = mergepreds(lpreds)
 
-            #web.debug(spreds, lpreds, listas)
+            #web.debug('files_by_predlist', '    spreds=%s' % spreds, '    lpreds=%s' % lpreds, '    listas=%s' % listas)
             subject_wheres = []
 
             for tag, preds in lpreds.items():
