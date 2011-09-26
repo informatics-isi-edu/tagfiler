@@ -329,8 +329,7 @@ class FileList (Node):
         self.storage = web.input()
 
         def body():
-            tagdefs = [ (tagdef.tagname, tagdef)
-                        for tagdef in self.select_tagdef() ]
+            tagdefs = self.globals['tagdefsdict'].items()
 
             listtags = self.queryopts.get('list', None)
             writetags = None
