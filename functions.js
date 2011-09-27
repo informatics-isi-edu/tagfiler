@@ -1119,59 +1119,107 @@ function dateFormat(date)
 }
 Calendar.prototype.dateFormat = dateFormat;	
 
+var MAX_RETRIES = 10;
+var AJAX_TIMEOUT = 300000;
+
 var tagSelectOptions = new Object();
 var typedefSelectValues = null;
 var typedefTagrefs = null;
 
-function handleError(jqXHR, textStatus, errorThrown) {
-	var err = jqXHR.getResponseHeader('X-Error-Description');
-	alert(err != null ? decodeURIComponent(err) : jqXHR.responseText);
+function handleError(jqXHR, textStatus, errorThrown, count) {
+	var retry = false;
+	var msg = '';
+	var err = jqXHR.status;
+	if (err != null) {
+		msg += 'Status: ' + err + '\n';
+	}
+	err = jqXHR.responseText;
+	if (err != null) {
+		msg += 'ResponseText: ' + err + '\n';
+	}
+	err = jqXHR.getResponseHeader('X-Error-Description');
+	if (err != null) {
+		msg += 'X-Error-Description: ' + decodeURIComponent(err) + '\n';
+	}
+	if (textStatus != null) {
+		msg += 'TextStatus: ' + textStatus + '\n';
+	}
+	if (errorThrown != null) {
+		msg += 'ErrorThrown: ' + errorThrown + '\n';
+	}
+	switch(jqXHR.status) {
+	case 0:		// client timeout
+	case 408:	// server timeout
+	case 503:	// Service Unavailable
+	case 504:	// Gateway Timeout
+		retry = true;
+	}
+	
+	if (!retry || count > MAX_RETRIES) {
+		alert(msg);
+	}
+	
+	return retry;
 }
 
-function initTypedefSelectValues(home) {
+function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count) {
 	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)?limit=none';
-	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
+  		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			typedefSelectValues = new Array();
 			$.each(data, function(i, object) {
 				typedefSelectValues.push(object['typedef']);
 			});
-			success = true;
+			initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, 0)
 		},
-		error: handleError
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
 	});
-	return success;
 }
 
-function initTypedefTagrefs(home) {
+function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
 	var url = home + '/query/' + encodeURIComponent('typedef tagref') + '(typedef;' + encodeURIComponent('typedef tagref') + ')?limit=none';
-	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
+  		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			typedefTagrefs = new Object();
 			$.each(data, function(i, object) {
 				typedefTagrefs[object['typedef']] = object['typedef tagref'];
 			});
-			success = true;
+			if (tagSelectOptions[typestr] == null) {
+				initTagSelectOptions(home, webauthnhome, typestr, id, pattern, 0);
+			} else {
+				appendOptions(typestr, id, pattern);
+			}
 		},
-		error: handleError
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
 	});
-	return success;
 }
 
-function initTagSelectOptions(home, webauthnhome, typestr) {
-	var success = false;
+function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
+	tagSelectOptions[typestr] = new Array();
 	if (typestr == 'role') {
 		url = webauthnhome + '/role';
 	} else if (typedefSelectValues.contains(typestr)) {
@@ -1180,14 +1228,15 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 		url = home + '/query/' + encodeURIComponent(typedefTagrefs[typestr]) + '(' + encodeURIComponent(typedefTagrefs[typestr]) + ')' + encodeURIComponent(typedefTagrefs[typestr]) + '?limit=none';
 	} else {
 		alert('Invalid typestr: "' + typestr + '"');
-		return success;
+		return;
 	}
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
+  		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			$.each(data, function(i, object) {
 				if (typestr == 'role') {
@@ -1215,31 +1264,39 @@ function initTagSelectOptions(home, webauthnhome, typestr) {
 					tagSelectOptions[typestr].push(option);
 				}
 			});
-			success = true;
+			appendOptions(typestr, id, pattern);
 		},
-		error: handleError
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			} else {
+				delete tagSelectOptions[typestr];
+			}
+		}
 	});
-	return success;
 }
 
 function chooseOptions(home, webauthnhome, typestr, id) {
-	if (typedefSelectValues == null && (!initTypedefSelectValues(home) || !initTypedefTagrefs(home))) {
-		return;
-	}
-	var pattern = null;
+	var pattern = '';
 	if (typestr == 'rolepat') {
 		pattern = '*';
 		typestr = 'role'
 	}
-	if (tagSelectOptions[typestr] == null) {
-		tagSelectOptions[typestr] = new Array();
-		if (!initTagSelectOptions(home, webauthnhome, typestr)) {
-			delete tagSelectOptions[typestr];
-		}
+	if (typedefSelectValues == null) {
+		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, 0);
+	} else if (tagSelectOptions[typestr] == null) {
+		initTagSelectOptions(home, webauthnhome, typestr, id, pattern, 0);
+	} else {
+		appendOptions(typestr, id, pattern);
 	}
+}
+
+function appendOptions(typestr, id, pattern) {
 	document.getElementById(id).removeAttribute('onclick');
 	var select = $(document.getElementById(id));
-	if (pattern != null) {
+	if (pattern != '') {
 		var option = $('<option>');
 		option.text(pattern);
 		option.attr('value', pattern);
@@ -1255,31 +1312,41 @@ function chooseOptions(home, webauthnhome, typestr, id) {
 
 var typedefTags = null;
 
-function initTypedefTags(home) {
+function initTypedefTags(home, id, count) {
 	var url = home + '/query/typedef(typedef;' + encodeURIComponent('typedef description') + ')' + encodeURIComponent('typedef description') + '?limit=none';
-	var success = false;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
+  		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			typedefTags = new Array();
 			$.each(data, function(i, object) {
 				typedefTags.push(object);
 			});
-			success = true;
+			appendTypedefs(id);
 		},
-		error: handleError
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefTags(home, id, count)}, delay);
+			}
+		}
 	});
-	return success;
 }
 
 function chooseTypedefs(home, id) {
-	if (typedefTags == null && !initTypedefTags(home)) {
-		return;
+	if (typedefTags == null) {
+		initTypedefTags(home, id, 0);
+	} else {
+		appendTypedefs(id);
 	}
+}
+
+function appendTypedefs(id) {
 	document.getElementById(id).removeAttribute('onclick');
 	var select = $(document.getElementById(id));
 	$.each(typedefTags, function(i, item) {
@@ -1291,3 +1358,4 @@ function chooseTypedefs(home, id) {
 		}
 	});
 }
+
