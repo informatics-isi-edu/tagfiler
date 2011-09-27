@@ -172,8 +172,9 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
 <Directory ${TAGFILERDIR}/wsgi>
 
-#    SetEnv ${SVCPREFIX}.dbnstr postgres
-#    SetEnv ${SVCPREFIX}.dbstr  ${SVCUSER}
+#    SetEnv dbnstr postgres
+#    SetEnv dbstr  ${SVCUSER}
+#    SetEnv dbmaxconnections 4
 
      # All other settings are tagged on dataset 'tagfiler configuration' now
 

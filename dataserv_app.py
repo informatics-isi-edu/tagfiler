@@ -414,6 +414,36 @@ class RuntimeError (WebException):
         desc = u'The request execution encountered a runtime error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
+def getParamEnv(suffix, default=None):
+    if hasattr(web.ctx, 'env'):
+        return web.ctx.env.get(suffix, default)
+    else:
+        return default
+
+try:
+    p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)
+    line = p.stdout.readline()
+    daemonuser = line.strip()
+except:
+    daemonuser = 'tagfiler'
+
+# We want to share one global DB instance when pooling is enabled
+shared_db = web.database(dbn=getParamEnv('dbnstr', 'postgres'),
+                         db=getParamEnv('db', ''),
+                         maxconnections=int(getParamEnv('dbmaxconnections', 8)))
+
+if not shared_db.has_pooling:
+    have_pooling = False
+    shared_db = None
+else:
+    have_pooling = True
+    
+def get_db():
+    if have_pooling:
+        return shared_db
+    else:
+        return web.database(dbn=getParamEnv('dbnstr', 'postgres'), db=getParamEnv('db', ''))
+
 class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
@@ -442,10 +472,10 @@ class Application:
                                     ('file write users', []),
                                     ('help', None),
                                     ('home', 'https://%s' % self.hostname),
-                                    ('log path', '/var/www/%s-logs' % self.daemonuser),
+                                    ('log path', '/var/www/%s-logs' % daemonuser),
                                     ('logo', ''),
                                     ('policy remappings', []),
-                                    ('store path', '/var/www/%s-data' % self.daemonuser),
+                                    ('store path', '/var/www/%s-data' % daemonuser),
                                     ('subtitle', ''),
                                     ('tag list tags', []),
                                     ('tagdef write users', []),
@@ -730,25 +760,12 @@ class Application:
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
-        def getParamEnv(suffix, default=None):
-            return web.ctx.env.get('%s.%s' % (myAppName, suffix), default)
-
-        try:
-            p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)
-            line = p.stdout.readline()
-            self.daemonuser = line.strip()
-        except:
-            self.daemonuser = 'tagfiler'
-
         self.hostname = socket.gethostname()
 
         self.logmsgs = []
         self.middispatchtime = None
 
-        self.dbnstr = getParamEnv('dbnstr', 'postgres')
-        self.dbstr = getParamEnv('dbstr', '')
-        self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
-
+        self.db = get_db()
 
         # BEGIN: get runtime parameters from database
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
@@ -1051,7 +1068,7 @@ class Application:
         self.request_uri = uri
         if self.globals['webauthnhome']:
             if not self.db:
-                self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+                self.db = get_db()
             t = self.db.transaction()
             try:
                 self.set_authn(webauthn.session.test_and_update_session(self.db,
@@ -1128,7 +1145,7 @@ class Application:
            commit/rollback/retry logic
         """
         if not self.db:
-            self.db = web.database(dbn=self.dbnstr, db=self.dbstr)
+            self.db = get_db()
 
         #self.log('TRACE', value='dbtransact() entered')
 
@@ -1247,7 +1264,7 @@ class Application:
 
                 except psycopg2.InterfaceError:
                     # try reopening the database connection
-                    self.db = web.database(db=self.dbstr, dbn=self.dbnstr)
+                    self.db = get_db()
 
                 # exponential backoff...
                 # count=1 is roughly 0.1 microsecond
