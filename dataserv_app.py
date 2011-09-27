@@ -2063,8 +2063,12 @@ class Application:
             """
             pd = dict()
             for pred in predlist:
-                pred = web.Storage(tag=pred.tag, op=pred.op, vals=pred.vals and [v for v in pred.vals] or [])
-                pred.vals.sort()
+                vals = pred.vals
+                if type(vals) == list:
+                    vals = [ v for v in pred.vals ]
+                    vals.sort()
+
+                pred = web.Storage(tag=pred.tag, op=pred.op, vals=vals)
 
                 pl = pd.get(pred.tag, [])
                 pd[pred.tag] = pl
