@@ -2005,7 +2005,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, rolekeys=None):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -2020,7 +2020,7 @@ class Application:
            'typedefs'     defaults to self.globals['typesdict'] if not supplied
            'listas'       provides an optional relabeling of list tags (projected result attributes)
 
-           Optional args 'values' and 'rolekeys' are used for recursive calls, not client calls.
+           Optional args 'values'used for recursive calls, not client calls.
         """
         if path == None:
             path = self.path
@@ -2037,6 +2037,14 @@ class Application:
         if listas == None:
             listas = dict()
 
+        if not values:
+            values = Values()
+
+        roles = [ r for r in self.authn.roles ]
+        roles.append('*')
+        roles = set(roles)
+        rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])
+
         prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner', 'dtype']))
         if len(prohibited) > 0:
             raise BadRequest(self, 'Use of %s as list tag alias is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
@@ -2049,18 +2057,25 @@ class Application:
             """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
 
                Resulting map has a key for each tag referenced in a
-               predicate, but drops op==None predicates. The keyed
-               list of predicates should then be compiled into a
-               conjunction of value constraints on that tag.
+               predicate. The keyed list of predicates should then be
+               compiled into a conjunction of value constraints on
+               that tag.
             """
             pd = dict()
-            for pred in [ p for p in predlist ]:
+            for pred in predlist:
+                pred = web.Storage(tag=pred.tag, op=pred.op, vals=pred.vals and [v for v in pred.vals] or [])
+                pred.vals.sort()
+
                 pl = pd.get(pred.tag, [])
                 pd[pred.tag] = pl
                 pl.append(pred)
+
+            for tag, preds in pd.items():
+                preds.sort(key=lambda p: (p.op, p.vals))
+
             return pd
         
-        def tag_query(tagdef, dbtype, preds, values, rolekeys, final=True, tprefix='_'):
+        def tag_query(tagdef, dbtype, preds, values, final=True, tprefix='_'):
             """Compile preds for one tag into a query fetching all satisfactory triples.
 
                Returns (tagdef, querystring, subject_wheres)
@@ -2164,7 +2179,7 @@ class Application:
 
             return (tagdef, q % m, subject_wheres)
 
-        def elem_query(spreds, lpreds, values, rolekeys, final=True):
+        def elem_query(spreds, lpreds, values, final=True):
             """Compile a query finding subjects by spreds and projecting by lpreds.
 
                final=True means projection is one column per ltag.
@@ -2185,8 +2200,6 @@ class Application:
                         raise BadRequest(self, 'Tag "id" cannot be filtered in a list-predicate.')
                     del lpreds[tag]
             
-            needed_tagdefs = [ tagdefs[tag] for tag in spreds.keys() + lpreds.keys() ]
-
             inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
             outer = [ ]
 
@@ -2210,7 +2223,7 @@ class Application:
                 selects = []
 
             for tag, preds in spreds.items():
-                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, rolekeys, tprefix='s_')
+                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, tprefix='s_')
                 if swheres or tag in versions_test_added:
                     outer.append(sq)
                     subject_wheres.extend(swheres)
@@ -2230,7 +2243,7 @@ class Application:
                     td = tagdefs[tag]
                     lq = None
                 else:
-                    td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, rolekeys, final, tprefix='l_')
+                    td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, final, tprefix='l_')
                     if swheres:
                         raise BadRequest(self, 'Operator ":not:" not supported in projection list predicates.')
                 if final:
@@ -2261,15 +2274,6 @@ class Application:
                                   + [ '%s USING (subject)' % o for o in outer ]),
                         where=where))
             return q
-
-        if not values:
-            values = Values()
-
-        if not rolekeys:
-            roles = [ r for r in self.authn.roles ]
-            roles.append('*')
-            roles = set(roles)
-            rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])
 
         cq = None
         order = None
@@ -2305,7 +2309,7 @@ class Application:
                         order_suffix.append(orderstmt)
                 if otags != None and (len(otags) > 0 or len(order_suffix) > 0):
                     order = ' ORDER BY %s' % ', '.join([ wraptag(listas.get(t, t), prefix='') for t in otags] + order_suffix)
-            cq = elem_query(spreds, lpreds, values, rolekeys, i==len(path)-1)
+            cq = elem_query(spreds, lpreds, values, i==len(path)-1)
 
         if order:
             cq += order
