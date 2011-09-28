@@ -20,7 +20,7 @@ SVCPREFIX=${1:-tagfiler}
 
 SVCUSER=${SVCPREFIX}
 
-svn_url=$(svn info | grep URL: | sed -e 's/URL: //')'@'$(svn info | grep Revision: | sed -e 's/Revision: //')
+svn_url=${2:-$(svn info | grep URL: | sed -e 's/URL: //')'@'$(svn info | grep Revision: | sed -e 's/Revision: //')}
 
 settag()
 {
