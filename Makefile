@@ -75,6 +75,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(WEBSTATICDIR)
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
+	python $(shell { echo 'import distutils.sysconfig' ; echo 'print distutils.sysconfig.get_python_lib()'; } | python)/web/template.py --compile $(INSTALLDIR)/templates/
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
