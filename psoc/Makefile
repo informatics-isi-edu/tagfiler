@@ -57,7 +57,7 @@ SVCDIR=/var/www/$(INSTALLSVC)
 DATADIR=$(SVCDIR)-data
 PSOCNAME="name=DEMO%3A%20Create%20PSOC%20entries"
 PSOCDIR=$(DATADIR)/$(PSOCNAME)
-PSOCFILE=$(PSOCDIR)/admin-psoctemplate
+PSOCFILE=$(PSOCDIR)/"$(admin)-psoctemplate"
 
 
 # turn off annoying built-ins
