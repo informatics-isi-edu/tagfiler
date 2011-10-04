@@ -190,7 +190,7 @@ class Study (Node):
                         files = []
     
                 self.globals['appletTagvals'] = [ (tagname,
-                                                   [ subject.tagname ])
+                                                   [ self.subject[tagname] ])
                                                   for tagname in self.globals['appletTagnames'] ]
                 
             elif self.action == 'upload' or self.action == 'download':
