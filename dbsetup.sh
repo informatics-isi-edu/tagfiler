@@ -628,17 +628,17 @@ cfgtagdef()
    [[ "$tagname" == "_cfg_file list tags" ]] ||  tag "$cfgtags" "_cfg_tag list tags" tagdef "$tagname"
 }
 
-#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
+#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY  TAGREF
 
 # file list tags MUST BE DEFINED FIRST
-cfgtagdef 'file list tags'            text  ""      subject     subject       true       tagdef
+cfgtagdef 'file list tags'            text  ""      subject     subject       true       tagdef     ''    tagdef
 # tag list tags MUST BE DEFINED NEXT...
-cfgtagdef 'tag list tags'             text  ""      subject     subject       true       tagdef
+cfgtagdef 'tag list tags'             text  ""      subject     subject       true       tagdef     ''    tagdef
 
 # THEN, need to do this manually to break dependency loop
 tag "$cfgtags" "_cfg_tag list tags" tagname "_cfg_file list tags"
 
-cfgtagdef 'file list tags write'      text  ""      subject     subject       true       tagdef
+cfgtagdef 'file list tags write'      text  ""      subject     subject       true       tagdef     ''    tagdef
 cfgtagdef 'tagdef write users'        text  ""      subject     subject       true       rolepat
 cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
 cfgtagdef home                        text  ""      subject     subject       false
@@ -661,14 +661,14 @@ cfgtagdef 'client socket buffer size' int8  ""      subject     subject       fa
 cfgtagdef 'client retry count'        int8  ""      subject     subject       false
 cfgtagdef 'client chunk bytes'        int8  ""      subject     subject       false
 cfgtagdef 'client socket timeout'     int8  ""      subject     subject       false
-cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagdef
-cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagdef
+cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagdef    ''    tagdef
+cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagdef    ''    tagdef
 cfgtagdef 'applet custom properties'  text  ""      subject     subject       true
 cfgtagdef 'applet test log'           text  ""      subject     subject       false
 cfgtagdef 'applet test properties'    text  ""      subject     subject       true
 cfgtagdef 'system software'           text  ""      anonymous   system        false
 
-#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY
+#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY  TAGREF
 
 cfgtag()
 {
