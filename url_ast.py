@@ -869,10 +869,11 @@ class FileTags (Node):
             tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
             tagvals = dict(tagvals)
             for tagname in jsonMungeTags:
-                try:
-                    tagvals[tagname] = str(tagvals[tagname])
-                except:
-                    pass
+                 if tagvals[tagname] != None:
+                    try:
+                        tagvals[tagname] = str(tagvals[tagname])
+                    except:
+                        pass
             return tagvals
 
         self.emit_headers()
@@ -1333,10 +1334,11 @@ class Query (Node):
                 tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
                 tagvals = dict(tagvals)
                 for tagname in jsonMungeTags:
-                    try:
-                        tagvals[tagname] = str(tagvals[tagname])
-                    except:
-                        pass
+                    if tagvals[tagname] != None:
+                        try:
+                            tagvals[tagname] = str(tagvals[tagname])
+                        except:
+                            pass
                 return tagvals
 
             if self.action in set(['add', 'delete']):
