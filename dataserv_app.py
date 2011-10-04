@@ -943,10 +943,9 @@ class Application:
             if len(results) == 0:
                 raise Conflict(self, 'Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
-            results = typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role, typename)
-            if len(results) == 0:
+            type = typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role, typename)
+            if type == None:
                 raise Conflict(self, 'The type "%s" is not defined!' % typename)
-            type = results[0]
             dbtype = type['typedef dbtype']
             try:
                 key = downcast_value(dbtype, key)
