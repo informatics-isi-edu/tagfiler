@@ -74,6 +74,8 @@ def downcast_value(dbtype, value):
     return value
 
 def myunicode(v):
+    if type(v) == list:
+        return [ myunicode(elem) for elem in v ]
     if type(v) == str:
         return unicode(v, 'utf8')
     else:
@@ -448,6 +450,23 @@ class Application:
     "common parent class of all service handler classes to use db etc."
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
+    def config_filler(self):
+        def helper():
+            config = self.select_config()
+            config['policy remappings'] = buildPolicyRules(config['policy remappings'])
+            return [ config ]
+
+        return lambda : helper()
+
+    def select_config_cached(self, configname=None):
+        if configname == None:
+            configname = 'tagfiler'
+        config = config_cache.select(self.db, self.config_filler(), None, configname)
+        if config == None:
+            return config_cache.select(self.db, self.config_filler(), None, 'tagfiler')
+        else:
+            return config
+
     def select_config(self, pred=None, params_and_defaults=None, fake_missing=True):
         
         if pred == None:
@@ -456,6 +475,8 @@ class Application:
         if params_and_defaults == None:
             params_and_defaults = [ ('applet custom properties', []),
                                     ('applet test properties', []),
+                                    ('applet tags', []),
+                                    ('applet tags require', []),
                                     ('applet test log', None),
                                     ('bugs', None),
                                     ('chunk bytes', 64 * 1024),
@@ -773,13 +794,9 @@ class Application:
         self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
         #self.log('TRACE', 'Application() constructor after static defaults')
 
-        def fill_config():
-            config = self.select_config()
-            config['policy remappings'] = buildPolicyRules(config['policy remappings'])
-            return [ config ]
-
         # get full config
-        self.config = config_cache.select(self.db, fill_config, None, 'tagfiler')
+        self.config = config_cache.select(self.db, self.config_filler(), None, 'tagfiler')
+
         #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
         

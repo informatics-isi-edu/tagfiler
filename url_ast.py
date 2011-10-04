@@ -164,7 +164,7 @@ class Study (Node):
         def body():
             files = []
 
-            config = self.select_config(self.study_type, [ ('applet tags', []), ('applet tags require', []) ])
+            config = self.select_config_cached(self.study_type)
             self.globals['appletTagnames'] = config['applet tags']
             self.globals['appletTagnamesRequire'] = config['applet tags require']
             
