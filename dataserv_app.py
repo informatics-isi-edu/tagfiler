@@ -2510,7 +2510,10 @@ class Application:
                 save_listpreds = listpreds
                 break
             elif source == 'list' and listopt:
-                listtags = [ x for x in listtags.split(',') if x ]
+                if type(listopt) in [ list, set ]:
+                    listtags = [ x for x in listopt if x ]
+                else:
+                    listtags = [ listopt ]
                 break
             elif source == 'view' and viewopt and view and view.get(listname, []):
                 listtags = view.get(listname, [])
