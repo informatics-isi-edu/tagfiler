@@ -500,7 +500,7 @@ tagdef 'template query'      text        "${admin}" subjectowner tag         tru
 typedef empty        ''            'No content'
 typedef int8         int8          'Integer'
 typedef float8       float8        'Floating point'
-typedef date         date          'Date'
+typedef date         date          'Date (yyyy-mm-dd)'
 typedef timestamptz  timestamptz   'Date and time with timezone'
 typedef text         text          'Text'
 typedef role         text          'Role'

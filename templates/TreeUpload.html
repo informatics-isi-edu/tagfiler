@@ -117,7 +117,7 @@ $if None:
 	<div id="custom-tags">
 	<table class="table-wrapper" id="Required Tags">
 	$ tagdefs = tagdefsdict.values()
-	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname)
+	$ tagdefs.sort(key=lambda tagdef: tagdef.tagname.lower())
 	$for tagdef in tagdefs:
 		$ type = typesdict[tagdef.typestr]
 		$ typedesc = type['typedef description']
