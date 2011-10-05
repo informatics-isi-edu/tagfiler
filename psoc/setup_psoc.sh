@@ -24,6 +24,40 @@ tag_names=()
 tag_dbtypes=()
 tag_multivalues=()
 tag_require=()
+group_names=()
+
+addGroup()
+{
+	local found="false"
+	local i
+	for ((  i = 0 ;  i < "${#group_names[*]}";  i++  ))
+	do
+		if [[ ${group_names[i]} == "$1" ]]
+		then
+			found="true"
+			break
+		fi
+	done
+	if [[ ${found} == "false" ]]
+	then
+		group_names[${#group_names[*]}]="$1"
+	fi
+}
+
+isRequiredTag()
+{
+	local found="false"
+	local i
+	for ((  i = 0 ;  i < "${#tag_require[*]}";  i++  ))
+	do
+		if [[ "${tag_require[i]}" == "$1" ]]
+		then
+			found="true"
+			break
+		fi
+	done
+	echo ${found}
+}
 
 urlquote()
 {
@@ -33,38 +67,96 @@ urlquote()
 typedef_values_tag=`urlquote "typedef values"`
 typedef_dbtype_tag=`urlquote "typedef dbtype"`
 typedef_descriptions_tag=`urlquote "typedef description"`
+applet_tags=`urlquote "_cfg_applet tags"`
+applet_required_tags=`urlquote "_cfg_applet tags require"`
+PSOC_tagfiler_admin=`urlquote "PSOC tagfiler admin"`
 
 typedef()
 {
-   # get the URL for the new id
-   local url=`curl -b cookiefile -c cookiefile -s -S -k -d action=post "https://${TARGET}/tagfiler/file" | sed 's/file\/id/tags\/id/g'`
-   local name=`urlquote "$1"`
-   local dbtype=`urlquote "$2"`
-   local description=`urlquote "$3"`
-   shift 3
-   local values=""
-   while (( "$#" )); do
+	# get the URL for the new id
+	local url=`curl -b cookiefile -c cookiefile -s -S -k -d action=post "https://${TARGET}/tagfiler/file" | sed 's/file\/id/tags\/id/g'`
+	local name=`urlquote "$1"`
+	local dbtype=`urlquote "$2"`
+	local description=`urlquote "$3"`
+	shift 3
+	local values=""
+	while (( "$#" )); do
+		if [[ -n ${values} ]]
+		then
+			values=${values},
+		fi
+		values=${values}`urlquote "$1"`
+		shift
+	done
+	local enum=""
 	if [[ -n ${values} ]]
 	then
-		values=${values},
+		enum=";${typedef_values_tag}=${values}"
 	fi
-	values=${values}`urlquote "$1"`
-	shift
-   done
-   local enum=""
-   if [[ -n ${values} ]]
-   then
-	enum=";${typedef_values_tag}=${values}"
-   fi
-   curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(typedef=${name}${enum};${typedef_descriptions_tag}=${description};${typedef_dbtype_tag}=${dbtype})"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(typedef=${name}${enum};${typedef_descriptions_tag}=${description};${typedef_dbtype_tag}=${dbtype})"
+}
+
+configdef()
+{
+	# get the URL for the new id
+	local url=`curl -b cookiefile -c cookiefile -s -S -k -d action=post "https://${TARGET}/tagfiler/file" | sed 's/file\/id/tags\/id/g'`
+	local name=`urlquote "$1"`
+	local values=""
+	local required_values=""
+	local tags="\${#tag_groups_${name}[*]}"
+	eval "count=${tags}"
+	local i
+	local isRequired
+	for ((  i = 0 ;  i < ${count};  i++  ))
+	do
+		if [[ -n ${values} ]]
+		then
+			values=${values},
+		fi
+		local tag="\${tag_groups_$name[i]}"
+		eval "tag=${tag}"
+		values=${values}`urlquote "${tag}"`
+		isRequired=$(isRequiredTag "${tag}")
+		if [[ ${isRequired} == "true" ]]
+		then
+			if [[ -n ${required_values} ]]
+			then
+				required_values=${required_values},
+			fi
+			required_values=${required_values}`urlquote "${tag}"`
+		fi
+	done
+	local enum=""
+	local required_enum=""
+	if [[ -n ${values} ]]
+	then
+		enum=";${applet_tags}=${values}"
+	fi
+	if [[ -n ${required_values} ]]
+	then
+		required_enum=";${applet_required_tags}=${required_values}"
+	fi
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(config=${name}${enum}${required_enum})"
+	
 }
 
 tagdef()
 {
-   tag_names[${#tag_names[*]}]=`urlquote "$1"`
-   tag_dbtypes[${#tag_dbtypes[*]}]=`urlquote "$2"`
-   tag_multivalues[${#tag_multivalues[*]}]="$3"
-   tag_require[${#tag_multivalues[*]}]="$4"
+	local name="$1"
+	tag_names[${#tag_names[*]}]=`urlquote "$1"`
+	tag_dbtypes[${#tag_dbtypes[*]}]=`urlquote "$2"`
+	tag_multivalues[${#tag_multivalues[*]}]="$3"
+	if [[ "$4" == "true" ]]
+	then
+		tag_require[${#tag_require[*]}]="$1"
+	fi
+	shift 4
+	while [ "$1" ]
+	do
+		addGroup "$1"
+		eval "tag_groups_$1[\${#tag_groups_$1[*]}]=\"${name}\""
+		shift 1
+	done
 }
 
 # Login
@@ -72,114 +164,91 @@ tagdef()
 rm -f cookiefile
 curl -b cookiefile -c cookiefile -s -S -k -d username=${USERNAME} -d password=${PASSWORD} https://${TARGET}/webauthn/login
 
-# Define the type definitions
 
-#	TYPENAME		DBTYPE	DESCRIPTION		VALUES
-typedef	'Material Source'	text	'Material Source'	'Cell Cell' 'Mouse Mouse'
-typedef	'Drug'			text	'Drug'			'CTX CTX'
-typedef	'Drug Source'		text	'Drug Source'		'Sigma Sigma'
-typedef	'Experimentalist'	text	'Experimentalist'	'Fred%20Casely Fred Casely'
+# Templates for defining types and tags
+#			TYPENAME			DBTYPE	DESCRIPTION			VALUES
+#typedef	'Material Source'	text	'Material Source'	'Cell Cell' 'Mouse Mouse'
+#typedef	'Drug'				text	'Drug'				'CTX CTX'
+#typedef	'Experimentalist'	text	'Experimentalist'	'Fred%20Casely Fred Casely'
+#		TAGNAME								TYPE				MULTIVAL	REQUIRED	GROUPS
+#tagdef	'Protocol Nm'						text				false		true		PSOC
+#tagdef	'Experimentalist'					'Experimentalist'	false		true		PSOC
+
 
 # Define the tags definitions
 
-#	TAGNAME						TYPE			MULTIVAL	REQUIRED
-tagdef	'Drug'						'Drug'			false		true
-tagdef	'Drug Source'					'Drug Source'		false		true
-tagdef	'Protocol Nm'					text			false		true
-tagdef	'Protocol Date'					date			false		true
-tagdef	'Protocol Version'				int8			false		true
-tagdef	'Experiment Date'				date			false		true
-tagdef	'Experimentalist'				'Experimentalist'	false		true
-tagdef	'Phone'						text			false		true
-tagdef	'Email'						text			false		true
-tagdef	'Lab Book #'					int8			false		true
-tagdef	'Page Number #'					int8			false		true
-tagdef	'Material Source'				'Material Source'	false		true
-tagdef	'Values of Internal Standards'			text			false		true
-tagdef	'Calibration Values & Parameters'		text			false		true
-tagdef	'Machine Parameters'				text			false		true
-tagdef	'Nutrient Conditions'				text			false		true
-tagdef	'Growth Media'					text			false		true
-tagdef	'Feeder Cells'					text			false		true
-tagdef	'CO2 Concentration'				int8			false		true
-tagdef	'O2 Concentration'				int8			false		true
-tagdef	'Serum Lot'					int8			false		true
-tagdef	'Serum Source'					text			false		true
-tagdef	'Serum Percentage'				int8			false		true
-tagdef	'Serum Type'					text			false		true
-tagdef	'Passage Number'				int8			false		true
-tagdef	'Added Growth Factors'				text			false		true
-tagdef	'Confluence Number'				int8			false		true
-tagdef	'Pressure'					int8			false		true
-tagdef	'pH'						text			false		true
-tagdef	'Experiment Geometry'				text			false		true
-tagdef	'Proliferation Rate'				int8			false		true
-tagdef	'Mouse Identifier'				text			false		true
-tagdef	'Mouse Age (start of experiment)'		int8			false		true
-tagdef	'Time since start of experiment'		int8			false		true
-tagdef	'Weight'					int8			false		true
-tagdef	'Drug Treatment Regimen'			text			false		true
-tagdef	'Cancer Model'					text			false		true
-tagdef	'Tumor Injection Protocol'			text			false		true
-tagdef	'Cage Number'					int8			false		true
-tagdef	'Number Cells Injected'				int8			false		true
-tagdef	'Serum Draw Researcher'				text			false		true
-tagdef	'Serum Draw Protocol'				text			false		true
-tagdef	'Draw Volume'					text			false		true
-tagdef	'Organ Harvest Protocol'			text			false		true
-tagdef	'Organ Type'					text			false		true
-tagdef	'Organ Preservation'				text			false		true
-tagdef	'Window Chamber Placement'			text			false		true
-tagdef	'Window Chamber Size'				int8			false		true
-tagdef	'Imaging Reagents'				text			false		true
-tagdef	'Tumor Shape / gross morphology'		text			false		true
-tagdef	'What is outside the window?'			text			false		true
-tagdef	'Chip Identifier'				text			false		true
-tagdef	'DNA Sequence for GOI'				text			false		true
-tagdef	'AB Vendors'					text			false		true
-tagdef	'AB Catalog #'					int8			false		true
-tagdef	'AB Lot #'					int8			false		true
-tagdef	'Equipment & Operating Conditions'		text			false		true
-tagdef	'Recent QC Information'				text			false		true
-tagdef	'Cell Images'					text			false		true
-
+#		TAGNAME								TYPE	MULTIVAL	REQUIRED	GROUPS
+tagdef	'Drug'								text	false		true		PSOC
+tagdef	'Drug Source'						text	false		true		PSOC
+tagdef	'Protocol Nm'						text	false		true		PSOC
+tagdef	'Protocol Date'						date	false		true		PSOC
+tagdef	'Protocol Version'					int8	false		true		PSOC
+tagdef	'Experiment Date'					date	false		true		PSOC
+tagdef	'Experimentalist'					text	false		true		PSOC
+tagdef	'Phone'								text	false		true		PSOC
+tagdef	'Email'								text	false		true		PSOC
+tagdef	'Lab Book #'						int8	false		true		PSOC
+tagdef	'Page Number #'						int8	false		true		PSOC
+tagdef	'Material Source'					text	false		true		PSOC
+tagdef	'Values of Internal Standards'		text	false		true		PSOC
+tagdef	'Calibration Values & Parameters'	text	false		true		PSOC
+tagdef	'Machine Parameters'				text	false		true		Rp1
+tagdef	'Nutrient Conditions'				text	false		true		Rp1
+tagdef	'Growth Media'						text	false		true		Rp1
+tagdef	'Feeder Cells'						text	false		true		Rp1
+tagdef	'CO2 Concentration'					int8	false		true		Rp1
+tagdef	'O2 Concentration'					int8	false		true		Rp1
+tagdef	'Serum Lot'							int8	false		true		Rp1
+tagdef	'Serum Source'						text	false		true		Rp1
+tagdef	'Serum Percentage'					int8	false		true		Rp1
+tagdef	'Serum Type'						text	false		true		Rp1
+tagdef	'Passage Number'					int8	false		true		Rp1
+tagdef	'Added Growth Factors'				text	false		true		Rp1
+tagdef	'Confluence Number'					int8	false		true		Rp1
+tagdef	'Pressure'							int8	false		true		Rp1
+tagdef	'pH'								text	false		true		Rp1
+tagdef	'Experiment Geometry'				text	false		true		Rp1
+tagdef	'Proliferation Rate'				int8	false		true		Rp1
+tagdef	'Mouse Identifier'					text	false		true		Rp3 Rp4
+tagdef	'Mouse Age (start of experiment)'	int8	false		true		Rp3 Rp4
+tagdef	'Time since start of experiment'	int8	false		true		Rp3 Rp4
+tagdef	'Weight'							int8	false		true		Rp3 Rp4
+tagdef	'Drug Treatment Regimen'			text	false		true		Rp3 Rp4
+tagdef	'Cancer Model'						text	false		true		Rp3 Rp4
+tagdef	'Tumor Injection Protocol'			text	false		true		Rp3 Rp4
+tagdef	'Cage Number'						int8	false		true		Rp3 Rp4
+tagdef	'Number Cells Injected'				int8	false		true		Rp3 Rp4
+tagdef	'Serum Draw Researcher'				text	false		true		Rp3 Rp4
+tagdef	'Serum Draw Protocol'				text	false		true		Rp3 Rp4
+tagdef	'Draw Volume'						text	false		true		Rp3 Rp4
+tagdef	'Organ Harvest Protocol'			text	false		true		Rp3 Rp4
+tagdef	'Organ Type'						text	false		true		Rp3 Rp4
+tagdef	'Organ Preservation'				text	false		true		Rp3 Rp4
+tagdef	'Window Chamber Placement'			text	false		true		Rp3
+tagdef	'Window Chamber Size'				int8	false		true		Rp3
+tagdef	'Imaging Reagents'					text	false		true		Rp3
+tagdef	'Tumor Shape / gross morphology'	text	false		true		Rp3
+tagdef	'What’s outside the window?'		text	false		true		Rp3
+tagdef	'Chip Identifier'					text	false		true		Rp4
+tagdef	'DNA Sequence for GOI'				text	false		true		Rp4
+tagdef	'AB Vendors'						text	false		true		Rp4
+tagdef	'AB Catalog #'						int8	false		true		Rp4
+tagdef	'AB Lot #’s'						int8	false		true		Rp4
+tagdef	'Equipment & Operating Conditions'	text	false		true		Rp4
+tagdef	'Recent QC Information'				text	false		true		RP1
+tagdef	'Cell Images'						text	false		true		RP1
 
 # Define the tags
 
 for ((  i = 0 ;  i < "${#tag_names[*]}";  i++  ))
 do
 	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tagdef/${tag_names[i]}?typestr=${tag_dbtypes[i]}&multivalue=${tag_multivalues[i]}&readpolicy-1=subject&writepolicy-1=subject"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/tagdef=${tag_names[i]}(owner=${PSOC_tagfiler_admin})"
 done
 
-# Set the applet tags
+# Define the group configurations
 
-applet_tags=`urlquote "_cfg_applet tags"`
-tags=${tag_names[0]}
-
-for ((  i = 1 ;  i < "${#tag_names[*]}";  i++  ))
+for ((  i = 0 ;  i < "${#group_names[*]}";  i++  ))
 do
-	tags=${tags},${tag_names[i]}
+	configdef ${group_names[i]}
 done
-
-curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/config=tagfiler(${applet_tags}=${tags})"
-
-# Set the applet required tags
-
-applet_required_tags=`urlquote "_cfg_applet tags require"`
-tags=""
-
-for ((  i = 0 ;  i < "${#tag_names[*]}";  i++  ))
-do
-	if [[ ${tag_require[i]} -eq "true" ]]
-	then
-		if [[ -n ${tags} ]]
-		then
-			tags=${tags},
-		fi
-		tags=${tags}${tag_names[i]}
-	fi
-done
-
-curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/config=tagfiler(${applet_required_tags}=${tags})"
-
-
