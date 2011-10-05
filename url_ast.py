@@ -484,6 +484,7 @@ class Contact (Node):
 
     def __init__(self, parser, appname, queryopts={}):
         Node.__init__(self, parser, appname)
+        self.globals['webauthnrequire'] = False
 
     def GET(self, uri):
         
