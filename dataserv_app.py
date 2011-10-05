@@ -1033,7 +1033,7 @@ class Application:
         return ('%s ' % action) + ', '.join(parts)
 
     def lograw(self, msg):
-        logger.info(msg)
+        logger.info(myutf8(msg))
 
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
         if self.start_time:
@@ -1294,7 +1294,7 @@ class Application:
             pass
                     
         for msg in self.logmsgs:
-            logger.info(msg)
+            logger.info(myutf8(msg))
         self.logmsgs = []
         return postCommit(bodyval)
 
