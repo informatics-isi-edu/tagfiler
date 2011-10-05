@@ -1,34 +1,31 @@
 $def with (files, tagdefs)
 $if None:
-	$# 
-	$# Copyright 2010 University of Southern California
-	$# 
-	$# Licensed under the Apache License, Version 2.0 (the "License");
-	$# you may not use this file except in compliance with the License.
-	$# You may obtain a copy of the License at
-	$# 
-	$#    http://www.apache.org/licenses/LICENSE-2.0
-	$# 
-	$# Unless required by applicable law or agreed to in writing, software
-	$# distributed under the License is distributed on an "AS IS" BASIS,
-	$# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-	$# See the License for the specific language governing permissions and
-	$# limitations under the License.
-	$#
-$# the following nonsense line is due to a bug in the template engine... don't know why it works but it does!
-$for foo in [ 0 ]:
+   $# 
+   $# Copyright 2010 University of Southern California
+   $# 
+   $# Licensed under the Apache License, Version 2.0 (the "License");
+   $# you may not use this file except in compliance with the License.
+   $# You may obtain a copy of the License at
+   $# 
+   $#    http://www.apache.org/licenses/LICENSE-2.0
+   $# 
+   $# Unless required by applicable law or agreed to in writing, software
+   $# distributed under the License is distributed on an "AS IS" BASIS,
+   $# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   $# See the License for the specific language governing permissions and
+   $# limitations under the License.
+   $#
 $code
-	def rendertagvals():
-		s = ""
-		for file in files:
-			subject = subject2identifiers(file)[0]
-			for tagdef in tagdefs:
-				if file[tagdef.tagname]:
-					if tagdef.typestr == 'empty':
-						s += home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + ")\n"
-					elif tagdef.multivalue:
-						s += home + "/tags/" + subject + "(" + urlquote(tagdef.tagname ) + "=" + ','.join([urlquote(str(val)) for val in file[tagdef.tagname]]) + ")\n"
-					else:
-						s += home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + "=" + urlquote(str(file[tagdef.tagname])) + ")\n"
-		return s
-${rendertagvals()[:-1]}
+   def render_file(file):
+      subject = subject2identifiers(file)[0]
+      def render_tagvals(tagdef):
+         if tagdef.typestr == 'empty':
+            return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + ")\n"
+         elif tagdef.multivalue and file[tagdef.tagname]:
+            return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname ) + "=" + ','.join([urlquote(str(val)) for val in file[tagdef.tagname]]) + ")\n"
+         elif file[tagdef.tagname]:
+            return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + "=" + urlquote(str(file[tagdef.tagname])) + ")\n"
+	 else:
+	    return ''
+      return ''.join([ render_tagvals(tagdef) for tagdef in tagdefs or [] ])
+${''.join([ render_file(file) for file in files or [] ])}
