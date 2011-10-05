@@ -189,9 +189,9 @@ class Study (Node):
                     if not files:
                         files = []
     
-                self.globals['appletTagvals'] = [ (tagname,
+                self.globals['appletTagvals'] = sorted([ (tagname,
                                                    [ self.subject[tagname] ])
-                                                  for tagname in self.globals['appletTagnames'] ]
+                                                  for tagname in self.globals['appletTagnames'] ], key=lambda tagdef: tagdef[0].lower())
                 
             elif self.action == 'upload' or self.action == 'download':
                 self.globals['tagdefsdict'] = dict([ item for item in self.globals['tagdefsdict'].iteritems()
