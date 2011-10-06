@@ -361,6 +361,21 @@ function getTagsName() {
 }
 
 /**
+ * Get the applet config
+ */
+function getConfig() {
+	var ret = '';
+	var options = window.location.search.substring(1).split('&');
+	for (var i=0; i<options.length; i++) {
+		if (options[i].indexOf('type=') == 0) {
+			ret = options[i];
+			break;
+		}
+	}
+	return ret;
+}
+
+/**
  * Get the custom tags name
  */
 function getRequiredTagsName() {
