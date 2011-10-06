@@ -140,16 +140,15 @@ configdef()
 	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(config=${name}${enum}${required_enum};${read_users}=*)"
 
 	case "${name}" in
-	    RP?)
-		offset=${name:2}
-		;;
-	    *)
-		offset=0
-		;;
-	esac
+            RP?)
+                offset=${name:2}
+                ;;
+            *)
+                offset=0
+                ;;
+        esac
 
-	curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/file/name=Upload%20${name}%20data;url=$(urlquote "https://${TARGET}/tagfiler/study?action=upload&type=${name}");list%20on%20homepage;homepage%20order=$(( 120 + $offset ));read%20users=%2A"
-	
+        curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/subject/name=Upload%20${name}%20data;url=$(urlquote "https://${TARGET}/tagfiler/study?action=upload&type=${name}");list%20on%20homepage;homepage%20order=$(( 120 + $offset ));read%20users=%2A"
 }
 
 tagdef()
