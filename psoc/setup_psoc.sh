@@ -70,6 +70,7 @@ typedef_descriptions_tag=`urlquote "typedef description"`
 applet_tags=`urlquote "_cfg_applet tags"`
 applet_required_tags=`urlquote "_cfg_applet tags require"`
 PSOC_tagfiler_admin=`urlquote "PSOC tagfiler admin"`
+read_users=`urlquote "read users"`
 
 typedef()
 {
@@ -136,7 +137,7 @@ configdef()
 	then
 		required_enum=";${applet_required_tags}=${required_values}"
 	fi
-	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(config=${name}${enum}${required_enum})"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(config=${name}${enum}${required_enum};${read_users}=*)"
 	
 }
 
@@ -178,63 +179,63 @@ curl -b cookiefile -c cookiefile -s -S -k -d username=${USERNAME} -d password=${
 # Define the tags definitions
 
 #		TAGNAME								TYPE	MULTIVAL	REQUIRED	GROUPS
-tagdef	'Drug'								text	false		true		PSOC
-tagdef	'Drug Source'						text	false		true		PSOC
-tagdef	'Protocol Nm'						text	false		true		PSOC
-tagdef	'Protocol Date'						date	false		true		PSOC
-tagdef	'Protocol Version'					int8	false		true		PSOC
-tagdef	'Experiment Date'					date	false		true		PSOC
-tagdef	'Experimentalist'					text	false		true		PSOC
-tagdef	'Phone'								text	false		true		PSOC
-tagdef	'Email'								text	false		true		PSOC
-tagdef	'Lab Book #'						int8	false		true		PSOC
-tagdef	'Page Number #'						int8	false		true		PSOC
-tagdef	'Material Source'					text	false		true		PSOC
-tagdef	'Values of Internal Standards'		text	false		true		PSOC
-tagdef	'Calibration Values & Parameters'	text	false		true		PSOC
-tagdef	'Machine Parameters'				text	false		true		Rp1
-tagdef	'Nutrient Conditions'				text	false		true		Rp1
-tagdef	'Growth Media'						text	false		true		Rp1
-tagdef	'Feeder Cells'						text	false		true		Rp1
-tagdef	'CO2 Concentration'					int8	false		true		Rp1
-tagdef	'O2 Concentration'					int8	false		true		Rp1
-tagdef	'Serum Lot'							int8	false		true		Rp1
-tagdef	'Serum Source'						text	false		true		Rp1
-tagdef	'Serum Percentage'					int8	false		true		Rp1
-tagdef	'Serum Type'						text	false		true		Rp1
-tagdef	'Passage Number'					int8	false		true		Rp1
-tagdef	'Added Growth Factors'				text	false		true		Rp1
-tagdef	'Confluence Number'					int8	false		true		Rp1
-tagdef	'Pressure'							int8	false		true		Rp1
-tagdef	'pH'								text	false		true		Rp1
-tagdef	'Experiment Geometry'				text	false		true		Rp1
-tagdef	'Proliferation Rate'				int8	false		true		Rp1
-tagdef	'Mouse Identifier'					text	false		true		Rp3 Rp4
-tagdef	'Mouse Age (start of experiment)'	int8	false		true		Rp3 Rp4
-tagdef	'Time since start of experiment'	int8	false		true		Rp3 Rp4
-tagdef	'Weight'							int8	false		true		Rp3 Rp4
-tagdef	'Drug Treatment Regimen'			text	false		true		Rp3 Rp4
-tagdef	'Cancer Model'						text	false		true		Rp3 Rp4
-tagdef	'Tumor Injection Protocol'			text	false		true		Rp3 Rp4
-tagdef	'Cage Number'						int8	false		true		Rp3 Rp4
-tagdef	'Number Cells Injected'				int8	false		true		Rp3 Rp4
-tagdef	'Serum Draw Researcher'				text	false		true		Rp3 Rp4
-tagdef	'Serum Draw Protocol'				text	false		true		Rp3 Rp4
-tagdef	'Draw Volume'						text	false		true		Rp3 Rp4
-tagdef	'Organ Harvest Protocol'			text	false		true		Rp3 Rp4
-tagdef	'Organ Type'						text	false		true		Rp3 Rp4
-tagdef	'Organ Preservation'				text	false		true		Rp3 Rp4
-tagdef	'Window Chamber Placement'			text	false		true		Rp3
-tagdef	'Window Chamber Size'				int8	false		true		Rp3
-tagdef	'Imaging Reagents'					text	false		true		Rp3
-tagdef	'Tumor Shape / gross morphology'	text	false		true		Rp3
-tagdef	'What’s outside the window?'		text	false		true		Rp3
-tagdef	'Chip Identifier'					text	false		true		Rp4
-tagdef	'DNA Sequence for GOI'				text	false		true		Rp4
-tagdef	'AB Vendors'						text	false		true		Rp4
-tagdef	'AB Catalog #'						int8	false		true		Rp4
-tagdef	'AB Lot #’s'						int8	false		true		Rp4
-tagdef	'Equipment & Operating Conditions'	text	false		true		Rp4
+tagdef	'Drug'								text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Drug Source'						text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Protocol Nm'						text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Protocol Date'						date	false		true		PSOC RP1 RP3 RP4
+tagdef	'Protocol Version'					int8	false		true		PSOC RP1 RP3 RP4
+tagdef	'Experiment Date'					date	false		true		PSOC RP1 RP3 RP4
+tagdef	'Experimentalist'					text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Phone'								text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Email'								text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Lab Book #'						int8	false		true		PSOC RP1 RP3 RP4
+tagdef	'Page Number #'						int8	false		true		PSOC RP1 RP3 RP4
+tagdef	'Material Source'					text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Values of Internal Standards'		text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Calibration Values & Parameters'	text	false		true		PSOC RP1 RP3 RP4
+tagdef	'Machine Parameters'				text	false		true		RP1
+tagdef	'Nutrient Conditions'				text	false		true		RP1
+tagdef	'Growth Media'						text	false		true		RP1
+tagdef	'Feeder Cells'						text	false		true		RP1
+tagdef	'CO2 Concentration'					int8	false		true		RP1
+tagdef	'O2 Concentration'					int8	false		true		RP1
+tagdef	'Serum Lot'							int8	false		true		RP1
+tagdef	'Serum Source'						text	false		true		RP1
+tagdef	'Serum Percentage'					int8	false		true		RP1
+tagdef	'Serum Type'						text	false		true		RP1
+tagdef	'Passage Number'					int8	false		true		RP1
+tagdef	'Added Growth Factors'				text	false		true		RP1
+tagdef	'Confluence Number'					int8	false		true		RP1
+tagdef	'Pressure'							int8	false		true		RP1
+tagdef	'pH'								text	false		true		RP1
+tagdef	'Experiment Geometry'				text	false		true		RP1
+tagdef	'Proliferation Rate'				int8	false		true		RP1
+tagdef	'Mouse Identifier'					text	false		true		RP3 RP4
+tagdef	'Mouse Age (start of experiment)'	int8	false		true		RP3 RP4
+tagdef	'Time since start of experiment'	int8	false		true		RP3 RP4
+tagdef	'Weight'							int8	false		true		RP3 RP4
+tagdef	'Drug Treatment Regimen'			text	false		true		RP3 RP4
+tagdef	'Cancer Model'						text	false		true		RP3 RP4
+tagdef	'Tumor Injection Protocol'			text	false		true		RP3 RP4
+tagdef	'Cage Number'						int8	false		true		RP3 RP4
+tagdef	'Number Cells Injected'				int8	false		true		RP3 RP4
+tagdef	'Serum Draw Researcher'				text	false		true		RP3 RP4
+tagdef	'Serum Draw Protocol'				text	false		true		RP3 RP4
+tagdef	'Draw Volume'						text	false		true		RP3 RP4
+tagdef	'Organ Harvest Protocol'			text	false		true		RP3 RP4
+tagdef	'Organ Type'						text	false		true		RP3 RP4
+tagdef	'Organ Preservation'				text	false		true		RP3 RP4
+tagdef	'Window Chamber Placement'			text	false		true		RP3
+tagdef	'Window Chamber Size'				int8	false		true		RP3
+tagdef	'Imaging Reagents'					text	false		true		RP3
+tagdef	'Tumor Shape / gross morphology'	text	false		true		RP3
+tagdef	'What’s outside the window?'		text	false		true		RP3
+tagdef	'Chip Identifier'					text	false		true		RP4
+tagdef	'DNA Sequence for GOI'				text	false		true		RP4
+tagdef	'AB Vendors'						text	false		true		RP4
+tagdef	'AB Catalog #'						int8	false		true		RP4
+tagdef	'AB Lot #’s'						int8	false		true		RP4
+tagdef	'Equipment & Operating Conditions'	text	false		true		RP4
 tagdef	'Recent QC Information'				text	false		true		RP1
 tagdef	'Cell Images'						text	false		true		RP1
 
