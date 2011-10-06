@@ -1095,14 +1095,14 @@ class FileTags (Node):
                         vals = [subject[tag]]
 
                     if vals:
-                        self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
+                        self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([u'%s' % val for val in vals])) or None)
                         for val in vals:
                             self.delete_tag(subject, tagdef, val)
             
                         if tag in [ 'read users', 'write users' ]:
                             for subfile in self.subfiles.values():
                                 self.enforce_tag_authz('write', subfile, tagdef)
-                                self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=tag, value=((vals[0]!=None) and ','.join([str(val) for val in vals])) or None)
+                                self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=tag, value=((vals[0]!=None) and ','.join([u'%s' % val for val in vals])) or None)
                                 for val in vals:
                                     self.delete_tag(subfile, tagdef, val)
                     else:

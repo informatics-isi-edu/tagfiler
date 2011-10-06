@@ -1044,11 +1044,11 @@ class Application:
     def logfmt(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
         if self.start_time:
             now = datetime.datetime.now(pytz.timezone('UTC'))
-            elapsed = '%d.%3.3d' % ( (now - self.start_time).seconds, (now - self.start_time).microseconds / 1000 )
+            elapsed = u'%d.%3.3d' % ( (now - self.start_time).seconds, (now - self.start_time).microseconds / 1000 )
             self.last_log_time = now
         else:
             elapsed = '-.---'
-        return '%ss %s%s req=%s -- %s' % (elapsed, web.ctx.ip, self.authn.role and ' user=%s' % urlquote(self.authn.role) or '', 
+        return u'%ss %s%s req=%s -- %s' % (elapsed, web.ctx.ip, self.authn.role and u' user=%s' % urlquote(self.authn.role) or u'', 
                                       self.request_guid, self.logfmt_old(action, dataset, tag, mode, user, value, txid))
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
