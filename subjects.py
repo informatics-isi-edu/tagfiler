@@ -400,7 +400,7 @@ class Subject (Application):
         tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
 
         if self.mergeSubjpredsTags:
-            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.tag not in [ 'name', 'version' ] and pred.op == '=' ]
+            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.tag not in [ 'name', 'version' ] and pred.op in [ '=', None ] ]
 
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)

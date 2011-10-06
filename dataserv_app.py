@@ -297,10 +297,23 @@ def path_linearize(path, quotefunc=urlquote):
     return u'/' + u'/'.join([ elem_linearize(elem) for elem in path ])
 
 def reduce_name_pred(x, y):
-    if x.tag == 'name' and x.op == '=' and len(x.vals) > 0:
-        return x.vals[0]
-    elif y.tag == 'name' and y.op == '=' and len(y.vals) > 0:
-        return y.vals[0]
+    names = set()
+    if type(x) is web.Storage:
+        if x.tag == 'name' and x.op == '=':
+            for name in x.vals or []:
+                names.add(name)
+    if type(y) is web.Storage:
+        if y.tag == 'name' and y.op == '=':
+            for name in y.vals or []:
+                names.add(name)
+    if type(x) is not web.Storage and x:
+        names.add(x)
+    if type(y) is not web.Storage and y:
+        names.add(y)
+    if len(names) > 1:
+        raise KeyError('too many names')
+    elif len(names) == 1:
+        return names.pop()
     else:
         return None
             
