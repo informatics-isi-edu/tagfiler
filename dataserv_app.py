@@ -451,12 +451,10 @@ class Application:
     __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
     def config_filler(self):
-        def helper():
-            config = self.select_config()
+        def helper(config):
             config['policy remappings'] = buildPolicyRules(config['policy remappings'])
-            return [ config ]
-
-        return lambda : helper()
+            return config
+        return lambda : [ helper(config) for config in self.select_config(pred=web.Storage(tag='config', op=None, vals=[])) ]
 
     def select_config_cached(self, configname=None):
         if configname == None:
@@ -509,19 +507,14 @@ class Application:
                                                 typedefs=Application.static_typedefs,
                                                 listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged', 'subject last tagged txid' ],
                                                 listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
-        if len(results) == 1:
-            config = results[0]
-            #web.debug(config)
-        elif not fake_missing:
-            return None
-        else:
-            config = web.Storage(params_and_defaults)
 
-        for key, default in params_and_defaults:
-            if config[key] == None or config[key] == []:
-                config[key] = default
+        def set_defaults(config):
+            for key, default in params_and_defaults:
+                if config[key] == None or config[key] == []:
+                    config[key] = default
+            return config
 
-        return config
+        return [ set_defaults(config) for config in results ]
 
     def select_view_all(self):
         return self.select_files_by_predlist(subjpreds=[ web.Storage(tag='view', op=None, vals=[]) ],
