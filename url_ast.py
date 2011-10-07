@@ -349,7 +349,7 @@ class FileList (Node):
                 subjpreds=[]
                 self.homepage = False
 
-            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['Image Set', 'id',
+            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['Image Set', 'id', 'Study Type',
                                                                                                                      'name', 'version',
                                                                                                                      'tagdef', 'typedef',
                                                                                                                      'config', 'view', 'url'])) ]
@@ -817,7 +817,7 @@ class FileTags (Node):
                                       list_priority=['path', 'list', 'view', 'all'],
                                       list_prefix='tag',
                                       extra_tags=
-                                      [ 'id', 'file', 'name', 'version', 'Image Set',
+                                      [ 'id', 'file', 'name', 'version', 'Image Set', 'Study Type',
                                         'write users', 'modified' ] 
                                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
@@ -956,7 +956,7 @@ class FileTags (Node):
             self.tagvals[pred.tag] = pred.vals
         
         listpreds =  [ web.Storage(tag=tag,op=None,vals=[])
-                       for tag in ['id', 'owner', 'write users', 'Image Set', 'url', 'incomplete'] + [p.tag for p in subjpreds]  ]
+                       for tag in ['id', 'owner', 'write users', 'Image Set', 'Study Type', 'url', 'incomplete'] + [p.tag for p in subjpreds]  ]
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
@@ -1056,7 +1056,7 @@ class FileTags (Node):
             # unique is True or None
             versions = 'any'
 
-        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'view', 'name', 'version', 'incomplete'] ] + origlistpreds
+        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'Study Type', 'view', 'name', 'version', 'incomplete'] ] + origlistpreds
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = ( simplepath[-1][0], [], [] )
@@ -1275,7 +1275,7 @@ class Query (Node):
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
-                                          extra_tags=[ 'id', 'file','name', 'version','Image Set',
+                                          extra_tags=[ 'id', 'file','name', 'version','Image Set', 'Study Type',
                                                        'write users', 'owner', 'modified', 'url' ]
                                           + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 

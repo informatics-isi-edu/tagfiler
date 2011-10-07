@@ -490,6 +490,7 @@ tagdef "incomplete"          empty       ""         anonymous   subject      fal
 tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
 tagdef "Image Set"           empty       "${admin}" subject     subject      false
+tagdef "Study Type"          text        "${admin}" subject     subject      false      config     ""       config
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
@@ -513,6 +514,7 @@ typedef type         text          'Scalar value type'             typedef
 typedef tagdef       text          'Tag definition'                tagdef
 typedef name         text          'Subject name'                  "latest with name"
 typedef vname        text          'Subject name@version'          vname
+typedef config       text          'Study Type'                    config
 typedef view         text          'View name'                     view
 typedef 'template mode' text       'Template rendering mode'       ""                 'embedded Embedded in Tagfiler HTML' 'page Standalone document'
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
