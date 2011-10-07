@@ -101,7 +101,6 @@ typedef()
 configdef()
 {
 	# get the URL for the new id
-	local url=`curl -b cookiefile -c cookiefile -s -S -k -d action=post "https://${TARGET}/tagfiler/file" | sed 's/file\/id/tags\/id/g'`
 	local name=`urlquote "$1"`
 	local values=""
 	local required_values=""
@@ -138,7 +137,7 @@ configdef()
 	then
 		required_enum=";${applet_required_tags}=${required_values}"
 	fi
-	curl -b cookiefile -c cookiefile -s -S -k -X PUT "${url}(config=${name}${enum}${required_enum};${read_users}=${all_users})"
+	curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/subject/config=${name}${enum}${required_enum};${read_users}=${all_users}"
 
 	case "${name}" in
             RP?)
