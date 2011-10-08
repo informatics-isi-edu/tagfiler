@@ -45,8 +45,10 @@ $else:
 			$ dtype = 'file'
 		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
 		$if filerecord.get('Image Set', False):
-			$ studyType=filerecord.get('Study Type', '')
-			$if studyType != '':
+			$ studyType=filerecord.get('Study Type', None)
+			$if studyType == None:
+				$ studyType=''
+			$else:
 				$ studyType='&type='+studyType
 			<a href="${home}/study/${dataid}?action=download${studyType}">(all&nbsp;parts)</a>
 		</td>
