@@ -72,6 +72,8 @@ applet_required_tags=`urlquote "_cfg_applet tags require"`
 PSOC_tagfiler_admin=`urlquote "PSOC tagfiler admin"`
 read_users=`urlquote "read users"`
 all_users=`urlquote "*"`
+_cfg_file_list_tags=`urlquote "_cfg_file list tags"`
+_cfg_tag_list_tags=`urlquote "_cfg_tag list tags"`
 
 typedef()
 {
@@ -137,7 +139,14 @@ configdef()
 	then
 		required_enum=";${applet_required_tags}=${required_values}"
 	fi
-	curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/subject/config=${name}${enum}${required_enum};${read_users}=${all_users}"
+	
+	# define the view
+	curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/subject/view=${name};${_cfg_file_list_tags}=${values};${_cfg_tag_list_tags}=${values}"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/view=${name}(owner=${PSOC_tagfiler_admin};${read_users}=${all_users})"
+	
+	# define the config
+	curl -b cookiefile -c cookiefile -s -S -k -X POST "https://${TARGET}/tagfiler/subject/config=${name}${enum}${required_enum}"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/config=${name}(owner=${PSOC_tagfiler_admin};${read_users}=${all_users})"
 
 	case "${name}" in
             RP?)
@@ -253,7 +262,7 @@ tagdef	'Cell Images'						text	false		false		RP1
 
 for ((  i = 0 ;  i < "${#tag_names[*]}";  i++  ))
 do
-	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tagdef/${tag_names[i]}?typestr=${tag_dbtypes[i]}&multivalue=${tag_multivalues[i]}&readpolicy-1=subject&writepolicy-1=subject"
+	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tagdef/${tag_names[i]}?typestr=${tag_dbtypes[i]}&multivalue=${tag_multivalues[i]}&readpolicy=subject&writepolicy=subject"
 	curl -b cookiefile -c cookiefile -s -S -k -X PUT "https://${TARGET}/tagfiler/tags/tagdef=${tag_names[i]}(owner=${PSOC_tagfiler_admin})"
 done
 
