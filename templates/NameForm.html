@@ -46,6 +46,10 @@ Select an initial write permission:
   <option value="owner">Only owner may write</option>
   <option value="*">Anybody may write</option>
 </select><br />
+Default View:
+<select name="defaultView" id="defaultView" onclick="chooseOptions('${home}', '${webauthnhome}', 'view', 'defaultView')" typestr="view">
+  <option value="">Choose a View name</option>
+</select><br />
 Status of the dataset:&nbsp;&nbsp;
 <input type="checkbox" id="incomplete" name="incomplete" value="incomplete" checked="checked" />Incomplete
 </div>

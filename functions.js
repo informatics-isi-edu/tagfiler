@@ -772,6 +772,11 @@ function validateNameForm(op, suffix) {
 			action += prefix + 'write%20users=*';
 			prefix = '&'
 		}
+		var defaultView = document.getElementById('defaultView'+suffix).value;
+		if (defaultView != '') {
+			action += prefix + 'default%20view=' + encodeURIComponent(defaultView);
+			prefix = '&'
+		}
 		if (document.getElementById('incomplete'+suffix).checked) {
 			action += prefix + 'incomplete';
 		}
