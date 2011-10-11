@@ -335,8 +335,12 @@ class FileList (Node):
             writetags = None
             if not listtags:
                 view = self.select_view(self.globals['view'])
-                listtags = view['file list tags']
-                writetags = view['file list tags write']
+                if view:
+                    listtags = view['file list tags']
+                    writetags = view['file list tags write']
+                else:
+                    listtags = []
+                    writetags = []
 
             builtinlist = [ 'id' ]
             self.globals['filelisttags'] = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
@@ -814,7 +818,7 @@ class FileTags (Node):
     def get_body(self):
         self.path_modified, self.listtags, writetags, self.limit, self.versions = \
               self.prepare_path_query(self.path,
-                                      list_priority=['path', 'list', 'view', 'all'],
+                                      list_priority=['path', 'list', 'view', 'subject', 'all'],
                                       list_prefix='tag',
                                       extra_tags=
                                       [ 'id', 'file', 'name', 'version', 'Image Set', 'Study Type',

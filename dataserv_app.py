@@ -535,17 +535,16 @@ class Application:
                                              listas=dict([ ("_cfg_%s" % key, key) for key in ['file list tags', 'file list tags write', 'tag list tags'] ]))
 
     def select_view(self, viewname=None, default='default'):
-        if viewname == None:
-            viewname = default
-        if viewname == None:
-            return None
-
-        view = view_cache.select(self.db, lambda : self.select_view_all(), self.authn.role, viewname)
-        if view == None:
-            return self.select_view(default, None)
-        else:
-            return view
+        return self.select_view_prioritized( [viewname, default] )
         
+    def select_view_prioritized(self, viewnames=['default']):
+        for viewname in viewnames:
+            if viewname:
+                view = view_cache.select(self.db, lambda : self.select_view_all(), self.authn.role, viewname)
+                if view != None:
+                    return view
+        return None
+
     ops = [ ('', 'Tagged'),
             (':not:', 'Not tagged'),
             ('=', 'Equal'),
@@ -2471,7 +2470,7 @@ class Application:
 
         return relevant_tags_txid(path)
 
-    def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'default'], list_prefix=None, extra_tags=[]):
+    def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'subject', 'default'], list_prefix=None, extra_tags=[]):
         """Prepare (path, listtags, writetags, limit, versions) from input path, web environment, and input policies.
 
            list_priority  -- chooses first successful source of listtags
@@ -2479,6 +2478,7 @@ class Application:
                 'path' : use listpreds from path[-1]
                 'list' : use 'list' queryopt
                 'view' : use view named by 'view' queryopt
+                'subject' : use view named by 'default view' tag of subject ... REQUIRES EXTRA QUERY STEP AND SINGLE SUBJECT
                 'default' : use 'default' view
                 'all' : use all defined tags
 
@@ -2502,15 +2502,34 @@ class Application:
         subjpreds, listpreds, ordertags = path[-1]
         save_listpreds = []
         
-        for source in list_priority:
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
+        if unique == False:
+            versions = 'latest'
+        else:
+            # unique is True or None
+            versions = 'any'
+
+        versions = self.queryopts.get('versions', versions)
+        if versions not in [ 'latest', 'any' ]:
+            versions = 'latest'
             
-            listopt = self.queryopts.get('list')
-            viewopt = self.queryopts.get('view')
-            view = self.select_view(viewopt)
-            default = self.select_view()
-            listname = '%s list tags' % list_prefix
-            writename = '%s list tags write' % list_prefix
-                
+        listopt = self.queryopts.get('list')
+        viewopt = self.queryopts.get('view')
+        view = self.select_view(viewopt)
+        default = self.select_view()
+        listname = '%s list tags' % list_prefix
+        writename = '%s list tags write' % list_prefix
+
+        sview = None
+        if 'subject' in list_priority:
+            test_path = [ x for x in path ]
+            test_path[-1] = (subjpreds, [web.Storage(tag='default view', op=None, vals=[])], [])
+            results = self.select_files_by_predlist_path(test_path, versions=versions, limit=1)
+            if len(results) > 0:
+                subject = results[0]
+                sview = self.select_view(subject['default view'])
+
+        for source in list_priority:
             if source == 'path' and listpreds:
                 listtags = [ pred.tag for pred in listpreds ]
                 save_listpreds = listpreds
@@ -2525,12 +2544,16 @@ class Application:
                 listtags = view.get(listname, [])
                 writetags = view.get(writename, [])
                 break
-            elif source == 'default' and default and view.get(listname, []):
+            elif source == 'default' and default and default.get(listname, []):
                 listtags = default.get(listname, [])
-                writetags = view.get(writename, [])
+                writetags = default.get(writename, [])
                 break
             elif source == 'all':
                 listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
+                break
+            elif source == 'subject' and sview and sview.get(listname, []):
+                listtags = sview.get(listname, [])
+                writetags = view.get(writename, [])
                 break
 
         listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
@@ -2546,17 +2569,6 @@ class Application:
             except:
                 limit = 25
                 
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
-        if unique == False:
-            versions = 'latest'
-        else:
-            # unique is True or None
-            versions = 'any'
-
-        versions = self.queryopts.get('versions', versions)
-        if versions not in [ 'latest', 'any' ]:
-            versions = 'latest'
-            
         return (path, listtags, writetags, limit, versions)
 
     # static class fields
