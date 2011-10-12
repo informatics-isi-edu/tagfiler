@@ -2147,7 +2147,7 @@ class Application:
 
             wheres = []
 
-            valcol = 'value'
+            valcol = '%s.value'  % wraptag(tagdef.tagname)
             if tagdef.tagname == 'id':
                 m['table'] = 'resources'
                 m['value'] = ', subject AS value'
@@ -2362,9 +2362,8 @@ class Application:
         def dbquote(s):
             return s.replace("'", "''")
         
-        #web.debug(cq, values.pack())
-        #traceInChunks(cq)
-        #web.debug('values', values.pack())
+        traceInChunks(cq)
+        web.debug('values', values.pack())
 
         return (cq, values.pack())
 
