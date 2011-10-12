@@ -2539,21 +2539,24 @@ class Application:
                 else:
                     listtags = [ listopt ]
                 break
-            elif source == 'view' and viewopt and view and view.get(listname, []):
+            elif source == 'view' and viewopt and view:
                 listtags = view.get(listname, [])
                 writetags = view.get(writename, [])
                 break
-            elif source == 'default' and default and default.get(listname, []):
+            elif source == 'default' and default:
                 listtags = default.get(listname, [])
                 writetags = default.get(writename, [])
                 break
             elif source == 'all':
-                listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
+                listtags == None
                 break
             elif source == 'subject' and sview and sview.get(listname, []):
                 listtags = sview.get(listname, [])
                 writetags = view.get(writename, [])
                 break
+
+        if not listtags:
+            listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
 
         listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
 
