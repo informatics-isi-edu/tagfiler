@@ -2362,8 +2362,8 @@ class Application:
         def dbquote(s):
             return s.replace("'", "''")
         
-        traceInChunks(cq)
-        web.debug('values', values.pack())
+        #traceInChunks(cq)
+        #web.debug('values', values.pack())
 
         return (cq, values.pack())
 
