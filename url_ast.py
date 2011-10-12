@@ -924,7 +924,7 @@ class FileTags (Node):
 
         tagdefs = [ x for x in all if x.tagname in self.listtags ]
 
-        title = u'Tag(s) for subject matching "' + urlunquote(path_linearize(simplepath, lambda x: x)) + u'"'
+        title = u'Tag(s) for subject matching "' + path_linearize(simplepath, lambda x: x) + u'"'
         if len(files) == 1:
             return self.renderlist(title,
                                    [self.render.FileTagExisting('', files[0], tagdefs)])
