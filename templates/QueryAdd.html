@@ -22,7 +22,7 @@ $if None:
   <table class="query-add"><tr>
   <td><select id="tag" name="tag" onchange='selectTagOperators();'>
   	$ tagnames = tagdefsdict.keys()
-	$ tagnames.sort()
+	$ tagnames.sort(key=lambda tagname: tagname.lower())
 	$ display = None
 	$ typestr = None
 	$for tagname in tagnames:
