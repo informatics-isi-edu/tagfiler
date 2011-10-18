@@ -575,7 +575,11 @@ class Subject (Application):
             if junk_files:
                 self.deletePrevious(junk_files)
             view = ''
-            if self.subject.dtype:
+            try:
+                view = '?view=%s' % urlquote('%s' % self.subject['default view'])
+            except:
+                pass
+            if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             if web.ctx.env.get('HTTP_REFERER', None) != None:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
