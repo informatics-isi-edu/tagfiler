@@ -2117,7 +2117,7 @@ class Application:
 
             return pd
         
-        def tag_query(tagdef, dbtype, preds, values, final=True, tprefix='_'):
+        def tag_query(tagdef, dbtype, preds, values, final=True, tprefix='_', spred=False):
             """Compile preds for one tag into a query fetching all satisfactory triples.
 
                Returns (tagdef, querystring, subject_wheres)
@@ -2137,14 +2137,8 @@ class Application:
             """
             typedef = typedefs[tagdef.typestr]
             subject_wheres = []
-            
-            if final:
-                q = '(SELECT subject%(value)s FROM %(table)s %(where)s %(group)s) AS %(alias)s'
-            else:
-                q = 'SELECT subject%(value)s FROM %(table)s %(where)s %(group)s'
 
             m = dict(value='', where='', group='', table=wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
-
             wheres = []
 
             valcol = '%s.value'  % wraptag(tagdef.tagname)
@@ -2219,6 +2213,24 @@ class Application:
             if w:
                 m['where'] = 'WHERE ' + w
 
+            if tagdef.typestr != 'empty':
+                if tagdef.multivalue and wheres and spred:
+                    # multivalue spred requires SUBJECT to match all preds, possibly using different triples for each match
+                    m['where'] = ''
+                    tables = [ m['table'] ]
+                    for i in range(0, len(wheres)):
+                        tables.append( 'JOIN (SELECT subject FROM %s WHERE %s GROUP BY subject) AS %s USING (subject)'
+                                       % (wraptag(tagdef.tagname), wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
+                    m['table'] = ' '.join(tables)
+
+                # single value or multivalue lpred requires VALUE to match all preds
+                q = 'SELECT subject%(value)s FROM %(table)s %(where)s %(group)s'
+            else:
+                q = 'SELECT subject FROM %(table)s %(where)s'
+            
+            if final:
+                q = '(' + q + ') AS %(alias)s'
+
             return (tagdef, q % m, subject_wheres)
 
         def elem_query(spreds, lpreds, values, final=True):
@@ -2265,7 +2277,7 @@ class Application:
                 selects = []
 
             for tag, preds in spreds.items():
-                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, tprefix='s_')
+                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, tprefix='s_', spred=True)
                 if swheres or tag in versions_test_added:
                     outer.append(sq)
                     subject_wheres.extend(swheres)
