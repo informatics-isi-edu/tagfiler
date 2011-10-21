@@ -1,0 +1,162 @@
+$def with ()
+$if None:
+	$# 
+	$# Copyright 2010 University of Southern California
+	$# 
+	$# Licensed under the Apache License, Version 2.0 (the "License");
+	$# you may not use this file except in compliance with the License.
+	$# You may obtain a copy of the License at
+	$# 
+	$#    http://www.apache.org/licenses/LICENSE-2.0
+	$# 
+	$# Unless required by applicable law or agreed to in writing, software
+	$# distributed under the License is distributed on an "AS IS" BASIS,
+	$# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	$# See the License for the specific language governing permissions and
+	$# limitations under the License.
+	$#
+<link rel="stylesheet" type="text/css" href="${home}/static/jquery-ui.css">
+<script type="text/javascript" src="${home}/static/jquery-ui.js"></script>
+<div id="psoc">
+<table width="100%" border="0">
+<tr>
+<th><h2>Query Tags</h2></th>
+<th><h2>Query Preview</h2></th>
+</tr>
+<tr>
+<td style="width:50%;vertical-align: top;" >
+<p>Select an available tag and click 'Add to query' to build a query:</p>
+<select id="available_tags" name="available_tags" onclick="loadAvailableTags('available_tags')">
+<option value=''>Available Tags</option>
+</select>
+<input type="button" id="addToQuery" name="addToQuery" onclick="addToQuery('tags', 'available_tags');" value="Add to query" />
+<br/><br/>
+<table class="role-list" id="tags">
+	<tr class="heading" >
+		<th>&nbsp;&nbsp;Tag&nbsp;&nbsp;</th>
+		<th>&nbsp;&nbsp;Operator&nbsp;&nbsp;</th>
+		<th>&nbsp;&nbsp;Values&nbsp;&nbsp;</th>
+		<th>&nbsp;&nbsp;Add Value&nbsp;&nbsp;</th>
+	</tr>
+</table>
+<br/><br/>
+<select name="versions" id="versions" onchange="showPreview()">
+        <option value="latest">Show latest version if matches</option>
+        <option value="any">Show any version which matches</option>
+</select><br/><br/>
+<input type="checkbox" id="Limit" name="Limit" value="all" onchange="showPreview()" />View all results<br/><br/>
+<input type="button" id="Submit" name="Submit" onclick="sendQuery();" value="Submit"/>
+</td>
+<td id="Query_Results" style="width:50%">
+<fieldset id="Query_Expression">
+<legend>Query Expression</legend>
+</fieldset>
+<br/>
+<fieldset id="Query_URL">
+<legend>Query URL</legend>
+</fieldset>
+<br/>
+<fieldset>
+<legend>Results View</legend>
+<input name="ResultsView" id="defaultResultsView" type="radio" value="default"  onclick="displayViewForm()" />Default View
+<br/>
+<input name="ResultsView" type="radio" value="existing" onclick="displayViewForm()" />Existing Views
+<select id="selectViews" name="selectViews"  onchange="showPreview()" style="display: none">
+</select>
+<br/>
+<input name="ResultsView" type="radio" value="customized" onclick="displayViewForm()" />Customized View
+<div id="customizedViewDiv" style="display: none">
+<p>Select an available tag and click 'Add to View' to customize the view:</p>
+<select id="customizedViewSelect" name="customizedViewSelect" onclick="loadAvailableTags('customizedViewSelect')">
+<option value=''>Available Tags</option>
+</select>
+<input type="button" id="addToListColumns" name="addToListColumns" onclick="addToListColumns('list_tags', 'customizedViewSelect');" value="Add to View" />
+<br/><br/>
+<table class="role-list">
+	<tr class="heading" >
+		<th>&nbsp;&nbsp;Tag&nbsp;&nbsp;</th>
+		<th>&nbsp;&nbsp;Order&nbsp;&nbsp;</th>
+	</tr>
+	<tr class="role">
+		<td>
+			<table id="list_tags" class="role-list">
+			</table>
+		</td>
+		<td>
+			<table id="move_list_tags" style="display: none;">
+				<tr>
+					<td style="border-width: 0px;">
+						<input type="button" id="move_list_tags_up" name="move_list_tags_up" onclick="moveUp('list_tags');" value="Move Up" disabled="disabled" />
+					</td>
+				</tr>
+				<tr>
+					<td style="border-width: 0px;">
+						<input type="button" id="move_list_tags_down" name="move_list_tags_down" onclick="moveDown('list_tags');" value="Move Down" disabled="disabled" />
+					</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
+</table>
+</div>
+</fieldset>
+<br/>
+<fieldset>
+<legend>
+<input type="checkbox" id="sortResults" name="sortResults" value="sort" onchange="showPreview()" onclick="displaySortResults()" />Sort results
+</legend>
+<div id="sortResultsDiv" style="display: none">
+<p>Select an available tag and click 'Add' to sort the results:</p>
+<select id="sortViewSelect" name="sortViewSelect" onclick="loadAvailableTags('sortViewSelect')">
+<option value=''>Available Tags</option>
+</select>
+<input type="button" id="addToSortColumns" name="addToSortColumns" onclick="addToSortColumns('sort_tags', 'sortViewSelect');" value="Add" />
+<br/><br/>
+<table class="role-list">
+	<tr class="heading" >
+		<th>&nbsp;&nbsp;Tag&nbsp;&nbsp;</th>
+		<th>&nbsp;&nbsp;Order&nbsp;&nbsp;</th>
+	</tr>
+	<tr class="role">
+		<td>
+			<table id="sort_tags" class="role-list">
+			</table>
+		</td>
+		<td>
+			<table id="move_sort_tags" style="display: none;">
+				<tr>
+					<td style="border-width: 0px;">
+						<input type="button" id="move_sort_tags_up" name="move_sort_tags_up" onclick="moveUp('sort_tags');" value="Move Up" disabled="disabled" />
+					</td>
+				</tr>
+				<tr>
+					<td style="border-width: 0px;">
+						<input type="button" id="move_sort_tags_down" name="move_sort_tags_down" onclick="moveDown('sort_tags');" value="Move Down" disabled="disabled" />
+					</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
+</table>
+</fieldset>
+<br/>
+<fieldset id="Query_Preview">
+</fieldset>
+</td>
+</tr>
+</table>
+</div>
+<script type="text/javascript">
+$for op in ops:
+	$ val, desc = op
+	ops["${desc}"] = "${val}";
+$for key, values in opsExcludeTypes.iteritems():
+	var temp = new Array();
+	$for val in values:
+		temp.push("${val}");
+	opsExcludeTypes["${key}"] = temp;
+\$(document).ready(function() {
+	initPSOC("${home}", "${authn.role}");
+});
+</script>
+

@@ -1382,11 +1382,18 @@ class Query (Node):
                     yield r
             else:
                 self.header('Content-Type', 'text/html')
-                for r in self.renderlist(self.title,
-                                         [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
-                                          self.render.QueryView(Application.ops, self.subjpreds),
-                                          self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
-                    yield r
+                try:
+                    preview = self.queryopts['preview']
+                except:
+                    preview = None
+                if preview == None:
+                    for r in self.renderlist(self.title,
+                                             [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
+                                              self.render.QueryView(Application.ops, self.subjpreds),
+                                              self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
+                        yield r
+                else:
+                    yield self.render.FileList(files, showversions=self.showversions, limit=self.limit)
 
         for res in self.dbtransact(body, postCommit):
             yield res
