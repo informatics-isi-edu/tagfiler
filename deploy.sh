@@ -113,16 +113,18 @@ runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
 
-cp dbsetup.sh /home/${SVCUSER}/dbsetup.sh
-chown ${SVCUSER}: /home/${SVCUSER}/dbsetup.sh
-chmod a+x /home/${SVCUSER}/dbsetup.sh
+SVCHOME=$(eval "echo ~${SVCUSER}")
 
-cp dbsetup-*-demo.sh /home/${SVCUSER}/
-chown ${SVCUSER}: /home/${SVCUSER}/dbsetup-*-demo.sh
-chmod a+x /home/${SVCUSER}/dbsetup-*-demo.sh
+cp dbsetup.sh ${SVCHOME}/dbsetup.sh
+chown ${SVCUSER}: ${SVCHOME}/dbsetup.sh
+chmod a+x ${SVCHOME}/dbsetup.sh
+
+cp dbsetup-*-demo.sh ${SVCHOME}/
+chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
+chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
 
 # setup db tables
-runuser -c "~${SVCUSER}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
+runuser -c "${SVCHOME}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
