@@ -1388,6 +1388,8 @@ var VAL_COUNTER;
 var ROW_TAGS_COUNTER;
 var ROW_SORTED_COUNTER;
 var availableTags = null;
+var availableTagdefs = null;
+var availableViews = null;
 var ops = new Object();
 var opsExcludeTypes = new Object();
 
@@ -1436,8 +1438,7 @@ function initPSOC(home, user) {
 	$('#defaultResultsView').click();
 }
 
-function loadAvailableTags(id) {
-	document.getElementById(id).removeAttribute('onclick');
+function loadTags() {
 	var url = HOME + '/query/tagdef(tagdef;' + encodeURIComponent('tagdef type') + ')?limit=none';
 	$.ajax({
 		url: url,
@@ -1447,18 +1448,45 @@ function loadAvailableTags(id) {
 		async: false,
 		success: function(data, textStatus, jqXHR) {
 			availableTags = new Object();
-			var availableTagdefs = new Array();
+			availableTagdefs = new Array();
 			$.each(data, function(i, object) {
 				availableTagdefs.push(object['tagdef']);
 				availableTags[object['tagdef']] = object['tagdef type'];
 			});
-			var select = $(document.getElementById(id));
 			availableTagdefs.sort(compareIgnoreCase);
-			$.each(availableTagdefs, function(i, value) {
-				var option = $('<option>');
-				option.text(value);
-				option.attr('value', value);
-				select.append(option);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
+}
+
+function loadAvailableTags(id) {
+	document.getElementById(id).removeAttribute('onclick');
+	if (availableTags == null) {
+		loadTags();
+	}
+	var select = $(document.getElementById(id));
+	$.each(availableTagdefs, function(i, value) {
+		var option = $('<option>');
+		option.text(value);
+		option.attr('value', value);
+		select.append(option);
+	});
+}
+
+function loadViews() {
+	var url = HOME + '/query/view(view)view?limit=none';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			availableViews = new Array();
+			$.each(data, function(i, object) {
+				availableViews.push(object.view);
 			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -1467,11 +1495,56 @@ function loadAvailableTags(id) {
 	});
 }
 
+function loadAvailableViews(id) {
+	document.getElementById(id).removeAttribute('onclick');
+	if (availableViews == null) {
+		loadViews();
+	}
+	var select = $('#' + id);
+	$.each(availableViews, function(i, object) {
+		var option = $('<option>');
+		option.text(object);
+		option.attr('value', object);
+		select.append(option);
+	});
+}
+
 function addToQuery(tableId, selectId) {
 	var tag = $('#' + selectId).val();
 	if (tag == '') {
 		return;
 	}
+	addToQueryTable(tableId, tag);
+}
+
+function addViewTagsToQuery(tableId, selectId) {
+	var tag = $('#' + selectId).val();
+	if (tag == '') {
+		return;
+	}
+	if (availableTags == null) {
+		loadTags();
+	}
+	var url = HOME + '/query/view=' + encodeURIComponent(tag) + '(' + encodeURIComponent('_cfg_file list tags') + ')' + encodeURIComponent('_cfg_file list tags');
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			var tags = data[0]['_cfg_file list tags'];
+			$.each(tags, function(i, value) {
+				addToQueryTable(tableId, value);
+			});
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
+}
+
+function addToQueryTable(tableId, tag) {
 	var tbody = getChild($('#' + tableId), 1);
 	var id = makeId('row', ++ROW_COUNTER);
 	var tr = $('<tr>');
@@ -1867,24 +1940,14 @@ function displayViewForm() {
 	var view = $('input:radio[name=ResultsView]:checked').val();
 	if (view == 'existing') {
 		if ($('#selectViews').val() == null) {
-			var url = HOME + '/query/view(view)view?limit=none';
-			$.ajax({
-				url: url,
-				accepts: {text: 'application/json'},
-				dataType: 'json',
-				headers: {'User-agent': 'Tagfiler/1.0'},
-				async: false,
-				success: function(data, textStatus, jqXHR) {
-					$.each(data, function(i, object) {
-						var option = $('<option>');
-						option.text(object.view);
-						option.attr('value', object.view);
-						select.append(option);
-					});
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
-				}
+			if (availableViews == null) {
+				loadViews();
+			}
+			$.each(availableViews, function(i, object) {
+				var option = $('<option>');
+				option.text(object);
+				option.attr('value', object);
+				select.append(option);
 			});
 		}
 		select.css('display', '');

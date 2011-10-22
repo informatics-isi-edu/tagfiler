@@ -25,11 +25,23 @@ $if None:
 </tr>
 <tr>
 <td style="width:50%;vertical-align: top;" >
-<p>Select an available tag and click 'Add to query' to build a query:</p>
+<fieldset>
+<legend>Available tags</legend>
+<p>Select an available tag and click 'Add' to build a query:</p>
 <select id="available_tags" name="available_tags" onclick="loadAvailableTags('available_tags')">
-<option value=''>Available Tags</option>
+<option value=''>Choose a tag</option>
 </select>
-<input type="button" id="addToQuery" name="addToQuery" onclick="addToQuery('tags', 'available_tags');" value="Add to query" />
+<input type="button" id="addToQuery" name="addToQuery" onclick="addToQuery('tags', 'available_tags');" value="Add" />
+</fieldset>
+<br/>
+<fieldset>
+<legend>Available views</legend>
+<p>Select an available view and click 'Add' to build a query:</p>
+<select id="available_views" name="available_views" onclick="loadAvailableViews('available_views')">
+<option value=''>Choose a view</option>
+</select>
+<input type="button" id="addViewTagsToQuery" name="addViewTagsToQuery" onclick="addViewTagsToQuery('tags', 'available_views');" value="Add" />
+</fieldset>
 <br/><br/>
 <table class="role-list" id="tags">
 	<tr class="heading" >
