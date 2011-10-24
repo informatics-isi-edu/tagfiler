@@ -1862,6 +1862,7 @@ function moveUp(tableId) {
 	var prevRow = row.prev();
 	prevRow.insertAfter(row);
 	checkMoveButtons(tableId);
+	showPreview();
 }
 
 function moveDown(tableId) {
@@ -1869,6 +1870,7 @@ function moveDown(tableId) {
 	var nextRow = row.next();
 	nextRow.insertBefore(row);
 	checkMoveButtons(tableId);
+	showPreview();
 }
 
 function showPreview() {
