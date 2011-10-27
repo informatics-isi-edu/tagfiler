@@ -1393,6 +1393,7 @@ var ROW_TAGS_COUNTER;
 var ROW_SORTED_COUNTER;
 var availableTags = null;
 var availableTagdefs = null;
+var allTagdefs = null;
 var availableViews = null;
 var ops = new Object();
 var opsExcludeTypes = new Object();
@@ -1466,7 +1467,7 @@ function loadTypedefs() {
 }
 
 function loadTags() {
-	var url = HOME + '/query/tagdef(tagdef;' + encodeURIComponent('tagdef type') + ')?limit=none';
+	var url = HOME + '/query/tagdef(tagdef;' + encodeURIComponent('tagdef type') + ';' + encodeURIComponent('tagdef multivalue') + ')?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1476,9 +1477,11 @@ function loadTags() {
 		success: function(data, textStatus, jqXHR) {
 			availableTags = new Object();
 			availableTagdefs = new Array();
+			allTagdefs = new Object();
 			$.each(data, function(i, object) {
 				availableTagdefs.push(object['tagdef']);
 				availableTags[object['tagdef']] = object['tagdef type'];
+				allTagdefs[object['tagdef']] = object;
 			});
 			availableTagdefs.sort(compareIgnoreCase);
 		},
@@ -1591,7 +1594,7 @@ function addToQueryTable(tableId, tag) {
 	td.append(input);
 	td = $('<td>');
 	tr.append(td);
-	var select = getSelectTagOperator(availableTags[tag]);
+	var select = getSelectTagOperator(tag, availableTags[tag]);
 	var selId = select.attr('id');
 	td.append(select);
 	td = $('<td>');
@@ -1635,20 +1638,22 @@ function deleteValue(id) {
 	showPreview();
 }
 
-function getSelectTagOperator(type) {
+function getSelectTagOperator(tag, type) {
 	var select = $('<select>');
 	var id = makeId('select', ROW_COUNTER);
 	makeAttributes(select,
 				   'id', id,
 				   'name', id,
 				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id)));
-	var option = $('<option>');
-	option.text('Between');
-	option.attr('value', 'Between');
-	select.append(option);
+	if (!allTagdefs[tag]['tagdef multivalue']) {
+		var option = $('<option>');
+		option.text('Between');
+		option.attr('value', 'Between');
+		select.append(option);
+	}
 	$.each(ops, function(key, value) {
 		if (!opsExcludeTypes[value].contains(type)) {
-				option = $('<option>');
+				var option = $('<option>');
 				option.text(key);
 				option.attr('value', key);
 				select.append(option);
