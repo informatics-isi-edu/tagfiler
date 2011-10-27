@@ -858,8 +858,8 @@ function renderTagdefs(home, table) {
     var columnmap = {};
     var typedescs = null;
     var cardinality = [];
-    cardinality[false] = "0 or one";
-    cardinality[true] = "1 or more";
+    cardinality[false] = "0 or 1";
+    cardinality[true] = "0 or more";
 
     var rows = table.getElementsByTagName("tr");
     var headrow = rows[0];
@@ -1191,14 +1191,14 @@ function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
+		async: (count <= MAX_RETRIES ? true : false),
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			typedefSelectValues = new Array();
 			$.each(data, function(i, object) {
 				typedefSelectValues.push(object['typedef']);
 			});
-			initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, 0)
+			initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
@@ -1217,7 +1217,7 @@ function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
+		async: (count <= MAX_RETRIES ? true : false),
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			typedefTagrefs = new Object();
@@ -1225,7 +1225,7 @@ function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
 				typedefTagrefs[object['typedef']] = object['typedef tagref'];
 			});
 			if (tagSelectOptions[typestr] == null) {
-				initTagSelectOptions(home, webauthnhome, typestr, id, pattern, 0);
+				initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count);
 			} else {
 				appendOptions(typestr, id, pattern);
 			}
@@ -1257,7 +1257,7 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
+		async: (count <= MAX_RETRIES ? true : false),
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			$.each(data, function(i, object) {
@@ -1300,16 +1300,19 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 	});
 }
 
-function chooseOptions(home, webauthnhome, typestr, id) {
+function chooseOptions(home, webauthnhome, typestr, id, count) {
+	if (count == null) {
+		count = 0;
+	}
 	var pattern = '';
 	if (typestr == 'rolepat') {
 		pattern = '*';
 		typestr = 'role'
 	}
 	if (typedefSelectValues == null) {
-		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, 0);
+		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count);
 	} else if (tagSelectOptions[typestr] == null) {
-		initTagSelectOptions(home, webauthnhome, typestr, id, pattern, 0);
+		initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count);
 	} else {
 		appendOptions(typestr, id, pattern);
 	}
@@ -1383,6 +1386,7 @@ function appendTypedefs(id) {
 
 var HOME;
 var USER;
+var WEBAUTHNHOME;
 var ROW_COUNTER;
 var VAL_COUNTER;
 var ROW_TAGS_COUNTER;
@@ -1392,6 +1396,7 @@ var availableTagdefs = null;
 var availableViews = null;
 var ops = new Object();
 var opsExcludeTypes = new Object();
+var typedefSubjects = null;
 
 function str(value) {
 	return '\'' + value + '\'';
@@ -1424,18 +1429,40 @@ function getChild(item, index) {
 	return item.children(':nth-child(' + index + ')');
 }
 
-function initPSOC(home, user) {
+function initPSOC(home, user, webauthnhome) {
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
+	WEBAUTHNHOME = webauthnhome;
 	ROW_COUNTER = 0;
 	VAL_COUNTER = 0;
 	ROW_TAGS_COUNTER = 0;
 	ROW_SORTED_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
+	loadTypedefs();
 	showPreview();
 	$('#defaultResultsView').click();
 	$('#defaultResultsView').click();
+}
+
+function loadTypedefs() {
+	var url = HOME + '/query/typedef(typedef;' + encodeURIComponent('typedef values') + ';' +encodeURIComponent('typedef dbtype') + ';' +encodeURIComponent('typedef tagref') + ')?limit=none';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			typedefSubjects = new Object();
+			$.each(data, function(i, object) {
+				typedefSubjects[object['typedef']] = object;
+			});
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
 }
 
 function loadTags() {
@@ -1565,6 +1592,7 @@ function addToQueryTable(tableId, tag) {
 	td = $('<td>');
 	tr.append(td);
 	var select = getSelectTagOperator(availableTags[tag]);
+	var selId = select.attr('id');
 	td.append(select);
 	td = $('<td>');
 	tr.append(td);
@@ -1579,12 +1607,15 @@ function addToQueryTable(tableId, tag) {
 		makeAttributes(input,
 						'type', 'button',
 						'id', makeId('button', ROW_COUNTER),
-						'onclick', makeFunction('addNewValue', ROW_COUNTER),
+						'onclick', makeFunction('addNewValue', ROW_COUNTER, str(availableTags[tag]), str(selId)),
 						'value', '+');
 		input.css('width', '100%');
 		input.css('margin', 'auto');
-		input.css('display', 'none');
 		td.append(input);
+		input.click();
+		if ($('#' + selId).val() == 'Between') {
+			input.css('display', 'none');
+		}
 	} else {
 		td = $('<td>');
 		tr.append(td);
@@ -1610,19 +1641,45 @@ function getSelectTagOperator(type) {
 	makeAttributes(select,
 				   'id', id,
 				   'name', id,
-				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER));
+				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id)));
+	var option = $('<option>');
+	option.text('Between');
+	option.attr('value', 'Between');
+	select.append(option);
 	$.each(ops, function(key, value) {
 		if (!opsExcludeTypes[value].contains(type)) {
-				var option = $('<option>');
+				option = $('<option>');
 				option.text(key);
 				option.attr('value', key);
 				select.append(option);
 		}
 	});
+	if (type == 'timestamptz' || type == 'date') {
+		select.val('Between');
+	} else if (type == 'empty') {
+		select.val('Tagged');
+	}
+	else if (type == 'int8' || type == 'float8' || isSelect(type)) {
+		select.val('Equal');
+	} else {
+		select.val('Regular expression (case insensitive)');
+	}
 	return select;
 }
 
-function addNewValue(row) {
+function isSelect(type) {
+	var ret = false;
+	if (type == 'role' || 
+		type == 'rolepat' || 
+		typedefSubjects[type]['typedef values'] != null ||
+		typedefSubjects[type]['typedef tagref'] != null) {
+		
+		ret = true;
+	}
+	return ret;
+}
+
+function addNewValue(row, type, selectOperatorId) {
 	var valId = makeId('vals', ++VAL_COUNTER);
 	var table = $('#' + makeId('table', row));
 	var tr = $('<tr>');
@@ -1632,11 +1689,64 @@ function addNewValue(row) {
 	var td = $('<td>');
 	tr.append(td);
 	td.css('border-width', '0px');
-	var input = $('<input>');
-	makeAttributes(input,
-					'type', 'text',
-					'onkeyup', makeFunction('showPreview'));
-	td.append(input);
+	var selVal = $('#' + selectOperatorId).val();
+	if (selVal == 'Between') {
+		if (!isSelect(type)) {
+			var input = $('<input>');
+			makeAttributes(input,
+							'type', 'text',
+							'onkeyup', makeFunction('showPreview'));
+			td.append(input);
+			td.append('AND');
+			input = $('<input>');
+			makeAttributes(input,
+							'type', 'text',
+							'onkeyup', makeFunction('showPreview'));
+			td.append(input);
+		} else {
+			var select = $('<select>');
+			var selid = makeId('select', 'value', VAL_COUNTER);
+			makeAttributes(select,
+							'id', selid,
+							'onchange', makeFunction('showPreview'));
+			var option = $('<option>');
+			option.text('Choose a value');
+			option.attr('value', '');
+			select.append(option);
+			td.append(select);
+			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			td.append('AND');
+			select = $('<select>');
+			selid = makeId('select', 'value', ++VAL_COUNTER);
+			makeAttributes(select,
+							'id', selid,
+							'onchange', makeFunction('showPreview'));
+			option = $('<option>');
+			option.text('Choose a value');
+			option.attr('value', '');
+			select.append(option);
+			td.append(select);
+			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+		}
+	} else if (!isSelect(type)) {
+		var input = $('<input>');
+		makeAttributes(input,
+						'type', 'text',
+						'onkeyup', makeFunction('showPreview'));
+		td.append(input);
+	} else {
+		var select = $('<select>');
+		var selid = makeId('select', 'value', VAL_COUNTER);
+		makeAttributes(select,
+						'id', selid,
+						'onchange', makeFunction('showPreview'));
+		var option = $('<option>');
+		option.text('Choose a value');
+		option.attr('value', '');
+		select.append(option);
+		td.append(select);
+		chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+	}
 	input = $('<input>');
 	makeAttributes(input,
 				   'type', 'button',
@@ -1718,7 +1828,19 @@ function getQueryUrl(preview) {
 			// operator column
 			td = getChild($(tr), 2);
 			var op = getChild(td, 1).val();
-			if (op != 'Tagged' && op != 'Not tagged') {
+			if (op == 'Between') {
+				td = getChild($(tr), 3);
+				var table = getChild(td, 1);
+				var tbody = getChild(table, 1);
+				var tr = getChild(tbody, 1);
+				var td = getChild(tr, 1);
+				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				if (val1 != '' && val2 != '') {
+					query.push(tag + ':geq:' + val1);
+					query.push(tag + ':leq:' + val2);
+				}
+			} else if (op != 'Tagged' && op != 'Not tagged') {
 				// values column
 				td = getChild($(tr), 3);
 				var table = getChild(td, 1);
@@ -1748,19 +1870,23 @@ function getQueryUrl(preview) {
 	return url;
 }
 
-function displayValuesTable(row) {
+function displayValuesTable(row, selId) {
 	var op = $('#' + makeId('select', row)).val();
 	var table = $('#' + makeId('table', row));
 	var tbody = getChild(table, 1);
+	if ($('#' + makeId('table', row)).get(0) != null) {
+		$.each(tbody.children(), function(i, tr) {
+			$(tr).remove();
+		});
+	}
 	if (op == 'Tagged' || op == 'Not tagged') {
-		if ($('#' + makeId('table', row)).get(0) != null) {
-			$.each(tbody.children(), function(i, tr) {
-				$(tr).remove();
-			});
-			$('#' + makeId('button', row)).css('display', 'none');
-		}
+		$('#' + makeId('button', row)).css('display', 'none');
 	} else {
 			$('#' + makeId('button', row)).css('display', '');
+			$('#' + makeId('button', row)).click();
+			if ($('#' + selId).val() == 'Between') {
+				$('#' + makeId('button', row)).css('display', 'none');
+			}
 	}
 	showPreview();
 }
@@ -1885,7 +2011,19 @@ function showPreview() {
 			// operator column
 			td = getChild($(tr), 2);
 			var op = getChild(td, 1).val();
-			if (op != 'Tagged' && op != 'Not tagged') {
+			if (op == 'Between') {
+				td = getChild($(tr), 3);
+				var table = getChild(td, 1);
+				var tbody = getChild(table, 1);
+				var tr = getChild(tbody, 1);
+				var td = getChild(tr, 1);
+				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				if (val1 != '' && val2 != '') {
+					query.push('<b>(&nbsp;</b><i style="color: green;">' + tag + '</i>&nbsp;<b>' + ':geq:' + '</b>&nbsp;<i style="color: blue;">' +  val1 + '</i><b>&nbsp;)</b>');
+					query.push('<b>(&nbsp;</b><i style="color: green;">' + tag + '</i>&nbsp;<b>' + ':leq:' + '</b>&nbsp;<i style="color: blue;">' +  val2 + '</i><b>&nbsp;)</b>');
+				}
+			} else if (op != 'Tagged' && op != 'Not tagged') {
 				// values column
 				td = getChild($(tr), 3);
 				var table = getChild(td, 1);

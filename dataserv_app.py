@@ -568,12 +568,12 @@ class Application:
                              (':leq:', ['empty']),
                              (':gt:', ['empty']),
                              (':geq:', ['empty']),
-                             (':like:', ['empty', 'int8', 'timestamptz']),
-                             (':simto:', ['empty', 'int8', 'timestamptz']),
-                             (':regexp:', ['empty', 'int8', 'timestamptz']),
-                             (':!regexp:', ['empty', 'int8', 'timestamptz']),
-                             (':ciregexp:', ['empty', 'int8', 'timestamptz']),
-                             (':!ciregexp:', ['empty', 'int8', 'timestamptz']) ])
+                             (':like:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
+                             (':simto:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
+                             (':regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
+                             (':!regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
+                             (':ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
+                             (':!ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']) ])
 
     opsDB = dict([ ('=', '='),
                    ('!=', '!='),

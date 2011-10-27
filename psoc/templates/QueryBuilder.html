@@ -28,7 +28,7 @@ $if None:
 <fieldset>
 <legend>Available tags</legend>
 <p>Select an available tag and click 'Add' to build a query:</p>
-<select id="available_tags" name="available_tags" onclick="loadAvailableTags('available_tags')">
+<select id="available_tags" name="available_tags" onclick="loadAvailableTags('available_tags')" >
 <option value=''>Choose a tag</option>
 </select>
 <input type="button" id="addToQuery" name="addToQuery" onclick="addToQuery('tags', 'available_tags');" value="Add" />
@@ -168,7 +168,7 @@ $for key, values in opsExcludeTypes.iteritems():
 		temp.push("${val}");
 	opsExcludeTypes["${key}"] = temp;
 \$(document).ready(function() {
-	initPSOC("${home}", "${authn.role}");
+	initPSOC("${home}", "${authn.role}", "${webauthnhome}");
 });
 </script>
 
