@@ -1440,6 +1440,7 @@ function initPSOC(home, user, webauthnhome) {
 	ROW_TAGS_COUNTER = 0;
 	ROW_SORTED_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
+	$('#sortResults').removeAttr('checked');
 	loadTypedefs();
 	showPreview();
 	$('#defaultResultsView').click();
@@ -1584,14 +1585,14 @@ function addToQueryTable(tableId, tag) {
 	tbody.append(tr);
 	var td = $('<td>');
 	tr.append(td);
-	td.html(tag);
-	var input = $('<input>');
-	makeAttributes(input,
-				   'type', 'button',
-				   'tag', tag,
-				   'onclick', makeFunction('deleteRow', str(id)),
-				   'value', 'Delete');
-	td.append(input);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', HOME + '/static/delete.png',
+				    'tag', tag,
+					'onclick', makeFunction('deleteRow', str(id)),
+					'alt', 'DEL');
+	td.append(img);
+	td.append(tag);
 	td = $('<td>');
 	tr.append(td);
 	var select = getSelectTagOperator(tag, availableTags[tag]);
@@ -1599,29 +1600,34 @@ function addToQueryTable(tableId, tag) {
 	td.append(select);
 	td = $('<td>');
 	tr.append(td);
-	if (tag != '' && availableTags[tag] != 'empty') {
+	if (availableTags[tag] != 'empty') {
 		var table = $('<table>');
 		makeAttributes(table,
 					   'id', makeId('table', ROW_COUNTER));
 		td.append(table);
+		if ($('#' + selId).val() == 'Between') {
+			td.attr('colspan', '2');
+		}
 		td = $('<td>');
+		td.css('text-align', 'center');
+		td.css('margin-top', '0px');
+		td.css('margin-bottom', '0px');
+		td.css('padding', '0px');
 		tr.append(td);
-		input = $('<input>');
-		makeAttributes(input,
-						'type', 'button',
+		var img = $('<img>');
+		makeAttributes(img,
+						'src', HOME + '/static/new.png',
 						'id', makeId('button', ROW_COUNTER),
 						'onclick', makeFunction('addNewValue', ROW_COUNTER, str(availableTags[tag]), str(selId)),
-						'value', '+');
-		input.css('width', '100%');
-		input.css('margin', 'auto');
-		td.append(input);
-		input.click();
+						'alt', '+');
+		td.append(img);
+		img.click();
 		if ($('#' + selId).val() == 'Between') {
-			input.css('display', 'none');
+			img.css('display', 'none');
+			td.css('display', 'none');
 		}
 	} else {
-		td = $('<td>');
-		tr.append(td);
+		td.attr('colspan', '2');
 	}
 	setRowsBackground();
 	showPreview();
@@ -1633,8 +1639,13 @@ function deleteRow(id) {
 	showPreview();
 }
 
-function deleteValue(id) {
+function deleteValue(id, tableId) {
 	$('#' + id).remove();
+	var table = $('#' + tableId);
+	var tbody = getChild(table, 1);
+	if (tbody.children().length == 0) {
+		table.parent().css('display', 'none');
+	}
 	showPreview();
 }
 
@@ -1645,7 +1656,7 @@ function getSelectTagOperator(tag, type) {
 				   'id', id,
 				   'name', id,
 				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id)));
-	if (!allTagdefs[tag]['tagdef multivalue']) {
+	if (type != 'empty' && !allTagdefs[tag]['tagdef multivalue']) {
 		var option = $('<option>');
 		option.text('Between');
 		option.attr('value', 'Between');
@@ -1685,8 +1696,10 @@ function isSelect(type) {
 }
 
 function addNewValue(row, type, selectOperatorId) {
+	var selVal = $('#' + selectOperatorId).val();
 	var valId = makeId('vals', ++VAL_COUNTER);
 	var table = $('#' + makeId('table', row));
+	table.parent().css('display', '');
 	var tr = $('<tr>');
 	makeAttributes(tr,
 					'id', valId);
@@ -1694,7 +1707,14 @@ function addNewValue(row, type, selectOperatorId) {
 	var td = $('<td>');
 	tr.append(td);
 	td.css('border-width', '0px');
-	var selVal = $('#' + selectOperatorId).val();
+	if (selVal != 'Between') {
+		var img = $('<img>');
+		makeAttributes(img,
+						'src', HOME + '/static/delete.png',
+						'onclick', makeFunction('deleteValue', str(valId), str(makeId('table', row))),
+						'alt', 'DEL');
+		td.append(img);
+	}
 	if (selVal == 'Between') {
 		if (!isSelect(type)) {
 			var input = $('<input>');
@@ -1752,12 +1772,6 @@ function addNewValue(row, type, selectOperatorId) {
 		td.append(select);
 		chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
 	}
-	input = $('<input>');
-	makeAttributes(input,
-				   'type', 'button',
-				   'onclick', makeFunction('deleteValue', str(valId)),
-				   'value', 'Delete');
-	td.append(input);
 }
 
 function setRowsBackground() {
@@ -1783,7 +1797,7 @@ function getQueryTags(tableId) {
 	var ret = new Array();
 	var tbody = getChild($('#' + tableId), 1);
 	$.each(tbody.children(), function(i, tr) {
-		ret.push(encodeURIComponent(getChild($(tr), 1).html()));
+		ret.push(encodeURIComponent(getChild($(tr), 2).html()));
 	});
 	if (ret.length == 0) {
 		ret = '';
@@ -1853,7 +1867,7 @@ function getQueryUrl(preview) {
 				var values = new Array();
 				$.each(tbody.children(), function(j, row) {
 					td = getChild($(row), 1);
-					var input = getChild(td, 1);
+					var input = getChild(td, 2);
 					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 					if (val.length > 0) {
 						values.push(encodeURIComponent(val));
@@ -1885,8 +1899,11 @@ function displayValuesTable(row, selId) {
 		});
 	}
 	if (op == 'Tagged' || op == 'Not tagged') {
-		$('#' + makeId('button', row)).css('display', 'none');
+		$('#' + makeId('button', row)).parent().prev().attr('colspan', '2');
+		$('#' + makeId('button', row)).parent().css('display', 'none');
 	} else {
+			$('#' + makeId('button', row)).parent().prev().attr('colspan', '1');
+			$('#' + makeId('button', row)).parent().css('display', '');
 			$('#' + makeId('button', row)).css('display', '');
 			$('#' + makeId('button', row)).click();
 			if ($('#' + selId).val() == 'Between') {
@@ -1942,17 +1959,17 @@ function addToTable(tableId, selectId, id) {
 	var td = $('<td>');
 	td.css('border-width', '0px');
 	tr.append(td);
-	td.html(tag);
+	var img = $('<img>');
+	makeAttributes(img,
+					'src', HOME + '/static/delete.png',
+					'tag', tag,
+					'onclick', makeFunction('deleteTag', str(tableId), str(id)),
+					'alt', 'DEL');
+	td.append(img);
 	td = $('<td>');
 	td.css('border-width', '0px');
 	tr.append(td);
-	var input = $('<input>');
-	makeAttributes(input,
-				   'type', 'button',
-				   'tag', tag,
-				   'onclick', makeFunction('deleteTag', str(tableId), str(id)),
-				   'value', 'Delete');
-	td.append(input);
+	td.html(tag);
 	$('#' + makeId('move', tableId)).css('display', '');
 	checkMoveButtons(tableId);
 	showPreview();
@@ -2036,7 +2053,7 @@ function showPreview() {
 				var values = new Array();
 				$.each(tbody.children(), function(j, row) {
 					td = getChild($(row), 1);
-					var input = getChild(td, 1);
+					var input = getChild(td, 2);
 					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 					if (val.length > 0) {
 						values.push('<i style="color: green;">' + tag + '</i>&nbsp;<b>' + ops[op] + '</b>&nbsp;<i style="color: blue;">' +  val + '</i>');
