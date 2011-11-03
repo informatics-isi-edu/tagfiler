@@ -320,7 +320,7 @@ def reduce_name_pred(x, y):
 def make_filter(allowed):
     allchars = string.maketrans('', '')
     delchars = ''.join([c for c in allchars if c not in allowed])
-    return lambda s, a=allchars, d=delchars: type(s) == str and s.translate(a,d) or type(s) == unicode and s.translate(dict([ (c, None) for c in d])) or str(s).translate(a, d)
+    return lambda s, a=allchars, d=delchars: type(s) == str and s.translate(a,d) or type(s) == unicode and s.translate(dict([ (ord(c), None) for c in d])) or str(s).translate(a, d)
 
 idquote = make_filter(string.letters + string.digits + '_-:.' )
 
