@@ -2511,6 +2511,8 @@ function getTagSearchDisplay(div) {
 			td.html(val);
 		}
 	});
+	makeAttributes(divConstraint,
+				   'onclick', makeFunction('editQuery', str(searchTag)));
 	return divConstraint;
 }
 
