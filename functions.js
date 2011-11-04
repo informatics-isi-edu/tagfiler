@@ -1399,6 +1399,12 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
+var headerTags = ['id', 'name', 'version', 'url', 'bytes'];
+var resultColumns = [];
+var viewListTags = new Object();
+var disableAjaxAlert = false;
+var sortColumnsArray = new Array();
+
 function str(value) {
 	return '\'' + value + '\'';
 }
@@ -1440,11 +1446,37 @@ function initPSOC(home, user, webauthnhome) {
 	ROW_TAGS_COUNTER = 0;
 	ROW_SORTED_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
-	$('#sortResults').removeAttr('checked');
 	loadTypedefs();
+	
+	// get the default view
+	var url = new String(window.location);
+	var default_view = null;
+	url = url.replace('/file/', '/tags/') + '(' + encodeURIComponent('default view') + ')';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			default_view = data[0]['default view'];
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
+	if (default_view == null) {
+		default_view = 'default';
+	}
+	// build the result columns from the header tags + the view tags
+	resultColumns = resultColumns.concat(headerTags);
+	setViewTags(default_view);
+	$.each(viewListTags[default_view], function(i, tag) {
+		if (!resultColumns.contains(tag)) {
+			resultColumns.push(tag);
+		}
+	});
 	showPreview();
-	$('#defaultResultsView').click();
-	$('#defaultResultsView').click();
 }
 
 function loadTypedefs() {
@@ -1540,21 +1572,12 @@ function loadAvailableViews(id) {
 	});
 }
 
-function addToQuery(tableId, selectId) {
-	var tag = $('#' + selectId).val();
-	if (tag == '') {
-		return;
-	}
-	addToQueryTable(tableId, tag);
-}
-
-function addViewTagsToQuery(tableId, selectId) {
-	var tag = $('#' + selectId).val();
-	if (tag == '') {
-		return;
-	}
+function setViewTags(tag) {
 	if (availableTags == null) {
 		loadTags();
+	}
+	if (viewListTags[tag] != null) {
+		return;
 	}
 	var url = HOME + '/query/view=' + encodeURIComponent(tag) + '(' + encodeURIComponent('_cfg_file list tags') + ')' + encodeURIComponent('_cfg_file list tags');
 	$.ajax({
@@ -1564,9 +1587,10 @@ function addViewTagsToQuery(tableId, selectId) {
 		headers: {'User-agent': 'Tagfiler/1.0'},
 		async: false,
 		success: function(data, textStatus, jqXHR) {
+			viewListTags[tag] = new Array();
 			var tags = data[0]['_cfg_file list tags'];
 			$.each(tags, function(i, value) {
-				addToQueryTable(tableId, value);
+				viewListTags[tag].push(value);
 			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -1592,7 +1616,6 @@ function addToQueryTable(tableId, tag) {
 					'onclick', makeFunction('deleteRow', str(id)),
 					'alt', 'DEL');
 	td.append(img);
-	td.append(tag);
 	td = $('<td>');
 	tr.append(td);
 	var select = getSelectTagOperator(tag, availableTags[tag]);
@@ -1629,22 +1652,29 @@ function addToQueryTable(tableId, tag) {
 	} else {
 		td.attr('colspan', '2');
 	}
-	setRowsBackground();
+	setRowsBackground(tableId);
 	showPreview();
 }
 
 function deleteRow(id) {
-	$('#' + id).remove();
-	setRowsBackground();
+	var row = $('#' + id);
+	var tableId = row.parent().parent().attr('id');
+	row.remove();
+	setRowsBackground(tableId);
 	showPreview();
 }
 
 function deleteValue(id, tableId) {
-	$('#' + id).remove();
+	var tr = $('#' + id);
 	var table = $('#' + tableId);
 	var tbody = getChild(table, 1);
-	if (tbody.children().length == 0) {
-		table.parent().css('display', 'none');
+	if (tbody.children().length == 1) {
+		//table.parent().css('display', 'none');
+		var td = getChild(tr, 1);
+		var input = getChild(td, 2);
+		input.val('');
+	} else {
+		$('#' + id).remove();
 	}
 	showPreview();
 }
@@ -1672,13 +1702,17 @@ function getSelectTagOperator(tag, type) {
 	});
 	if (type == 'timestamptz' || type == 'date') {
 		select.val('Between');
+		select.attr('prevVal', 'Between');
 	} else if (type == 'empty') {
 		select.val('Tagged');
+		select.attr('prevVal', 'Tagged');
 	}
 	else if (type == 'int8' || type == 'float8' || isSelect(type)) {
 		select.val('Equal');
+		select.attr('prevVal', 'Equal');
 	} else {
 		select.val('Regular expression (case insensitive)');
+		select.attr('prevVal', 'Regular expression (case insensitive)');
 	}
 	return select;
 }
@@ -1753,7 +1787,7 @@ function addNewValue(row, type, selectOperatorId) {
 			td.append(select);
 			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
 		}
-	} else if (!isSelect(type)) {
+	} else if (!isSelect(type) || (selVal != 'Equal' && selVal != 'Not equal')) {
 		var input = $('<input>');
 		makeAttributes(input,
 						'type', 'text',
@@ -1774,10 +1808,10 @@ function addNewValue(row, type, selectOperatorId) {
 	}
 }
 
-function setRowsBackground() {
-	var table = $('#tags');
+function setRowsBackground(tableId) {
+	var table = $('#' + tableId);
 	var tbody = getChild(table, 1);
-	var odd = true;
+	var odd = false;
 	$.each(tbody.children(), function(i, tr) {
 		if (i != 0) {
 			$(tr).removeClass('odd');
@@ -1806,90 +1840,76 @@ function getQueryTags(tableId) {
 	return ret;
 }
 
-function getQueryUrl(preview) {
+function getQueryUrl(limit) {
 	var retTags = '';
-	var view = $('input:radio[name=ResultsView]:checked').val();
-	if (view == 'existing') {
-		view = '&view=' + encodeURIComponent($('#selectViews').val());
-	} else if (view == 'customized') {
-		view = '';
-		retTags = getQueryTags('list_tags');
-		if (retTags != '') {
-			retTags = '(' + retTags.join(';') + ')';
-		}
-	} else {
-		view = '';
+	if (resultColumns != null) {
+		retTags = '(' + resultColumns.join(';') + ')';
 	}
-	var limit = '';
-	if (preview == '') {
-		if($('#Limit').attr('checked') == 'checked') {
-			limit = '&limit=none';
-		}
-	} else {
-		limit = '&limit=5';
-	}
-	var latest = '&versions=' + $('#versions').val();
-	var sortTags = '';
-	if (preview == '' && $('#sortResults').attr('checked') == 'checked') {
-		sortTags = getQueryTags('sort_tags');
-		if (sortTags != '') {
-			sortTags = sortTags.join(',');
-		}
-	}
-	var trs = getChild($('#tags'), 1).children();
+	var latest = '?versions=' + $('#versions').val();
+	var sortTags = sortColumnsArray.join(',');
+	
 	var query = new Array();
-	$.each(trs, function(i, tr) {
-		if (i != 0) {
-			// tag column
-			var td = getChild($(tr), 1);
-			var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
-			
-			// operator column
-			td = getChild($(tr), 2);
-			var op = getChild(td, 1).val();
-			if (op == 'Between') {
-				td = getChild($(tr), 3);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var tr = getChild(tbody, 1);
-				var td = getChild(tr, 1);
-				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				if (val1 != '' && val2 != '') {
-					query.push(tag + ':geq:' + val1);
-					query.push(tag + ':leq:' + val2);
-				}
-			} else if (op != 'Tagged' && op != 'Not tagged') {
-				// values column
-				td = getChild($(tr), 3);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var values = new Array();
-				$.each(tbody.children(), function(j, row) {
-					td = getChild($(row), 1);
-					var input = getChild(td, 2);
-					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
-					if (val.length > 0) {
-						values.push(encodeURIComponent(val));
+	var divs = $('#queryDiv').children();
+	$.each(divs, function(k, div) {
+		var searchTag = $(div).attr('tag');
+		var searchTagId = makeId(searchTag.split(' ').join('_'));
+		var divTable = $('#' + makeId(searchTagId, 'searchTable'));
+		var divtbody = getChild(divTable, 1);
+		var trs = divtbody.children();
+		$.each(trs, function(i, tr) {
+			if (i != 0) {
+				// tag column
+				var td = getChild($(tr), 1);
+				var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
+				
+				// operator column
+				td = getChild($(tr), 2);
+				var op = getChild(td, 1).val();
+				if (op == 'Between') {
+					td = getChild($(tr), 3);
+					var table = getChild(td, 1);
+					var tbody = getChild(table, 1);
+					var tr = getChild(tbody, 1);
+					var td = getChild(tr, 1);
+					var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+					var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
+					if (val1 != '' && val2 != '') {
+						query.push(tag + ':geq:' + val1);
+						query.push(tag + ':leq:' + val2);
 					}
-				});
-				if (values.length > 0) {
-					query.push(tag + ops[op] + values.join(','));
+				} else if (op != 'Tagged' && op != 'Not tagged') {
+					// values column
+					td = getChild($(tr), 3);
+					var table = getChild(td, 1);
+					var tbody = getChild(table, 1);
+					var values = new Array();
+					$.each(tbody.children(), function(j, row) {
+						td = getChild($(row), 1);
+						var input = getChild(td, 2);
+						var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+						if (val.length > 0) {
+							values.push(encodeURIComponent(val));
+						}
+					});
+					if (values.length > 0) {
+						query.push(tag + ops[op] + values.join(','));
+					}
+				} else {
+					query.push(tag + ops[op]);
 				}
-			} else {
-				query.push(tag + ops[op]);
 			}
-		}
+		});
 	});
 	var url = '';
 	if (query.length > 0) {
 		url = query.join(';');
 	}
-	url = HOME + '/query/' + url + retTags + sortTags + '?action=edit' + view + latest + limit + preview;
+	url = HOME + '/query/' + url + retTags + sortTags + latest + limit;
 	return url;
 }
 
 function displayValuesTable(row, selId) {
+	var oldOp = $('#' + makeId('select', row)).attr('prevVal');
 	var op = $('#' + makeId('select', row)).val();
 	var table = $('#' + makeId('table', row));
 	var tbody = getChild(table, 1);
@@ -1910,125 +1930,503 @@ function displayValuesTable(row, selId) {
 				$('#' + makeId('button', row)).css('display', 'none');
 			}
 	}
+	$('#' + makeId('select', row)).attr('prevVal', op);
 	showPreview();
 }
 
-function highlight(tableId, id) {
-	if (!ENABLE_ROW_HIGHLIGHT) {
-		ENABLE_ROW_HIGHLIGHT = true;
-		return;
-	}
-	var row = $('#' + tableId).find('.odd');
-	if (row.is('tr')) {
-		row.removeClass('odd');
-	}
-	
-	$('#' + id).addClass('odd');
-	if ($('#' + id).next().get(0) != null) {
-		$('#' + makeId('move', tableId, 'down')).removeAttr('disabled');
-	} else {
-		$('#' + makeId('move', tableId, 'down')).attr('disabled', 'disabled');
-	}
-	if ($('#' + id).prev().get(0) != null) {
-		$('#' + makeId('move', tableId, 'up')).removeAttr('disabled');
-	} else {
-		$('#' + makeId('move', tableId, 'up')).attr('disabled', 'disabled');
+function addToListColumns(selectId) {
+	var column = $('#' + selectId).val();
+	$('#customizedViewDiv').css('display', 'none');
+	$('#AddTagToQueryDiv').css('display', '');
+	if (!resultColumns.contains(column)) {
+		resultColumns.push(column);
+		showPreview();
 	}
 }
 
-function addToListColumns(tableId, selectId) {
-	addToTable(tableId, selectId, makeId('row', 'tags', ++ROW_TAGS_COUNTER));
-}
-
-function addToSortColumns(tableId, selectId) {
-	addToTable(tableId, selectId, makeId('sorted', 'tags', ++ROW_SORTED_COUNTER));
-}
-
-function addToTable(tableId, selectId, id) {
-	var tag = $('#' + selectId).val();
-	if (tag == '') {
-		return;
-	}
-	var tbody = $('#' + tableId);
-	var tr = $('<tr>');
-	makeAttributes(tr,
-					'id', id,
-					'onclick', makeFunction('highlight', str(tableId), str(id)));
-	tr.addClass('role');
-	tbody.append(tr);
-	var td = $('<td>');
-	td.css('border-width', '0px');
-	tr.append(td);
-	var img = $('<img>');
-	makeAttributes(img,
-					'src', HOME + '/static/delete.png',
-					'tag', tag,
-					'onclick', makeFunction('deleteTag', str(tableId), str(id)),
-					'alt', 'DEL');
-	td.append(img);
-	td = $('<td>');
-	td.css('border-width', '0px');
-	tr.append(td);
-	td.html(tag);
-	$('#' + makeId('move', tableId)).css('display', '');
-	checkMoveButtons(tableId);
-	showPreview();
+function cancelAddToListColumns() {
+	$('#customizedViewDiv').css('display', 'none');
+	$('#selectViewDiv').css('display', 'none');
+	$('#AddTagToQueryDiv').css('display', '');
 }
 
 function deleteTag(tableId, id) {
 	$('#' + id).remove();
 	ENABLE_ROW_HIGHLIGHT = false;
-	checkMoveButtons(tableId);
-	showPreview();
-}
-
-function checkMoveButtons(tableId) {
-	var row = $('#' + tableId).find('.odd');
-	if (row.is('tr')) {
-		if (row.next().get(0) != null) {
-			$('#' + makeId('move', tableId, 'down')).removeAttr('disabled');
-		} else {
-			$('#' + makeId('move', tableId, 'down')).attr('disabled', 'disabled');
-		}
-		if (row.prev().get(0) != null) {
-			$('#' + makeId('move', tableId, 'up')).removeAttr('disabled');
-		} else {
-			$('#' + makeId('move', tableId, 'up')).attr('disabled', 'disabled');
-		}
-	} else {
-		$('#' + makeId('move', tableId, 'down')).attr('disabled', 'disabled');
-		$('#' + makeId('move', tableId, 'up')).attr('disabled', 'disabled');
-		var tbody = getChild($('#' + tableId), 1);
-		if (tbody.children().length == 0) {
-			$('#' + makeId('move', tableId)).css('display', 'none');
-		}
-	}
-}
-
-function moveUp(tableId) {
-	var row = $('#' + tableId).find('.odd');
-	var prevRow = row.prev();
-	prevRow.insertAfter(row);
-	checkMoveButtons(tableId);
-	showPreview();
-}
-
-function moveDown(tableId) {
-	var row = $('#' + tableId).find('.odd');
-	var nextRow = row.next();
-	nextRow.insertBefore(row);
-	checkMoveButtons(tableId);
 	showPreview();
 }
 
 function showPreview() {
-	var trs = getChild($('#tags'), 1).children();
+	showQueryResults('');
+}
+
+function showQueryResults(limit) {
+	var queryUrl = getQueryUrl(limit);
+	$('#Query_URL').attr('href', queryUrl);
+	queryUrl = getQueryUrl(limit == '' ? '&limit=5' : limit);
+	
+	// build the table header
+	var table = $('<table>');
+	table.addClass('file-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('file-heading');
+	$.each(resultColumns, function(i, column) {
+		var tagTd = $('<td>');
+		tr.append(tagTd);
+		makeAttributes(tagTd,
+						'id', makeId('tag', 'column', column.split(' ').join('_')),
+						'valign', 'top');
+		tagTd.addClass('file-tag');
+		var tagDiv = $('<div>');
+		tagDiv.attr('ALIGN', 'CENTER');
+		tagTd.append(tagDiv);
+		
+		var topDiv = $('<div>');
+		topDiv.attr('ALIGN', 'RIGHT');
+		tagDiv.append(topDiv);
+		
+		var toolbarTable = $('<table>');
+		topDiv.append(toolbarTable);
+		var toolbarTr = $('<tr>');
+		toolbarTable.append(toolbarTr);
+		var toolbarTd = $('<td>');
+		toolbarTr.append(toolbarTd);
+		var columSortId = makeId('sort', column.split(' ').join('_'));
+		makeAttributes(toolbarTd,
+						'id', columSortId);
+		var sortValue = getSortOrder(column);
+		toolbarTd.html(sortValue);
+		toolbarTd = $('<td>');
+		toolbarTr.append(toolbarTd);
+		var img = $('<img>');
+		makeAttributes(img,
+						'id', makeId('arrow_up', column.split(' ').join('_')),
+						'src', HOME + '/static/bullet_arrow_up.png',
+					    'tag', column,
+						'onclick', makeFunction('sortColumn', str(column), str(columSortId)),
+						'alt', 'Sort');
+		toolbarTd.append(img);
+		if (sortValue != '') {
+			img.css('display', 'none');
+		}
+		toolbarTd = $('<td>');
+		toolbarTr.append(toolbarTd);
+		img = $('<img>');
+		makeAttributes(img,
+						'id', makeId('clear_sort', column.split(' ').join('_')),
+						'src', HOME + '/static/control_stop.png',
+					    'tag', column,
+						'onclick', makeFunction('stopSortColumn', str(column), str(columSortId)),
+						'alt', 'Stop sort');
+		toolbarTd.append(img);
+		if (sortValue == '') {
+			img.css('display', 'none');
+		}
+
+		img = $('<img>');
+		makeAttributes(img,
+						'src', HOME + '/static/delete.png',
+					    'tag', column,
+						'onclick', makeFunction('deleteColumn', str(column)),
+						'alt', 'DEL');
+		toolbarTd.append(img);
+		
+		var moveDiv = $('<div>');
+		moveDiv.css('width', '100%');
+		tagDiv.append(moveDiv);
+		
+		var leftDiv = $('<div>');
+		moveDiv.append(leftDiv);
+		leftDiv.attr('ALIGN', 'LEFT');
+		leftDiv.css('float', 'left');
+		
+		img = $('<img>');
+		makeAttributes(img,
+						'src', HOME + '/static/arrow_left.png',
+					    'tag', column,
+						'onclick', makeFunction('moveColumn', str(column), -1),
+						'alt', 'Move Left');
+		leftDiv.append(img);
+		if (i == 0) {
+			leftDiv.css('display', 'none');
+		}
+		
+		var rightDiv = $('<div>');
+		moveDiv.append(rightDiv);
+		rightDiv.attr('ALIGN', 'RIGHT');
+		
+		img = $('<img>');
+		makeAttributes(img,
+						'src', HOME + '/static/arrow_right.png',
+					    'tag', column,
+						'onclick', makeFunction('moveColumn', str(column), 1),
+						'alt', 'Move Right');
+		rightDiv.append(img);
+		if (i == resultColumns.length -1) {
+			rightDiv.css('display', 'none');
+		}
+
+		var thDiv = $('<div>');
+		thDiv.attr('ALIGN', 'CENTER');
+		tagDiv.append(thDiv);
+		
+		var th = $('<th>');
+		tagDiv.append(th);
+		th.addClass(column);
+		var a = $('<a>');
+		makeAttributes(a,
+					   'href', makeFunction('javascript:editQuery', str(column)));
+		a.html(column);
+		th.append(a);
+		
+		var divConstraint = $('<div>');
+		tagDiv.append(divConstraint);
+		makeAttributes(divConstraint,
+						'id', makeId('constraint', column.split(' ').join('_')));
+		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
+		if (searchDisplay.get(0) != null) {
+			var constraint = getTagSearchDisplay(searchDisplay);
+			divConstraint.append(constraint);
+		}
+	});
+	$.ajax({
+		url: queryUrl,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		success: function(data, textStatus, jqXHR) {
+			var odd = false;
+			$.each(data, function(i, row) {
+				var tr = $('<tr>');
+				table.append(tr);
+				tr.addClass('file');
+				tr.addClass(odd ? 'odd' : 'even');
+				odd = !odd;
+				$.each(resultColumns, function(j, column) {
+					var td = $('<td>');
+					tr.append(td);
+					td.addClass('file-tag-list');
+					td.addClass(column);
+					td.addClass('multivalue');
+					if (row[column] != null) {
+						if (!allTagdefs[column]['tagdef multivalue']) {
+							if (row[column] === true) {
+								td.html('is set');
+							} else if (row[column] === false) {
+								td.html('not set');
+							} else {
+								if (column == 'id') {
+									var a = $('<a>');
+									td.append(a);
+									makeAttributes(a,
+												   'href', HOME + '/tags/id=' + row[column]);
+									a.html(row[column]);
+								} else if (column == 'name') {
+									var a = $('<a>');
+									td.append(a);
+									makeAttributes(a,
+												   'href', HOME + '/tags/name=' + encodeSafeURIComponent(row[column]));
+									a.html(row[column]);
+								} else if (column == 'url') {
+									var a = $('<a>');
+									td.append(a);
+									makeAttributes(a,
+												   'href', row[column]);
+									a.html(row[column]);
+								} else {
+									td.html(htmlEscape(row[column]));
+								}
+							}
+						} else {
+							td.html(row[column].join('<br/>'));
+						}
+					}
+				});
+			});
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			if (!disableAjaxAlert) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			}
+		}
+	});
+	var queryPreview = $('#Query_Preview');
+	queryPreview.html('');
+	queryPreview.append(table);
+}
+
+function checkSelectValue(selId, addId) {
+	var val = $('#' + selId).val();
+	if (val == '') {
+		$('#' + addId).attr('disabled', 'disabled');
+	} else {
+		$('#' + addId).removeAttr('disabled');
+	}
+}
+
+function htmlEscape(str) {
+    return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+}
+
+function moveColumn(tag, position) {
+	var index = -1;
+	$.each(resultColumns, function(i, column) {
+		if (column == tag) {
+			index = i;
+			return false;
+		}
+	});
+	resultColumns.splice(index, 1);
+	resultColumns.splice(index + position, 0, tag);
+	showPreview();
+}
+
+function sortColumn(column, id) {
+	sortColumnsArray.push(column);
+	$('#' + makeId('arrow_up', column.split(' ').join('_'))).css('display', 'none');
+	$('#' + makeId('clear_sort', column.split(' ').join('_'))).css('display', '');
+	$('#' + id).html('' + sortColumnsArray.length);
+	showPreview();
+}
+
+function stopSortColumn(tag, id) {
+	var index = -1;
+	$.each(sortColumnsArray, function(i, column) {
+		if (column == tag) {
+			index = i;
+			return false;
+		}
+	});
+	sortColumnsArray.splice(index, 1);
+	$('#' + id).html('');
+	$('#' + makeId('arrow_up', tag.split(' ').join('_'))).css('display', '');
+	$('#' + makeId('clear_sort', tag.split(' ').join('_'))).css('display', 'none');
+	$.each(sortColumnsArray, function(i, column) {
+		var id = makeId('sort', column.split(' ').join('_'));
+		var val = parseInt($('#' + id).html());
+		if (val > index) {
+			$('#' + id).html('' + --val);
+		}
+	});
+	showPreview();
+}
+
+function getSortOrder(tag) {
+	var ret = '';
+	$.each(sortColumnsArray, function(i, column) {
+		if (column == tag) {
+			ret += (i + 1);
+			return false;
+		}
+	});
+	return ret;
+}
+
+function addTagToQuery() {
+	$('#AddTagToQueryDiv').css('display', 'none');
+	$('#customizedViewDiv').css('display', '');
+	$('#customizedViewSelect').val('');
+	checkSelectValue('customizedViewSelect', 'addToListColumns');
+}
+
+function addViewTagsToQuery() {
+	$('#AddTagToQueryDiv').css('display', 'none');
+	$('#selectViewDiv').css('display', '');
+	$('#selectViews').val('');
+	checkSelectValue('selectViews', 'addViewToListColumns');
+	$('#viewTagsDiv').css('display', 'none');
+}
+
+function addViewToListColumns(id) {
+	var val = $('#' + id).val();
+	setViewTags(val);
+	var preview = false; 
+	$.each(viewListTags[val], function(i, tag) {
+		if (!resultColumns.contains(tag)) {
+			resultColumns.push(tag);
+			preview = true;
+		}
+	});
+	$('#selectViewDiv').css('display', 'none');
+	$('#AddTagToQueryDiv').css('display', '');
+	if (preview) {
+		showPreview();
+	}
+}
+
+function buildViewTagsTable(id) {
+	var val = $('#selectViews').val();
+	setViewTags(val);
+	var div = $('#viewTagsDiv');
+	div.css('display', '');
+	div.html('');
+	var table = $('<table>');
+	div.append(table)
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('file-heading');
+	var th = $('<th>');
+	th.addClass('tag-name');
+	tr.append(th);
+	th.html('Tag');
+	var odd = false;
+	$.each(viewListTags[val], function(i, tag) {
+		var tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('file');
+		tr.addClass(odd ? 'odd' : 'even');
+		odd = !odd;
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('file-tag-list');
+		td.addClass(tag);
+		td.addClass('multivalue');
+		td.html(tag);
+	});
+	div.append(table);
+	div.append($('<br>'));
+	div.append($('<br>'));
+}
+
+function deleteColumn(column) {
+	$.each(sortColumnsArray, function(i, tag) {
+		if (tag == column) {
+			sortColumnsArray.splice(i, 1);
+			return false;
+		}
+	});
+	$.each(resultColumns, function(i, tag) {
+		if (tag == column) {
+			resultColumns.splice(i, 1);
+			return false;
+		}
+	});
+	showPreview();
+}
+
+function encodeSafeURIComponent(value) {
+	var ret = encodeURIComponent(value);
+	$.each("~!()'", function(i, c) {
+		ret = ret.replace(new RegExp('\\' + c, 'g'), escape(c));
+	});
+	return ret;
+}
+
+function editQuery(tag) {
+	disableAjaxAlert = true;
+	var tagId = makeId(tag.split(' ').join('_'));
+	var id =  makeId('tag', 'column', tagId);
+	var left = $('#' + id).offset().left;
+	var top = $('#' + id).offset().top;
+	var div = $('#queryDiv');
+	div.css('display', '');
+	div.css('margin-left', left + 'px');
+	
+	var tagDiv = $('#' + makeId('queryDiv', tagId));
+	if (tagDiv.get(0) == null) {
+		tagDiv = tagQueryDiv(tag);
+		div.append(tagDiv);
+	}
+	tagDiv.css('display', '');
+	$('#queryLegend').html(tag);
+	window.scrollTo(left, top);
+}
+
+function cancelEdit(tag) {
+	var tagId = makeId(tag.split(' ').join('_'));
+	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
+	$('#queryDiv').css('display', 'none');
+	disableAjaxAlert = false;
+}
+
+function saveTagQuery(tag) {
+	var tagId = makeId(tag.split(' ').join('_'));
+	var div = $('#' + makeId('constraint', tag.split(' ').join('_')));
+	div.html('');
+	var constraintDiv = getTagSearchDisplay($('#' +makeId('queryDiv', tagId)));
+	div.append(constraintDiv);
+	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
+	$('#queryDiv').css('display', 'none');
+	disableAjaxAlert = false;
+	showPreview();
+}
+
+function tagQueryDiv(tag) {
+	var tagId = makeId(tag.split(' ').join('_'));
+	var div = $('<div>');
+	makeAttributes(div,
+				   'id', makeId('queryDiv', tagId),
+				   'tag', tag);
+	var fieldset = $('<fieldset>');
+	div.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html(tag);
+	var a = $('<a>');
+	fieldset.append(a);
+	makeAttributes(a,
+				   'href', makeFunction('javascript:addToQueryTable', str(makeId(tagId, 'searchTable')), str(tag)));
+	a.html('New Constraint');
+	fieldset.append($('<br>'));
+	fieldset.append($('<br>'));
+	var table = $('<table>');
+	fieldset.append(table);
+	table.addClass('role-list');
+	makeAttributes(table,
+				   'id', makeId(tagId, 'searchTable'));
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('heading');
+	var th = $('<th>');
+	tr.append(th);
+	th.attr('colspan', '2');
+	th.html('&nbsp;&nbsp;Operator&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('colspan', '2');
+	th.html('&nbsp;&nbsp;Values&nbsp;&nbsp;');
+	fieldset.append($('<br>'));
+	fieldset.append($('<br>'));
+	var input = $('<input>');
+	makeAttributes(input,
+				   'id', makeId(tagId, 'searchTable', 'cancel'),
+				   'name', makeId(tagId, 'searchTable', 'cancel'),
+				   'type', 'button',
+				   'onclick', makeFunction('cancelEdit', str(tag)),
+				   'value', 'Cancel');
+	fieldset.append(input);
+	input = $('<input>');
+	makeAttributes(input,
+				   'id', makeId(tagId, 'searchTable', 'save'),
+				   'name', makeId(tagId, 'searchTable', 'save'),
+				   'type', 'button',
+				   'onclick', makeFunction('saveTagQuery', str(tag)),
+				   'value', 'Save');
+	fieldset.append(input);
+	div.append($('<br>'));
+	div.append($('<br>'));
+	return div;
+}
+
+function getTagSearchDisplay(div) {
 	var query = new Array();
+	var searchTag = div.attr('tag');
+	var searchTagId = makeId(searchTag.split(' ').join('_'));
+	var divTable = $('#' + makeId(searchTagId, 'searchTable'));
+	var divtbody = getChild(divTable, 1);
+	var trs = divtbody.children();
 	$.each(trs, function(i, tr) {
 		if (i != 0) {
 			// tag column
 			var td = getChild($(tr), 1);
-			var tag = getChild(td, 1).attr('tag');
+			var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
 			
 			// operator column
 			td = getChild($(tr), 2);
@@ -2042,8 +2440,7 @@ function showPreview() {
 				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 				var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
 				if (val1 != '' && val2 != '') {
-					query.push('<b>(&nbsp;</b><i style="color: green;">' + tag + '</i>&nbsp;<b>' + ':geq:' + '</b>&nbsp;<i style="color: blue;">' +  val1 + '</i><b>&nbsp;)</b>');
-					query.push('<b>(&nbsp;</b><i style="color: green;">' + tag + '</i>&nbsp;<b>' + ':leq:' + '</b>&nbsp;<i style="color: blue;">' +  val2 + '</i><b>&nbsp;)</b>');
+					query.push('['+ val1 + ', ' + val2 + ']');
 				}
 			} else if (op != 'Tagged' && op != 'Not tagged') {
 				// values column
@@ -2056,79 +2453,35 @@ function showPreview() {
 					var input = getChild(td, 2);
 					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 					if (val.length > 0) {
-						values.push('<i style="color: green;">' + tag + '</i>&nbsp;<b>' + ops[op] + '</b>&nbsp;<i style="color: blue;">' +  val + '</i>');
+						values.push(encodeURIComponent(val));
 					}
 				});
-				if (values.length > 0) {
-					query.push('<b>(&nbsp;</b>' + values.join('&nbsp;<b>OR</b>&nbsp;') + '<b>&nbsp;)</b>');
+				if (values.length == 1) {
+					query.push(ops[op] + ' ' + values.join(', '));
+				}
+				else if (values.length > 0) {
+					query.push(ops[op] + ' {' + values.join(', ') + '}');
 				}
 			} else {
-				query.push('<b>(&nbsp;' + ops[op] + '</b>&nbsp;<i style="color: green;">' + tag + '</i><b>&nbsp;)</b>');
+				query.push(ops[op]);
 			}
 		}
 	});
-	$('#Query_URL').find('a').remove();
-	var queryExpr = '';
-	if (query.length > 0) {
-		queryExpr = query.join('<br/><b>AND</b><br/>');
-	}
-	$('#Query_Expression').html(queryExpr);
-	var legend = $('<legend>');
-	legend.html('Query Expression');
-	$('#Query_Expression').append(legend);
-	var queryUrl = getQueryUrl('');
-	var a = $('<a>');
-	makeAttributes(a,
-				   'href', queryUrl);
-	a.html(queryUrl);
-	$('#Query_URL').append(a);
-	queryUrl = getQueryUrl('&preview=filelist');
-	$.ajax({
-		url: queryUrl,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			$('#Query_Preview').html(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+	var divConstraint = $('<div>');
+	divConstraint.attr('ALIGN', 'LEFT');
+	var table = $('<table>');
+	divConstraint.append(table);
+	$.each(query, function(i, val) {
+		var tr = $('<tr>');
+		table.append(tr);
+		var td = $('<td>');
+		tr.append(td);
+		if (val == '') {
+			td.html(':tagged:');
+		} else {
+			td.html(val);
 		}
 	});
-}
-
-function displayViewForm() {
-	var select = $('#selectViews');
-	var div = $('#customizedViewDiv');
-	var view = $('input:radio[name=ResultsView]:checked').val();
-	if (view == 'existing') {
-		if ($('#selectViews').val() == null) {
-			if (availableViews == null) {
-				loadViews();
-			}
-			$.each(availableViews, function(i, object) {
-				var option = $('<option>');
-				option.text(object);
-				option.attr('value', object);
-				select.append(option);
-			});
-		}
-		select.css('display', '');
-		div.css('display', 'none');
-	} else if (view == 'default') {
-		select.css('display', 'none');
-		div.css('display', 'none');
-	} else if (view == 'customized') {
-		select.css('display', 'none');
-		div.css('display', '');
-	}
-	showPreview();
-}
-
-function displaySortResults() {
-	if($('#sortResults').attr('checked') == 'checked') {
-		$('#sortResultsDiv').css('display', '');
-	} else {
-		$('#sortResultsDiv').css('display', 'none');
-	}
+	return divConstraint;
 }
 

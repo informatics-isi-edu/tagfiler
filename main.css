@@ -43,6 +43,7 @@ table.file-tag-list {
 tr.file-heading, tr.heading, tr.file-heading A:link, tr.heading A:link, tr.file-heading A:visited, tr.heading A:visited {
   background-color: #990000;
   color: #ffcc00;
+  white-space:nowrap;
 }
 tr.file-footer {
   border: 1px black;
