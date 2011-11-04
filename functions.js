@@ -1685,7 +1685,7 @@ function getSelectTagOperator(tag, type) {
 	makeAttributes(select,
 				   'id', id,
 				   'name', id,
-				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id)));
+				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id), str(tag)));
 	if (type != 'empty' && !allTagdefs[tag]['tagdef multivalue']) {
 		var option = $('<option>');
 		option.text('Between');
@@ -1725,6 +1725,24 @@ function isSelect(type) {
 		typedefSubjects[type]['typedef tagref'] != null) {
 		
 		ret = true;
+	}
+	return ret;
+}
+
+function clearValues(tag, op, oldOp) {
+	var ret = false;
+	if (op == 'Tagged' || op == 'Not tagged' || op == 'Between' || 
+		oldOp == 'Tagged' || oldOp == 'Not tagged' || oldOp == 'Between') {
+		ret = true;
+	} else {
+		var type = availableTags[tag];
+		if (isSelect(type)) {
+			if (oldOp == 'Equal' || oldOp == 'Not equal') {
+				ret = (op != 'Equal' && op != 'Not equal');
+			} else if (op == 'Equal' || op == 'Not equal') {
+				ret = (oldOp != 'Equal' && oldOp != 'Not equal');
+			}
+		}
 	}
 	return ret;
 }
@@ -1908,15 +1926,18 @@ function getQueryUrl(limit) {
 	return url;
 }
 
-function displayValuesTable(row, selId) {
+function displayValuesTable(row, selId, tag) {
 	var oldOp = $('#' + makeId('select', row)).attr('prevVal');
 	var op = $('#' + makeId('select', row)).val();
-	var table = $('#' + makeId('table', row));
-	var tbody = getChild(table, 1);
-	if ($('#' + makeId('table', row)).get(0) != null) {
-		$.each(tbody.children(), function(i, tr) {
-			$(tr).remove();
-		});
+	var clearValuesTable = clearValues(tag, op, oldOp);
+	if (clearValuesTable) {
+		var table = $('#' + makeId('table', row));
+		var tbody = getChild(table, 1);
+		if ($('#' + makeId('table', row)).get(0) != null) {
+			$.each(tbody.children(), function(i, tr) {
+				$(tr).remove();
+			});
+		}
 	}
 	if (op == 'Tagged' || op == 'Not tagged') {
 		$('#' + makeId('button', row)).parent().prev().attr('colspan', '2');
@@ -1925,7 +1946,9 @@ function displayValuesTable(row, selId) {
 			$('#' + makeId('button', row)).parent().prev().attr('colspan', '1');
 			$('#' + makeId('button', row)).parent().css('display', '');
 			$('#' + makeId('button', row)).css('display', '');
-			$('#' + makeId('button', row)).click();
+			if (clearValuesTable) {
+				$('#' + makeId('button', row)).click();
+			}
 			if ($('#' + selId).val() == 'Between') {
 				$('#' + makeId('button', row)).css('display', 'none');
 			}
