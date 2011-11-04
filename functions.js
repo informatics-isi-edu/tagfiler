@@ -1404,6 +1404,7 @@ var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
 var sortColumnsArray = new Array();
+var editInProgress = false;
 
 function str(value) {
 	return '\'' + value + '\'';
@@ -2343,6 +2344,10 @@ function encodeSafeURIComponent(value) {
 }
 
 function editQuery(tag) {
+	if (editInProgress) {
+		return;
+	}
+	editInProgress = true;
 	$('#AddTagToQueryDiv').css('display', 'none');
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
@@ -2365,6 +2370,7 @@ function cancelEdit(tag) {
 	$('#queryDiv').css('display', 'none');
 	disableAjaxAlert = false;
 	$('#AddTagToQueryDiv').css('display', '');
+	editInProgress = false;
 }
 
 function saveTagQuery(tag) {
@@ -2377,6 +2383,7 @@ function saveTagQuery(tag) {
 	$('#queryDiv').css('display', 'none');
 	disableAjaxAlert = false;
 	$('#AddTagToQueryDiv').css('display', '');
+	editInProgress = false;
 	showPreview();
 }
 
