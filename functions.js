@@ -2343,14 +2343,12 @@ function encodeSafeURIComponent(value) {
 }
 
 function editQuery(tag) {
+	$('#AddTagToQueryDiv').css('display', 'none');
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
 	var id =  makeId('tag', 'column', tagId);
-	var left = $('#' + id).offset().left;
-	var top = $('#' + id).offset().top;
 	var div = $('#queryDiv');
 	div.css('display', '');
-	div.css('margin-left', left + 'px');
 	
 	var tagDiv = $('#' + makeId('queryDiv', tagId));
 	if (tagDiv.get(0) == null) {
@@ -2359,7 +2357,6 @@ function editQuery(tag) {
 	}
 	tagDiv.css('display', '');
 	$('#queryLegend').html(tag);
-	window.scrollTo(left, top);
 }
 
 function cancelEdit(tag) {
@@ -2367,6 +2364,7 @@ function cancelEdit(tag) {
 	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
 	$('#queryDiv').css('display', 'none');
 	disableAjaxAlert = false;
+	$('#AddTagToQueryDiv').css('display', '');
 }
 
 function saveTagQuery(tag) {
@@ -2378,6 +2376,7 @@ function saveTagQuery(tag) {
 	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
 	$('#queryDiv').css('display', 'none');
 	disableAjaxAlert = false;
+	$('#AddTagToQueryDiv').css('display', '');
 	showPreview();
 }
 
