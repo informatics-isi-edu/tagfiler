@@ -2086,9 +2086,10 @@ function showQueryResults(limit) {
 					    'tag', column,
 						'onclick', makeFunction('moveColumn', str(column), 1),
 						'alt', 'Move Right');
+		rightDiv.append('&nbsp;');
 		rightDiv.append(img);
 		if (i == resultColumns.length -1) {
-			rightDiv.css('display', 'none');
+			img.css('display', 'none');
 		}
 
 		var thDiv = $('<div>');
