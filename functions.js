@@ -1405,6 +1405,7 @@ var viewListTags = new Object();
 var disableAjaxAlert = false;
 var sortColumnsArray = new Array();
 var editInProgress = false;
+var saveSearchConstraint;
 
 function str(value) {
 	return '\'' + value + '\'';
@@ -1670,7 +1671,6 @@ function deleteValue(id, tableId) {
 	var table = $('#' + tableId);
 	var tbody = getChild(table, 1);
 	if (tbody.children().length == 1) {
-		//table.parent().css('display', 'none');
 		var td = getChild(tr, 1);
 		var input = getChild(td, 2);
 		input.val('');
@@ -2361,16 +2361,35 @@ function editQuery(tag) {
 		div.append(tagDiv);
 	}
 	tagDiv.css('display', '');
+	saveSearchConstraint = tagDiv.clone(true, true);
+	copySelectOperator(tag);
 	$('#queryLegend').html(tag);
+}
+
+function copySelectOperator(tag) {
+	var searchTagId = makeId(tag.split(' ').join('_'));
+	var divTable = $('#' + makeId(searchTagId, 'searchTable'));
+	var divtbody = getChild(divTable, 1);
+	var trs = divtbody.children();
+	var toDivTable = saveSearchConstraint.find('#' + makeId(searchTagId, 'searchTable'));
+	var toDivtbody = getChild(toDivTable, 1);
+	$.each(trs, function(i, tr) {
+		if (i != 0) {
+			// operator column
+			var td = getChild($(tr), 2);
+			var op = getChild(td, 1).val();
+			var toTr = getChild(toDivtbody, i+1);
+			var toTd = getChild(toTr, 2);
+			getChild(toTd, 1).val(op);
+		}
+	});
 }
 
 function cancelEdit(tag) {
 	var tagId = makeId(tag.split(' ').join('_'));
-	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
-	$('#queryDiv').css('display', 'none');
-	disableAjaxAlert = false;
-	$('#AddTagToQueryDiv').css('display', '');
-	editInProgress = false;
+	$('#' + makeId('queryDiv', tagId)).remove();
+	$('#queryDiv').append(saveSearchConstraint);
+	saveTagQuery(tag);
 }
 
 function saveTagQuery(tag) {
@@ -2453,12 +2472,8 @@ function getTagSearchDisplay(div) {
 	var trs = divtbody.children();
 	$.each(trs, function(i, tr) {
 		if (i != 0) {
-			// tag column
-			var td = getChild($(tr), 1);
-			var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
-			
 			// operator column
-			td = getChild($(tr), 2);
+			var td = getChild($(tr), 2);
 			var op = getChild(td, 1).val();
 			if (op == 'Between') {
 				td = getChild($(tr), 3);
