@@ -1984,6 +1984,11 @@ function showPreview() {
 	showQueryResults('');
 }
 
+function showHide(showId, hideId) {
+	$('#' + hideId).css('display', 'none');
+	$('#' + showId).css('display', '');
+}
+
 function showQueryResults(limit) {
 	var queryUrl = getQueryUrl(limit);
 	$('#Query_URL').attr('href', queryUrl);
@@ -1996,6 +2001,7 @@ function showQueryResults(limit) {
 	table.append(tr);
 	tr.addClass('file-heading');
 	$.each(resultColumns, function(i, column) {
+		var tagId = column.split(' ').join('_');
 		var tagTd = $('<td>');
 		tr.append(tagTd);
 		makeAttributes(tagTd,
@@ -2065,32 +2071,54 @@ function showQueryResults(limit) {
 		leftDiv.attr('ALIGN', 'LEFT');
 		leftDiv.css('float', 'left');
 		
+		var imgId = makeId(tagId, 'left', 'arrow');
+		var leftId = makeId(tagId, 'left', 'b');
+		var b = $('<b>');
+		makeAttributes(b,
+						'id', leftId);
+		b.html('&nbsp;');
+		leftDiv.append(b);
+		if (i != 0) {
+			makeAttributes(b,
+							'onmouseover', makeFunction('showHide', str(imgId), str(leftId)));
+		}
 		img = $('<img>');
 		makeAttributes(img,
 						'src', HOME + '/static/arrow_left.png',
+						'id', imgId,
 					    'tag', column,
 						'onclick', makeFunction('moveColumn', str(column), -1),
+						'onmouseout', makeFunction('showHide', str(leftId), str(imgId)),
 						'alt', 'Move Left');
 		leftDiv.append(img);
-		if (i == 0) {
-			leftDiv.css('display', 'none');
-		}
+		img.css('display', 'none');
 		
 		var rightDiv = $('<div>');
 		moveDiv.append(rightDiv);
 		rightDiv.attr('ALIGN', 'RIGHT');
 		
+		imgId = makeId(tagId, 'right', 'arrow');
+		var rightId = makeId(tagId, 'right', 'b');
+		b = $('<b>');
+		makeAttributes(b,
+						'id', rightId);
+		b.html('&nbsp;');
+		if (i != resultColumns.length -1) {
+			makeAttributes(b,
+							'onmouseover', makeFunction('showHide', str(imgId), str(rightId)));
+		}
+		
 		img = $('<img>');
 		makeAttributes(img,
 						'src', HOME + '/static/arrow_right.png',
+						'id', imgId,
 					    'tag', column,
+						'onmouseout', makeFunction('showHide', str(rightId), str(imgId)),
 						'onclick', makeFunction('moveColumn', str(column), 1),
 						'alt', 'Move Right');
-		rightDiv.append('&nbsp;');
 		rightDiv.append(img);
-		if (i == resultColumns.length -1) {
-			img.css('display', 'none');
-		}
+		img.css('display', 'none');
+		rightDiv.append(b);
 
 		var thDiv = $('<div>');
 		thDiv.attr('ALIGN', 'CENTER');
