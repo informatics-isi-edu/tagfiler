@@ -1416,6 +1416,9 @@ function copyColumn(e, column, id) {
 }
 
 function dropColumn(e, tag, id) {
+	if (tagToMove == null) {
+		return;
+	}
 	e.preventDefault();
 	if (tagToMove == tag) {
 		tagToMove = null;
