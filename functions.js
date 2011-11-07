@@ -1422,6 +1422,8 @@ function dropColumn(e, tag, id) {
 	e.preventDefault();
 	if (tagToMove == tag) {
 		tagToMove = null;
+		document.body.style.cursor = "default";
+		$('#' + id).removeClass('odd');
 		return;
 	}
 	var index = -1;
