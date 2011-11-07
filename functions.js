@@ -1406,6 +1406,42 @@ var disableAjaxAlert = false;
 var sortColumnsArray = new Array();
 var editInProgress = false;
 var saveSearchConstraint;
+var tagToMove = null;
+
+function copyColumn(e, column, id) {
+	e.preventDefault();
+	tagToMove = column;
+	document.body.style.cursor = "move";
+	$('#' + id).addClass('odd');
+}
+
+function dropColumn(e, tag, id) {
+	e.preventDefault();
+	if (tagToMove == tag) {
+		tagToMove = null;
+		return;
+	}
+	var index = -1;
+	$.each(resultColumns, function(i, column) {
+		if (column == tagToMove) {
+			index = i;
+			return false;
+		}
+	});
+	resultColumns.splice(index, 1);
+	index = -1;
+	$.each(resultColumns, function(i, column) {
+		if (column == tag) {
+			index = i;
+			return false;
+		}
+	});
+	resultColumns.splice(index, 0, tagToMove);
+	tagToMove = null;
+	document.body.style.cursor = "default";
+	$('#' + id).removeClass('odd');
+	showPreview();
+}
 
 function str(value) {
 	return '\'' + value + '\'';
@@ -2002,10 +2038,12 @@ function showQueryResults(limit) {
 	tr.addClass('file-heading');
 	$.each(resultColumns, function(i, column) {
 		var tagId = column.split(' ').join('_');
+		var thId = makeId(tagId, 'th');
 		var tagTd = $('<td>');
 		tr.append(tagTd);
 		makeAttributes(tagTd,
 						'id', makeId('tag', 'column', column.split(' ').join('_')),
+						'onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId)),
 						'valign', 'top');
 		tagTd.addClass('file-tag');
 		var tagDiv = $('<div>');
@@ -2127,6 +2165,9 @@ function showQueryResults(limit) {
 		var th = $('<th>');
 		tagDiv.append(th);
 		th.addClass(column);
+		makeAttributes(th,
+						'id', thId,
+						'onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
 		var a = $('<a>');
 		makeAttributes(a,
 					   'href', makeFunction('javascript:editQuery', str(column)));

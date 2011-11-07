@@ -51,7 +51,7 @@ tr.file-footer {
 tr.no-border {
   border: 0px black;
 }
-tr.odd {
+tr.odd, th.odd {
   background-color: #cccccc;
 }
 tr.even {
