@@ -1389,6 +1389,7 @@ var USER;
 var WEBAUTHNHOME;
 var ROW_COUNTER;
 var VAL_COUNTER;
+var PREVIEW_COUNTER;
 var ROW_TAGS_COUNTER;
 var ROW_SORTED_COUNTER;
 var availableTags = null;
@@ -1488,6 +1489,7 @@ function initPSOC(home, user, webauthnhome) {
 	VAL_COUNTER = 0;
 	ROW_TAGS_COUNTER = 0;
 	ROW_SORTED_COUNTER = 0;
+	PREVIEW_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
 	
@@ -2022,6 +2024,7 @@ function deleteTag(tableId, id) {
 }
 
 function showPreview() {
+	PREVIEW_COUNTER++;
 	showQueryResults('');
 }
 
@@ -2034,160 +2037,186 @@ function showQueryResults(limit) {
 	var queryUrl = getQueryUrl(limit);
 	$('#Query_URL').attr('href', queryUrl);
 	queryUrl = getQueryUrl(limit == '' ? '&limit=15' : limit);
-	
+	var queryPreview = $('#Query_Preview');
+	var table = getChild(queryPreview, 1);
+	if (table.get(0) == null) {
+		table = $('<table>');
+		table.addClass('file-list');
+		queryPreview.append(table);
+	}
+
 	// build the table header
-	var table = $('<table>');
-	table.addClass('file-list');
-	var tr = $('<tr>');
-	table.append(tr);
-	tr.addClass('file-heading');
+	var tbody = getChild(table, 1);
+	if (tbody.get(0) == null) {
+		tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('file-heading');
+		tbody = getChild(table, 1);
+	}
+	var tr = getChild(tbody, 1);
+	var columnLimit = 0;
 	$.each(resultColumns, function(i, column) {
+		columnLimit = i + 1;
 		var tagId = column.split(' ').join('_');
-		var thId = makeId(tagId, 'th');
-		var tagTd = $('<td>');
-		tr.append(tagTd);
-		makeAttributes(tagTd,
-						'id', makeId('tag', 'column', column.split(' ').join('_')),
-						'onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId)),
-						'valign', 'top');
-		tagTd.addClass('file-tag');
-		var tagDiv = $('<div>');
-		tagDiv.attr('ALIGN', 'CENTER');
-		tagTd.append(tagDiv);
-		
-		var topDiv = $('<div>');
-		topDiv.attr('ALIGN', 'RIGHT');
-		tagDiv.append(topDiv);
-		
-		var toolbarTable = $('<table>');
-		topDiv.append(toolbarTable);
-		var toolbarTr = $('<tr>');
-		toolbarTable.append(toolbarTr);
-		var toolbarTd = $('<td>');
-		toolbarTr.append(toolbarTd);
-		var columSortId = makeId('sort', column.split(' ').join('_'));
-		makeAttributes(toolbarTd,
-						'id', columSortId);
+		var thId = makeId(tagId, 'th', PREVIEW_COUNTER);
+		var tagTd = getChild(tr, i+1);
+		if (tagTd.get(0) == null) {
+			tagTd = $('<td>');
+			tr.append(tagTd);
+			tagTd.addClass('file-tag');
+			tagTd.attr('valign', 'top');
+			var tagDiv = $('<div>');
+			tagDiv.attr('ALIGN', 'CENTER');
+			tagTd.append(tagDiv);
+			var topDiv = $('<div>');
+			topDiv.attr('ALIGN', 'RIGHT');
+			tagDiv.append(topDiv);
+			var toolbarTable = $('<table>');
+			topDiv.append(toolbarTable);
+			var toolbarTr = $('<tr>');
+			toolbarTable.append(toolbarTr);
+			var toolbarTd = $('<td>');
+			toolbarTr.append(toolbarTd);
+			toolbarTd = $('<td>');
+			toolbarTr.append(toolbarTd);
+			var img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/bullet_arrow_up.png',
+							'alt', 'Sort');
+			toolbarTd.append(img);
+			toolbarTd = $('<td>');
+			toolbarTr.append(toolbarTd);
+			img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/control_stop.png',
+							'alt', 'Stop sort');
+			toolbarTd.append(img);
+			img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/delete.png',
+							'alt', 'DEL');
+			toolbarTd.append(img);
+			var moveDiv = $('<div>');
+			moveDiv.css('width', '100%');
+			tagDiv.append(moveDiv);
+			var leftDiv = $('<div>');
+			moveDiv.append(leftDiv);
+			leftDiv.attr('ALIGN', 'LEFT');
+			leftDiv.css('float', 'left');
+			var b = $('<b>');
+			b.html('&nbsp;');
+			leftDiv.append(b);
+			img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/arrow_left.png',
+						    'tag', column,
+							'alt', 'Move Left');
+			leftDiv.append(img);
+			var rightDiv = $('<div>');
+			moveDiv.append(rightDiv);
+			rightDiv.attr('ALIGN', 'RIGHT');
+			img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/arrow_right.png',
+							'alt', 'Move Right');
+			rightDiv.append(img);
+			b = $('<b>');
+			b.html('&nbsp;');
+			rightDiv.append(b);
+			var thDiv = $('<div>');
+			thDiv.attr('ALIGN', 'CENTER');
+			tagDiv.append(thDiv);
+			var th = $('<th>');
+			tagDiv.append(th);
+			var a = $('<a>');
+			th.append(a);
+			var divConstraint = $('<div>');
+			tagDiv.append(divConstraint);
+		}
+		tagTd.css('display', '');
+		tagTd.attr('id', makeId('tag', 'column', column.split(' ').join('_'), PREVIEW_COUNTER));
+		tagTd.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId)));
+		var tagDiv = getChild(tagTd, 1);
+		var topDiv = getChild(tagDiv, 1);
+		var toolbarTable = getChild(topDiv, 1);
+		var toolbarTbody = getChild(toolbarTable, 1);
+		var toolbarTr = getChild(toolbarTbody, 1);
+		var toolbarTd = getChild(toolbarTr, 1);;
+		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
+		toolbarTd.attr('id', columSortId);
 		var sortValue = getSortOrder(column);
 		toolbarTd.html(sortValue);
-		toolbarTd = $('<td>');
-		toolbarTr.append(toolbarTd);
-		var img = $('<img>');
-		makeAttributes(img,
-						'id', makeId('arrow_up', column.split(' ').join('_')),
-						'src', HOME + '/static/bullet_arrow_up.png',
-					    'tag', column,
-						'onclick', makeFunction('sortColumn', str(column), str(columSortId)),
-						'alt', 'Sort');
-		toolbarTd.append(img);
+		toolbarTd = getChild(toolbarTr, 2);
+		var img = getChild(toolbarTd, 1);
+		img.css('display', '');
+		img.attr('id', makeId('arrow_up', column.split(' ').join('_'), PREVIEW_COUNTER));
+		img.attr('tag', column);
+		img.attr('onclick', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER));
 		if (sortValue != '') {
 			img.css('display', 'none');
 		}
-		toolbarTd = $('<td>');
-		toolbarTr.append(toolbarTd);
-		img = $('<img>');
-		makeAttributes(img,
-						'id', makeId('clear_sort', column.split(' ').join('_')),
-						'src', HOME + '/static/control_stop.png',
-					    'tag', column,
-						'onclick', makeFunction('stopSortColumn', str(column), str(columSortId)),
-						'alt', 'Stop sort');
-		toolbarTd.append(img);
+		toolbarTd = getChild(toolbarTr, 3);
+		img = getChild(toolbarTd, 1);
+		img.css('display', '');
+		img.attr('id', makeId('clear_sort', column.split(' ').join('_'), PREVIEW_COUNTER));
+		img.attr('tag', column);
+		img.attr('onclick', makeFunction('stopSortColumn', str(column), str(columSortId), PREVIEW_COUNTER));
 		if (sortValue == '') {
 			img.css('display', 'none');
 		}
-
-		img = $('<img>');
-		makeAttributes(img,
-						'src', HOME + '/static/delete.png',
-					    'tag', column,
-						'onclick', makeFunction('deleteColumn', str(column)),
-						'alt', 'DEL');
-		toolbarTd.append(img);
-		
-		var moveDiv = $('<div>');
-		moveDiv.css('width', '100%');
-		tagDiv.append(moveDiv);
-		
-		var leftDiv = $('<div>');
-		moveDiv.append(leftDiv);
-		leftDiv.attr('ALIGN', 'LEFT');
-		leftDiv.css('float', 'left');
-		
-		var imgId = makeId(tagId, 'left', 'arrow');
-		var leftId = makeId(tagId, 'left', 'b');
-		var b = $('<b>');
-		makeAttributes(b,
-						'id', leftId);
-		b.html('&nbsp;');
-		leftDiv.append(b);
+		img = getChild(toolbarTd, 2);
+		img.attr('tag', column);
+		img.attr('onclick', makeFunction('deleteColumn', str(column)));
+		var moveDiv = getChild(tagDiv, 2);
+		var leftDiv = getChild(moveDiv, 1);;
+		var imgId = makeId(tagId, 'left', 'arrow', PREVIEW_COUNTER);
+		var leftId = makeId(tagId, 'left', 'b', PREVIEW_COUNTER);
+		var b = getChild(leftDiv, 1);
 		if (i != 0) {
-			makeAttributes(b,
-							'onmouseover', makeFunction('showHide', str(imgId), str(leftId)));
+			b.attr('onmouseover', makeFunction('showHide', str(imgId), str(leftId)));
 		}
-		img = $('<img>');
-		makeAttributes(img,
-						'src', HOME + '/static/arrow_left.png',
-						'id', imgId,
-					    'tag', column,
-						'onclick', makeFunction('moveColumn', str(column), -1),
-						'onmouseout', makeFunction('showHide', str(leftId), str(imgId)),
-						'alt', 'Move Left');
-		leftDiv.append(img);
+		img = getChild(leftDiv, 2);
+		img.attr('id', imgId);
+		img.attr('tag', column);
+		img.attr('onclick', makeFunction('moveColumn', str(column), -1));
+		img.attr('onmouseout', makeFunction('showHide', str(leftId), str(imgId)));
 		img.css('display', 'none');
-		
-		var rightDiv = $('<div>');
-		moveDiv.append(rightDiv);
-		rightDiv.attr('ALIGN', 'RIGHT');
-		
-		imgId = makeId(tagId, 'right', 'arrow');
-		var rightId = makeId(tagId, 'right', 'b');
-		b = $('<b>');
-		makeAttributes(b,
-						'id', rightId);
-		b.html('&nbsp;');
+		var rightDiv = getChild(moveDiv, 2);
+		imgId = makeId(tagId, 'right', 'arrow', PREVIEW_COUNTER);
+		var rightId = makeId(tagId, 'right', 'b', PREVIEW_COUNTER);
+		img = getChild(rightDiv, 1);
+		img.attr('id', imgId);
+		img.attr('tag', column);
+		img.attr('onclick', makeFunction('moveColumn', str(column), 1));
+		img.attr('onmouseout', makeFunction('showHide', str(rightId), str(imgId)));
+		img.css('display', 'none');
+		b = getChild(rightDiv, 2);
 		if (i != resultColumns.length -1) {
-			makeAttributes(b,
-							'onmouseover', makeFunction('showHide', str(imgId), str(rightId)));
+			b.attr('onmouseover', makeFunction('showHide', str(imgId), str(rightId)));
 		}
-		
-		img = $('<img>');
-		makeAttributes(img,
-						'src', HOME + '/static/arrow_right.png',
-						'id', imgId,
-					    'tag', column,
-						'onmouseout', makeFunction('showHide', str(rightId), str(imgId)),
-						'onclick', makeFunction('moveColumn', str(column), 1),
-						'alt', 'Move Right');
-		rightDiv.append(img);
-		img.css('display', 'none');
-		rightDiv.append(b);
-
-		var thDiv = $('<div>');
-		thDiv.attr('ALIGN', 'CENTER');
-		tagDiv.append(thDiv);
-		
-		var th = $('<th>');
-		tagDiv.append(th);
-		makeAttributes(th,
-						'id', thId,
-						'onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
-		var a = $('<a>');
-		makeAttributes(a,
-					   'href', makeFunction('javascript:editQuery', str(column)));
+		var th = getChild(tagDiv, 4);
+		th.attr('id', thId);
+		th.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
+		var a = getChild(th, 1);
+		a.attr('href', makeFunction('javascript:editQuery', str(column)));
 		a.html(column);
-		th.append(a);
-		
-		var divConstraint = $('<div>');
-		tagDiv.append(divConstraint);
-		makeAttributes(divConstraint,
-						'id', makeId('constraint', column.split(' ').join('_')));
+		var divConstraint = getChild(tagDiv, 5);
+		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
+		divConstraint.html('');
 		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
 		if (searchDisplay.get(0) != null) {
 			var constraint = getTagSearchDisplay(searchDisplay);
 			divConstraint.append(constraint);
 		}
 	});
+	var columnLength = tr.children().length;
+	for (var i=columnLimit; i < columnLength; i++) {
+		var td = getChild(tr, i+1);
+		if (td.css('display') == 'none') {
+			break;
+		}
+		td.css('display', 'none');
+	}
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2195,19 +2224,31 @@ function showQueryResults(limit) {
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
+			var rowLimit = 1;
 			var odd = false;
 			$.each(data, function(i, row) {
-				var tr = $('<tr>');
-				table.append(tr);
-				tr.addClass('file');
-				tr.addClass(odd ? 'odd' : 'even');
+				rowLimit = i + 2;
+				var tr = getChild(tbody, i+2);
+				if (tr.get(0) == null) {
+					tr = $('<tr>');
+					table.append(tr);
+					tr.addClass('file');
+					tr.addClass(odd ? 'odd' : 'even');
+				}
+				tr.css('display', '');
 				odd = !odd;
 				$.each(resultColumns, function(j, column) {
-					var td = $('<td>');
-					tr.append(td);
+					var td = getChild(tr, j+1);
+					if (td.get(0) == null) {
+						td = $('<td>');
+						tr.append(td);
+					}
+					td.css('display', '');
+					td.removeClass();
 					td.addClass('file-tag-list');
 					td.addClass(column);
 					td.addClass('multivalue');
+					td.html('');
 					if (row[column] != null) {
 						if (!allTagdefs[column]['tagdef multivalue']) {
 							if (row[column] === true) {
@@ -2242,7 +2283,22 @@ function showQueryResults(limit) {
 						}
 					}
 				});
+				for (var k=columnLimit; k < columnLength; k++) {
+					var td = getChild(tr, k+1);
+					if (td.css('display') == 'none') {
+						break;
+					}
+					td.css('display', 'none');
+				}
 			});
+			var tableLength = tbody.children().length;
+			for (var i=rowLimit; i < tableLength; i++) {
+				var tr = getChild(tbody, i+1);
+				if (tr.css('display') == 'none') {
+					break;
+				}
+				tr.css('display', 'none');
+			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
@@ -2250,9 +2306,6 @@ function showQueryResults(limit) {
 			}
 		}
 	});
-	var queryPreview = $('#Query_Preview');
-	queryPreview.html('');
-	queryPreview.append(table);
 }
 
 function checkSelectValue(selId, addId) {
@@ -2286,15 +2339,15 @@ function moveColumn(tag, position) {
 	showPreview();
 }
 
-function sortColumn(column, id) {
+function sortColumn(column, id, count) {
 	sortColumnsArray.push(column);
-	$('#' + makeId('arrow_up', column.split(' ').join('_'))).css('display', 'none');
-	$('#' + makeId('clear_sort', column.split(' ').join('_'))).css('display', '');
+	$('#' + makeId('arrow_up', column.split(' ').join('_'), count)).css('display', 'none');
+	$('#' + makeId('clear_sort', column.split(' ').join('_'), count)).css('display', '');
 	$('#' + id).html('' + sortColumnsArray.length);
 	showPreview();
 }
 
-function stopSortColumn(tag, id) {
+function stopSortColumn(tag, id, count) {
 	var index = -1;
 	$.each(sortColumnsArray, function(i, column) {
 		if (column == tag) {
@@ -2304,10 +2357,10 @@ function stopSortColumn(tag, id) {
 	});
 	sortColumnsArray.splice(index, 1);
 	$('#' + id).html('');
-	$('#' + makeId('arrow_up', tag.split(' ').join('_'))).css('display', '');
-	$('#' + makeId('clear_sort', tag.split(' ').join('_'))).css('display', 'none');
+	$('#' + makeId('arrow_up', tag.split(' ').join('_'), count)).css('display', '');
+	$('#' + makeId('clear_sort', tag.split(' ').join('_'), count)).css('display', 'none');
 	$.each(sortColumnsArray, function(i, column) {
-		var id = makeId('sort', column.split(' ').join('_'));
+		var id = makeId('sort', column.split(' ').join('_'), count);
 		var val = parseInt($('#' + id).html());
 		if (val > index) {
 			$('#' + id).html('' + --val);
