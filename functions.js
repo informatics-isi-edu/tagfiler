@@ -1399,7 +1399,7 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
-var headerTags = ['id', 'name', 'version', 'url', 'bytes'];
+var headerTags = ['id', 'name'];
 var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
@@ -2033,7 +2033,7 @@ function showHide(showId, hideId) {
 function showQueryResults(limit) {
 	var queryUrl = getQueryUrl(limit);
 	$('#Query_URL').attr('href', queryUrl);
-	queryUrl = getQueryUrl(limit == '' ? '&limit=5' : limit);
+	queryUrl = getQueryUrl(limit == '' ? '&limit=15' : limit);
 	
 	// build the table header
 	var table = $('<table>');
@@ -2169,7 +2169,6 @@ function showQueryResults(limit) {
 		
 		var th = $('<th>');
 		tagDiv.append(th);
-		th.addClass(column);
 		makeAttributes(th,
 						'id', thId,
 						'onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
