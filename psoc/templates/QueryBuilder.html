@@ -19,46 +19,29 @@ $if None:
 <script type="text/javascript" src="${home}/static/jquery-ui.js"></script>
 <div id="psoc" onmouseup="document.body.style.cursor = 'default';" >
 <br/>
-<a id="Query_URL">Permanent link</a>
-<br/><br/>
-
-<div id="AddTagToQueryDiv">
-<a id="AddTagToQueryLink" href="javascript:addTagToQuery()">Add a tag</a>
-<br/><br/>
-<a id="AddViewTagsToQueryLink" href="javascript:addViewTagsToQuery()">Add the tags of a view</a>
-<br/><br/>
+<a id="Query_URL" href="" >Permanent link</a>&nbsp;&nbsp;
+<a id="AddTagToQueryLink" href="javascript:addTagToQuery()">Add a column</a>&nbsp;&nbsp;
+<a id="AddViewTagsToQueryLink" href="javascript:addViewTagsToQuery()">Add multiple columns</a>&nbsp;&nbsp;
 <a id="ViewAllResults" href="javascript:showQueryResults('&limit=none')">View all results.</a>
 <br/><br/>
-</div>
 
 <div id="customizedViewDiv" style="display: none">
 <fieldset>
-<legend>Add a tag</legend>
 <p>Select an available tag and click 'Add to query':</p>
-<select id="customizedViewSelect" name="customizedViewSelect" onclick="loadAvailableTags('customizedViewSelect')" onchange="checkSelectValue('customizedViewSelect', 'addToListColumns')" >
-<option value=''>Available Tags</option>
+<select id="customizedViewSelect" name="customizedViewSelect" onclick="loadAvailableTags('customizedViewSelect')" >
+<option value=''>Available tags</option>
 </select>
-<input type="button" id="cancelAddToListColumns" name="cancelAddToListColumns" onclick="cancelAddToListColumns();" value="Cancel" />
-<input type="button" id="addToListColumns" name="addToListColumns" disabled="disabled" onclick="addToListColumns('customizedViewSelect');" value="Add to query" />
 </fieldset>
-<br/><br/>
 </div>
 
 <div id="selectViewDiv" style="display: none">
 <fieldset>
-<legend>Add the tags of a view</legend>
 <p>Select an available view and click 'Add to query':</p>
-<select id="selectViews" name="selectViews"  onclick="loadAvailableViews('selectViews')" onchange="checkSelectValue('selectViews', 'addViewToListColumns');buildViewTagsTable('viewTagsDiv')">
+<select id="selectViews" name="selectViews"  onclick="loadAvailableViews('selectViews')" >
 <option value=''>Available Views</option>
 </select>
-<br/><br/>
-<div id="viewTagsDiv" style="display: none">
-<br/><br/>
 </div>
-<input type="button" id="cancelAddViewToListColumns" name="cancelAddViewToListColumns" onclick="cancelAddToListColumns();" value="Cancel" />
-<input type="button" id="addViewToListColumns" name="addViewToListColumns" disabled="disabled" onclick="addViewToListColumns('selectViews');" value="Add to query" />
 </fieldset>
-<br/><br/>
 </div>
 
 <div id="queryDiv" style="display: none; width:25%" >
@@ -71,10 +54,22 @@ $if None:
 <select name="versions" id="versions" onchange="showPreview()">
         <option value="latest">Show latest version if matches</option>
         <option value="any">Show any version which matches</option>
-</select><br/><br/>
-<br/>
+</select>
 
-<br/>
+<div 
+   id="DragAndDropBox" 
+   style="
+      display:none;
+      position:absolute; 
+      font-size:12px;
+      font-weight:bold;
+      font-family:verdana;
+      border:#72B0E6 solid 1px;
+      padding:15px;
+      color:#1A80DB;
+      background-color:#FFFFFF;">
+</div>
+
 </div>
 <script type="text/javascript">
 $for op in ops:

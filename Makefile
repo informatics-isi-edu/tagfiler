@@ -28,7 +28,9 @@ WSGIFILE=tagfiler.wsgi
 
 SCRIPTFILES=functions.js \
 			jquery.js \
+			jquery-ui.js \
 			main.css \
+			jquery-ui.css \
 			calendar.gif \
 			new.png \
 			delete.png \
@@ -45,7 +47,9 @@ FILES=dataserv_app.py rest_fileio.py subjects.py \
 WEBSTATICFILES=logo.png \
 	functions.js \
 	jquery.js \
+	jquery-ui.js \
 	main.css \
+	jquery-ui.css \
 	calendar.gif \
 	new.png \
 	delete.png \

@@ -35,7 +35,7 @@ table.file-tag-list {
 }
 .file-list, .file-heading, .file, .file-tag, .file-name, .file-update, .file-tags, .file-tag, .file-delete, .file-tag-list, .heading, table.tagdefs, tr.tagdef, tr.tagdef td, tr.heading th, tr.role td {
   border: 1px solid black;
-  white-space:nowrap;
+  /* white-space:nowrap; */
 }
 .file-tag.multivalue {
   border-style: hidden;
@@ -43,7 +43,7 @@ table.file-tag-list {
 tr.file-heading, tr.heading, tr.file-heading A:link, tr.heading A:link, tr.file-heading A:visited, tr.heading A:visited {
   background-color: #990000;
   color: #ffcc00;
-  white-space:nowrap;
+  /* white-space:nowrap; */
 }
 tr.file-footer {
   border: 1px black;
@@ -65,7 +65,7 @@ tr.file-tag.even, tr.file-footer.even {
 td.entity {
   vertical-align: top;
 }
-td.bytes {
+td.bytes, td.externalfilebytes {
   text-align: right;
 }
 div.progress-wrapper {
@@ -110,11 +110,11 @@ table.file-tag-list tr {
   border-style: solid;
 }
 td.text-tree {
-    white-space:nowrap;
+    /* white-space:nowrap; */
 }
 td.tag-name {
     background-color: aqua;
-    white-space:nowrap;
+    /* white-space:nowrap; */
 }
 td.status-wrapper {
     text-align: center;
@@ -136,8 +136,21 @@ img.pattern {
 }
 .directory {
     border: 1px solid black;
-    white-space:nowrap;
+    /* white-space:nowrap; */
 }
 #javascriptlog {
   font-size: small;
 }
+
+.dialogfont {
+  font-size: 12px;
+}
+
+tr.odd.gradeA {
+	background-color: #ddffdd;
+}
+
+tr.even.gradeA {
+	background-color: #eeffee;
+}
+

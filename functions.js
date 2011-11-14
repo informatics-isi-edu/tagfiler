@@ -1409,6 +1409,24 @@ var editInProgress = false;
 var saveSearchConstraint;
 var tagToMove = null;
 
+var confirmQueryEditDialog = null;
+var confirmAddTagDialog = null;
+var confirmAddMultipleTagsDialog = null;
+
+var dragAndDropBox;
+
+function DisplayDragAndDropBox(e) {
+   dragAndDropBox.css('left', String(parseInt(e.pageX) + 'px'));
+   dragAndDropBox.css('top', String(parseInt(e.pageY) + 'px'));
+   dragAndDropBox.html(tagToMove);
+   dragAndDropBox.css('display', 'block');
+}
+
+function HideDragAndDropBox() {
+	dragAndDropBox.css('display', 'none');
+	document.body.style.cursor = "default";
+}
+
 function copyColumn(e, column, id) {
 	e.preventDefault();
 	tagToMove = column;
@@ -1416,11 +1434,12 @@ function copyColumn(e, column, id) {
 	$('#' + id).addClass('odd');
 }
 
-function dropColumn(e, tag, id) {
+function dropColumn(e, tag, id, append) {
 	if (tagToMove == null) {
 		return;
 	}
 	e.preventDefault();
+	HideDragAndDropBox();
 	if (tagToMove == tag) {
 		tagToMove = null;
 		document.body.style.cursor = "default";
@@ -1442,7 +1461,11 @@ function dropColumn(e, tag, id) {
 			return false;
 		}
 	});
-	resultColumns.splice(index, 0, tagToMove);
+	if (!append) {
+		resultColumns.splice(index, 0, tagToMove);
+	} else {
+		resultColumns.push(tagToMove);
+	}
 	tagToMove = null;
 	document.body.style.cursor = "default";
 	$('#' + id).removeClass('odd');
@@ -1493,6 +1516,53 @@ function initPSOC(home, user, webauthnhome) {
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
 	
+	$(document).mousemove(function(e){
+		if (tagToMove == null) {
+			return;
+		}
+		DisplayDragAndDropBox(e);
+	});
+	$(document).mouseup(function(e) {
+		var header = $('#Query_Preview_header');
+		var minY = parseInt(header.offset().top);
+		var minX = parseInt(header.offset().left);
+		var value = header.css('height');
+		var length = value.length - 2;
+		maxY = minY + parseInt(value.substr(0, length));
+		value = header.css('width');
+		length = value.length - 2;
+		maxX = minX + parseInt(value.substr(0, length));
+		var x = parseInt(e.pageX);
+		var y = parseInt(e.pageY);
+		if (y < minY || y > maxY || x < minX) {
+			HideDragAndDropBox();
+			tagToMove = null;
+		} else if (x > maxX) {
+			var children = header.children();
+			var i = resultColumns.length;
+			var tag = resultColumns[i-1];
+			var th = $(children[i-1]).find('th');
+			var id = th.attr('id');
+			dropColumn(e, tag, id, true);
+		} else {
+			var children = header.children();
+			for (var i=1; i < children.length; i++) {
+				var left = parseInt($(children[i]).offset().left);
+				if (left > x || (i == children.length - 1)) {
+					var j = i - 1;
+					if (i == children.length - 1) {
+						j = i;
+					}
+					var tag = resultColumns[j];
+					var th = $(children[j]).find('th');
+					var id = th.attr('id');
+					dropColumn(e, tag, id, false);
+					break;
+				}
+			}
+		}
+	});
+
 	// get the default view
 	var url = new String(window.location);
 	var default_view = null;
@@ -1521,6 +1591,49 @@ function initPSOC(home, user, webauthnhome) {
 			resultColumns.push(tag);
 		}
 	});
+	$('#customizedViewDiv').css('display', '');
+	confirmAddTagDialog = $('#customizedViewDiv');
+	confirmAddTagDialog.dialog({
+		autoOpen: false,
+		title: 'Add a column',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Add to query": function() {
+					addToListColumns('customizedViewSelect');
+					$(this).dialog('close');
+				}
+		},
+		draggable: true,
+		position: 'top',
+		height: 250,
+		modal: false,
+		resizable: true,
+		width: 450,
+	});
+	$('#selectViewDiv').css('display', '');
+	confirmAddMultipleTagsDialog = $('#selectViewDiv');
+	confirmAddMultipleTagsDialog.dialog({
+		autoOpen: false,
+		title: 'Add columns from a view',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Add to query": function() {
+					addViewToListColumns('selectViews');
+					$(this).dialog('close');
+				}
+		},
+		draggable: true,
+		position: 'top',
+		height: 250,
+		modal: false,
+		resizable: true,
+		width: 450,
+	});
+	dragAndDropBox = $('#DragAndDropBox');
 	showPreview();
 }
 
@@ -1813,18 +1926,30 @@ function addNewValue(row, type, selectOperatorId) {
 	}
 	if (selVal == 'Between') {
 		if (!isSelect(type)) {
+			td = $('<td>');
+			tr.append(td);
+			td.css('border-width', '0px');
 			var input = $('<input>');
 			makeAttributes(input,
 							'type', 'text',
 							'onkeyup', makeFunction('showPreview'));
 			td.append(input);
+			td = $('<td>');
+			tr.append(td);
+			td.css('border-width', '0px');
 			td.append('AND');
+			td = $('<td>');
+			tr.append(td);
+			td.css('border-width', '0px');
 			input = $('<input>');
 			makeAttributes(input,
 							'type', 'text',
 							'onkeyup', makeFunction('showPreview'));
 			td.append(input);
 		} else {
+			td = $('<td>');
+			tr.append(td);
+			td.css('border-width', '0px');
 			var select = $('<select>');
 			var selid = makeId('select', 'value', VAL_COUNTER);
 			makeAttributes(select,
@@ -1850,12 +1975,18 @@ function addNewValue(row, type, selectOperatorId) {
 			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
 		}
 	} else if (!isSelect(type) || (selVal != 'Equal' && selVal != 'Not equal')) {
+		td = $('<td>');
+		tr.append(td);
+		td.css('border-width', '0px');
 		var input = $('<input>');
 		makeAttributes(input,
 						'type', 'text',
 						'onkeyup', makeFunction('showPreview'));
 		td.append(input);
 	} else {
+		td = $('<td>');
+		tr.append(td);
+		td.css('border-width', '0px');
 		var select = $('<select>');
 		var selid = makeId('select', 'value', VAL_COUNTER);
 		makeAttributes(select,
@@ -1912,6 +2043,9 @@ function getQueryUrl(limit) {
 	
 	var query = new Array();
 	var divs = $('#queryDiv').children();
+	if (confirmQueryEditDialog != null) {
+		divs.push(confirmQueryEditDialog);
+	}
 	$.each(divs, function(k, div) {
 		var searchTag = $(div).attr('tag');
 		var searchTagId = makeId(searchTag.split(' ').join('_'));
@@ -1932,9 +2066,10 @@ function getQueryUrl(limit) {
 					var table = getChild(td, 1);
 					var tbody = getChild(table, 1);
 					var tr = getChild(tbody, 1);
-					var td = getChild(tr, 1);
+					var td = getChild(tr, 2);
 					var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-					var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
+					td = getChild(tr, 4);
+					var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 					if (val1 != '' && val2 != '') {
 						query.push(tag + ':geq:' + val1);
 						query.push(tag + ':leq:' + val2);
@@ -1946,8 +2081,8 @@ function getQueryUrl(limit) {
 					var tbody = getChild(table, 1);
 					var values = new Array();
 					$.each(tbody.children(), function(j, row) {
-						td = getChild($(row), 1);
-						var input = getChild(td, 2);
+						td = getChild($(row), 2);
+						var input = getChild(td, 1);
 						var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 						if (val.length > 0) {
 							values.push(encodeURIComponent(val));
@@ -2003,18 +2138,11 @@ function displayValuesTable(row, selId, tag) {
 
 function addToListColumns(selectId) {
 	var column = $('#' + selectId).val();
-	$('#customizedViewDiv').css('display', 'none');
-	$('#AddTagToQueryDiv').css('display', '');
+	confirmAddTagDialog.dialog('close');
 	if (!resultColumns.contains(column)) {
 		resultColumns.push(column);
 		showPreview();
 	}
-}
-
-function cancelAddToListColumns() {
-	$('#customizedViewDiv').css('display', 'none');
-	$('#selectViewDiv').css('display', 'none');
-	$('#AddTagToQueryDiv').css('display', '');
 }
 
 function deleteTag(tableId, id) {
@@ -2026,11 +2154,6 @@ function deleteTag(tableId, id) {
 function showPreview() {
 	PREVIEW_COUNTER++;
 	showQueryResults('');
-}
-
-function showHide(showId, hideId) {
-	$('#' + hideId).css('display', 'none');
-	$('#' + showId).css('display', '');
 }
 
 function showQueryResults(limit) {
@@ -2049,6 +2172,8 @@ function showQueryResults(limit) {
 	var tbody = getChild(table, 1);
 	if (tbody.get(0) == null) {
 		tr = $('<tr>');
+		makeAttributes(tr,
+						'id', 'Query_Preview_header');
 		table.append(tr);
 		tr.addClass('file-heading');
 		tbody = getChild(table, 1);
@@ -2096,46 +2221,22 @@ function showQueryResults(limit) {
 							'src', HOME + '/static/delete.png',
 							'alt', 'DEL');
 			toolbarTd.append(img);
-			var moveDiv = $('<div>');
-			moveDiv.css('width', '100%');
-			tagDiv.append(moveDiv);
-			var leftDiv = $('<div>');
-			moveDiv.append(leftDiv);
-			leftDiv.attr('ALIGN', 'LEFT');
-			leftDiv.css('float', 'left');
-			var b = $('<b>');
-			b.html('&nbsp;');
-			leftDiv.append(b);
-			img = $('<img>');
-			makeAttributes(img,
-							'src', HOME + '/static/arrow_left.png',
-						    'tag', column,
-							'alt', 'Move Left');
-			leftDiv.append(img);
-			var rightDiv = $('<div>');
-			moveDiv.append(rightDiv);
-			rightDiv.attr('ALIGN', 'RIGHT');
-			img = $('<img>');
-			makeAttributes(img,
-							'src', HOME + '/static/arrow_right.png',
-							'alt', 'Move Right');
-			rightDiv.append(img);
-			b = $('<b>');
-			b.html('&nbsp;');
-			rightDiv.append(b);
 			var thDiv = $('<div>');
 			thDiv.attr('ALIGN', 'CENTER');
 			tagDiv.append(thDiv);
 			var th = $('<th>');
-			tagDiv.append(th);
+			thDiv.append(th);
 			var a = $('<a>');
 			th.append(a);
 			var divConstraint = $('<div>');
 			tagDiv.append(divConstraint);
+			tagDiv.css('display', 'none');
+			tagDiv.css('display', '');
 		}
 		tagTd.css('display', '');
 		tagTd.attr('id', makeId('tag', 'column', column.split(' ').join('_'), PREVIEW_COUNTER));
-		tagTd.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId)));
+		tagTd.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
+		tagTd.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
 		var tagDiv = getChild(tagTd, 1);
 		var topDiv = getChild(tagDiv, 1);
 		var toolbarTable = getChild(topDiv, 1);
@@ -2167,40 +2268,13 @@ function showQueryResults(limit) {
 		img = getChild(toolbarTd, 2);
 		img.attr('tag', column);
 		img.attr('onclick', makeFunction('deleteColumn', str(column)));
-		var moveDiv = getChild(tagDiv, 2);
-		var leftDiv = getChild(moveDiv, 1);;
-		var imgId = makeId(tagId, 'left', 'arrow', PREVIEW_COUNTER);
-		var leftId = makeId(tagId, 'left', 'b', PREVIEW_COUNTER);
-		var b = getChild(leftDiv, 1);
-		if (i != 0) {
-			b.attr('onmouseover', makeFunction('showHide', str(imgId), str(leftId)));
-		}
-		img = getChild(leftDiv, 2);
-		img.attr('id', imgId);
-		img.attr('tag', column);
-		img.attr('onclick', makeFunction('moveColumn', str(column), -1));
-		img.attr('onmouseout', makeFunction('showHide', str(leftId), str(imgId)));
-		img.css('display', 'none');
-		var rightDiv = getChild(moveDiv, 2);
-		imgId = makeId(tagId, 'right', 'arrow', PREVIEW_COUNTER);
-		var rightId = makeId(tagId, 'right', 'b', PREVIEW_COUNTER);
-		img = getChild(rightDiv, 1);
-		img.attr('id', imgId);
-		img.attr('tag', column);
-		img.attr('onclick', makeFunction('moveColumn', str(column), 1));
-		img.attr('onmouseout', makeFunction('showHide', str(rightId), str(imgId)));
-		img.css('display', 'none');
-		b = getChild(rightDiv, 2);
-		if (i != resultColumns.length -1) {
-			b.attr('onmouseover', makeFunction('showHide', str(imgId), str(rightId)));
-		}
-		var th = getChild(tagDiv, 4);
+		var thDiv = getChild(tagDiv, 2);
+		var th = getChild(thDiv, 1);
 		th.attr('id', thId);
-		th.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
 		var a = getChild(th, 1);
 		a.attr('href', makeFunction('javascript:editQuery', str(column)));
 		a.html(column);
-		var divConstraint = getChild(tagDiv, 5);
+		var divConstraint = getChild(tagDiv, 3);
 		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
 		divConstraint.html('');
 		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
@@ -2232,8 +2306,9 @@ function showQueryResults(limit) {
 				if (tr.get(0) == null) {
 					tr = $('<tr>');
 					table.append(tr);
-					tr.addClass('file');
+					//tr.addClass('file');
 					tr.addClass(odd ? 'odd' : 'even');
+					tr.addClass('gradeA');
 				}
 				tr.css('display', '');
 				odd = !odd;
@@ -2246,7 +2321,7 @@ function showQueryResults(limit) {
 					td.css('display', '');
 					td.removeClass();
 					td.addClass('file-tag-list');
-					td.addClass(column);
+					td.addClass(column.replace(/ /g, ''));
 					td.addClass('multivalue');
 					td.html('');
 					if (row[column] != null) {
@@ -2306,15 +2381,6 @@ function showQueryResults(limit) {
 			}
 		}
 	});
-}
-
-function checkSelectValue(selId, addId) {
-	var val = $('#' + selId).val();
-	if (val == '') {
-		$('#' + addId).attr('disabled', 'disabled');
-	} else {
-		$('#' + addId).removeAttr('disabled');
-	}
 }
 
 function htmlEscape(str) {
@@ -2381,18 +2447,13 @@ function getSortOrder(tag) {
 }
 
 function addTagToQuery() {
-	$('#AddTagToQueryDiv').css('display', 'none');
-	$('#customizedViewDiv').css('display', '');
+	confirmAddTagDialog.dialog('open');
 	$('#customizedViewSelect').val('');
-	checkSelectValue('customizedViewSelect', 'addToListColumns');
 }
 
 function addViewTagsToQuery() {
-	$('#AddTagToQueryDiv').css('display', 'none');
-	$('#selectViewDiv').css('display', '');
+	confirmAddMultipleTagsDialog.dialog('open');
 	$('#selectViews').val('');
-	checkSelectValue('selectViews', 'addViewToListColumns');
-	$('#viewTagsDiv').css('display', 'none');
 }
 
 function addViewToListColumns(id) {
@@ -2405,13 +2466,12 @@ function addViewToListColumns(id) {
 			preview = true;
 		}
 	});
-	$('#selectViewDiv').css('display', 'none');
-	$('#AddTagToQueryDiv').css('display', '');
 	if (preview) {
 		showPreview();
 	}
 }
 
+/*
 function buildViewTagsTable(id) {
 	var val = $('#selectViews').val();
 	setViewTags(val);
@@ -2445,6 +2505,7 @@ function buildViewTagsTable(id) {
 	div.append($('<br>'));
 	div.append($('<br>'));
 }
+*/
 
 function deleteColumn(column) {
 	$.each(sortColumnsArray, function(i, tag) {
@@ -2475,7 +2536,6 @@ function editQuery(tag) {
 		return;
 	}
 	editInProgress = true;
-	$('#AddTagToQueryDiv').css('display', 'none');
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
 	var id =  makeId('tag', 'column', tagId);
@@ -2487,10 +2547,35 @@ function editQuery(tag) {
 		tagDiv = tagQueryDiv(tag);
 		div.append(tagDiv);
 	}
-	tagDiv.css('display', '');
+	var tbody = tagDiv.find('tbody');
+	if (tbody.children().length == 1) {
+		addToQueryTable(makeId(tagId, 'searchTable'), tag);
+	}
 	saveSearchConstraint = tagDiv.clone(true, true);
 	copySelectOperator(tag);
-	$('#queryLegend').html(tag);
+	tagDiv.css('display', '');
+	confirmQueryEditDialog = tagDiv;
+	confirmQueryEditDialog.dialog({
+		autoOpen: false,
+		title: 'Edit constraint for column "' + tag + '"',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Save": function() {
+					saveTagQuery(tag);
+					$(this).dialog('close');
+				}
+		},
+		position: 'top',
+		draggable: true,
+		height: 250,
+		modal: false,
+		resizable: true,
+		width: 750,
+		beforeClose: function(event, ui) {cancelEdit(tag);}
+	});
+	confirmQueryEditDialog.dialog('open');
 }
 
 function copySelectOperator(tag) {
@@ -2508,15 +2593,28 @@ function copySelectOperator(tag) {
 			var toTr = getChild(toDivtbody, i+1);
 			var toTd = getChild(toTr, 2);
 			getChild(toTd, 1).val(op);
+			td = getChild($(tr), 3);
+			toTd = getChild($(toTr), 3);
+			var selects = td.find('select');
+			var toSelects = toTd.find('select');
+			$.each(selects, function(i, sel) {
+				$(toSelects[i]).val($(sel).val());
+			});
 		}
 	});
 }
 
 function cancelEdit(tag) {
-	var tagId = makeId(tag.split(' ').join('_'));
-	$('#' + makeId('queryDiv', tagId)).remove();
+	if (!editInProgress) {
+		confirmQueryEditDialog.remove();
+		confirmQueryEditDialog = null;
+		return true;
+	}
+	confirmQueryEditDialog.remove();
+	confirmQueryEditDialog = null;
 	$('#queryDiv').append(saveSearchConstraint);
 	saveTagQuery(tag);
+	return true;
 }
 
 function saveTagQuery(tag) {
@@ -2526,10 +2624,22 @@ function saveTagQuery(tag) {
 	var constraintDiv = getTagSearchDisplay($('#' +makeId('queryDiv', tagId)));
 	div.append(constraintDiv);
 	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
-	$('#queryDiv').css('display', 'none');
 	disableAjaxAlert = false;
-	$('#AddTagToQueryDiv').css('display', '');
 	editInProgress = false;
+	if (confirmQueryEditDialog != null) {
+		var child = getChild(confirmQueryEditDialog, 1);
+		var tagDiv = $('<div>');
+		makeAttributes(tagDiv,
+					   'id', makeId('queryDiv', tagId),
+					   'tag', tag);
+		tagDiv.addClass('dialogfont');
+		tagDiv.append(child);
+		$('#queryDiv').append(tagDiv);
+		tagDiv.css('display', 'none');
+		confirmQueryEditDialog.remove();
+		confirmQueryEditDialog = null;
+	}
+	$('#queryDiv').css('display', 'none');
 	showPreview();
 }
 
@@ -2539,11 +2649,10 @@ function tagQueryDiv(tag) {
 	makeAttributes(div,
 				   'id', makeId('queryDiv', tagId),
 				   'tag', tag);
+	div.addClass('dialogfont');
+	div.css('display', 'none');
 	var fieldset = $('<fieldset>');
 	div.append(fieldset);
-	var legend = $('<legend>');
-	fieldset.append(legend);
-	legend.html(tag);
 	var a = $('<a>');
 	fieldset.append(a);
 	makeAttributes(a,
@@ -2567,26 +2676,6 @@ function tagQueryDiv(tag) {
 	tr.append(th);
 	th.attr('colspan', '2');
 	th.html('&nbsp;&nbsp;Values&nbsp;&nbsp;');
-	fieldset.append($('<br>'));
-	fieldset.append($('<br>'));
-	var input = $('<input>');
-	makeAttributes(input,
-				   'id', makeId(tagId, 'searchTable', 'cancel'),
-				   'name', makeId(tagId, 'searchTable', 'cancel'),
-				   'type', 'button',
-				   'onclick', makeFunction('cancelEdit', str(tag)),
-				   'value', 'Cancel');
-	fieldset.append(input);
-	input = $('<input>');
-	makeAttributes(input,
-				   'id', makeId(tagId, 'searchTable', 'save'),
-				   'name', makeId(tagId, 'searchTable', 'save'),
-				   'type', 'button',
-				   'onclick', makeFunction('saveTagQuery', str(tag)),
-				   'value', 'Save');
-	fieldset.append(input);
-	div.append($('<br>'));
-	div.append($('<br>'));
 	return div;
 }
 
@@ -2607,9 +2696,10 @@ function getTagSearchDisplay(div) {
 				var table = getChild(td, 1);
 				var tbody = getChild(table, 1);
 				var tr = getChild(tbody, 1);
-				var td = getChild(tr, 1);
+				var td = getChild(tr, 2);
 				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				var val2 = getChild(td, 2).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				td = getChild(tr, 4);
+				var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 				if (val1 != '' && val2 != '') {
 					query.push('['+ val1 + ', ' + val2 + ']');
 				}
@@ -2620,8 +2710,8 @@ function getTagSearchDisplay(div) {
 				var tbody = getChild(table, 1);
 				var values = new Array();
 				$.each(tbody.children(), function(j, row) {
-					td = getChild($(row), 1);
-					var input = getChild(td, 2);
+					td = getChild($(row), 2);
+					var input = getChild(td, 1);
 					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 					if (val.length > 0) {
 						values.push(encodeURIComponent(val));
