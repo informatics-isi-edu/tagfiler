@@ -70,9 +70,9 @@ class Node (object, Application):
 
     __slots__ = [ 'appname' ]
 
-    def __init__(self, parser, appname):
+    def __init__(self, parser, appname, queryopts=None):
         self.appname = appname
-        Application.__init__(self, parser)
+        Application.__init__(self, parser, queryopts)
 
     def uri2referer(self, uri):
         return self.config['home'] + uri
@@ -125,7 +125,7 @@ class Study (Node):
     __slots__ = []
 
     def __init__(self, parser, appname, subjpreds=[], queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.action = 'get'
         self.study_type = None
         self.study_size = None
@@ -290,7 +290,7 @@ class AppletError (Node):
     __slots__ = []
 
     def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.action = None
         self.status = None
 
@@ -319,9 +319,8 @@ class FileList (Node):
     __slots__ = []
 
     def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.globals['view'] = None
-        self.queryopts = queryopts
 
     def GET(self, uri):
         
@@ -451,7 +450,7 @@ class LogList (Node):
        """
 
     def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
 
     def GET(self, uri):
         if not self.authn.hasRoles(['admin']):
@@ -487,7 +486,7 @@ class Contact (Node):
        """
 
     def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.globals['webauthnrequire'] = False
 
     def GET(self, uri):
@@ -506,10 +505,9 @@ class FileId(Node, FileIO):
     """
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
     def __init__(self, parser, appname, path, queryopts={}, versions='any', storage=None):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         FileIO.__init__(self, parser=parser)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
-        self.queryopts = queryopts
         self.versions = versions
         if storage:
             self.storage = storage
@@ -517,10 +515,9 @@ class FileId(Node, FileIO):
 class Subject(Node, subjects.Subject):
     __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
     def __init__(self, parser, appname, path, queryopts={}, storage=None):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         subjects.Subject.__init__(self)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
-        self.queryopts = queryopts
         if storage:
             self.storage = storage
 
@@ -532,10 +529,9 @@ class LogId(Node, LogFileIO):
     """
     __slots__ = [ ]
     def __init__(self, parser, appname, name, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         LogFileIO.__init__(self)
         self.name = name
-        self.queryopts = queryopts
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
@@ -543,7 +539,7 @@ class Tagdef (Node):
     __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writepolicy', 'readpolicy', 'multivalue', 'queryopts' ]
 
     def __init__(self, parser, appname, tag_id=None, typestr=None, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.tag_id = tag_id
         self.typestr = typestr
         self.writepolicy = None
@@ -552,7 +548,6 @@ class Tagdef (Node):
         self.is_unique = None
         self.action = None
         self.tagdefs = {}
-        self.queryopts = queryopts
 
     def GET(self, uri):
 
@@ -784,13 +779,12 @@ class FileTags (Node):
     __slots__ = [ 'tag_id', 'value', 'tagvals' ]
 
     def __init__(self, parser, appname, path=None, queryopts={}):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         if path:
             self.path = path
         else:
             self.path = [ ([], [], []) ]
         self.referer = None
-        self.queryopts = queryopts
         self.globals['queryTarget'] = self.qtarget()
         self.globals['queryAllTags'] = None
 
@@ -1185,12 +1179,11 @@ class FileTags (Node):
 class Query (Node):
     __slots__ = [ 'subjpreds', 'queryopts', 'action' ]
     def __init__(self, parser, appname, queryopts={}, path=[]):
-        Node.__init__(self, parser, appname)
+        Node.__init__(self, parser, appname, queryopts)
         self.path = path
         if len(self.path) == 0:
             self.path = [ ( [], [], [] ) ]
         self.subjpreds = self.path[-1][0]
-        self.queryopts = queryopts
         self.action = 'query'
         self.globals['view'] = None
         #self.log('TRACE', 'Query() constructor exiting')

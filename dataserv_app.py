@@ -755,7 +755,7 @@ class Application:
 
         return False
 
-    def __init__(self, parser=None):
+    def __init__(self, parser=None, queryopts=None):
         "store common configuration data for all service classes"
         global render
         global db_cache
@@ -780,6 +780,11 @@ class Application:
         self.version = None
         self.subjpreds = []
         self.globals = dict()
+
+        if queryopts == None:
+            self.queryopts = dict()
+        else:
+            self.queryopts = queryopts
 
         # this ordered list can be pruned to optimize transactions
         self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
