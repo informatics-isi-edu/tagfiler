@@ -786,6 +786,13 @@ class Application:
         else:
             self.queryopts = queryopts
 
+        # this will interfere with internal queries
+        if self.queryopts.has_key('range'):
+            self.query_range = self.queryopts['range']
+            del self.queryopts['range']
+        else:
+            self.query_range = None
+
         # this ordered list can be pruned to optimize transactions
         self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
 
@@ -2096,6 +2103,12 @@ class Application:
         if len(prohibited) > 0:
             raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
+        rangemode = self.queryopts.get('range', None)
+        if rangemode not in [ 'values', 'count' ]:
+            rangemode = None
+
+        web.debug(rangemode, self.queryopts)
+
         def mergepreds(predlist):
             """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
 
@@ -2134,8 +2147,16 @@ class Application:
                     OUTER JOIN to combine querystring with resources
                     table.
 
-               final=True means projection is one column per ltag.
-               final=False means projection is a single-column UNION of all ltags.
+               final=False uses template: "q"
+               final=True  uses template: "( q ) AS alias"  and array_agg of multivalue tags
+
+               normal query templates:
+                   SELECT subject FROM "_%(tagname)s"
+                   SELECT subject, subject AS value FROM resources [WHERE subject ...]
+                   SELECT subject, value FROM "_%(tagname)s" [WHERE value ...]
+                   SELECT subject, value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
+                   SELECT subject, value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
+                   SELECT subject, array_agg(value) AS value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
 
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
@@ -2271,7 +2292,7 @@ class Application:
                         spreds[tag] = []
                         versions_test_added.append(tag)
 
-            if final:
+            if final and rangemode == None:
                 selects = ['resources.subject AS id',
                            'resources.dtype AS dtype',
                            'resources.readok AS readok',
@@ -2291,30 +2312,54 @@ class Application:
 
             finals = []
             for tag, preds in lpreds.items():
-                if tag == 'owner':
-                    # owner is restricted, since it MUST appear unfiltered in all results
-                    if len(set([p.op for p in preds]).difference(set([None]))) > 0:
-                        raise Conflict(self, 'The tag "owner" cannot be filtered in projection list predicates.')
-                    # skip this iteration since it's already in the base results
-                    continue
-                elif spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final:
-                    # this projection does not further filter triples relative to the spred so optimize it away
+                if rangemode and final:
                     td = tagdefs[tag]
-                    lq = None
-                else:
-                    td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, final, tprefix='l_')
-                    if swheres:
-                        raise BadRequest(self, 'Operator ":not:" not supported in projection list predicates.')
-                if final:
-                    if lq:
-                        outer.append(lq)
-                        tprefix = 'l_'
-                    else:
-                        tprefix = 's_'
+                    if len([ p for p in preds if p.op]) > 0:
+                        raise BadRequest(self, 'Operators not supported in rangemode list predicates.')
                     if td.typestr != 'empty':
-                        selects.append('%s.value AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        # find active value range for given tag
+                        if td.tagname == 'id':
+                            lq = '(SELECT %(agg)s(DISTINCT resources.subject) FROM resources)'
+                        else:
+                            lq = '(SELECT %(agg)s(DISTINCT ' + wraptag(td.tagname) + '.value) FROM ' + wraptag(td.tagname) + ' JOIN resources USING (subject))'
                     else:
-                        selects.append('%s.subject IS NOT NULL AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        # pretend empty tags have binary range True, False
+                        lq = '(SELECT %(agg)s(t.x) FROM (VALUES (True), (False)) AS t (x))'
+
+                else:
+                    if tag == 'owner':
+                        # owner is restricted, since it MUST appear unfiltered in all results
+                        if len(set([p.op for p in preds]).difference(set([None]))) > 0:
+                            raise Conflict(self, 'The tag "owner" cannot be filtered in projection list predicates.')
+                        # skip this iteration since it's already in the base results
+                        continue
+                    elif spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final and rangemode == None:
+                        # this projection does not further filter triples relative to the spred so optimize it away
+                        td = tagdefs[tag]
+                        lq = None
+                    else:
+                        td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, final, tprefix='l_')
+                        if swheres:
+                            raise BadRequest(self, 'Operator ":not:" not supported in projection list predicates.')
+
+                if final:
+                    if rangemode == None:
+                        # returning triple values per subject
+                        if lq:
+                            outer.append(lq)
+                            tprefix = 'l_'
+                        else:
+                            tprefix = 's_'
+                        if td.typestr != 'empty':
+                            selects.append('%s.value AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        else:
+                            selects.append('%s.subject IS NOT NULL AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                    elif rangemode == 'values':
+                        # returning distinct values across all subjects
+                        selects.append((lq % dict(agg='array_agg')) + ' AS %s' % wraptag(listas.get(td.tagname, td.tagname), prefix=''))
+                    else:
+                        # returning count of distinct values across all subjects
+                        selects.append((lq % dict(agg='count')) + ' AS %s' % wraptag(listas.get(td.tagname, td.tagname), prefix=''))
                 else:
                     finals.append(lq)
 
@@ -2326,12 +2371,22 @@ class Application:
                 where = 'WHERE ' + ' AND '.join([ '(%s)' % w for w in subject_wheres ])
             else:
                 where = ''
-            q = ('SELECT %(selects)s FROM %(tables)s %(where)s' 
-                 % dict(selects=', '.join([ s for s in selects ]),
-                        tables=' LEFT OUTER JOIN ' \
+
+            if rangemode == None or not final:
+                q = ('SELECT %(selects)s FROM %(tables)s %(where)s' 
+                     % dict(selects=', '.join([ s for s in selects ]),
+                            tables=' LEFT OUTER JOIN ' \
                             .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
                                   + [ '%s USING (subject)' % o for o in outer ]),
-                        where=where))
+                            where=where))
+            else:
+                q = ('WITH resources AS ( SELECT resources.subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
+                     % dict(selects=', '.join([ s for s in selects ]),
+                            tables=' LEFT OUTER JOIN ' \
+                            .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
+                                  + [ '%s USING (subject)' % o for o in outer ]),
+                            where=where))
+            
             return q
 
         cq = None
@@ -2355,25 +2410,27 @@ class Application:
 
             if i == len(path) - 1:
                 lpreds = [ p for p in lpreds ]
-                lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag in otags ])
-                order_suffix = []
-                for tag in ['txid', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
-                    if tag in set([p.tag for p in lpreds] + ['txid', 'id']):
-                        orderstmt = wraptag(listas.get(tag, tag), prefix='')
-                        if tag in [ 'modified', 'txid', 'id' ]:
-                            orderstmt += ' DESC'
-                        else:
-                            orderstmt += ' ASC'
-                        orderstmt += ' NULLS LAST'
-                        order_suffix.append(orderstmt)
-                if otags != None and (len(otags) > 0 or len(order_suffix) > 0):
-                    order = ' ORDER BY %s' % ', '.join([ wraptag(listas.get(t, t), prefix='') for t in otags] + order_suffix)
+                if rangemode == None:
+                    lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag in otags ])
+                    order_suffix = []
+                    for tag in ['txid', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
+                        if tag in set([p.tag for p in lpreds] + ['txid', 'id']):
+                            orderstmt = wraptag(listas.get(tag, tag), prefix='')
+                            if tag in [ 'modified', 'txid', 'id' ]:
+                                orderstmt += ' DESC'
+                            else:
+                                orderstmt += ' ASC'
+                            orderstmt += ' NULLS LAST'
+                            order_suffix.append(orderstmt)
+                    if otags != None and (len(otags) > 0 or len(order_suffix) > 0):
+                        order = ' ORDER BY %s' % ', '.join([ wraptag(listas.get(t, t), prefix='') for t in otags] + order_suffix)
+
             cq = elem_query(spreds, lpreds, values, i==len(path)-1)
 
         if order:
             cq += order
 
-        if limit:
+        if limit and rangemode == None:
             cq += ' LIMIT %d' % limit
 
         def dbquote(s):

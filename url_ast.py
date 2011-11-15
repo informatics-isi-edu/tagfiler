@@ -1291,7 +1291,9 @@ class Query (Node):
                 else:
                     try_default_view = False
 
+                self.queryopts['range'] = self.query_range
                 files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
+                self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
 
                 if len(files) > 0:
@@ -1353,6 +1355,8 @@ class Query (Node):
                 for acceptType in self.acceptTypesPreferedOrder():
                     if acceptType == 'text/uri-list':
                         # return raw results for REST client
+                        if self.query_range:
+                            raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
                         self.header('Content-Type', 'text/uri-list')
                         yield self.render.FileUriList(files)
                         return
@@ -1368,6 +1372,8 @@ class Query (Node):
                         return
                     elif acceptType == 'text/html':
                         break
+                if self.query_range:
+                    raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
                 self.header('Content-Type', 'text/html')
                 for r in self.renderlist(self.title,
                                          [self.render.QueryViewStatic(Application.ops, self.subjpreds),
@@ -1379,6 +1385,8 @@ class Query (Node):
                     preview = self.queryopts['preview']
                 except:
                     preview = None
+                if self.query_range:
+                    raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
                 if preview == None:
                     for r in self.renderlist(self.title,
                                              [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
