@@ -2107,8 +2107,6 @@ class Application:
         if rangemode not in [ 'values', 'count' ]:
             rangemode = None
 
-        web.debug(rangemode, self.queryopts)
-
         def mergepreds(predlist):
             """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
 
