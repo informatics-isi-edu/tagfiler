@@ -2276,7 +2276,8 @@ class Application:
                 if tag == 'id':
                     if len([ p for p in preds if p.op]) != 0:
                         raise BadRequest(self, 'Tag "id" cannot be filtered in a list-predicate.')
-                    del lpreds[tag]
+                    if not final or rangemode == None:
+                        del lpreds[tag]
             
             inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
             outer = [ ]
