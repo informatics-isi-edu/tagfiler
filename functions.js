@@ -1414,6 +1414,7 @@ var confirmAddTagDialog = null;
 var confirmAddMultipleTagsDialog = null;
 
 var dragAndDropBox;
+var tipBox;
 
 function DisplayDragAndDropBox(e) {
    dragAndDropBox.css('left', String(parseInt(e.pageX) + 'px'));
@@ -1425,6 +1426,17 @@ function DisplayDragAndDropBox(e) {
 function HideDragAndDropBox() {
 	dragAndDropBox.css('display', 'none');
 	document.body.style.cursor = "default";
+}
+
+function DisplayTipBox(e, content) {
+   tipBox.css('left', String(parseInt(e.pageX + 25) + 'px'));
+   tipBox.css('top', String(parseInt(e.pageY - 50) + 'px'));
+   tipBox.html(content);
+   tipBox.css('display', 'block');
+}
+
+function HideTipBox() {
+	tipBox.css('display', 'none');
 }
 
 function copyColumn(e, column, id) {
@@ -1503,6 +1515,80 @@ function getChild(item, index) {
 	return item.children(':nth-child(' + index + ')');
 }
 
+function getColumnOver(e) {
+	var ret = new Object();
+	var header = $('#Query_Preview_header');
+	var minY = parseInt(header.offset().top);
+	var minX = parseInt(header.offset().left);
+	var value = header.css('height');
+	var length = value.length - 2;
+	maxY = minY + parseInt(value.substr(0, length));
+	value = header.css('width');
+	length = value.length - 2;
+	maxX = minX + parseInt(value.substr(0, length));
+	var x = parseInt(e.pageX);
+	var y = parseInt(e.pageY);
+	var tr = getChild(header, 2);
+	if (y < minY || y > maxY) {
+		$('td.highlighted').removeClass('highlighted');
+	} else if (x <= minX) {
+		var children = tr.children();
+		var tag = resultColumns[0];
+		var th = $(children[0]).find('th');
+		var id = th.attr('id');
+		ret['tag'] = tag;
+		ret['id'] = id;
+		ret['append'] = false;
+		ret['index'] = 0;
+		var trs = $('.tablerow');
+		$('td.highlighted').removeClass('highlighted');
+		$('td:nth-child('+1+')', trs).addClass('highlighted');
+	} else if (x >= maxX) {
+		var children = tr.children();
+		var i = resultColumns.length;
+		var tag = resultColumns[i-1];
+		var th = $(children[i-1]).find('th');
+		var id = th.attr('id');
+		ret['tag'] = tag;
+		ret['id'] = id;
+		ret['append'] = true;
+		ret['index'] = i - 1;
+	} else {
+		var children = tr.children();
+		var lastLeft = parseInt($(children[0]).offset().left);
+		for (var i=1; i < children.length; i++) {
+			var left = parseInt($(children[i]).offset().left);
+			if (left >= x || i == children.length - 1) {
+				var j = i;
+				var append = false;
+				if (x <= (left + lastLeft)/2) {
+					j--;
+				} else if (i == children.length - 1) {
+					if (x >= (maxX + left)/2) {
+						append = true;
+					}
+				}
+				var tag = resultColumns[j];
+				var th = $(children[j]).find('th');
+				var id = th.attr('id');
+				ret['tag'] = tag;
+				ret['id'] = id;
+				ret['append'] = append;
+				ret['index'] = j;
+				var trs = $('.tablerow');
+				$('td.highlighted').removeClass('highlighted');
+				if (!append) {
+					$('td:nth-child('+(j+1)+')', trs).addClass('highlighted');
+				}
+				break;
+			} else {
+				lastLeft = left;
+			}
+		}
+	}
+	return ret;
+}
+
 function initPSOC(home, user, webauthnhome) {
 	expiration_warning = false;
 	HOME = home;
@@ -1520,46 +1606,16 @@ function initPSOC(home, user, webauthnhome) {
 		if (tagToMove == null) {
 			return;
 		}
+		getColumnOver(e);
 		DisplayDragAndDropBox(e);
 	});
 	$(document).mouseup(function(e) {
-		var header = $('#Query_Preview_header');
-		var minY = parseInt(header.offset().top);
-		var minX = parseInt(header.offset().left);
-		var value = header.css('height');
-		var length = value.length - 2;
-		maxY = minY + parseInt(value.substr(0, length));
-		value = header.css('width');
-		length = value.length - 2;
-		maxX = minX + parseInt(value.substr(0, length));
-		var x = parseInt(e.pageX);
-		var y = parseInt(e.pageY);
-		if (y < minY || y > maxY || x < minX) {
+		var ret = getColumnOver(e);
+		if (ret['tag'] == null) {
 			HideDragAndDropBox();
 			tagToMove = null;
-		} else if (x > maxX) {
-			var children = header.children();
-			var i = resultColumns.length;
-			var tag = resultColumns[i-1];
-			var th = $(children[i-1]).find('th');
-			var id = th.attr('id');
-			dropColumn(e, tag, id, true);
 		} else {
-			var children = header.children();
-			for (var i=1; i < children.length; i++) {
-				var left = parseInt($(children[i]).offset().left);
-				if (left > x || (i == children.length - 1)) {
-					var j = i - 1;
-					if (i == children.length - 1) {
-						j = i;
-					}
-					var tag = resultColumns[j];
-					var th = $(children[j]).find('th');
-					var id = th.attr('id');
-					dropColumn(e, tag, id, false);
-					break;
-				}
-			}
+			dropColumn(e, ret['tag'], ret['id'], ret['append']);
 		}
 	});
 
@@ -1634,6 +1690,7 @@ function initPSOC(home, user, webauthnhome) {
 		width: 450,
 	});
 	dragAndDropBox = $('#DragAndDropBox');
+	tipBox = $('#TipBox');
 	showPreview();
 }
 
@@ -1758,12 +1815,13 @@ function setViewTags(tag) {
 }
 
 function addToQueryTable(tableId, tag) {
-	var tbody = getChild($('#' + tableId), 1);
+	var tbody = getChild($('#' + tableId), 2);
 	var id = makeId('row', ++ROW_COUNTER);
 	var tr = $('<tr>');
 	makeAttributes(tr,
 					'id', id);
-	tr.addClass('role');
+	tr.addClass((tbody.children().length % 2 != 0) ? 'odd' : 'even');
+	tr.addClass('gradeA');
 	tbody.append(tr);
 	var td = $('<td>');
 	tr.append(td);
@@ -2050,50 +2108,48 @@ function getQueryUrl(limit) {
 		var searchTag = $(div).attr('tag');
 		var searchTagId = makeId(searchTag.split(' ').join('_'));
 		var divTable = $('#' + makeId(searchTagId, 'searchTable'));
-		var divtbody = getChild(divTable, 1);
+		var divtbody = getChild(divTable, 2);
 		var trs = divtbody.children();
 		$.each(trs, function(i, tr) {
-			if (i != 0) {
-				// tag column
-				var td = getChild($(tr), 1);
-				var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
-				
-				// operator column
-				td = getChild($(tr), 2);
-				var op = getChild(td, 1).val();
-				if (op == 'Between') {
-					td = getChild($(tr), 3);
-					var table = getChild(td, 1);
-					var tbody = getChild(table, 1);
-					var tr = getChild(tbody, 1);
-					var td = getChild(tr, 2);
-					var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-					td = getChild(tr, 4);
-					var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-					if (val1 != '' && val2 != '') {
-						query.push(tag + ':geq:' + val1);
-						query.push(tag + ':leq:' + val2);
-					}
-				} else if (op != 'Tagged' && op != 'Not tagged') {
-					// values column
-					td = getChild($(tr), 3);
-					var table = getChild(td, 1);
-					var tbody = getChild(table, 1);
-					var values = new Array();
-					$.each(tbody.children(), function(j, row) {
-						td = getChild($(row), 2);
-						var input = getChild(td, 1);
-						var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
-						if (val.length > 0) {
-							values.push(encodeURIComponent(val));
-						}
-					});
-					if (values.length > 0) {
-						query.push(tag + ops[op] + values.join(','));
-					}
-				} else {
-					query.push(tag + ops[op]);
+			// tag column
+			var td = getChild($(tr), 1);
+			var tag = encodeURIComponent(getChild(td, 1).attr('tag'));
+			
+			// operator column
+			td = getChild($(tr), 2);
+			var op = getChild(td, 1).val();
+			if (op == 'Between') {
+				td = getChild($(tr), 3);
+				var table = getChild(td, 1);
+				var tbody = getChild(table, 1);
+				var tr = getChild(tbody, 1);
+				var td = getChild(tr, 2);
+				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				td = getChild(tr, 4);
+				var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+				if (val1 != '' && val2 != '') {
+					query.push(tag + ':geq:' + val1);
+					query.push(tag + ':leq:' + val2);
 				}
+			} else if (op != 'Tagged' && op != 'Not tagged') {
+				// values column
+				td = getChild($(tr), 3);
+				var table = getChild(td, 1);
+				var tbody = getChild(table, 1);
+				var values = new Array();
+				$.each(tbody.children(), function(j, row) {
+					td = getChild($(row), 2);
+					var input = getChild(td, 1);
+					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+					if (val.length > 0) {
+						values.push(encodeURIComponent(val));
+					}
+				});
+				if (values.length > 0) {
+					query.push(tag + ops[op] + values.join(','));
+				}
+			} else {
+				query.push(tag + ops[op]);
 			}
 		});
 	});
@@ -2164,38 +2220,43 @@ function showQueryResults(limit) {
 	var table = getChild(queryPreview, 1);
 	if (table.get(0) == null) {
 		table = $('<table>');
-		table.addClass('file-list');
+		table.addClass('display');
+		makeAttributes(table,
+						'border', '0',
+						'cellpadding', '0',
+						'cellspacing', '0');
 		queryPreview.append(table);
+		var thead = $('<thead>');
+		table.append(thead);
+		makeAttributes(thead,
+						'id', 'Query_Preview_header');
+		var tr = $('<tr>');
+		thead.append(tr);
+		tr = $('<tr>');
+		thead.append(tr);
+		tr = $('<tr>');
+		thead.append(tr);
+		var tbody = $('<tbody>');
+		table.append(tbody);
 	}
 
 	// build the table header
-	var tbody = getChild(table, 1);
-	if (tbody.get(0) == null) {
-		tr = $('<tr>');
-		makeAttributes(tr,
-						'id', 'Query_Preview_header');
-		table.append(tr);
-		tr.addClass('file-heading');
-		tbody = getChild(table, 1);
-	}
-	var tr = getChild(tbody, 1);
+	var thead = getChild(table, 1);
+	var tr1 = getChild(thead, 1);
+	var tr2 = getChild(thead, 2);
+	var tr3 = getChild(thead, 3);
 	var columnLimit = 0;
 	$.each(resultColumns, function(i, column) {
 		columnLimit = i + 1;
 		var tagId = column.split(' ').join('_');
 		var thId = makeId(tagId, 'th', PREVIEW_COUNTER);
-		var tagTd = getChild(tr, i+1);
-		if (tagTd.get(0) == null) {
-			tagTd = $('<td>');
-			tr.append(tagTd);
-			tagTd.addClass('file-tag');
-			tagTd.attr('valign', 'top');
-			var tagDiv = $('<div>');
-			tagDiv.attr('ALIGN', 'CENTER');
-			tagTd.append(tagDiv);
+		var td = getChild(tr1, i+1);
+		if (td.get(0) == null) {
+			var td = $('<td>');
+			tr1.append(td);
 			var topDiv = $('<div>');
 			topDiv.attr('ALIGN', 'RIGHT');
-			tagDiv.append(topDiv);
+			td.append(topDiv);
 			var toolbarTable = $('<table>');
 			topDiv.append(toolbarTable);
 			var toolbarTr = $('<tr>');
@@ -2205,6 +2266,7 @@ function showQueryResults(limit) {
 			toolbarTd = $('<td>');
 			toolbarTr.append(toolbarTd);
 			var img = $('<img>');
+			img.addClass('tablecolumnsort');
 			makeAttributes(img,
 							'src', HOME + '/static/bullet_arrow_up.png',
 							'alt', 'Sort');
@@ -2212,37 +2274,36 @@ function showQueryResults(limit) {
 			toolbarTd = $('<td>');
 			toolbarTr.append(toolbarTd);
 			img = $('<img>');
-			makeAttributes(img,
-							'src', HOME + '/static/control_stop.png',
-							'alt', 'Stop sort');
-			toolbarTd.append(img);
-			img = $('<img>');
+			img.addClass('tablecolumnundelete');
 			makeAttributes(img,
 							'src', HOME + '/static/delete.png',
 							'alt', 'DEL');
 			toolbarTd.append(img);
-			var thDiv = $('<div>');
-			thDiv.attr('ALIGN', 'CENTER');
-			tagDiv.append(thDiv);
 			var th = $('<th>');
-			thDiv.append(th);
+			tr2.append(th);
 			var a = $('<a>');
+			a.addClass('tableheadercell');
 			th.append(a);
+			
+			td = $('<td>');
+			tr3.append(td);
 			var divConstraint = $('<div>');
-			tagDiv.append(divConstraint);
-			tagDiv.css('display', 'none');
-			tagDiv.css('display', '');
+			td.append(divConstraint);
 		}
-		tagTd.css('display', '');
-		tagTd.attr('id', makeId('tag', 'column', column.split(' ').join('_'), PREVIEW_COUNTER));
-		tagTd.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
-		tagTd.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
-		var tagDiv = getChild(tagTd, 1);
-		var topDiv = getChild(tagDiv, 1);
+		var td1 = getChild(tr1, i+1);
+		var td2 = getChild(tr2, i+1);
+		var td3 = getChild(tr3, i+1);
+		td1.css('display', '');
+		td2.css('display', '');
+		td3.css('display', '');
+		td2.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
+		td2.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
+		
+		var topDiv = getChild(td1, 1);
 		var toolbarTable = getChild(topDiv, 1);
 		var toolbarTbody = getChild(toolbarTable, 1);
 		var toolbarTr = getChild(toolbarTbody, 1);
-		var toolbarTd = getChild(toolbarTr, 1);;
+		var toolbarTd = getChild(toolbarTr, 1);
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
 		toolbarTd.attr('id', columSortId);
 		var sortValue = getSortOrder(column);
@@ -2252,29 +2313,24 @@ function showQueryResults(limit) {
 		img.css('display', '');
 		img.attr('id', makeId('arrow_up', column.split(' ').join('_'), PREVIEW_COUNTER));
 		img.attr('tag', column);
-		img.attr('onclick', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER));
+		img.attr('onclick', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER, (sortValue == ''), true));
+		$('#' + columSortId).unbind('mouseenter mouseleave');
 		if (sortValue != '') {
-			img.css('display', 'none');
+			setSortTipBox(columSortId, parseInt(sortValue));
 		}
 		toolbarTd = getChild(toolbarTr, 3);
 		img = getChild(toolbarTd, 1);
-		img.css('display', '');
-		img.attr('id', makeId('clear_sort', column.split(' ').join('_'), PREVIEW_COUNTER));
-		img.attr('tag', column);
-		img.attr('onclick', makeFunction('stopSortColumn', str(column), str(columSortId), PREVIEW_COUNTER));
-		if (sortValue == '') {
-			img.css('display', 'none');
-		}
-		img = getChild(toolbarTd, 2);
 		img.attr('tag', column);
 		img.attr('onclick', makeFunction('deleteColumn', str(column)));
-		var thDiv = getChild(tagDiv, 2);
-		var th = getChild(thDiv, 1);
+		
+		var th = td2;
 		th.attr('id', thId);
 		var a = getChild(th, 1);
 		a.attr('href', makeFunction('javascript:editQuery', str(column)));
 		a.html(column);
-		var divConstraint = getChild(tagDiv, 3);
+		
+		var divConstraint = getChild(td3, 1);
+		divConstraint.css('white-space', 'nowrap');
 		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
 		divConstraint.html('');
 		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
@@ -2283,12 +2339,16 @@ function showQueryResults(limit) {
 			divConstraint.append(constraint);
 		}
 	});
-	var columnLength = tr.children().length;
+	var columnLength = tr1.children().length;
 	for (var i=columnLimit; i < columnLength; i++) {
-		var td = getChild(tr, i+1);
+		var td = getChild(tr1, i+1);
 		if (td.css('display') == 'none') {
 			break;
 		}
+		td.css('display', 'none');
+		td = getChild(tr2, i+1);
+		td.css('display', 'none');
+		td = getChild(tr3, i+1);
 		td.css('display', 'none');
 	}
 	$.ajax({
@@ -2300,15 +2360,16 @@ function showQueryResults(limit) {
 		success: function(data, textStatus, jqXHR) {
 			var rowLimit = 1;
 			var odd = false;
+			var tbody = getChild(table, 2);
 			$.each(data, function(i, row) {
-				rowLimit = i + 2;
-				var tr = getChild(tbody, i+2);
+				rowLimit = i + 4;
+				var tr = getChild(tbody, i+1);
 				if (tr.get(0) == null) {
 					tr = $('<tr>');
-					table.append(tr);
-					//tr.addClass('file');
+					tbody.append(tr);
 					tr.addClass(odd ? 'odd' : 'even');
 					tr.addClass('gradeA');
+					tr.addClass('tablerow');
 				}
 				tr.css('display', '');
 				odd = !odd;
@@ -2316,13 +2377,13 @@ function showQueryResults(limit) {
 					var td = getChild(tr, j+1);
 					if (td.get(0) == null) {
 						td = $('<td>');
+						td.addClass('tablecell');
 						tr.append(td);
 					}
 					td.css('display', '');
 					td.removeClass();
-					td.addClass('file-tag-list');
 					td.addClass(column.replace(/ /g, ''));
-					td.addClass('multivalue');
+					td.addClass('tablecell');
 					td.html('');
 					if (row[column] != null) {
 						if (!allTagdefs[column]['tagdef multivalue']) {
@@ -2374,6 +2435,34 @@ function showQueryResults(limit) {
 				}
 				tr.css('display', 'none');
 			}
+			$('.tablecell').hover( function() {
+				var iCol = $('td', this.parentNode).index(this) % resultColumns.length;
+				var trs = $('.tablerow');
+				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
+			}, function() {
+				$('td.highlighted').removeClass('highlighted');
+			});
+			$('.tableheadercell').hover( function(e) {
+				var iCol = $('th', this.parentNode.parentNode).index(this.parentNode) % resultColumns.length;;
+				var trs = $('.tablerow');
+				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
+				DisplayTipBox(e, 'Click to edit');
+			}, function() {
+				if (tagToMove == null) {
+					$('td.highlighted').removeClass('highlighted');
+				}
+				HideTipBox();
+			});
+			$('.tablecolumnsort').hover( function(e) {
+				DisplayTipBox(e, 'Sort column');
+			}, function() {
+				HideTipBox();
+			});
+			$('.tablecolumnundelete').hover( function(e) {
+				DisplayTipBox(e, 'Delete column');
+			}, function() {
+				HideTipBox();
+			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
@@ -2392,24 +2481,52 @@ function htmlEscape(str) {
             .replace(/>/g, '&gt;');
 }
 
-function moveColumn(tag, position) {
-	var index = -1;
-	$.each(resultColumns, function(i, column) {
-		if (column == tag) {
-			index = i;
-			return false;
-		}
+function setSortTipBox(id, index) {
+	var content;
+	switch(index) {
+		case 1:
+			content = 'First sorted column';
+			break;
+		case 2:
+			content = 'Second sorted column';
+			break;
+		default:
+			content = 'n-th sorted column';
+			break;
+	}
+	$('#' + id).hover( function(e) {
+		DisplayTipBox(e, content);
+	}, function() {
+		HideTipBox();
 	});
-	resultColumns.splice(index, 1);
-	resultColumns.splice(index + position, 0, tag);
-	showPreview();
 }
 
-function sortColumn(column, id, count) {
-	sortColumnsArray.push(column);
-	$('#' + makeId('arrow_up', column.split(' ').join('_'), count)).css('display', 'none');
-	$('#' + makeId('clear_sort', column.split(' ').join('_'), count)).css('display', '');
-	$('#' + id).html('' + sortColumnsArray.length);
+function sortColumn(column, id, count, sort) {
+	if (sort) {
+		sortColumnsArray.push(column);
+		var length = sortColumnsArray.length;
+		$('#' + id).html('' + length);
+		var content;
+		switch(length) {
+			case 1:
+				content = 'First sorted column';
+				break;
+			case 2:
+				content = 'Second sorted column';
+				break;
+			default:
+				content = 'n-th sorted column';
+				break;
+		}
+		$('#' + id).hover( function(e) {
+			DisplayTipBox(e, content);
+		}, function() {
+			HideTipBox();
+		});
+	} else {
+		stopSortColumn(column, id, count);
+		$('#' + id).unbind('mouseenter mouseleave');
+	}
 	showPreview();
 }
 
@@ -2423,16 +2540,29 @@ function stopSortColumn(tag, id, count) {
 	});
 	sortColumnsArray.splice(index, 1);
 	$('#' + id).html('');
-	$('#' + makeId('arrow_up', tag.split(' ').join('_'), count)).css('display', '');
-	$('#' + makeId('clear_sort', tag.split(' ').join('_'), count)).css('display', 'none');
 	$.each(sortColumnsArray, function(i, column) {
 		var id = makeId('sort', column.split(' ').join('_'), count);
 		var val = parseInt($('#' + id).html());
 		if (val > index) {
 			$('#' + id).html('' + --val);
+			var content = null;
+			switch(val) {
+				case 1:
+					content = 'First sorted column';
+					break;
+				case 2:
+					content = 'Second sorted column';
+					break;
+			}
+			if (content != null) {
+				$('#' + id).hover( function(e) {
+					DisplayTipBox(e, content);
+				}, function() {
+					HideTipBox();
+				});
+			}
 		}
 	});
-	showPreview();
 }
 
 function getSortOrder(tag) {
@@ -2471,42 +2601,6 @@ function addViewToListColumns(id) {
 	}
 }
 
-/*
-function buildViewTagsTable(id) {
-	var val = $('#selectViews').val();
-	setViewTags(val);
-	var div = $('#viewTagsDiv');
-	div.css('display', '');
-	div.html('');
-	var table = $('<table>');
-	div.append(table)
-	var tr = $('<tr>');
-	table.append(tr);
-	tr.addClass('file-heading');
-	var th = $('<th>');
-	th.addClass('tag-name');
-	tr.append(th);
-	th.html('Tag');
-	var odd = false;
-	$.each(viewListTags[val], function(i, tag) {
-		var tr = $('<tr>');
-		table.append(tr);
-		tr.addClass('file');
-		tr.addClass(odd ? 'odd' : 'even');
-		odd = !odd;
-		var td = $('<td>');
-		tr.append(td);
-		td.addClass('file-tag-list');
-		td.addClass(tag);
-		td.addClass('multivalue');
-		td.html(tag);
-	});
-	div.append(table);
-	div.append($('<br>'));
-	div.append($('<br>'));
-}
-*/
-
 function deleteColumn(column) {
 	$.each(sortColumnsArray, function(i, tag) {
 		if (tag == column) {
@@ -2538,7 +2632,6 @@ function editQuery(tag) {
 	editInProgress = true;
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
-	var id =  makeId('tag', 'column', tagId);
 	var div = $('#queryDiv');
 	div.css('display', '');
 	
@@ -2548,7 +2641,7 @@ function editQuery(tag) {
 		div.append(tagDiv);
 	}
 	var tbody = tagDiv.find('tbody');
-	if (tbody.children().length == 1) {
+	if (tbody.children().length == 0) {
 		addToQueryTable(makeId(tagId, 'searchTable'), tag);
 	}
 	saveSearchConstraint = tagDiv.clone(true, true);
@@ -2581,26 +2674,24 @@ function editQuery(tag) {
 function copySelectOperator(tag) {
 	var searchTagId = makeId(tag.split(' ').join('_'));
 	var divTable = $('#' + makeId(searchTagId, 'searchTable'));
-	var divtbody = getChild(divTable, 1);
+	var divtbody = getChild(divTable, 2);
 	var trs = divtbody.children();
 	var toDivTable = saveSearchConstraint.find('#' + makeId(searchTagId, 'searchTable'));
-	var toDivtbody = getChild(toDivTable, 1);
+	var toDivtbody = getChild(toDivTable, 2);
 	$.each(trs, function(i, tr) {
-		if (i != 0) {
-			// operator column
-			var td = getChild($(tr), 2);
-			var op = getChild(td, 1).val();
-			var toTr = getChild(toDivtbody, i+1);
-			var toTd = getChild(toTr, 2);
-			getChild(toTd, 1).val(op);
-			td = getChild($(tr), 3);
-			toTd = getChild($(toTr), 3);
-			var selects = td.find('select');
-			var toSelects = toTd.find('select');
-			$.each(selects, function(i, sel) {
-				$(toSelects[i]).val($(sel).val());
-			});
-		}
+		// operator column
+		var td = getChild($(tr), 2);
+		var op = getChild(td, 1).val();
+		var toTr = getChild(toDivtbody, i+1);
+		var toTd = getChild(toTr, 2);
+		getChild(toTd, 1).val(op);
+		td = getChild($(tr), 3);
+		toTd = getChild($(toTr), 3);
+		var selects = td.find('select');
+		var toSelects = toTd.find('select');
+		$.each(selects, function(j, sel) {
+			$(toSelects[j]).val($(sel).val());
+		});
 	});
 }
 
@@ -2662,12 +2753,16 @@ function tagQueryDiv(tag) {
 	fieldset.append($('<br>'));
 	var table = $('<table>');
 	fieldset.append(table);
-	table.addClass('role-list');
+	table.addClass('display');
 	makeAttributes(table,
-				   'id', makeId(tagId, 'searchTable'));
+				   'id', makeId(tagId, 'searchTable'),
+					'border', '0',
+					'cellpadding', '0',
+					'cellspacing', '0');
+	var thead = $('<thead>');
+	table.append(thead);
 	var tr = $('<tr>');
-	table.append(tr);
-	tr.addClass('heading');
+	thead.append(tr);
 	var th = $('<th>');
 	tr.append(th);
 	th.attr('colspan', '2');
@@ -2676,6 +2771,8 @@ function tagQueryDiv(tag) {
 	tr.append(th);
 	th.attr('colspan', '2');
 	th.html('&nbsp;&nbsp;Values&nbsp;&nbsp;');
+	var tbody = $('<tbody>');
+	table.append(tbody);
 	return div;
 }
 
@@ -2684,48 +2781,45 @@ function getTagSearchDisplay(div) {
 	var searchTag = div.attr('tag');
 	var searchTagId = makeId(searchTag.split(' ').join('_'));
 	var divTable = $('#' + makeId(searchTagId, 'searchTable'));
-	var divtbody = getChild(divTable, 1);
+	var divtbody = getChild(divTable, 2);
 	var trs = divtbody.children();
 	$.each(trs, function(i, tr) {
-		if (i != 0) {
-			// operator column
-			var td = getChild($(tr), 2);
-			var op = getChild(td, 1).val();
-			if (op == 'Between') {
-				td = getChild($(tr), 3);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var tr = getChild(tbody, 1);
-				var td = getChild(tr, 2);
-				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				td = getChild(tr, 4);
-				var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				if (val1 != '' && val2 != '') {
-					query.push('['+ val1 + ', ' + val2 + ']');
-				}
-			} else if (op != 'Tagged' && op != 'Not tagged') {
-				// values column
-				td = getChild($(tr), 3);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var values = new Array();
-				$.each(tbody.children(), function(j, row) {
-					td = getChild($(row), 2);
-					var input = getChild(td, 1);
-					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
-					if (val.length > 0) {
-						values.push(encodeURIComponent(val));
-					}
-				});
-				if (values.length == 1) {
-					query.push(ops[op] + ' ' + values.join(', '));
-				}
-				else if (values.length > 0) {
-					query.push(ops[op] + ' {' + values.join(', ') + '}');
-				}
-			} else {
-				query.push(ops[op]);
+		var td = getChild($(tr), 2);
+		var op = getChild(td, 1).val();
+		if (op == 'Between') {
+			td = getChild($(tr), 3);
+			var table = getChild(td, 1);
+			var tbody = getChild(table, 1);
+			var tr = getChild(tbody, 1);
+			var td = getChild(tr, 2);
+			var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+			td = getChild(tr, 4);
+			var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+			if (val1 != '' && val2 != '') {
+				query.push('['+ val1 + ', ' + val2 + ']');
 			}
+		} else if (op != 'Tagged' && op != 'Not tagged') {
+			// values column
+			td = getChild($(tr), 3);
+			var table = getChild(td, 1);
+			var tbody = getChild(table, 1);
+			var values = new Array();
+			$.each(tbody.children(), function(j, row) {
+				td = getChild($(row), 2);
+				var input = getChild(td, 1);
+				var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+				if (val.length > 0) {
+					values.push(val);
+				}
+			});
+			if (values.length == 1) {
+				query.push(ops[op] + ' ' + values.join(', '));
+			}
+			else if (values.length > 0) {
+				query.push(ops[op] + ' {' + values.join(', ') + '}');
+			}
+		} else {
+			query.push(ops[op]);
 		}
 	});
 	var divConstraint = $('<div>');
