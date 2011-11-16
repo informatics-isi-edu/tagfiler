@@ -2238,13 +2238,20 @@ function showQueryResults(limit) {
 		thead.append(tr);
 		var tbody = $('<tbody>');
 		table.append(tbody);
+		var tfoot = $('<tfoot>');
+		table.append(tfoot);
+		tr = $('<tr>');
+		tr.addClass('topborder');
+		tfoot.append(tr);
 	}
 
 	// build the table header
 	var thead = getChild(table, 1);
+	var tfoot = getChild(table, 3);
 	var tr1 = getChild(thead, 1);
 	var tr2 = getChild(thead, 2);
 	var tr3 = getChild(thead, 3);
+	var trfoot = getChild(tfoot, 1);
 	var columnLimit = 0;
 	$.each(resultColumns, function(i, column) {
 		columnLimit = i + 1;
@@ -2289,13 +2296,19 @@ function showQueryResults(limit) {
 			tr3.append(td);
 			var divConstraint = $('<div>');
 			td.append(divConstraint);
+			
+			th = $('<th>');
+			trfoot.append(th);
+			th.html('&nbsp;');
 		}
 		var td1 = getChild(tr1, i+1);
 		var td2 = getChild(tr2, i+1);
 		var td3 = getChild(tr3, i+1);
+		var tdfoot = getChild(trfoot, i+1);
 		td1.css('display', '');
 		td2.css('display', '');
 		td3.css('display', '');
+		tdfoot.css('display', '');
 		td2.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
 		td2.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
 		
@@ -2350,6 +2363,8 @@ function showQueryResults(limit) {
 		td.css('display', 'none');
 		td = getChild(tr3, i+1);
 		td.css('display', 'none');
+		td = getChild(trfoot, i+1);
+		td.css('display', 'none');
 	}
 	$.ajax({
 		url: queryUrl,
@@ -2358,11 +2373,11 @@ function showQueryResults(limit) {
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
-			var rowLimit = 1;
+			var rowLimit = 0;
 			var odd = false;
 			var tbody = getChild(table, 2);
 			$.each(data, function(i, row) {
-				rowLimit = i + 4;
+				rowLimit = i + 1;
 				var tr = getChild(tbody, i+1);
 				if (tr.get(0) == null) {
 					tr = $('<tr>');
@@ -2370,6 +2385,9 @@ function showQueryResults(limit) {
 					tr.addClass(odd ? 'odd' : 'even');
 					tr.addClass('gradeA');
 					tr.addClass('tablerow');
+					if (i == 0) {
+						tr.addClass('topborder');
+					}
 				}
 				tr.css('display', '');
 				odd = !odd;

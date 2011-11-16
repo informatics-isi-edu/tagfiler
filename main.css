@@ -154,8 +154,21 @@ tr.even.gradeA {
 	background-color: #eeffee;
 }
 
-table.display thead th, table.display tbody td {
-	padding: 3px 0px 3px 10px;
+table.display {
+	margin: 0 auto;
+	clear: both;
+	width: 100%;
+}
+
+table.display thead th, table.display tbody td  {
+	padding: 3px 18px 3px 10px;
+	cursor: pointer;
+	* cursor: hand;
+}
+
+table.display tfoot tr.topborder th, table.display tbody tr.topborder td {
+	padding: 3px 18px 3px 10px;
+	border-top: 1px solid black;
 	cursor: pointer;
 	* cursor: hand;
 }
