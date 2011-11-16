@@ -1555,15 +1555,13 @@ function getColumnOver(e) {
 		ret['index'] = i - 1;
 	} else {
 		var children = tr.children();
-		var lastLeft = parseInt($(children[0]).offset().left);
-		for (var i=1; i < children.length; i++) {
-			var left = parseInt($(children[i]).offset().left);
-			if (left >= x || i == children.length - 1) {
-				var j = i;
+		for (var i=1; i <= children.length; i++) {
+			var j = (i < children.length) ? i : (i-1);
+			var left = parseInt($(children[j]).offset().left);
+			if (left >= x || i == children.length) {
+				j = (j == i) ? i - 1 : j;
 				var append = false;
-				if (x <= (left + lastLeft)/2) {
-					j--;
-				} else if (i == children.length - 1) {
+				if (i == children.length) {
 					if (x >= (maxX + left)/2) {
 						append = true;
 					}
@@ -1581,8 +1579,6 @@ function getColumnOver(e) {
 					$('td:nth-child('+(j+1)+')', trs).addClass('highlighted');
 				}
 				break;
-			} else {
-				lastLeft = left;
 			}
 		}
 	}
