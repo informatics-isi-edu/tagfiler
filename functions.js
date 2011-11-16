@@ -1443,7 +1443,6 @@ function copyColumn(e, column, id) {
 	e.preventDefault();
 	tagToMove = column;
 	document.body.style.cursor = "move";
-	$('#' + id).addClass('odd');
 }
 
 function dropColumn(e, tag, id, append) {
@@ -1480,7 +1479,6 @@ function dropColumn(e, tag, id, append) {
 	}
 	tagToMove = null;
 	document.body.style.cursor = "default";
-	$('#' + id).removeClass('odd');
 	showPreview();
 }
 
