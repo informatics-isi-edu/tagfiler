@@ -1454,7 +1454,6 @@ function dropColumn(e, tag, id, append) {
 	if (tagToMove == tag) {
 		tagToMove = null;
 		document.body.style.cursor = "default";
-		$('#' + id).removeClass('odd');
 		return;
 	}
 	var index = -1;
@@ -1464,7 +1463,16 @@ function dropColumn(e, tag, id, append) {
 			return false;
 		}
 	});
-	resultColumns.splice(index, 1);
+	var tagToMoveIndex = index;
+	index = -1;
+	$.each(resultColumns, function(i, column) {
+		if (column == tag) {
+			index = i;
+			return false;
+		}
+	});
+	var tagToDropIndex = index;
+	resultColumns.splice(tagToMoveIndex, 1);
 	index = -1;
 	$.each(resultColumns, function(i, column) {
 		if (column == tag) {
@@ -1477,9 +1485,34 @@ function dropColumn(e, tag, id, append) {
 	} else {
 		resultColumns.push(tagToMove);
 	}
+
 	tagToMove = null;
 	document.body.style.cursor = "default";
-	showPreview();
+	var thead = $('#Query_Preview_header');
+	for (var i=0; i < thead.children().length; i++) {
+		var tr = getChild(thead, i+1);
+		var tdToMove = getChild(tr, tagToMoveIndex + 1);
+		var tdToDrop = getChild(tr, tagToDropIndex + 1);
+		if (append) {
+			tdToMove.insertAfter(tdToDrop);
+		} else {
+			tdToMove.insertBefore(tdToDrop);
+		}
+	}
+	var tbody = $('#Query_Preview_tbody');
+	for (var i=0; i < tbody.children().length; i++) {
+		var tr = getChild(tbody, i+1);
+		if (tr.css('display') == 'none') {
+			break;
+		}
+		var tdToMove = getChild(tr, tagToMoveIndex + 1);
+		var tdToDrop = getChild(tr, tagToDropIndex + 1);
+		if (append) {
+			tdToMove.insertAfter(tdToDrop);
+		} else {
+			tdToMove.insertBefore(tdToDrop);
+		}
+	}
 }
 
 function str(value) {
@@ -1553,13 +1586,13 @@ function getColumnOver(e) {
 		ret['index'] = i - 1;
 	} else {
 		var children = tr.children();
-		for (var i=1; i <= children.length; i++) {
-			var j = (i < children.length) ? i : (i-1);
+		for (var i=1; i <= resultColumns.length; i++) {
+			var j = (i < resultColumns.length) ? i : (i-1);
 			var left = parseInt($(children[j]).offset().left);
-			if (left >= x || i == children.length) {
+			if (left >= x || i == resultColumns.length) {
 				j = (j == i) ? i - 1 : j;
 				var append = false;
-				if (i == children.length) {
+				if (i == resultColumns.length) {
 					if (x >= (maxX + left)/2) {
 						append = true;
 					}
@@ -2229,6 +2262,8 @@ function showQueryResults(limit) {
 		tr = $('<tr>');
 		thead.append(tr);
 		var tbody = $('<tbody>');
+		makeAttributes(tbody,
+						'id', 'Query_Preview_tbody');
 		table.append(tbody);
 		var tfoot = $('<tfoot>');
 		table.append(tfoot);
