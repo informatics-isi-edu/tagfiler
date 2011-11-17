@@ -2055,15 +2055,13 @@ function addNewValue(row, type, selectOperatorId) {
 
 function setRowsBackground(tableId) {
 	var table = $('#' + tableId);
-	var tbody = getChild(table, 1);
+	var tbody = getChild(table, 2);
 	var odd = false;
 	$.each(tbody.children(), function(i, tr) {
-		if (i != 0) {
-			$(tr).removeClass('odd');
-			$(tr).removeClass('even');
-			$(tr).addClass(odd ? 'odd' : 'even');
-			odd = !odd
-		}
+		$(tr).removeClass('odd');
+		$(tr).removeClass('even');
+		$(tr).addClass(odd ? 'odd' : 'even');
+		odd = !odd
 	});
 }
 
