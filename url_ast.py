@@ -1273,8 +1273,7 @@ class Query (Node):
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
                                           extra_tags=[ 'id', 'file','name', 'version','Image Set', 'Study Type',
-                                                       'write users', 'owner', 'modified', 'url' ]
-                                          + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
+                                                       'write users', 'owner', 'modified', 'url', 'tagdef', 'typedef' ])
 
             #self.txlog('TRACE', value='Query::body query prepared')
             self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))
