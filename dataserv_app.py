@@ -2185,7 +2185,7 @@ class Application:
                     used_other_op = True
 
                 if pred.op == 'IN':
-                    wheres.append( '%s IN (SELECT context FROM (%s) AS c)' % (valcol, pred.vals) )
+                    wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
                 elif pred.op != ":not:" and pred.op:
                     if tagdef.typestr == 'empty':
                         raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
@@ -2212,8 +2212,11 @@ class Application:
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
                     clauses = []
                     if constants:
-                        constants = ', '.join(constants)
-                        clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, dbtype) )
+                        if len(constants) == 1:
+                            clauses.append( '%s %s ( %s )' % (valcol, Application.opsDB[pred.op], constants[0]) )
+                        else:
+                            constants = ', '.join(constants)
+                            clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, dbtype) )
                     if vqueries:
                         vqueries = ' UNION '.join(vqueries)
                         clauses.append( '%s %s ANY (%s)' % (valcol, Application.opsDB[pred.op], vqueries) )
@@ -2278,9 +2281,11 @@ class Application:
                         raise BadRequest(self, 'Tag "id" cannot be filtered in a list-predicate.')
                     if not final or rangemode == None:
                         del lpreds[tag]
-            
-            inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
-            outer = [ ]
+
+            selects = []
+            #inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
+            inner = []
+            outer = []
 
             versions_test_added = []
             if versions == 'latest':
@@ -2291,16 +2296,6 @@ class Application:
                         spreds[tag] = []
                         versions_test_added.append(tag)
 
-            if final and rangemode == None:
-                selects = ['resources.subject AS id',
-                           'resources.dtype AS dtype',
-                           'resources.readok AS readok',
-                           'resources.writeok AS writeok',
-                           'resources.owner AS owner',
-                           'resources.txid AS txid']
-            else:
-                selects = []
-
             for tag, preds in spreds.items():
                 td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, tprefix='s_', spred=True)
                 if swheres or tag in versions_test_added:
@@ -2308,6 +2303,36 @@ class Application:
                     subject_wheres.extend(swheres)
                 else:
                     inner.append(sq)
+
+            if enforce_read_authz:
+                inner += [ '(SELECT DISTINCT subject from _owner AS o WHERE o.value = ANY (%(rolekeys)s)'
+                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value = ANY (%(rolekeys)s)) AS rok'
+                           % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+
+                outer += [ '"_subject last tagged txid" t',
+                           '"_owner" o',
+                           '(SELECT DISTINCT subject FROM "_write users" WHERE value = ANY (%(rolekeys)s)) AS wu'
+                           % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+
+                if final and rangemode == None:
+                    selects += [ 'rok.subject AS id',
+                                 'True AS readok',
+                                 'wu.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS writeok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                                 'o.value AS owner',
+                                 't.value AS txid' ]
+            else:
+                inner += [ 'resources AS r' ]
+
+                outer += [ '"_subject last tagged txid" t',
+                           '"_owner" o',
+                           '(SELECT DISTINCT subject FROM "_read users" WHERE value = ANY (%(rolekeys)s)) AS ru' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                           '(SELECT DISTINCT subject FROM "_write users" WHERE value = ANY (%(rolekeys)s)) AS wu' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+                if final and rangemode == None:
+                    selects += [ 'r.subject AS id',
+                                 'ru.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS readok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                                 'wu.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS writeok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                                 'o.value AS owner',
+                                 't.value AS txid' ]
 
             finals = []
             for tag, preds in lpreds.items():
