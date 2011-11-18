@@ -1705,7 +1705,7 @@ function initPSOC(home, user, webauthnhome) {
 	setViewTags(default_view);
 	$.each(viewListTags[default_view], function(i, tag) {
 		if (!resultColumns.contains(tag)) {
-			resultColumns.push(tag);
+			resultColumns.unshift(tag);
 		}
 	});
 	resultColumns = resultColumns.concat(headerTags);
@@ -1869,6 +1869,7 @@ function setViewTags(tag) {
 			$.each(tags, function(i, value) {
 				viewListTags[tag].push(value);
 			});
+			viewListTags[tag].reverse();
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
@@ -2264,7 +2265,7 @@ function addToListColumns(selectId) {
 	var column = $('#' + selectId).val();
 	confirmAddTagDialog.dialog('close');
 	if (!resultColumns.contains(column)) {
-		resultColumns.push(column);
+		resultColumns.unshift(column);
 		showPreview();
 	}
 }
@@ -2682,7 +2683,7 @@ function addViewToListColumns(id) {
 	var preview = false; 
 	$.each(viewListTags[val], function(i, tag) {
 		if (!resultColumns.contains(tag)) {
-			resultColumns.push(tag);
+			resultColumns.unshift(tag);
 			preview = true;
 		}
 	});
