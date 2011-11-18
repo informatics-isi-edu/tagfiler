@@ -1187,12 +1187,12 @@ class Application:
             limit = 8
             error = None
             while True:
+                count = count + 1
                 try:
                     t = self.db.transaction()
                     
                     try:
                         self.logmsgs = []
-                        count = count + 1
                         self.subject = None
                         self.datapred = None
                         self.dataname = None
@@ -1255,7 +1255,11 @@ class Application:
                         # syntax "Type as var" not supported by Python 2.4
                     except (psycopg2.InterfaceError), te:
                         # pass this to outer handler
-
+                        error = str(te)
+                        web.debug('got psycopg2.InterfaceError "%s"' % error)
+                        et, ev, tb = sys.exc_info()
+                        web.debug('got exception "%s" during dbtransact' % str(ev),
+                                  traceback.format_exception(et, ev, tb))
                         raise te
                     except (web.SeeOther), te:
                         t.commit()
@@ -1297,12 +1301,18 @@ class Application:
 
                 except psycopg2.InterfaceError:
                     # try reopening the database connection
+                    web.debug('got psycopg2.InterfaceError')
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception "%s" during dbtransact' % str(ev),
+                              traceback.format_exception(et, ev, tb))
                     self.db = get_db()
 
                 # exponential backoff...
                 # count=1 is roughly 0.1 microsecond
                 # count=9 is roughly 10 seconds
                 # randomly jittered from 75-125% of exponential delay
+                if count > limit:
+                    raise RuntimeError(self, data='Exceeded retry limit with error "%s".' % error)
                 delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.00000001
                 web.debug('transaction retry: delaying %f on "%s"' % (delay, error))
                 time.sleep(delay)
