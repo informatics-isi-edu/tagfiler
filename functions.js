@@ -2541,9 +2541,8 @@ function showQueryResults(limit) {
 				var a = $('<a>');
 				makeAttributes(a,
 								'href', makeFunction('javascript:showQueryResults', str('&limit=none')));
-				a.html('' + totalRows);
+				a.html('' + totalRows + ' results.');
 				b.append(a);
-				b.append(' results.');
 			} else {
 				b.html('Showing all ' + previewRows + ' results.');
 			}
