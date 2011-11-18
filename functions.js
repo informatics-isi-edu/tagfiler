@@ -1416,23 +1416,56 @@ var confirmAddMultipleTagsDialog = null;
 var dragAndDropBox;
 var tipBox;
 
+var movePageX;
+
 function DisplayDragAndDropBox(e) {
-   dragAndDropBox.css('left', String(parseInt(e.pageX) + 'px'));
-   dragAndDropBox.css('top', String(parseInt(e.pageY) + 'px'));
-   dragAndDropBox.html(tagToMove);
-   dragAndDropBox.css('display', 'block');
+	dragAndDropBox.css('left', String(parseInt(e.pageX) + 'px'));
+	dragAndDropBox.css('top', String(parseInt(e.pageY) + 'px'));
+	dragAndDropBox.html(tagToMove);
+	dragAndDropBox.css('display', 'block');
+	var header = $('#Query_Preview_header');
+	var minX = parseInt(header.offset().left);
+	var value = header.css('width');
+	var length = value.length - 2;
+	var maxX = minX + parseInt(value.substr(0, length));
+	var x = e.pageX;
+	if (x <= maxX) {
+		if (e.pageX != movePageX) {
+			if (e.pageX > movePageX) {
+				// right move
+				if (e.clientX > $(window).width() * 2 / 3) {
+					var dx = Math.ceil(($(window).width() - e.clientX) / 4);
+					window.scrollBy(dx, 0);
+					movePageX = e.pageX;
+				}
+			} else if (e.pageX < movePageX) {
+				// left move
+				if (e.clientX < $(window).width() / 4) {
+					var dx = Math.floor(- (e.clientX / 4));
+					window.scrollBy(dx, 0);
+					movePageX = e.pageX;
+				}
+			}
+		}
+	}
 }
 
 function HideDragAndDropBox() {
 	dragAndDropBox.css('display', 'none');
-	document.body.style.cursor = "default";
 }
 
 function DisplayTipBox(e, content) {
-   tipBox.css('left', String(parseInt(e.pageX + 25) + 'px'));
-   tipBox.css('top', String(parseInt(e.pageY - 50) + 'px'));
-   tipBox.html(content);
-   tipBox.css('display', 'block');
+	if (tagToMove != null) {
+		return;
+	}
+	tipBox.html(content);
+	var value = tipBox.css('width');
+	var length = value.length - 2;
+	var dx = parseInt(value.substr(0, length)) + 30;
+	dx = (e.clientX >= $(window).width() * 2 / 3) ? -dx : 0;
+	tipBox.css('left', String(parseInt(e.pageX + dx) + 'px'));
+	tipBox.css('top', String(parseInt(e.pageY - 50) + 'px'));
+	tipBox.css('display', 'block');
 }
 
 function HideTipBox() {
@@ -1442,7 +1475,7 @@ function HideTipBox() {
 function copyColumn(e, column, id) {
 	e.preventDefault();
 	tagToMove = column;
-	document.body.style.cursor = "move";
+	movePageX = e.pageX;
 }
 
 function interchangeColumns(index1, index2, append) {
@@ -1481,7 +1514,6 @@ function dropColumn(e, tag, id, append) {
 	HideDragAndDropBox();
 	if (tagToMove == tag) {
 		tagToMove = null;
-		document.body.style.cursor = "default";
 		return;
 	}
 	var index = -1;
@@ -1515,7 +1547,6 @@ function dropColumn(e, tag, id, append) {
 	}
 
 	tagToMove = null;
-	document.body.style.cursor = "default";
 	interchangeColumns(tagToMoveIndex, tagToDropIndex, append);
 }
 
@@ -1557,10 +1588,10 @@ function getColumnOver(e) {
 	var minX = parseInt(header.offset().left);
 	var value = header.css('height');
 	var length = value.length - 2;
-	maxY = minY + parseInt(value.substr(0, length));
+	var maxY = minY + parseInt(value.substr(0, length));
 	value = header.css('width');
 	length = value.length - 2;
-	maxX = minX + parseInt(value.substr(0, length));
+	var maxX = minX + parseInt(value.substr(0, length));
 	var x = parseInt(e.pageX);
 	var y = parseInt(e.pageY);
 	var tr = getChild(header, 2);
