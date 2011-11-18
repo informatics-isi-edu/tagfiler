@@ -2122,8 +2122,12 @@ function getQueryTags(tableId) {
 
 function getQueryUrl(limit) {
 	var retTags = '';
+	var encodedResultColumns = new Array();
 	if (resultColumns != null) {
-		retTags = '(' + resultColumns.join(';') + ')';
+	    for (var i=0; i<resultColumns.length; i++) {
+		encodedResultColumns.push(encodeURIComponent(resultColumns[i]));
+	    }
+	    retTags = '(' + encodedResultColumns.join(';') + ')';
 	}
 	var latest = '?versions=' + $('#versions').val();
 	var sortTags = sortColumnsArray.join(',');
