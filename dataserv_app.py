@@ -2306,7 +2306,7 @@ class Application:
 
             if enforce_read_authz:
                 inner += [ '(SELECT DISTINCT subject from _owner AS o WHERE o.value = ANY (%(rolekeys)s)'
-                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value = ANY (%(rolekeys)s)) AS rok'
+                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value = ANY (%(rolekeys)s)) AS r'
                            % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
 
                 outer += [ '"_subject last tagged txid" t',
@@ -2315,7 +2315,7 @@ class Application:
                            % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
 
                 if final and rangemode == None:
-                    selects += [ 'rok.subject AS id',
+                    selects += [ 'r.subject AS id',
                                  'True AS readok',
                                  'wu.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS writeok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
                                  'o.value AS owner',
@@ -2404,7 +2404,7 @@ class Application:
                                   + [ '%s USING (subject)' % o for o in outer ]),
                             where=where))
             else:
-                q = ('WITH resources AS ( SELECT resources.subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
+                q = ('WITH resources AS ( SELECT r.subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
                      % dict(selects=', '.join([ s for s in selects ]),
                             tables=' LEFT OUTER JOIN ' \
                             .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
