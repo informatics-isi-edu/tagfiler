@@ -714,8 +714,8 @@ function selectOperatorForm() {
 	var select_list_field = document.getElementById("op");
 	var select_list_selected_index = select_list_field.selectedIndex;
 	var op = select_list_field.options[select_list_selected_index].value;
-	if (op == '' || op == ':not:') {
-		// tagged or not tagged
+	if (op == '' || op == ':absent:') {
+		// tagged or tag absent
 		display_value = 'none';
 	}
 	
@@ -2009,8 +2009,8 @@ function isSelect(type) {
 
 function clearValues(tag, op, oldOp) {
 	var ret = false;
-	if (op == 'Tagged' || op == 'Not tagged' || op == 'Between' || 
-		oldOp == 'Tagged' || oldOp == 'Not tagged' || oldOp == 'Between') {
+	if (op == 'Tagged' || op == 'Tag absent' || op == 'Between' || 
+		oldOp == 'Tagged' || oldOp == 'Tag absent' || oldOp == 'Between') {
 		ret = true;
 	} else {
 		var type = availableTags[tag];
@@ -2195,7 +2195,7 @@ function getQueryUrl(limit) {
 					query.push(tag + ':geq:' + val1);
 					query.push(tag + ':leq:' + val2);
 				}
-			} else if (op != 'Tagged' && op != 'Not tagged') {
+			} else if (op != 'Tagged' && op != 'Tag absent') {
 				// values column
 				td = getChild($(tr), 3);
 				var table = getChild(td, 1);
@@ -2238,7 +2238,7 @@ function displayValuesTable(row, selId, tag) {
 			});
 		}
 	}
-	if (op == 'Tagged' || op == 'Not tagged') {
+	if (op == 'Tagged' || op == 'Tag absent') {
 		$('#' + makeId('button', row)).parent().prev().attr('colspan', '2');
 		$('#' + makeId('button', row)).parent().css('display', 'none');
 	} else {
@@ -2944,7 +2944,7 @@ function getTagSearchDisplay(div) {
 			if (val1 != '' && val2 != '') {
 				query.push('['+ val1 + ', ' + val2 + ']');
 			}
-		} else if (op != 'Tagged' && op != 'Not tagged') {
+		} else if (op != 'Tagged' && op != 'Tag absent') {
 			// values column
 			td = getChild($(tr), 3);
 			var table = getChild(td, 1);

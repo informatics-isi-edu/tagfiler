@@ -562,7 +562,7 @@ class Tagdef (Node):
     def GETall(self, uri):
 
         def body():
-            predefined = [ tagdef for tagdef in self.select_tagdef(subjpreds=[web.Storage(tag='owner', op=':not:', vals=[])], order='tagdef') ]
+            predefined = [ tagdef for tagdef in self.select_tagdef(subjpreds=[web.Storage(tag='owner', op=':absent:', vals=[])], order='tagdef') ]
             userdefined = [ tagdef for tagdef in self.select_tagdef(subjpreds=[web.Storage(tag='owner', op=None, vals=[])], order='tagdef') ]
             types = self.get_type()
             

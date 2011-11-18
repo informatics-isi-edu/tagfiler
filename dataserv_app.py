@@ -555,7 +555,7 @@ class Application:
         return None
 
     ops = [ ('', 'Tagged'),
-            (':not:', 'Not tagged'),
+            (':absent:', 'Tag absent'),
             ('=', 'Equal'),
             ('!=', 'Not equal'),
             (':lt:', 'Less than'),
@@ -570,7 +570,7 @@ class Application:
             (':!ciregexp:', 'Negated regular expression (case insensitive)')]
 
     opsExcludeTypes = dict([ ('', []),
-                             (':not:', []),
+                             (':absent:', []),
                              ('=', ['empty']),
                              ('!=', ['empty']),
                              (':lt:', ['empty', 'boolean']),
@@ -2202,14 +2202,14 @@ class Application:
             used_not_op = False
             used_other_op = False
             for pred in preds:
-                if pred.op == ':not:':
+                if pred.op == ':absent:':
                     used_not_op = True
                 else:
                     used_other_op = True
 
                 if pred.op == 'IN':
                     wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
-                elif pred.op != ":not:" and pred.op:
+                elif pred.op != ":absent:" and pred.op:
                     if tagdef.typestr == 'empty':
                         raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
 
@@ -2387,7 +2387,7 @@ class Application:
                     else:
                         td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, final, tprefix='l_')
                         if swheres:
-                            raise BadRequest(self, 'Operator ":not:" not supported in projection list predicates.')
+                            raise BadRequest(self, 'Operator ":absent:" not supported in projection list predicates.')
 
                 if final:
                     if rangemode == None:

@@ -40,7 +40,7 @@ $for pred in predlist:
 	<legend>${pred['tag']}</legend>
 	$if pred['op'] in [ '', None ]:
 		${opsdict['']}
-	$if pred['op'] == ':not:':
+	$if pred['op'] == ':absent:':
 		${opsdict[pred['op']]}
 	$elif pred['op']:
 		${opsdict[pred['op']]}

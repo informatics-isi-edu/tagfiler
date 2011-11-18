@@ -19,7 +19,7 @@
 ## Types and Tags for NEI MISD/DEI demo...
 
 homelinks=(
-$(dataset "New image studies" url 'Image%20Set;Downloaded:not:?view=study%20tags' "${admin}" "${downloader}")
+$(dataset "New image studies" url 'Image%20Set;Downloaded:absent:?view=study%20tags' "${admin}" "${downloader}")
 $(dataset "Previous image studies" url 'Image%20Set;Downloaded?view=study%20tags' "${admin}" "${downloader}")
 $(dataset "All image studies" url 'Image%20Set?view=study%20tags' "${admin}" "${downloader}")
 )

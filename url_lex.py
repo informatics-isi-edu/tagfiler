@@ -47,7 +47,7 @@ keywords = {
     'simto' : 'SIMTO',
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
-    'not' : 'NOT',
+    'absent' : 'ABSENT',
     'transmitnumber' : 'TRANSMITNUMBER',
     'study' : 'STUDY',
     'appleterror' : 'APPLETERROR',

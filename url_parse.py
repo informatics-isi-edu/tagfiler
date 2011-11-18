@@ -219,8 +219,8 @@ def p_pred_tag(p):
     p[0] = web.Storage([ ('tag', p[1]), ('op', None), ('vals', []) ])
 
 def p_pred_not_tag(p):
-    """pred : string ':' NOT ':'"""
-    p[0] = web.Storage([ ('tag', p[1]), ('op', ':not:'), ('vals', []) ])
+    """pred : string ':' ABSENT ':'"""
+    p[0] = web.Storage([ ('tag', p[1]), ('op', ':absent:'), ('vals', []) ])
 
 def p_pred_vallist(p):
     """vallist : val"""

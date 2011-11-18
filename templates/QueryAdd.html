@@ -43,7 +43,7 @@ $if None:
   			$ opdisplay = 'none'
   		$elif not firstdisplay:
   			$ firstdisplay = op
-  			$if display == 'block' and (op == '' or op == ':not:'):
+  			$if display == 'block' and (op == '' or op == ':absent:'):
   				$ display = 'none'
 		<option value="${op}" id="id_${op}" style="display:${opdisplay};">${desc}</option>
   </select></td>
