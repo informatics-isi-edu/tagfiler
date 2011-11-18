@@ -275,14 +275,16 @@ tagdef_phase2()
    local subject="$1"
 
    tag "$subject" "tagdef" text "$2" >&2
-   tag "$subject" "tagdef active" >&2
+   tag "$subject" "tagdef active" boolean true >&2
 
    tag "$subject" "tagdef readpolicy" tagpolicy "$5" >&2
    tag "$subject" "tagdef writepolicy" tagpolicy "$6" >&2
 
    if [[ "$7" == "true" ]]
    then
-      tag "$subject" "tagdef multivalue" >&2
+      tag "$subject" "tagdef multivalue" boolean true >&2
+   else
+      tag "$subject" "tagdef multivalue" boolean false >&2
    fi
 
    if [[ -n "$8" ]]
@@ -294,7 +296,9 @@ tagdef_phase2()
 
    if [[ "$9" == "true" ]]
    then
-      tag "$subject" "tagdef unique" >&2
+      tag "$subject" "tagdef unique" boolean true >&2
+   else
+      tag "$subject" "tagdef unique" boolean false >&2
    fi
 }
 
@@ -453,9 +457,9 @@ tagdef 'typedef'             text        ""         anonymous   subject      fal
 tagdef 'typedef description' text        ""         anonymous   subject      false
 tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
 tagdef 'typedef values'      text        ""         anonymous   subject      true
-tagdef 'tagdef unique'       empty       ""         anonymous   system       false      ""
-tagdef 'tagdef multivalue'   empty       ""         anonymous   system       false
-tagdef 'tagdef active'       empty       ""         anonymous   system       false
+tagdef 'tagdef unique'       boolean       ""         anonymous   system       false      ""
+tagdef 'tagdef multivalue'   boolean       ""         anonymous   system       false
+tagdef 'tagdef active'       boolean       ""         anonymous   system       false
 tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false      tagpolicy
 tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false      tagpolicy
 tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
@@ -499,6 +503,7 @@ tagdef 'template query'      text        "${admin}" subjectowner tag         tru
 
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
 typedef empty        ''            'No content'
+typedef boolean      boolean       'Boolean (true or false)'       ''                 'True True' 'False False'
 typedef int8         int8          'Integer'
 typedef float8       float8        'Floating point'
 typedef date         date          'Date (yyyy-mm-dd)'
@@ -645,7 +650,7 @@ cfgtagdef 'tagdef write users'        text  ""      subject     subject       tr
 cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
 cfgtagdef home                        text  ""      subject     subject       false
 cfgtagdef 'webauthn home'             text  ""      subject     subject       false
-cfgtagdef 'webauthn require'          empty ""      subject     subject       false
+cfgtagdef 'webauthn require'          boolean ""      subject     subject       false
 cfgtagdef 'store path'                text  ""      subject     subject       false
 cfgtagdef 'log path'                  text  ""      subject     subject       false
 cfgtagdef 'template path'             text  ""      subject     subject       false
@@ -657,8 +662,8 @@ cfgtagdef contact                     text  ""      subject     subject       fa
 cfgtagdef help                        text  ""      subject     subject       false
 cfgtagdef bugs                        text  ""      subject     subject       false
 cfgtagdef 'client connections'        int8  ""      subject     subject       false
-cfgtagdef 'client upload chunks'      empty ""      subject     subject       false
-cfgtagdef 'client download chunks'    empty ""      subject     subject       false
+cfgtagdef 'client upload chunks'      boolean ""      subject     subject       false
+cfgtagdef 'client download chunks'    boolean ""      subject     subject       false
 cfgtagdef 'client socket buffer size' int8  ""      subject     subject       false
 cfgtagdef 'client retry count'        int8  ""      subject     subject       false
 cfgtagdef 'client chunk bytes'        int8  ""      subject     subject       false
@@ -681,7 +686,7 @@ cfgtag()
 
 #cfgtag "home" text 'https://${HOME_HOST}'
 cfgtag "webauthn home" text "https://${HOME_HOST}/webauthn"
-cfgtag "webauthn require"
+cfgtag "webauthn require" boolean true
 
 #cfgtag "store path" text '${DATADIR}'
 #cfgtag "log path" text '${LOGDIR}'
@@ -689,8 +694,8 @@ cfgtag "webauthn require"
 cfgtag "chunk bytes" text '1048576'
 
 cfgtag "client connections" int8 '4'
-cfgtag "client upload chunks"
-cfgtag "client download chunks"
+cfgtag "client upload chunks" boolean true
+cfgtag "client download chunks" boolean true
 cfgtag "client socket buffer size" int8 '8192'
 cfgtag "client retry count" int8 '10'
 cfgtag "client chunk bytes" int8 '8388608'

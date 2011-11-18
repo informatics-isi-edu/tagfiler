@@ -58,7 +58,16 @@ import struct
 render = None
 
 def downcast_value(dbtype, value):
-    if dbtype == 'int8':
+    if dbtype == 'boolean':
+        if hasattr(value, 'lower'):
+            if value.lower() in [ 'true', 'yes', 't', 'on' ]:
+                return True
+            elif value.lower() in [ 'false', 'no', 'f', 'off' ]:
+                return False
+        elif type(value) == 'bool':
+            return value
+        raise ValueError('Value %s not a boolean' % str(value))
+    elif dbtype == 'int8':
         value = int(value)
     elif dbtype == 'float8':
         value = float(value)
@@ -564,16 +573,16 @@ class Application:
                              (':not:', []),
                              ('=', ['empty']),
                              ('!=', ['empty']),
-                             (':lt:', ['empty']),
-                             (':leq:', ['empty']),
-                             (':gt:', ['empty']),
-                             (':geq:', ['empty']),
-                             (':like:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
-                             (':simto:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
-                             (':regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
-                             (':!regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
-                             (':ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']),
-                             (':!ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz']) ])
+                             (':lt:', ['empty', 'boolean']),
+                             (':leq:', ['empty', 'boolean']),
+                             (':gt:', ['empty', 'boolean']),
+                             (':geq:', ['empty', 'boolean']),
+                             (':like:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':simto:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':!regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':!ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
 
     opsDB = dict([ ('=', '='),
                    ('!=', '!='),
@@ -595,11 +604,11 @@ class Application:
                        ('id', 'int8', False, 'system', True),
                        ('tagdef', 'text', False, 'system', True),
                        ('tagdef type', 'type', False, 'system', False),
-                       ('tagdef multivalue', 'empty', False, 'system', False),
-                       ('tagdef active', 'empty', False, 'system', False),
+                       ('tagdef multivalue', 'boolean', False, 'system', False),
+                       ('tagdef active', 'boolean', False, 'system', False),
                        ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
                        ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
-                       ('tagdef unique', 'empty', False, 'system', False),
+                       ('tagdef unique', 'boolean', False, 'system', False),
                        ('tag read users', 'rolepat', True, 'subjectowner', False),
                        ('tag write users', 'rolepat', True, 'subjectowner', False),
                        ('typedef', 'text', False, 'subject', True),
@@ -627,10 +636,10 @@ class Application:
                        ('_cfg_client chunk bytes', 'int8', False, 'subject', False),
                        ('_cfg_client socket timeout', 'int8', False, 'subject', False),
                        ('_cfg_client connections', 'int8', False, 'subject', False),
-                       ('_cfg_client download chunks', 'empty', False, 'subject', False),
+                       ('_cfg_client download chunks', 'boolean', False, 'subject', False),
                        ('_cfg_client socket buffer size', 'int8', False, 'subject', False),
                        ('_cfg_client retry count', 'int8', False, 'subject', False),
-                       ('_cfg_client upload chunks', 'empty', False, 'subject', False),
+                       ('_cfg_client upload chunks', 'boolean', False, 'subject', False),
                        ('_cfg_contact', 'text', False, 'subject', False),
                        ('_cfg_file list tags', 'tagdef', True, 'subject', False),
                        ('_cfg_file list tags write', 'tagdef', True, 'subject', False),
@@ -646,7 +655,7 @@ class Application:
                        ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
                        ('_cfg_template path', 'text', False, 'subject', False),
                        ('_cfg_webauthn home', 'text', False, 'subject', False),
-                       ('_cfg_webauthn require', 'empty', False, 'subject', False) ]:
+                       ('_cfg_webauthn require', 'boolean', False, 'subject', False) ]:
         deftagname, typestr, multivalue, writepolicy, unique = prototype
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
@@ -664,6 +673,7 @@ class Application:
 
     static_typedefs = []
     for prototype in [ ('empty', '', 'No Content', None, []),
+                       ('boolean', 'boolean', 'Boolean', None, ['T true', 'F false']),
                        ('int8', 'int8', 'Integer', None, []),
                        ('float8', 'float8', 'Floating point', None, []),
                        ('date', 'date', 'Date', None, []),

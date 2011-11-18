@@ -77,7 +77,7 @@ $else:
 		<a href="${home}/tags/tagdef=${urlquote(val)}?view=tagdef">${val}</a>
 	$elif typevals:
 		$# this lambda is to simulate ternary operator in Python 2.4
-		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0])(typevals.get(val, ''))}
+		${val} ${(lambda s: ("", "(%s)" % s)[len(s) > 0 and s != val])(typevals.get(val, ''))}
 	$elif typestr == 'url':
 		<a href="${val}">${val}</a>
 	$elif typestr == 'name':
