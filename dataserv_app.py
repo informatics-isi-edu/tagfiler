@@ -763,6 +763,9 @@ class Application:
         def long2str(x):
             s = ''
 
+        if hasattr(self, 'content_range'):
+            return
+            
         self.content_range = None
         self.last_log_time = 0
         self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
