@@ -659,7 +659,8 @@ class FileIO (Subject):
 
             try:
                 try:
-                    self.db._db_cursor().connection.close()
+                    #self.db._db_cursor().connection.close()
+                    pass
                 except:
                     pass
                 wbytes, flen = self.storeInput(inf, f)
