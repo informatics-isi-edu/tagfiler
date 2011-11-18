@@ -1400,7 +1400,7 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
-var headerTags = ['id', 'name'];
+var headerTags = ['name', 'id'];
 var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
@@ -1702,13 +1702,13 @@ function initPSOC(home, user, webauthnhome) {
 		default_view = 'default';
 	}
 	// build the result columns from the header tags + the view tags
-	resultColumns = resultColumns.concat(headerTags);
 	setViewTags(default_view);
 	$.each(viewListTags[default_view], function(i, tag) {
 		if (!resultColumns.contains(tag)) {
 			resultColumns.push(tag);
 		}
 	});
+	resultColumns = resultColumns.concat(headerTags);
 	$('#customizedViewDiv').css('display', '');
 	confirmAddTagDialog = $('#customizedViewDiv');
 	confirmAddTagDialog.dialog({
