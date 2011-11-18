@@ -2134,11 +2134,6 @@ function setRowsBackground(tableId) {
 	});
 }
 
-function sendQuery() {
-	var url = getQueryUrl('');
-	window.location = url;
-}
-
 function getQueryTags(tableId) {
 	var ret = new Array();
 	var tbody = getChild($('#' + tableId), 1);
@@ -2284,6 +2279,24 @@ function showPreview() {
 function showQueryResults(limit) {
 	var queryUrl = getQueryUrl(limit);
 	$('#Query_URL').attr('href', queryUrl);
+	var totalRows = 0;
+	var previewRows = 0;
+	queryUrl = getQueryUrl('&limit=none&range=count');
+	$.ajax({
+		url: queryUrl,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		success: function(data, textStatus, jqXHR) {
+			totalRows = data[0]['id'];
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			if (!disableAjaxAlert) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			}
+		}
+	});
 	queryUrl = getQueryUrl(limit == '' ? '&limit=15' : limit);
 	var queryPreview = $('#Query_Preview');
 	var table = getChild(queryPreview, 1);
@@ -2447,6 +2460,7 @@ function showQueryResults(limit) {
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
 			var rowLimit = 0;
+			previewRows = data.length;
 			var odd = false;
 			var tbody = getChild(table, 2);
 			$.each(data, function(i, row) {
@@ -2518,6 +2532,21 @@ function showQueryResults(limit) {
 					td.css('display', 'none');
 				}
 			});
+			var b = $('#ViewResults');
+			b.html('');
+			if (previewRows == 0) {
+				b.html('There are no results to list with your current query.');
+			} else if (previewRows < totalRows) {
+				b.append('Showing only ' + previewRows + ' of ');
+				var a = $('<a>');
+				makeAttributes(a,
+								'href', makeFunction('javascript:showQueryResults', str('&limit=none')));
+				a.html('' + totalRows);
+				b.append(a);
+				b.append(' results.');
+			} else {
+				b.html('Showing all ' + previewRows + ' results.');
+			}
 			var tableLength = tbody.children().length;
 			for (var i=rowLimit; i < tableLength; i++) {
 				var tr = getChild(tbody, i+1);
