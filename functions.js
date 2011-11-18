@@ -2161,7 +2161,11 @@ function getQueryUrl(limit) {
 	    retTags = '(' + encodedResultColumns.join(';') + ')';
 	}
 	var latest = '?versions=' + $('#versions').val();
-	var sortTags = sortColumnsArray.join(',');
+	encodedResultColumns = new Array();
+	for (var i=0; i<sortColumnsArray.length; i++) {
+		encodedResultColumns.push(encodeURIComponent(sortColumnsArray[i]));
+	}
+	var sortTags = encodedResultColumns.join(',');
 	
 	var query = new Array();
 	var divs = $('#queryDiv').children();
