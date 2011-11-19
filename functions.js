@@ -1272,7 +1272,12 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 						var index = item.indexOf(' ');
 						if (index != -1) {
 							option.value = item.substring(0, index++);
-							option.text = decodeURIComponent(item.substring(0, index)) + '(' + item.substr(index) + ')';
+							var description = item.substr(index);
+							if (description != option.value) {
+								option.text = option.value + ' (' + item.substr(index) + ')';
+							} else {
+								option.text = option.value;
+							}
 						} else {
 							option.value = item;
 							option.text = item;
