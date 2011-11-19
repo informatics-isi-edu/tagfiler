@@ -21,7 +21,7 @@ import web
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value
 from rest_fileio import FileIO, LogFileIO
 import subjects
 import json
@@ -544,8 +544,8 @@ class Tagdef (Node):
         self.typestr = typestr
         self.writepolicy = None
         self.readpolicy = None
-        self.multivalue = None
-        self.is_unique = None
+        self.multivalue = False
+        self.is_unique = False
         self.action = None
         self.tagdefs = {}
 
@@ -653,21 +653,13 @@ class Tagdef (Node):
 
         if self.multivalue == None:
             try:
-                multivalue = self.queryopts['multivalue'].lower()
-            except:
-                multivalue = 'false'
-            if multivalue in [ 'true', 't', 'yes', 'y' ]:
-                self.multivalue = True
+                self.multivalue = downcast_value('boolean', self.queryopts['multivalue'])
             else:
                 self.multivalue = False
 
         if self.is_unique == None:
             try:
-                unique = self.queryopts['unique'].lower()
-            except:
-                unique = 'false'
-            if unique in [ 'true', 't', 'yes', 'y' ]:
-                self.is_unique = True
+                self.unique = downcase_value('boolean', self.queryopts['unique'])
             else:
                 self.is_unique = False
 
@@ -716,7 +708,7 @@ class Tagdef (Node):
                             unique = storage['unique-%s' % (key[4:])]
                         except:
                             unique = 'false'
-                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, parseBoolString(multivalue), parseBoolString(unique))
+                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, downcast_value('boolean', multivalue), downcast_value('boolean', unique))
             try:
                 self.tag_id = storage.tag
             except:
