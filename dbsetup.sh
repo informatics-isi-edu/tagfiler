@@ -316,6 +316,9 @@ tagdef_phase1()
       if [[ "$2" = "text" ]]
       then
          default="DEFAULT ''"
+      elif [[ "$2" = "boolean" ]]
+      then
+	 default="DEFAULT False"
       else
          default=""
       fi

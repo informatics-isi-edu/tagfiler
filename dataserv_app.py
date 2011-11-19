@@ -1744,6 +1744,8 @@ class Application:
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
+            elif dbtype == 'boolean':
+                tabledef += ' DEFAULT False'
             tabledef += ' NOT NULL'
 
             if tagdef.unique:
