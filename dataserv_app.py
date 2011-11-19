@@ -64,9 +64,9 @@ def downcast_value(dbtype, value):
                 return True
             elif value.lower() in [ 'false', 'no', 'f', 'off' ]:
                 return False
-        elif type(value) == 'bool':
+        elif type(value) == bool:
             return value
-        raise ValueError('Value %s not a boolean' % str(value))
+        raise ValueError('Value %s of type %s cannot be coerced to boolean' % (str(value), type(value)))
     elif dbtype == 'int8':
         value = int(value)
     elif dbtype == 'float8':
@@ -1714,9 +1714,15 @@ class Application:
         if owner:
             tags.append( ('owner', owner) )
         if self.multivalue:
-            tags.append( ('tagdef multivalue', None) )
+            self.multivalue = downcast_value('boolean', self.multivalue)
+            tags.append( ('tagdef multivalue', self.multivalue) )
+        else:
+            tags.append( ('tagdef multivalue', False) )
         if self.is_unique:
-            tags.append( ('tagdef unique', None) )
+            self.is_unique = downcast_value('boolean', self.is_unique)
+            tags.append( ('tagdef unique', self.is_unique) )
+        else:
+            tags.append( ('tagdef unique', False) )
 
         for tag, value in tags:
             self.set_tag(subject, self.globals['tagdefsdict'][tag], value)

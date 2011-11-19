@@ -55,8 +55,8 @@ $if title == 'User' and len(authn.roles.union(set('*')).intersection(set(config[
 	</select>
 	</td>
 	<td><select name="unique-1">
-	<option value="false">not set</option>
-	<option value="true">set</option>
+	<option value="False">False</option>
+	<option value="True">True</option>
 	</select></td>
 	<input type="hidden" name="action" value="add" />
 	</tr>
@@ -68,9 +68,9 @@ $for tagdef in tagdefs:
 	$else:
 		$ writeclass = 'readonly'
 	$if tagdef.unique:
-		$ unique = 'is set'
+		$ unique = 'True'
 	$else:
-		$ unique = 'not set'
+		$ unique = 'False'
 	<tr class="tagdef ${writeclass}"><td>${tagdef.tagname}</td><td>${tagdef.typestr}</td><td>${jsonWriter(tagdef.multivalue)}</td><td>${tagdef.owner}</td><td>${tagdef.readpolicy}</td><td>${tagdef.writepolicy}</td><td>${unique}</td></tr>
 </table>
 <script type="text/javascript">
