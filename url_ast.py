@@ -654,13 +654,13 @@ class Tagdef (Node):
         if self.multivalue == None:
             try:
                 self.multivalue = downcast_value('boolean', self.queryopts['multivalue'])
-            else:
+            except:
                 self.multivalue = False
 
         if self.is_unique == None:
             try:
                 self.unique = downcase_value('boolean', self.queryopts['unique'])
-            else:
+            except:
                 self.is_unique = False
 
         def body():
