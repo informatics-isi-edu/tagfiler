@@ -554,43 +554,6 @@ tagdef vcontains             text        ""         subject     subject      tru
 psql -e -t <<EOF
 ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 DROP TABLE "_id";
-
-CREATE OR REPLACE FUNCTION
-  resources_dtypes () RETURNS TABLE ( subject int8, dtype text ) AS \$\$
-  SELECT subject,
-         CASE WHEN array_length(utags, 1) = 0 THEN 'id'
-              WHEN 'file' = ANY(utags) THEN 'file'
-              WHEN 'url' = ANY(utags) THEN 'url' 
-              WHEN 'vname' = ANY(utags) THEN 'name' 
-              ELSE utags[1]
-         END AS dtype 
-  FROM (SELECT r.subject AS subject, 
-               array_agg(DISTINCT st.tagname) AS utags 
-        FROM resources r
-        LEFT OUTER JOIN (SELECT st.subject, st.tagname
-                         FROM subjecttags AS st
-                         JOIN _tagdef AS td ON (td.value = st.tagname) 
-                         JOIN "_tagdef unique" AS tdu ON (tdu.subject = td.subject OR td.value = 'url')) AS st USING(subject)
-        GROUP BY r.subject) AS t
-\$\$ LANGUAGE SQL;
-
-CREATE OR REPLACE FUNCTION 
-  resources_authzinfo ( roles text[], ignore_read_authz boolean = False ) RETURNS TABLE ( subject int8, dtype text, txid int8, owner text, readok boolean, writeok boolean ) AS \$\$
-  SELECT r.subject AS subject, 
-         r.dtype AS dtype, 
-         t.value AS txid,
-         o.value AS owner,
-         bool_or(ru.value = ANY (\$1) OR o.value = ANY (\$1)) AS readok, 
-         bool_or(wu.value = ANY (\$1) OR o.value = ANY (\$1)) AS writeok
-  FROM resources_dtypes() r
-  LEFT OUTER JOIN "_subject last tagged txid" t ON (r.subject = t.subject)
-  LEFT OUTER JOIN "_owner" o ON (r.subject = o.subject)
-  LEFT OUTER JOIN "_read users" ru ON (r.subject = ru.subject AND ru.value = ANY (\$1))
-  LEFT OUTER JOIN "_write users" wu ON (r.subject = wu.subject AND wu.value = ANY (\$1))
-  WHERE \$2 or o.value = ANY (\$1) OR ru.value IS NOT NULL
-  GROUP BY r.subject, r.dtype, txid, o.value
-\$\$ LANGUAGE SQL;
-
 EOF
 
 tagacl "list on homepage" read "*"
