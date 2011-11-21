@@ -1204,23 +1204,6 @@ class Query (Node):
         def equals(pred, userpred):
             return ({'tag' : pred.tag, 'op' : pred.op, 'vals' : str(pred.vals)} == userpred)
 
-        tagname = None
-        op = None
-        value = []
-        try:
-            self.action = self.queryopts['action']
-            tagname = self.queryopts.tag
-            op = self.queryopts.op
-            if self.action == 'add':
-                for i in range(0,10):
-                    val = self.queryopts['val' + str(i)]
-                    if val != None:
-                        value.append(val)
-            elif self.action == 'delete':
-                value = self.queryopts.vals
-        except:
-            pass
-
         try:
             self.title = self.queryopts['title']
         except:
@@ -1231,30 +1214,12 @@ class Query (Node):
         except:
             pass
 
-        if op == '':
-            op = None
+        contentType = 'text/html'
 
-        if op == None and self.action == 'delete':
-            value = str([])
-
-        userpred = web.Storage(tag=tagname, op=op, vals=value)
-
-        if self.action == 'add':
-            if userpred not in self.subjpreds:
-                self.subjpreds.append( userpred )
-        elif self.action == 'delete':
-            self.subjpreds = [ pred for pred in self.subjpreds if not equals(pred, userpred) ]
-        elif self.action == 'query':
-            pass
-        elif self.action == 'edit':
-            pass
-        else:
-            raise BadRequest(self, data="Form field action=%s not understood." % self.action)
-
-        if self.action in [ 'add', 'delete' ]:
-            # apply subjpreds changes to last path element
-            subjpreds, listtags, ordertags = self.path[-1]
-            self.path[-1] = (self.subjpreds, listtags, ordertags)
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType in [ 'text/uri-list', 'text/html', 'application/json' ]:
+                contentType = acceptType
+                break
 
         def body():
             #self.txlog('TRACE', value='Query::body entered')
@@ -1275,7 +1240,7 @@ class Query (Node):
             if cached:
                 web.ctx.status = '304 Not Modified'
                 return None
-            else:
+            elif contentType != 'text/html':
                 self.txlog('QUERY', dataset=path_linearize(self.path))
                 if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
                     try_default_view = True
@@ -1303,6 +1268,12 @@ class Query (Node):
                 self.globals['filelisttagswrite'] = writetags
 
                 return files
+            else:
+                self.globals['basepath'] = path_linearize(path[0:-1])
+                self.globals['querypath'] = path
+                self.globals['ops'] = Application.ops
+                self.globals['opsExcludeTypes'] = Application.opsExcludeTypes
+                return []
 
         def postCommit(files):
             self.emit_headers()
@@ -1342,50 +1313,31 @@ class Query (Node):
                     self.title = "Query by Tags"
 
             #self.log('TRACE', value='Query::body postCommit dispatching on content type')
-            if self.action == 'query':
-                for acceptType in self.acceptTypesPreferedOrder():
-                    if acceptType == 'text/uri-list':
-                        # return raw results for REST client
-                        if self.query_range:
-                            raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
-                        self.header('Content-Type', 'text/uri-list')
-                        yield self.render.FileUriList(files)
-                        return
-                    elif acceptType == 'application/json':
-                        self.header('Content-Type', 'application/json')
-                        yield '['
-                        if len(files) > 0:
-                            yield jsonWriter(dictFile(files[0])) + '\n'
-                        if len(files) > 1:
-                            for i in range(1,len(files)):
-                                yield ',' + jsonWriter(dictFile(files[i])) + '\n'
-                        yield ']\n'
-                        return
-                    elif acceptType == 'text/html':
-                        break
+
+            if contentType == 'text/uri-list':
+                # return raw results for REST client
                 if self.query_range:
-                    raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
-                self.header('Content-Type', 'text/html')
-                for r in self.renderlist(self.title,
-                                         [self.render.QueryViewStatic(Application.ops, self.subjpreds),
-                                          self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
-                    yield r
+                    raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
+                self.header('Content-Type', 'text/uri-list')
+                yield self.render.FileUriList(files)
+                return
+            elif contentType == 'application/json':
+                self.header('Content-Type', 'application/json')
+                yield '['
+                if len(files) > 0:
+                    yield jsonWriter(dictFile(files[0])) + '\n'
+                if len(files) > 1:
+                    for i in range(1,len(files)):
+                        yield ',' + jsonWriter(dictFile(files[i])) + '\n'
+                yield ']\n'
+                return
             else:
-                self.header('Content-Type', 'text/html')
-                try:
-                    preview = self.queryopts['preview']
-                except:
-                    preview = None
                 if self.query_range:
                     raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
-                if preview == None:
-                    for r in self.renderlist(self.title,
-                                             [self.render.QueryAdd(Application.ops, Application.opsExcludeTypes),
-                                              self.render.QueryView(Application.ops, self.subjpreds),
-                                              self.render.FileList(files, showversions=self.showversions, limit=self.limit)]):
-                        yield r
-                else:
-                    yield self.render.FileList(files, showversions=self.showversions, limit=self.limit)
+                self.header('Content-Type', 'text/html')
+                for r in self.renderlist(self.title, [self.render.Query()]):
+                    yield r
+                return
 
         for res in self.dbtransact(body, postCommit):
             yield res

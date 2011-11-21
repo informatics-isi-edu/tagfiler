@@ -67,7 +67,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	TagdefExisting.html \
 	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
 	TagdefNewShortcut.html \
-	QueryAdd.html QueryView.html QueryViewStatic.html \
+	QueryAdd.html QueryView.html QueryViewStatic.html Query.html \
 	TreeUpload.html TreeDownload.html TreeStatus.html \
 	Error.html AppletError.html \
 	LogList.html LogUriList.html Contact.html DatasetForm.html \
