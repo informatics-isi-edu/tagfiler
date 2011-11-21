@@ -1270,7 +1270,10 @@ class Query (Node):
                 return files
             else:
                 self.globals['basepath'] = path_linearize(path[0:-1])
-                self.globals['querypath'] = path
+                self.globals['querypath'] = [ dict(spreds=[dict(s) for s in spreds],
+                                                   lpreds=[dict(l) for l in lpreds],
+                                                   otags=otags)
+                                              for spreds, lpreds, otags in path ]
                 self.globals['ops'] = Application.ops
                 self.globals['opsExcludeTypes'] = Application.opsExcludeTypes
                 return []
