@@ -2155,6 +2155,11 @@ class Application:
 
                 pred = web.Storage(tag=pred.tag, op=pred.op, vals=vals)
 
+                tagdef = tagdefs.get(pred.tag, None)
+                if tagdef == None:
+                    #raise KeyError()
+                    raise Conflict(self, 'Tagdef "%s" not defined on this server.' % pred.tag)
+
                 pl = pd.get(pred.tag, [])
                 pd[pred.tag] = pl
                 pl.append(pred)
