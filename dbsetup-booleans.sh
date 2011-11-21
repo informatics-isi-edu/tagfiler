@@ -3,20 +3,35 @@
 ## run once to upgrade some tagdefs on the fly...
 ## copy to daemon account and run it there as the daemon user
 
+mypsql()
+{
+    local input=$(cat)
+    if [[ -n "$input" ]]
+    then
+	echo "mypsql " "$@" -c "\"${input}\"" >&2
+	psql "$@" -c  "${input}"
+    else
+	echo "mypsql " "$@" >&2
+	psql "$@"
+    fi
+}
+
 empty2boolean()
 {
-    psql <<EOF
-BEGIN
-ALTER TABLE "_${1}" ADD COLUMN value boolean DEFAULT False;
-UPDATE "_tagdef type" 
-UPDATE "_${1}" SET value = True WHERE value IS NULL;
+    echo converting tag "$1" to boolean type >&2
+    mypsql <<EOF
+BEGIN ;
+ALTER TABLE "_${1}" ADD COLUMN value boolean DEFAULT False ;
+UPDATE "_${1}" SET value = True ;
+UPDATE "_tagdef type" AS t SET value = 'boolean' FROM "_tagdef" AS d WHERE t.subject = d.subject AND d.value = '${1}' ;
 COMMIT
 EOF
 }
 
 insert_value_from()
 {
-    psql <<EOF
+    echo inserting into "$1" value "$2" for extra rows from "$3" >&2
+    mypsql <<EOF
 INSERT INTO "_${1}" (subject, value) 
   SELECT subject, $2 
   FROM (SELECT subject FROM "_${3}"
@@ -37,23 +52,29 @@ insert_or_update_singleval_tag()
 	columns="subject, value"
 	values="$subject, $3"
     else
-	setstmt="SET subject = subject"
+	setstmt="SET subject = $subject"
 	columns="subject"
 	values="$subject"
     fi
 
-    count=$(psql -A -t -q <<EOF
-UPDATE "_$tagname" ${setstmt} WHERE subject = $subject RETURNING subject ;
+    echo insert_or_update "$tagname" "( $columns )" "= $values " >&2
+
+    count=$(mypsql -A -t -q <<EOF
+SELECT count(*) FROM "_$tagname" WHERE subject = $subject ;
 EOF
     )
     if [[ $count -eq 0 ]]
     then
-	psql -q -t -A <<EOF
+	mypsql -q -t -A <<EOF
 INSERT INTO "_$tagname" ( ${columns} ) VALUES ( ${values} ) ;
+EOF
+    else
+	mypsql -q -t -A <<EOF
+UPDATE "_$tagname" ${setstmt} WHERE subject = $subject ;
 EOF
     fi
 
-    psql -q -t -A <<EOF
+    mypsql -q -t -A <<EOF
 INSERT INTO subjecttags ( subject, tagname ) 
    SELECT $subject, '$tagname'
    EXCEPT
@@ -72,18 +93,18 @@ insert_or_update_multival_tag()
 
     while [[ $# -gt 0 ]]
     do
-      psql -q -t -A <<EOF
+
+      mypsql -q -t -A <<EOF
+BEGIN ;
 INSERT INTO "_$tagname" ( subject, value ) 
    SELECT $subject, $1 
    EXCEPT
    SELECT subject, value FROM "_$tagname" ;
-EOF
-      
-      psql -q -t -A <<EOF
 INSERT INTO subjecttags ( subject, tagname ) 
    SELECT $subject, '$tagname'
    EXCEPT
    SELECT subject, tagname FROM subjecttags ;
+COMMIT
 EOF
 
       shift
@@ -105,7 +126,7 @@ update_tag_meta_tags()
    local subject="$1"
    local tagname="$2"
 
-   local msubject=$(psql -q -A -t <<EOF
+   local msubject=$(mypsql -q -A -t <<EOF
 SELECT subject FROM "_tagdef" WHERE value = '$tagname'
 EOF
    )
@@ -122,7 +143,7 @@ EOF
 
 # create typedef=boolean
 
-subject=$(psql -A -t -q <<EOF
+subject=$(mypsql -A -t -q <<EOF
 INSERT INTO resources DEFAULT VALUES RETURNING subject;
 EOF
 )
@@ -134,7 +155,7 @@ insert_or_update_multival_tag "$subject" "typedef values" "'True True'" "'False 
 insert_or_update_multival_tag "$subject" "read users" "'*'"
 
 # convert built-in tagdefs from empty to boolean 
-for tag in "tagdef "{active,multivalue,boolean}
+for tag in "tagdef "{active,multivalue,unique}
 do
   empty2boolean "$tag"
   insert_value_from "$tag" "False" "tagdef"
