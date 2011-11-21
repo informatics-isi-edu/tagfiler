@@ -1669,7 +1669,7 @@ function getColumnOver(e) {
 	return ret;
 }
 
-function initPSOC(home, user, webauthnhome) {
+function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	expiration_warning = false;
 	HOME = home;
 	USER = user;
@@ -1681,6 +1681,8 @@ function initPSOC(home, user, webauthnhome) {
 	PREVIEW_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
+	alert('querypath: ' + querypath);
+	//var t = $.parseJSON( querypath );
 	
 	$(document).mousemove(function(e){
 		if (tagToMove == null) {
@@ -1700,6 +1702,7 @@ function initPSOC(home, user, webauthnhome) {
 	});
 
 	// get the default view
+	/*
 	var url = new String(window.location);
 	var default_view = null;
 	url = url.replace('/file/', '/tags/') + '(' + encodeURIComponent('default view') + ')';
@@ -1719,6 +1722,8 @@ function initPSOC(home, user, webauthnhome) {
 	if (default_view == null) {
 		default_view = 'default';
 	}
+	*/
+	default_view = 'default';
 	// build the result columns from the header tags + the view tags
 	setViewTags(default_view);
 	$.each(viewListTags[default_view], function(i, tag) {

@@ -96,7 +96,7 @@ $for key, values in opsExcludeTypes.iteritems():
 		temp.push("${val}");
 	opsExcludeTypes["${key}"] = temp;
 \$(document).ready(function() {
-	initPSOC("${home}", "${authn.role}", "${webauthnhome}");
+	initPSOC("${home}", "${authn.role}", "${webauthnhome}", "${basepath}", "$:{jsonWriter(querypath).replace('"','\\"')}");
 });
 </script>
 
