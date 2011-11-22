@@ -1960,6 +1960,9 @@ function deleteValue(id, tableId) {
 }
 
 function getSelectTagOperator(tag, type) {
+	if (select_tags[tag] == null) {
+		showPreviewSync();
+	}
 	var select = $('<select>');
 	var id = makeId('select', ROW_COUNTER);
 	makeAttributes(select,
@@ -2029,9 +2032,6 @@ function clearValues(tag, op, oldOp) {
 }
 
 function addNewValue(row, type, selectOperatorId, tag) {
-	if (select_tags[tag] == null) {
-		showPreviewSync();
-	}
 	var selVal = $('#' + selectOperatorId).val();
 	var valId = makeId('vals', ++VAL_COUNTER);
 	var table = $('#' + makeId('table', row));
@@ -2425,13 +2425,10 @@ function showQueryResultsTable(limit, totalRows) {
 							'alt', 'Sort');
 			toolbarTd.append(img);
 			toolbarTd = $('<td>');
+			toolbarTd.html('&nbsp;');
+			toolbarTd.addClass('tablecolumnundelete');
+			toolbarTd.attr('iCol', '' + i);
 			toolbarTr.append(toolbarTd);
-			img = $('<img>');
-			img.addClass('tablecolumnundelete');
-			makeAttributes(img,
-							'src', HOME + '/static/delete.png',
-							'alt', 'DEL');
-			toolbarTd.append(img);
 			var th = $('<th>');
 			tr2.append(th);
 			var a = $('<a>');
@@ -2478,9 +2475,8 @@ function showQueryResultsTable(limit, totalRows) {
 			setSortTipBox(columSortId, parseInt(sortValue));
 		}
 		toolbarTd = getChild(toolbarTr, 3);
-		img = getChild(toolbarTd, 1);
-		img.attr('tag', column);
-		img.attr('onclick', makeFunction('deleteColumn', str(column)));
+		toolbarTd.attr('tag', column);
+		toolbarTd.attr('onclick', makeFunction('deleteColumn', str(column)));
 		
 		var th = td2;
 		th.attr('id', thId);
@@ -2644,8 +2640,12 @@ function showQueryResultsTable(limit, totalRows) {
 				HideTipBox();
 			});
 			$('.tablecolumnundelete').hover( function(e) {
-				DisplayTipBox(e, 'Delete column');
+				var iCol = parseInt($(this).attr('iCol'));
+				var trs = $('.tablerow');
+				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
+				DisplayTipBox(e, 'Click to delete');
 			}, function() {
+				$('td.highlighted').removeClass('highlighted');
 				HideTipBox();
 			});
 		},
@@ -2824,6 +2824,14 @@ function deleteColumn(column) {
 	});
 	for (var i=deleteIndex; i < resultColumns.length - 1; i++) {
 		interchangeColumns(i+1, i, false);
+	}
+	var thead = $('#Query_Preview_header');
+	var tr = getChild(thead, 1);
+	for (var i=deleteIndex; i < resultColumns.length - 1; i++) {
+		var col1 = getChild(tr, i + 1);
+		var td = col1.find('.tablecolumnundelete');
+		var iCol = parseInt(td.attr('iCol'));
+		td.attr('iCol', '' + (iCol - 1));
 	}
 	hideColumn(resultColumns.length - 1);
 	resultColumns.splice(deleteIndex, 1);
