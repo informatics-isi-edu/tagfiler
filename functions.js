@@ -1681,8 +1681,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
-	//var t = $.parseJSON( querypath );
-	
 	$(document).mousemove(function(e){
 		if (tagToMove == null) {
 			return;
@@ -1700,28 +1698,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		}
 	});
 
-	// get the default view
-	/*
-	var url = new String(window.location);
-	var default_view = null;
-	url = url.replace('/file/', '/tags/') + '(' + encodeURIComponent('default view') + ')';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			default_view = data[0]['default view'];
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
-		}
-	});
-	if (default_view == null) {
-		default_view = 'default';
-	}
-	*/
 	default_view = 'default';
 	// build the result columns from the header tags + the view tags
 	setViewTags(default_view);
@@ -2613,7 +2589,13 @@ function showQueryResultsTable(limit, totalRows) {
 				if (tr.css('display') == 'none') {
 					break;
 				}
-				tr.css('display', 'none');
+				if (i < 15) {
+					tr.css('display', 'none');
+				} else {
+					tr.remove();
+					tableLength--;
+					i--;
+				}
 			}
 			$('.tablecell').hover( function() {
 				var iCol = $('td', this.parentNode).index(this) % resultColumns.length;
