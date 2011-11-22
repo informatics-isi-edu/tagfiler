@@ -2029,6 +2029,9 @@ function clearValues(tag, op, oldOp) {
 }
 
 function addNewValue(row, type, selectOperatorId, tag) {
+	if (select_tags[tag] == null) {
+		showPreviewSync();
+	}
 	var selVal = $('#' + selectOperatorId).val();
 	var valId = makeId('vals', ++VAL_COUNTER);
 	var table = $('#' + makeId('table', row));
@@ -2121,9 +2124,6 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		option.attr('value', '');
 		select.append(option);
 		td.append(select);
-		if (select_tags[tag] == null) {
-			showPreviewSync();
-		}
 		if (select_tags[tag] != null) {
 			appendTagValuesOptions(tag, selid);
 		} else {
