@@ -1405,7 +1405,7 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
-var headerTags = ['name', 'id'];
+var headerTags = ['base name', 'name', 'id'];
 var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
@@ -1707,7 +1707,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	// build the result columns from the header tags + the view tags
 	setViewTags(default_view);
 	$.each(viewListTags[default_view], function(i, tag) {
-		if (!resultColumns.contains(tag)) {
+		if (!resultColumns.contains(tag) && !headerTags.contains(tag)) {
 			resultColumns.unshift(tag);
 		}
 	});
@@ -2121,7 +2121,9 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		option.attr('value', '');
 		select.append(option);
 		td.append(select);
-		showPreviewSync();
+		if (select_tags[tag] == null) {
+			showPreviewSync();
+		}
 		if (select_tags[tag] != null) {
 			appendTagValuesOptions(tag, selid);
 		} else {
@@ -2874,7 +2876,7 @@ function editQuery(tag) {
 		},
 		position: 'top',
 		draggable: true,
-		height: 250,
+		height: 750,
 		modal: false,
 		resizable: true,
 		width: 750,
