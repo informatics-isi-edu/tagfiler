@@ -1411,6 +1411,7 @@ var viewListTags = new Object();
 var disableAjaxAlert = false;
 var sortColumnsArray = new Array();
 var editInProgress = false;
+var tagInEdit = null;
 var saveSearchConstraint;
 var tagToMove = null;
 
@@ -1423,8 +1424,8 @@ var tipBox;
 
 var movePageX;
 
-var SELECT_LIMIT = 15;
-var select_tags;
+var SELECT_LIMIT = 50;
+var select_tags = null;
 
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
@@ -1681,6 +1682,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
+	if (querypath != null) {
+		var t = $.parseJSON( querypath );
+	}
+	
 	$(document).mousemove(function(e){
 		if (tagToMove == null) {
 			return;
@@ -1930,7 +1935,6 @@ function addToQueryTable(tableId, tag) {
 		td.attr('colspan', '2');
 	}
 	setRowsBackground(tableId);
-	showPreview();
 }
 
 function deleteRow(id) {
@@ -2117,6 +2121,7 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		option.attr('value', '');
 		select.append(option);
 		td.append(select);
+		showPreviewSync();
 		if (select_tags[tag] != null) {
 			appendTagValuesOptions(tag, selid);
 		} else {
@@ -2276,19 +2281,31 @@ function showPreview() {
 	showQueryResults('');
 }
 
-function showQueryResults(limit) {
+function showPreviewSync() {
+	PREVIEW_COUNTER++;
+	showQueryResults('', false);
+}
+
+function showQueryResults(limit, sync) {
 	var queryUrl = getQueryUrl(limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray));
 	$('#Query_URL').attr('href', queryUrl);
 	var totalRows = 0;
+	var currentTagInEditValues = null;
 	queryUrl = getQueryUrl('&range=count', encodeURIArray(resultColumns), new Array());
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
+		async: sync,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
 			totalRows = data[0]['id'];
+			if (select_tags != null && tagInEdit != null) {
+				currentTagInEditValues = select_tags[tagInEdit];
+				if (!currentTagInEditValues) {
+					currentTagInEditValues = null;
+				}
+			}
 			select_tags = new Object();
 			if (totalRows > 0) {
 				var selectedResults = new Array();
@@ -2302,12 +2319,16 @@ function showQueryResults(limit) {
 					$.ajax({
 						url: queryUrl,
 						headers: {'User-agent': 'Tagfiler/1.0'},
-						async: true,
+						async: sync,
 						accepts: {text: 'application/json'},
 						dataType: 'json',
 						success: function(data, textStatus, jqXHR) {
 							$.each(data[0], function(tag, values) {
-								select_tags[tag] = values;
+								if (tag == tagInEdit && currentTagInEditValues != null) {
+									select_tags[tag] = currentTagInEditValues;
+								} else {
+									select_tags[tag] = values;
+								}
 							});
 							showQueryResultsTable(limit, totalRows);
 						},
@@ -2577,7 +2598,7 @@ function showQueryResultsTable(limit, totalRows) {
 				b.append('Showing only ' + previewRows + ' of ');
 				var a = $('<a>');
 				makeAttributes(a,
-								'href', makeFunction('javascript:showQueryResults', str('&limit=none')));
+								'href', makeFunction('javascript:showQueryResults', str('&limit=none'), true));
 				a.html('' + totalRows + ' results.');
 				b.append(a);
 			} else {
@@ -2819,6 +2840,8 @@ function editQuery(tag) {
 		return;
 	}
 	editInProgress = true;
+	select_tags = new Object();
+	tagInEdit = tag;
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
 	var div = $('#queryDiv');
@@ -2888,6 +2911,8 @@ function cancelEdit(tag) {
 	if (!editInProgress) {
 		confirmQueryEditDialog.remove();
 		confirmQueryEditDialog = null;
+		tagInEdit = null;
+		select_tags = null;
 		return true;
 	}
 	confirmQueryEditDialog.remove();
@@ -2906,6 +2931,8 @@ function saveTagQuery(tag) {
 	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
 	disableAjaxAlert = false;
 	editInProgress = false;
+	tagInEdit = null;
+	select_tags = null;
 	if (confirmQueryEditDialog != null) {
 		var child = getChild(confirmQueryEditDialog, 1);
 		var tagDiv = $('<div>');
