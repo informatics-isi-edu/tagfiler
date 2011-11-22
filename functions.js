@@ -1681,7 +1681,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_COUNTER = 0;
 	ENABLE_ROW_HIGHLIGHT = true;
 	loadTypedefs();
-	alert('querypath: ' + querypath);
 	//var t = $.parseJSON( querypath );
 	
 	$(document).mousemove(function(e){
