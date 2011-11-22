@@ -2867,9 +2867,13 @@ function editQuery(tag) {
 	var tbody = tagDiv.find('tbody');
 	if (tbody.children().length == 0) {
 		addToQueryTable(makeId(tagId, 'searchTable'), tag);
+		tbody = tagDiv.find('tbody');
 	}
 	tagDiv.css('display', '');
 	confirmQueryEditDialog = tagDiv;
+	var width = tbody.css('width');
+	var length = width.length - 2;
+	var width = 100 + parseInt(width.substr(0, length));
 	confirmQueryEditDialog.dialog({
 		autoOpen: false,
 		title: 'Edit constraint for column "' + tag + '"',
@@ -2887,7 +2891,7 @@ function editQuery(tag) {
 		height: 750,
 		modal: false,
 		resizable: true,
-		width: 750,
+		width: width,
 		beforeClose: function(event, ui) {cancelEdit(tag);}
 	});
 	confirmQueryEditDialog.dialog('open');
