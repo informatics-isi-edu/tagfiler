@@ -38,7 +38,9 @@ SCRIPTFILES=functions.js \
 			arrow_right.png \
 			bullet_arrow_down.png \
 			bullet_arrow_up.png \
-			control_stop.png
+			control_stop.png \
+			minus.png \
+			plus.png
 
 FILES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
@@ -57,7 +59,9 @@ WEBSTATICFILES=logo.png \
 	arrow_right.png \
 	bullet_arrow_down.png \
 	bullet_arrow_up.png \
-	control_stop.png
+	control_stop.png \
+	minus.png \
+	plus.png
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \

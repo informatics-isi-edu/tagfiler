@@ -160,13 +160,22 @@ table.display {
 	width: 100%;
 }
 
+table.displayQuery thead th, table.display tbody td  {
+	font-family: helvetica;
+	padding: 3px 1px 3px 1px;
+	cursor: pointer;
+	* cursor: hand;
+}
+
 table.display thead th, table.display tbody td  {
+	font-family: helvetica;
 	padding: 3px 18px 3px 10px;
 	cursor: pointer;
 	* cursor: hand;
 }
 
 table.display tfoot tr.topborder th, table.display tbody tr.topborder td {
+	font-family: helvetica;
 	padding: 3px 18px 3px 10px;
 	border-top: 1px solid black;
 	cursor: pointer;
