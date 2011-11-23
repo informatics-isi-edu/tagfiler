@@ -2377,6 +2377,20 @@ function showQueryResults(limit, sync) {
 	});
 }
 
+function showColumnDetails(column, count) {
+	var id = makeId('arrow_up', column.split(' ').join('_'), count);
+	$('#' + id).css('display', '');
+	id = makeId('delete', column.split(' ').join('_'), count);
+	$('#' + id).css('display', '');
+}
+
+function hideColumnDetails(column, count) {
+	var id = makeId('arrow_up', column.split(' ').join('_'), count);
+	$('#' + id).css('display', 'none');
+	id = makeId('delete', column.split(' ').join('_'), count);
+	$('#' + id).css('display', 'none');
+}
+
 function showQueryResultsTable(limit, totalRows) {
 	var previewRows = 0;
 	var queryUrl = getQueryUrl(limit == '' ? '&limit=' + PREVIEW_LIMIT : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray));
@@ -2447,10 +2461,14 @@ function showQueryResultsTable(limit, totalRows) {
 							'alt', 'Sort');
 			toolbarTd.append(img);
 			toolbarTd = $('<td>');
-			toolbarTd.html('&nbsp;');
 			toolbarTd.addClass('tablecolumnundelete');
 			toolbarTd.attr('iCol', '' + i);
 			toolbarTr.append(toolbarTd);
+			img = $('<img>');
+			makeAttributes(img,
+							'src', HOME + '/static/delete.png',
+							'alt', 'DEL');
+			toolbarTd.append(img);
 			var th = $('<th>');
 			tr2.append(th);
 			var a = $('<a>');
@@ -2496,9 +2514,15 @@ function showQueryResultsTable(limit, totalRows) {
 		if (sortValue != '') {
 			setSortTipBox(columSortId, parseInt(sortValue));
 		}
+		img.css('display', 'none');
+		
 		toolbarTd = getChild(toolbarTr, 3);
-		toolbarTd.attr('tag', column);
-		toolbarTd.attr('onclick', makeFunction('deleteColumn', str(column)));
+		img = getChild(toolbarTd, 1);
+		img.attr('tag', column);
+		img.css('display', '');
+		img.attr('id', makeId('delete', column.split(' ').join('_'), PREVIEW_COUNTER));
+		img.attr('onclick', makeFunction('deleteColumn', str(column)));
+		img.css('display', 'none');
 		
 		var th = td2;
 		th.attr('id', thId);
@@ -2515,6 +2539,15 @@ function showQueryResultsTable(limit, totalRows) {
 			var constraint = getTagSearchDisplay(searchDisplay);
 			divConstraint.append(constraint);
 		}
+		makeAttributes(td1,
+						'onmouseover', makeFunction('showColumnDetails', str(column), PREVIEW_COUNTER),
+						'onmouseout', makeFunction('hideColumnDetails', str(column), PREVIEW_COUNTER));
+		makeAttributes(td2,
+						'onmouseover', makeFunction('showColumnDetails', str(column), PREVIEW_COUNTER),
+						'onmouseout', makeFunction('hideColumnDetails', str(column), PREVIEW_COUNTER));
+		makeAttributes(td3,
+						'onmouseover', makeFunction('showColumnDetails', str(column), PREVIEW_COUNTER),
+						'onmouseout', makeFunction('hideColumnDetails', str(column), PREVIEW_COUNTER));
 	});
 	var columnLength = tr1.children().length;
 	for (var i=columnLimit; i < columnLength; i++) {
