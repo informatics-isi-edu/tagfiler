@@ -2086,7 +2086,7 @@ class Application:
             if len(res) == 0:
                 return value
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -2493,6 +2493,9 @@ class Application:
         if limit and rangemode == None:
             cq += ' LIMIT %d' % limit
 
+        if offset and rangemode == None:
+            cq += ' OFFSET %d' % offset
+
         def dbquote(s):
             return s.replace("'", "''")
         
@@ -2704,8 +2707,15 @@ class Application:
                 limit = int(limit)
             except:
                 limit = 25
+
+        offset = self.queryopts.get('offset', None)
+        if offset:
+            try:
+                offset = int(offset)
+            except:
+                offset = None
                 
-        return (path, listtags, writetags, limit, versions)
+        return (path, listtags, writetags, limit, offset, versions)
 
     # static class fields
     tagnameValidators = { 'owner' : validateRole,

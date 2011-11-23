@@ -802,7 +802,7 @@ class FileTags (Node):
         return url
 
     def get_body(self):
-        self.path_modified, self.listtags, writetags, self.limit, self.versions = \
+        self.path_modified, self.listtags, writetags, self.limit, self.offset, self.versions = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
                                       list_prefix='tag',
@@ -1225,7 +1225,7 @@ class Query (Node):
             #self.txlog('TRACE', value='Query::body entered')
             self.http_vary.add('Accept')
 
-            path, self.listtags, writetags, self.limit, self.versions = \
+            path, self.listtags, writetags, self.limit, self.offset, self.versions = \
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
