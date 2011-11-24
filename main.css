@@ -182,6 +182,10 @@ table.display tfoot tr.topborder th, table.display tbody tr.topborder td {
 	* cursor: hand;
 }
 
+td.topborder {
+	border-top: 1px solid black;
+}
+
 tr.even.gradeA:hover, tr.even.gradeA td.highlighted {
 	background-color: #ECFFB3;
 }
@@ -190,3 +194,6 @@ tr.odd.gradeA:hover, tr.odd.gradeA td.highlighted {
 	background-color: #E6FF99;
 }
 
+.separator {
+	border-right: 1px solid #B0BED9;
+}

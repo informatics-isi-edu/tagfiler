@@ -2442,6 +2442,8 @@ function showQueryResultsTable(limit, totalRows) {
 		var td = getChild(tr1, i+1);
 		if (td.get(0) == null) {
 			var td = $('<td>');
+			td.addClass('separator');
+			td.addClass('topborder');
 			tr1.append(td);
 			var topDiv = $('<div>');
 			topDiv.attr('ALIGN', 'RIGHT');
@@ -2470,12 +2472,14 @@ function showQueryResultsTable(limit, totalRows) {
 							'alt', 'DEL');
 			toolbarTd.append(img);
 			var th = $('<th>');
+			th.addClass('separator');
 			tr2.append(th);
 			var a = $('<a>');
 			a.addClass('tableheadercell');
 			th.append(a);
 			
 			td = $('<td>');
+			td.addClass('separator');
 			tr3.append(td);
 			var divConstraint = $('<div>');
 			td.append(divConstraint);
