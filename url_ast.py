@@ -1248,7 +1248,7 @@ class Query (Node):
                     try_default_view = False
 
                 self.queryopts['range'] = self.query_range
-                files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit) ]
+                files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset) ]
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
 

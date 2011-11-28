@@ -2541,9 +2541,9 @@ class Application:
         #    web.debug(r)
         return self.dbquery(query, vars=values)
 
-    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True):
+    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, offset=None):
         #self.txlog('TRACE', value='select_files_by_predlist_path entered')
-        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz)
+        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz, offset=offset)
         #self.txlog('TRACE', value='select_files_by_predlist_path query built')
         result = self.dbquery(query, values)
         #self.txlog('TRACE', value='select_files_by_predlist_path exiting')
