@@ -1406,7 +1406,8 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
-var headerTags = ['base name', 'name', 'id'];
+var headerTags = ['name', 'id'];
+var relocateColumns = ['base name'];
 var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
@@ -1426,7 +1427,7 @@ var tipBox;
 var movePageX;
 
 var SELECT_LIMIT = 50;
-var PREVIEW_LIMIT = 50;
+var PREVIEW_LIMIT = 15;
 var select_tags = null;
 
 var lastPreviewURL = null;
@@ -1712,6 +1713,11 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	default_view = 'default';
 	// build the result columns from the header tags + the view tags
 	setViewTags(default_view);
+	$.each(relocateColumns, function(i, tag) {
+		if (viewListTags[default_view].contains(tag) && !headerTags.contains(tag)) {
+			headerTags.unshift(tag);
+		}
+	});
 	$.each(viewListTags[default_view], function(i, tag) {
 		if (!resultColumns.contains(tag) && !headerTags.contains(tag)) {
 			resultColumns.unshift(tag);
@@ -2176,7 +2182,7 @@ function encodeURIArray(tags) {
 	return ret;
 }
 
-function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns) {
+function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns, offset) {
 	var retTags = '(' + encodedResultColumns.join(';') + ')';
 	var encodedResultColumns = new Array();
 	var sortTags = encodedSortedColumns.join(',');
@@ -2243,7 +2249,7 @@ function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns) {
 	if (query.length > 0) {
 		url = query.join(';');
 	}
-	url = HOME + '/query/' + url + retTags + sortTags + latest + limit;
+	url = HOME + '/query/' + url + retTags + sortTags + latest + limit + offset;
 	return url;
 }
 
@@ -2306,7 +2312,14 @@ function showPreviewSync() {
 }
 
 function showQueryResults(limit, sync) {
-	var queryUrl = getQueryUrl(limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray));
+	var offset = '';
+	if (!editInProgress) {
+		var offset = $('#previewOffset').val().replace(/^\s*/, "").replace(/\s*$/, "");
+		if (offset != '') {
+			offset = '&offset=' + offset;
+		}
+	}
+	var queryUrl = getQueryUrl(limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
 	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit) {
 		return;
 	}
@@ -2315,7 +2328,7 @@ function showQueryResults(limit, sync) {
 	$('#Query_URL').attr('href', queryUrl);
 	var totalRows = 0;
 	var currentTagInEditValues = null;
-	queryUrl = getQueryUrl('&range=count', encodeURIArray(resultColumns), new Array());
+	queryUrl = getQueryUrl('&range=count', encodeURIArray(resultColumns), new Array(), '');
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2339,7 +2352,7 @@ function showQueryResults(limit, sync) {
 					} 
 				});
 				if (selectedResults.length > 0) {
-					queryUrl = getQueryUrl('&range=values', encodeURIArray(selectedResults), new Array());
+					queryUrl = getQueryUrl('&range=values', encodeURIArray(selectedResults), new Array(), '');
 					$.ajax({
 						url: queryUrl,
 						headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2354,7 +2367,7 @@ function showQueryResults(limit, sync) {
 									select_tags[tag] = values;
 								}
 							});
-							showQueryResultsTable(limit, totalRows);
+							showQueryResultsTable(limit, totalRows, offset);
 						},
 						error: function(jqXHR, textStatus, errorThrown) {
 							if (!disableAjaxAlert) {
@@ -2363,10 +2376,10 @@ function showQueryResults(limit, sync) {
 						}
 					});
 				} else {
-					showQueryResultsTable(limit, totalRows);
+					showQueryResultsTable(limit, totalRows, offset);
 				}
 			} else {
-				showQueryResultsTable(limit, totalRows);
+				showQueryResultsTable(limit, totalRows, offset);
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -2391,9 +2404,9 @@ function hideColumnDetails(column, count) {
 	$('#' + id).css('display', 'none');
 }
 
-function showQueryResultsTable(limit, totalRows) {
+function showQueryResultsTable(limit, totalRows, offset) {
 	var previewRows = 0;
-	var queryUrl = getQueryUrl(limit == '' ? '&limit=' + PREVIEW_LIMIT : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray));
+	var queryUrl = getQueryUrl(limit == '' ? '&limit=' + PREVIEW_LIMIT : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
 	var queryPreview = $('#Query_Preview');
 	var table = getChild(queryPreview, 1);
 	if (table.get(0) == null) {
