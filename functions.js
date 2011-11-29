@@ -3221,7 +3221,7 @@ function getTagSearchDisplay(div) {
 				var input = getChild(td, 1);
 				var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
 				if (val.length > 0) {
-					values.push(encodeURIComponent(val));
+					values.push(val);
 				}
 			});
 			if (values.length == 1) {
