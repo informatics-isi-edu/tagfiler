@@ -186,6 +186,10 @@ td.topborder {
 	border-top: 1px solid black;
 }
 
+td.headborder {
+	border-top: 2px solid gray;
+}
+
 tr.even.gradeA:hover, tr.even.gradeA td.highlighted {
 	background-color: #ECFFB3;
 }
@@ -195,5 +199,5 @@ tr.odd.gradeA:hover, tr.odd.gradeA td.highlighted {
 }
 
 .separator {
-	border-right: 1px solid #B0BED9;
+	border-right: 2px solid #FFFFFF;
 }

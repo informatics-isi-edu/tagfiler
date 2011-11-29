@@ -40,7 +40,11 @@ SCRIPTFILES=functions.js \
 			bullet_arrow_up.png \
 			control_stop.png \
 			minus.png \
-			plus.png
+			plus.png \
+			back.jpg \
+			forward.jpg \
+			back_disabled.jpg \
+			forward_disabled.jpg
 
 FILES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
@@ -61,7 +65,11 @@ WEBSTATICFILES=logo.png \
 	bullet_arrow_up.png \
 	control_stop.png \
 	minus.png \
-	plus.png
+	plus.png \
+	back.jpg \
+	forward.jpg \
+	back_disabled.jpg \
+	forward_disabled.jpg
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \

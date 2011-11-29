@@ -23,8 +23,20 @@ $if None:
 <a id="AddTagToQueryLink" href="javascript:addTagToQuery()">Add a column</a>&nbsp;&nbsp;
 <a id="AddViewTagsToQueryLink" href="javascript:addViewTagsToQuery()">Add multiple columns</a>&nbsp;&nbsp;
 <br/><br/>
+<div>
+Show&nbsp;
+<select id="previewLimit" name="previewLimit" onchange="updatePreviewLimit()" >
+<option value="10">10</option>
+<option value="25">25</option>
+<option value="50">50</option>
+<option value="100">100</option>
+</select>&nbsp;entries&nbsp;&nbsp;&nbsp;
 <b id="ViewResults"</b>
+&nbsp;&nbsp;&nbsp;
+<img id="pagePrevious" alt="Previous"></img>
+<img id="pageNext" alt="Next"></img>
 <br/><br/>
+</div>
 
 <div id="customizedViewDiv" style="display: none">
 <fieldset>
@@ -55,8 +67,6 @@ $if None:
         <option value="latest">Show latest version if matches</option>
         <option value="any">Show any version which matches</option>
 </select>
-&nbsp;&nbsp;Offset:
-<input type="text" id="previewOffset" name="previewOffset" onchange="showPreview();" />
 <div 
    id="DragAndDropBox" 
    style="
