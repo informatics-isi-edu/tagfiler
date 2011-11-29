@@ -2407,6 +2407,8 @@ function showQueryResults(limit, sync) {
 function updatePreviewLimit() {
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
+	// update the page counter
+	PAGE_PREVIEW = Math.floor((LAST_PREVIEW_LIMIT * PAGE_PREVIEW / PREVIEW_LIMIT));
 	showPreview();
 }
 
