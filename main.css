@@ -174,20 +174,12 @@ table.display thead th, table.display tbody td  {
 	* cursor: hand;
 }
 
-table.display tfoot tr.topborder th, table.display tbody tr.topborder td {
+table.display tfoot tr.headborder th, table.display tbody tr.headborder td {
 	font-family: helvetica;
 	padding: 3px 18px 3px 10px;
-	border-top: 1px solid black;
+	border-top: 1px solid #E8E8E8;
 	cursor: pointer;
 	* cursor: hand;
-}
-
-td.topborder {
-	border-top: 1px solid black;
-}
-
-td.headborder {
-	border-top: 2px solid gray;
 }
 
 tr.even.gradeA:hover, tr.even.gradeA td.highlighted {
@@ -200,4 +192,35 @@ tr.odd.gradeA:hover, tr.odd.gradeA td.highlighted {
 
 .separator {
 	border-right: 2px solid #FFFFFF;
+}
+
+thead.topnav tr th span { /*--Drop down trigger styles--*/
+	width: 10px;
+	height: 10px;
+	float: left;
+	background: url(arrow_down.gif)  no-repeat center top;
+}
+thead.topnav tr th span.subhover {cursor: pointer;} /*--Hover effect for trigger--*/
+thead.topnav tr th ul.subnav {
+	list-style: none;
+	float: left;
+	position: absolute;
+	background: #CACACA;
+	margin: 0; padding: 0;
+	display: none;
+	width: 170px;
+	border: 1px solid #FFFFFF;
+}
+thead.topnav tr th ul.subnav li{
+	margin: 0; padding: 0;
+	border-top: 1px solid #FFFFFF; /*--Create bevel effect--*/
+	border-bottom: 1px solid #FFFFFF; /*--Create bevel effect--*/
+	clear: both;
+	width: 170px;
+	text-align: left;
+	font-weight: normal;
+}
+thead.topnav tr th ul.subnav li:hover { /*--Hover effect for subnav links--*/
+	background: #8E8E8E; 
+	cursor: pointer;
 }

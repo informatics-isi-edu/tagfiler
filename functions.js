@@ -1399,6 +1399,7 @@ var ROW_TAGS_COUNTER;
 var ROW_SORTED_COUNTER;
 var FIELDSET_COUNTER;
 var PAGE_PREVIEW;
+var LAST_PAGE_PREVIEW;
 var availableTags = null;
 var availableTagdefs = null;
 var allTagdefs = null;
@@ -1701,6 +1702,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	ENABLE_ROW_HIGHLIGHT = true;
 	FIELDSET_COUNTER = 0;
 	PAGE_PREVIEW = 0;
+	LAST_PAGE_PREVIEW = 0;
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = null;
 	$('#pagePrevious').attr('src', home + '/static/back_disabled.jpg');
@@ -2459,7 +2461,7 @@ function showQueryResultsTable(limit, totalRows, offset) {
 						'id', 'Query_Preview_tfoot');
 		table.append(tfoot);
 		tr = $('<tr>');
-		tr.addClass('topborder');
+		tr.addClass('headborder');
 		tfoot.append(tr);
 	}
 
@@ -2481,44 +2483,34 @@ function showQueryResultsTable(limit, totalRows, offset) {
 			if (i < (resultColumns.length - 1)) {
 				td.addClass('separator');
 			}
+			td.css('text-align', 'center');
 			tr1.append(td);
-			var topDiv = $('<div>');
-			topDiv.attr('ALIGN', 'RIGHT');
-			td.append(topDiv);
-			var toolbarTable = $('<table>');
-			topDiv.append(toolbarTable);
-			var toolbarTr = $('<tr>');
-			toolbarTable.append(toolbarTr);
-			var toolbarTd = $('<td>');
-			toolbarTr.append(toolbarTd);
-			toolbarTd = $('<td>');
-			toolbarTr.append(toolbarTd);
-			var img = $('<img>');
-			img.addClass('tablecolumnsort');
-			makeAttributes(img,
-							'src', HOME + '/static/bullet_arrow_up.png',
-							'alt', 'Sort');
-			toolbarTd.append(img);
-			toolbarTd = $('<td>');
-			toolbarTd.addClass('tablecolumnundelete');
-			toolbarTd.attr('iCol', '' + i);
-			toolbarTr.append(toolbarTd);
-			img = $('<img>');
-			makeAttributes(img,
-							'src', HOME + '/static/delete.png',
-							'width', '10',
-							'height', '10',
-							'alt', 'DEL');
-			toolbarTd.append(img);
 			var th = $('<th>');
-			th.addClass('separator');
+			if (i < (resultColumns.length - 1)) {
+				th.addClass('separator');
+			}
 			tr2.append(th);
-			var a = $('<a>');
-			a.addClass('tableheadercell');
-			th.append(a);
+			var table = $('<table>');
+			th.append(table);
+			var thead1 = $('<thead>');
+			thead1.addClass('topnav');
+			table.append(thead1);
+			var tr = $('<tr>');
+			thead1.append(tr);
+			tr = $('<tr>');
+			thead1.append(tr);
+			var th = $('<th>');
+			th.addClass('tableheadercell');
+			tr.append(th);
+			th = $('<th>');
+			tr.append(th);
+			var span = $('<span>');
+			th.append(span);
 			
 			td = $('<td>');
-			td.addClass('separator');
+			if (i < (resultColumns.length - 1)) {
+				td.addClass('separator');
+			}
 			tr3.append(td);
 			var divConstraint = $('<div>');
 			td.append(divConstraint);
@@ -2527,47 +2519,50 @@ function showQueryResultsTable(limit, totalRows, offset) {
 			trfoot.append(th);
 			th.html('&nbsp;');
 		}
-		var td1 = getChild(tr1, i+1);
-		var td2 = getChild(tr2, i+1);
-		var td3 = getChild(tr3, i+1);
-		var tdfoot = getChild(trfoot, i+1);
-		td1.css('display', '');
-		td2.css('display', '');
-		td3.css('display', '');
-		tdfoot.css('display', '');
-		td2.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
-		td2.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
-		
-		var topDiv = getChild(td1, 1);
-		var toolbarTable = getChild(topDiv, 1);
-		var toolbarTbody = getChild(toolbarTable, 1);
-		var toolbarTr = getChild(toolbarTbody, 1);
-		var toolbarTd = getChild(toolbarTr, 1);
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
-		toolbarTd.attr('id', columSortId);
+		var tdSort = getChild(tr1, i+1);
+		tdSort.attr('id', columSortId);
 		var sortValue = getSortOrder(column);
-		toolbarTd.html(sortValue);
-		toolbarTd = getChild(toolbarTr, 2);
-		var img = getChild(toolbarTd, 1);
-		img.attr('id', makeId('arrow_up', column.split(' ').join('_'), PREVIEW_COUNTER));
-		img.attr('tag', column);
-		img.attr('onclick', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER, (sortValue == ''), true));
-		$('#' + columSortId).unbind('mouseenter mouseleave');
 		if (sortValue != '') {
-			setSortTipBox(columSortId, parseInt(sortValue));
+			tdSort.html(sortValue);
+		} else {
+			tdSort.html('&nbsp;');
 		}
-		toolbarTd = getChild(toolbarTr, 3);
-		img = getChild(toolbarTd, 1);
-		img.attr('tag', column);
-		img.attr('id', makeId('delete', column.split(' ').join('_'), PREVIEW_COUNTER));
-		img.attr('onclick', makeFunction('deleteColumn', str(column)));
+		var tr = getChild(tr2, i+1).find('tr');
+		var td3 = getChild(tr3, i+1);
+		td3.css('display', '');
+		var tdfoot = getChild(trfoot, i+1);
+		tdfoot.css('display', '');
 		
-		var th = td2;
+		var th = getChild(tr, 1);
+		th.css('display', '');
+		th.html('');
+		th.attr('iCol', '' + i);
+		th.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
+		th.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
 		th.attr('id', thId);
-		var a = getChild(th, 1);
-		a.attr('href', makeFunction('javascript:editQuery', str(column)));
-		a.html(column);
-		
+		th.append(column);
+		var ul = $('<ul>');
+		ul.addClass('subnav');
+		th.append(ul);
+		var li = $('<li>');
+		li.html('Edit column filter');
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('editQuery', str(column)));
+		ul.append(li);
+		li = $('<li>');
+		li.html('Delete column');
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('deleteColumn', str(column)));
+		ul.append(li);
+		li = $('<li>');
+		li.html('Sort/Unsort column');
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER, (sortValue == ''), true));
+		ul.append(li);
 		var divConstraint = getChild(td3, 1);
 		divConstraint.css('white-space', 'nowrap');
 		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
@@ -2592,6 +2587,27 @@ function showQueryResultsTable(limit, totalRows, offset) {
 		td = getChild(trfoot, i+1);
 		td.css('display', 'none');
 	}
+	$('thead.topnav tr th ul.subnav').click(function(event) {event.preventDefault();});
+	$('thead.topnav span').click(function() {
+		var height = ($(this).css('height'));
+		height = parseInt(height.substr(0, height.length - 2));
+		var top = ($(this).position().top + height) + 'px';
+		$('ul.subnav').css('top', top);
+		
+		//Following events are applied to the subnav itself (moving subnav up and down)
+		$(this).parent().parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
+
+		$(this).parent().parent().hover(function() {
+		}, function(){	
+			$(this).parent().parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
+		});
+
+		//Following events are applied to the trigger (Hover events for the trigger)
+		}).hover(function() { 
+			$(this).addClass("subhover"); //On hover over, add class "subhover"
+		}, function(){	//On Hover Out
+			$(this).removeClass("subhover"); //On hover out, remove class "subhover"
+	});
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2613,7 +2629,6 @@ function showQueryResultsTable(limit, totalRows, offset) {
 					tr.addClass('gradeA');
 					tr.addClass('tablerow');
 					if (i == 0) {
-						//tr.addClass('topborder');
 						tr.addClass('headborder');
 					}
 				}
@@ -2734,15 +2749,13 @@ function showQueryResultsTable(limit, totalRows, offset) {
 				$('td.highlighted').removeClass('highlighted');
 			});
 			$('.tableheadercell').hover( function(e) {
-				var iCol = $('th', this.parentNode.parentNode).index(this.parentNode) % resultColumns.length;;
+				var iCol = parseInt($(this).attr('iCol'));
 				var trs = $('.tablerow');
 				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
-				DisplayTipBox(e, 'Edit filter');
 			}, function() {
 				if (tagToMove == null) {
 					$('td.highlighted').removeClass('highlighted');
 				}
-				HideTipBox();
 			});
 			$('.tablecolumnsort').hover( function(e) {
 				DisplayTipBox(e, 'Sort column');
@@ -2960,6 +2973,8 @@ function editQuery(tag) {
 		return;
 	}
 	editInProgress = true;
+	LAST_PAGE_PREVIEW = PAGE_PREVIEW;
+	PAGE_PREVIEW = 0;
 	select_tags = new Object();
 	tagInEdit = tag;
 	disableAjaxAlert = true;
@@ -3068,6 +3083,7 @@ function cancelEdit(tag) {
 	confirmQueryEditDialog.remove();
 	confirmQueryEditDialog = null;
 	$('#queryDiv').append(saveSearchConstraint);
+	PAGE_PREVIEW = LAST_PAGE_PREVIEW;
 	saveTagQuery(tag);
 	return true;
 }

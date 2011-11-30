@@ -44,7 +44,8 @@ SCRIPTFILES=functions.js \
 			back.jpg \
 			forward.jpg \
 			back_disabled.jpg \
-			forward_disabled.jpg
+			forward_disabled.jpg \
+			arrow_down.gif
 
 FILES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
@@ -69,7 +70,8 @@ WEBSTATICFILES=logo.png \
 	back.jpg \
 	forward.jpg \
 	back_disabled.jpg \
-	forward_disabled.jpg
+	forward_disabled.jpg \
+	arrow_down.gif
 
 TEMPLATEBASES=Top.html Bottom.html Commands.html \
 	FileForm.html NameForm.html UrlForm.html \
