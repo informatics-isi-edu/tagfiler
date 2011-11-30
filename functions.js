@@ -2551,7 +2551,7 @@ function showQueryResultsTable(limit, totalRows, offset) {
 						'onmousedown', makeFunction('deleteColumn', str(column)));
 		ul.append(li);
 		li = $('<li>');
-		li.html('Sort/Unsort column');
+		li.html((sortValue == '' ? 'Sort' : 'Unsort') + ' column');
 		makeAttributes(li,
 						'onmouseup', str('event.preventDefault();'),
 						'onmousedown', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER, (sortValue == ''), true));
