@@ -3004,6 +3004,7 @@ function editQuery(tag) {
 		}
 	}
 	width += 100;
+	var height = Math.ceil($(window).height() * 2 / 3);
 	confirmQueryEditDialog = tagDiv;
 	confirmQueryEditDialog.dialog({
 		autoOpen: false,
@@ -3019,7 +3020,7 @@ function editQuery(tag) {
 		},
 		position: 'top',
 		draggable: true,
-		height: 750,
+		height: height,
 		modal: false,
 		resizable: true,
 		width: width,
