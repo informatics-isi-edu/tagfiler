@@ -1250,27 +1250,11 @@ class Query (Node):
                 return None
             elif contentType != 'text/html':
                 self.txlog('QUERY', dataset=path_linearize(self.path))
-                if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
-                    try_default_view = True
-                else:
-                    try_default_view = False
 
                 self.queryopts['range'] = self.query_range
                 files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset) ]
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
-
-                if len(files) > 0:
-                    subject = files[0]
-                    datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
-
-                    if try_default_view and subject.dtype:
-                        view = self.select_view(subject.dtype)
-                        if view:
-                            if view['file list tags']:
-                                self.listtags = view['file list tags']
-                            if view['file list tags write']:
-                                writetags = view['file list tags write']
 
                 self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
                 self.globals['filelisttagswrite'] = writetags
