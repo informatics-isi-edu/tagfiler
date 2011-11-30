@@ -1453,9 +1453,7 @@ function DisplayDragAndDropBox(e) {
 	dragAndDropBox.css('display', 'block');
 	var header = $('#Query_Preview_header');
 	var minX = parseInt(header.offset().left);
-	var value = header.css('width');
-	var length = value.length - 2;
-	var maxX = minX + parseInt(value.substr(0, length));
+	var maxX = minX + header.width();
 	var x = e.pageX;
 	if (x <= maxX) {
 		if (e.pageX != movePageX) {
@@ -1487,9 +1485,7 @@ function DisplayTipBox(e, content) {
 		return;
 	}
 	tipBox.html(content);
-	var value = tipBox.css('width');
-	var length = value.length - 2;
-	var dx = parseInt(value.substr(0, length)) + 30;
+	var dx = tipBox.width() + 30;
 	dx = (e.clientX >= $(window).width() * 2 / 3) ? -dx : 0;
 	tipBox.css('left', String(parseInt(e.pageX + dx) + 'px'));
 	tipBox.css('top', String(parseInt(e.pageY - 50) + 'px'));
@@ -1614,12 +1610,8 @@ function getColumnOver(e) {
 	var header = $('#Query_Preview_header');
 	var minY = parseInt(header.offset().top);
 	var minX = parseInt(header.offset().left);
-	var value = header.css('height');
-	var length = value.length - 2;
-	var maxY = minY + parseInt(value.substr(0, length));
-	value = header.css('width');
-	length = value.length - 2;
-	var maxX = minX + parseInt(value.substr(0, length));
+	var maxY = minY + header.height();
+	var maxX = minX + header.width();
 	var x = parseInt(e.pageX);
 	var y = parseInt(e.pageY);
 	var tr = getChild(header, 2);
@@ -2589,8 +2581,7 @@ function showQueryResultsTable(limit, totalRows, offset) {
 	}
 	$('thead.topnav tr th ul.subnav').click(function(event) {event.preventDefault();});
 	$('thead.topnav span').click(function() {
-		var height = ($(this).css('height'));
-		height = parseInt(height.substr(0, height.length - 2));
+		var height = $(this).height();
 		var top = ($(this).position().top + height) + 'px';
 		$('ul.subnav').css('top', top);
 		
@@ -2996,9 +2987,7 @@ function editQuery(tag) {
 	var width = 0;
 	for (var i=0; i<tagDiv.children().length; i++) {
 		var tbody = getChild(tagDiv, i+1).find('tbody');
-		var value = tbody.css('width');
-		var length = value.length - 2;
-		var crtWidth = parseInt(value.substr(0, length));
+		var crtWidth = tbody.width();
 		if (crtWidth > width) {
 			width = crtWidth;
 		}
