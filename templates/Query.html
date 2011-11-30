@@ -18,12 +18,25 @@ $if None:
 <link rel="stylesheet" type="text/css" href="${home}/static/jquery-ui.css">
 <script type="text/javascript" src="${home}/static/jquery-ui.js"></script>
 <div id="psoc" onmouseup="document.body.style.cursor = 'default';" >
-<br/>
-<a id="Query_URL" href="" >Permanent link</a>&nbsp;&nbsp;
-<a id="AddTagToQueryLink" href="javascript:addTagToQuery()">Add a column</a>&nbsp;&nbsp;
-<a id="AddViewTagsToQueryLink" href="javascript:addViewTagsToQuery()">Add multiple columns</a>&nbsp;&nbsp;
+<a id="Query_URL" href="" >Permanent link</a>
 <br/><br/>
+<table>
+<thead class="topnav" >
+<tr>
+<th>Actions
+<ul class="subnav">
+	<li onmouseup="event.preventDefault();" onmousedown="addTagToQuery();" >Add a column</li>
+	<li onmouseup="event.preventDefault();" onmousedown="addViewTagsToQuery();" >Add multiple columns</li>
+</ul>
+</th>
+<th>
+<span></span>
+</th>
+</tr>
+</thead>
+</table>
 <div>
+<br/>
 Show&nbsp;
 <select id="previewLimit" name="previewLimit" onchange="updatePreviewLimit()" >
 <option value="10">10</option>
