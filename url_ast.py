@@ -25,8 +25,30 @@ from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden,
 from rest_fileio import FileIO, LogFileIO
 import subjects
 import json
+import datetime
 
-jsonMungeTypes = set([ 'date', 'timestamptz' ])
+jsonMungeTypes = set([ datetime.datetime, datetime.date ])
+
+def jsonMunger(file, listtags):
+    
+    def mungeVal(value):
+        if type(value) == tuple:
+            return [ mungeVal(v) for v in value ]
+        elif type(value) in jsonMungeTypes:
+            try:
+                return str(value)
+            except:
+                return value
+        else:
+            return value
+
+    def mungePair(tag, value):
+        if type(value) == list:
+            return ( tag, [ mungeVal(v) for v in value ] )
+        else:
+            return ( tag, mungeVal(value) )
+
+    return dict([ mungePair( tag, file[tag] ) for tag in listtags ])
 
 def listmax(list):
     if list:
@@ -854,19 +876,6 @@ class FileTags (Node):
             web.ctx.status = '304 Not Modified'
             return ''
 
-        jsonMungeTags = set( [ tagdef.tagname for tagdef in all if tagdef.typestr in jsonMungeTypes ] )
-
-        def dictFile(file):
-            tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
-            tagvals = dict(tagvals)
-            for tagname in jsonMungeTags:
-                 if tagvals[tagname] != None:
-                    try:
-                        tagvals[tagname] = str(tagvals[tagname])
-                    except:
-                        pass
-            return tagvals
-
         self.emit_headers()
         for acceptType in self.acceptTypesPreferedOrder():
             if acceptType == 'text/uri-list':
@@ -889,7 +898,7 @@ class FileTags (Node):
                 return '&'.join(body)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                return '[' + ",\n".join([ jsonWriter(dictFile(file)) for file in files ]) + ']\n'
+                return '[' + ",\n".join([ jsonWriter(jsonMunger(file, all)) for file in files ]) + ']\n'
             elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
                 self.header('Content-Type', 'text/plain')
                 val = files[0][self.listtags[0]]
@@ -1292,20 +1301,6 @@ class Query (Node):
             self.globals['showVersions'] = self.showversions
             self.globals['queryTarget'] = self.qtarget()
                 
-            jsonMungeTags = set( [ tagname for tagname in self.globals['filelisttags']
-                                   if self.globals['tagdefsdict'][tagname].typestr in jsonMungeTypes ] )
-
-            def dictFile(file):
-                tagvals = [ ( tag, file[tag] ) for tag in self.listtags ]
-                tagvals = dict(tagvals)
-                for tagname in jsonMungeTags:
-                    if tagvals[tagname] != None:
-                        try:
-                            tagvals[tagname] = str(tagvals[tagname])
-                        except:
-                            pass
-                return tagvals
-
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )
 
@@ -1328,10 +1323,10 @@ class Query (Node):
                 self.header('Content-Type', 'application/json')
                 yield '['
                 if len(files) > 0:
-                    yield jsonWriter(dictFile(files[0])) + '\n'
+                    yield jsonWriter(jsonMunger(files[0], self.listtags)) + '\n'
                 if len(files) > 1:
                     for i in range(1,len(files)):
-                        yield ',' + jsonWriter(dictFile(files[i])) + '\n'
+                        yield ',' + jsonWriter(jsonMunger(files[i], self.listtags)) + '\n'
                 yield ']\n'
                 return
             else:

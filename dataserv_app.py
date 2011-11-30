@@ -2135,7 +2135,7 @@ class Application:
             raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
         rangemode = self.queryopts.get('range', None)
-        if rangemode not in [ 'values', 'count' ]:
+        if rangemode not in [ 'values', 'count', 'values<', 'values>' ]:
             rangemode = None
 
         def mergepreds(predlist):
@@ -2379,12 +2379,15 @@ class Application:
                     if td.typestr != 'empty':
                         # find active value range for given tag
                         if td.tagname == 'id':
-                            lq = '(SELECT %(agg)s(DISTINCT resources.subject) FROM resources)'
+                            range_column = 'resources.subject'
+                            range_table = 'resources'
                         else:
-                            lq = '(SELECT %(agg)s(DISTINCT ' + wraptag(td.tagname) + '.value) FROM ' + wraptag(td.tagname) + ' JOIN resources USING (subject))'
+                            range_column = wraptag(td.tagname) + '.value'
+                            range_table = wraptag(td.tagname) + ' JOIN resources USING (subject)'
                     else:
                         # pretend empty tags have binary range True, False
-                        lq = '(SELECT %(agg)s(t.x) FROM (VALUES (True), (False)) AS t (x))'
+                        range_column = 't.x'
+                        range_table = '(VALUES (True), (False)) AS t (x)'
 
                 else:
                     if tag == 'owner':
@@ -2416,10 +2419,31 @@ class Application:
                             selects.append('%s.subject IS NOT NULL AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
                     elif rangemode == 'values':
                         # returning distinct values across all subjects
-                        selects.append((lq % dict(agg='array_agg')) + ' AS %s' % wraptag(listas.get(td.tagname, td.tagname), prefix=''))
-                    else:
+                        selects.append('(SELECT array_agg(DISTINCT %s) FROM %s) AS %s'
+                                       % (range_column, range_table, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                    elif rangemode == 'count':
                         # returning count of distinct values across all subjects
-                        selects.append((lq % dict(agg='count')) + ' AS %s' % wraptag(listas.get(td.tagname, td.tagname), prefix=''))
+                        selects.append('(SELECT count(DISTINCT %s) FROM %s) AS %s'
+                                       % (range_column, range_table, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                    else:
+                        # returning (in)frequent values
+                        if rangemode[-1] == '<':
+                            freqorder = 'ASC'
+                        else:
+                            freqorder = 'DESC'
+                        selects.append('(SELECT array_agg(value) '
+                                        'FROM (SELECT %(column)s AS value, count(%(column)s) AS count '
+                                              'FROM %(table)s '
+                                              'GROUP BY %(column)s '
+                                              'ORDER BY count %(order)s, value '
+                                              '%(limit)s) AS t) '
+                                        'AS %(alias)s'
+                                       % dict(column=range_column,
+                                              table=range_table,
+                                              order=freqorder,
+                                              limit=({ True: 'LIMIT %d' % limit, False: ''}[limit != None]),
+                                              alias=wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        
                 else:
                     finals.append(lq)
 
