@@ -2331,6 +2331,7 @@ function showQueryResults(limit, sync) {
 	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
+	document.body.style.cursor = "wait";
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
 	$('#Query_URL').attr('href', queryUrl);
@@ -2769,6 +2770,7 @@ function showQueryResultsTable(limit, totalRows, offset) {
 			}
 		}
 	});
+	document.body.style.cursor = "default";
 }
 
 function htmlEscape(str) {
