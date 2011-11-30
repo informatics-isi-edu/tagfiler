@@ -1238,8 +1238,7 @@ class Query (Node):
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
-                                          extra_tags=[ 'id', 'file','name', 'version','Image Set', 'Study Type',
-                                                       'write users', 'owner', 'modified', 'url', 'tagdef', 'typedef' ])
+                                          extra_tags=[ ])
 
             #self.txlog('TRACE', value='Query::body query prepared')
             self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))

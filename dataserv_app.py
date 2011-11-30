@@ -2719,7 +2719,10 @@ class Application:
         if not listtags:
             listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
 
-        listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
+        if save_listpreds:
+            listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags ]
+        else:
+            listpreds = [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
 
         path[-1] = ( subjpreds, listpreds, ordertags )
 
