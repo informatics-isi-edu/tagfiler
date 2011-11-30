@@ -1751,10 +1751,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		},
 		draggable: true,
 		position: 'top',
-		height: 250,
+		height: ($(window).height() < 250 ? $(window).height() : 250),
 		modal: false,
 		resizable: true,
-		width: 450,
+		width: ($(window).width() < 450 ? $(window).width() : 450),
 	});
 	$('#selectViewDiv').css('display', '');
 	confirmAddMultipleTagsDialog = $('#selectViewDiv');
@@ -1772,10 +1772,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		},
 		draggable: true,
 		position: 'top',
-		height: 250,
+		height: ($(window).height() < 250 ? $(window).height() : 250),
 		modal: false,
 		resizable: true,
-		width: 450,
+		width: ($(window).width() < 450 ? $(window).width() : 450),
 	});
 	dragAndDropBox = $('#DragAndDropBox');
 	tipBox = $('#TipBox');
