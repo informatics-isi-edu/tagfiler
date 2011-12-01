@@ -1423,6 +1423,8 @@ var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
 var confirmAddMultipleTagsDialog = null;
 
+var queryFilter = new Object();
+
 var dragAndDropBox;
 var tipBox;
 
@@ -1700,10 +1702,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	$('#pagePrevious').attr('src', home + '/static/back_disabled.jpg');
 	$('#pageNext').attr('src', home + '/static/forward_disabled.jpg');
 	loadTypedefs();
-	if (querypath != null) {
-		var t = $.parseJSON( querypath );
-	}
-	
 	$(document).mousemove(function(e){
 		if (tagToMove == null) {
 			return;
@@ -1721,20 +1719,59 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		}
 	});
 
-	default_view = 'default';
-	// build the result columns from the header tags + the view tags
-	setViewTags(default_view);
-	$.each(relocateColumns, function(i, tag) {
-		if (viewListTags[default_view].contains(tag) && !headerTags.contains(tag)) {
-			headerTags.unshift(tag);
-		}
-	});
-	$.each(viewListTags[default_view], function(i, tag) {
-		if (!resultColumns.contains(tag) && !headerTags.contains(tag)) {
-			resultColumns.unshift(tag);
-		}
-	});
-	resultColumns = resultColumns.concat(headerTags);
+	if (availableTags == null) {
+		loadTags();
+	}
+	
+	if (querypath != null) {
+		var querypathJSON = $.parseJSON( querypath );
+		var lpreds = querypathJSON[0]['lpreds'];
+		$.each(lpreds, function(i, pred) {
+			if (!relocateColumns.contains(pred['tag']) && !headerTags.contains(pred['tag'])) {
+				resultColumns.push(pred['tag']);
+			}
+		});
+		$.each(relocateColumns, function(i, tag) {
+			if (availableTagdefs.contains(tag) && !headerTags.contains(tag)) {
+				headerTags.unshift(tag);
+			}
+		});
+		$.each(headerTags, function(i, tag) {
+			if (availableTagdefs.contains(tag)) {
+				resultColumns.push(tag);
+			}
+		});
+		var spreds = querypathJSON[0]['spreds'];
+		$.each(spreds, function(i, item) {
+			if (queryFilter[item['tag']] == null) {
+				queryFilter[item['tag']] = new Array();
+			}
+			var pred = new Object();
+			pred['op'] = item['op'];
+			pred['vals'] = item['vals'];
+			queryFilter[item['tag']].push(pred);
+		});
+		var otags = querypathJSON[0]['otags'];
+		$.each(otags, function(i, item) {
+			sortColumnsArray.push(item);
+		});
+	} else {
+		default_view = 'default';
+		// build the result columns from the header tags + the view tags
+		setViewTags(default_view);
+		$.each(relocateColumns, function(i, tag) {
+			if (viewListTags[default_view].contains(tag) && !headerTags.contains(tag)) {
+				headerTags.unshift(tag);
+			}
+		});
+		$.each(viewListTags[default_view], function(i, tag) {
+			if (!resultColumns.contains(tag) && !headerTags.contains(tag)) {
+				resultColumns.unshift(tag);
+			}
+		});
+		resultColumns = resultColumns.concat(headerTags);
+	}
+	
 	$('#customizedViewDiv').css('display', '');
 	confirmAddTagDialog = $('#customizedViewDiv');
 	confirmAddTagDialog.dialog({
@@ -1876,9 +1913,6 @@ function loadAvailableViews(id) {
 }
 
 function setViewTags(tag) {
-	if (availableTags == null) {
-		loadTags();
-	}
 	if (viewListTags[tag] != null) {
 		return;
 	}
@@ -2231,8 +2265,8 @@ function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns, offset) 
 				td = getChild(tr, 3);
 				var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 				if (val1 != '' && val2 != '') {
-					query.push(tag + ':geq:' + val1);
-					query.push(tag + ':leq:' + val2);
+					query.push(tag + ':geq:' + encodeURIComponent(val1));
+					query.push(tag + ':leq:' + encodeURIComponent(val2));
 				}
 			} else if (op != 'Tagged' && op != 'Tag absent') {
 				// values column
@@ -2562,7 +2596,7 @@ function showQueryResultsTable(limit, totalRows, offset) {
 		divConstraint.html('');
 		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
 		if (searchDisplay.get(0) != null) {
-			var constraint = getTagSearchDisplay(searchDisplay);
+			var constraint = getTagSearchDisplay(column);
 			divConstraint.append(constraint);
 		}
 	});
@@ -3082,10 +3116,7 @@ function cancelEdit(tag) {
 
 function saveTagQuery(tag) {
 	var tagId = makeId(tag.split(' ').join('_'));
-	var div = $('#' + makeId('constraint', tag.split(' ').join('_'), PREVIEW_COUNTER));
-	div.html('');
-	var constraintDiv = getTagSearchDisplay($('#' +makeId('queryDiv', tagId)));
-	div.append(constraintDiv);
+	var constraintDiv = getTagSearchDisplay(tag);
 	disableAjaxAlert = false;
 	editInProgress = false;
 	tagInEdit = null;
@@ -3192,9 +3223,39 @@ function tagTableWrapper(tag) {
 	return tableWrapper;
 }
 
-function getTagSearchDisplay(div) {
-	var query = new Array();
-	var searchTag = div.attr('tag');
+function getTagSearchDisplay(tag) {
+	var tagConstraintDiv = $('#' +makeId('queryDiv', tag.split(' ').join('_')));
+	saveTagPredicate(tag, tagConstraintDiv);
+	var divConstraint = $('<div>');
+	divConstraint.attr('ALIGN', 'LEFT');
+	var table = $('<table>');
+	divConstraint.append(table);
+	if (queryFilter[tag] != null) {
+		$.each(queryFilter[tag], function(i, item) {
+			var tr = $('<tr>');
+			table.append(tr);
+			var td = $('<td>');
+			tr.append(td);
+			var val = item['op'] == null ? ':tagged:' : item['op'];
+			switch (item['vals'].length) {
+			case 0: break;
+			case 1: val += ' ' + item['vals'][0];
+					break;
+			default: val += ' {' + item['vals'].join(', ') + '}';
+					 break;
+				
+			}
+			td.html(val);
+		});
+	}
+	
+	makeAttributes(divConstraint,
+				   'onclick', makeFunction('editQuery', str(tag)));
+	return divConstraint;
+}
+
+function saveTagPredicate(tag, div) {
+	queryFilter[tag] = new Array();
 	var divTables = div.children();
 	$.each(divTables, function(i, divTable) {
 		var tbody = getChild($(divTable), 1);
@@ -3216,7 +3277,15 @@ function getTagSearchDisplay(div) {
 			td = getChild(tr, 3);
 			var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 			if (val1 != '' && val2 != '') {
-				query.push('['+ val1 + ', ' + val2 + ']');
+				var pred = new Object();
+				pred['op'] = ':geq:';
+				pred['vals'] = new Array();
+				pred['vals'].push(val1);
+				queryFilter[tag].push(pred);
+				pred = new Object();
+				pred['op'] = ':leq:';
+				pred['vals'] = new Array();
+				pred['vals'].push(val2);
 			}
 		} else if (op != 'Tagged' && op != 'Tag absent') {
 			// values column
@@ -3232,33 +3301,25 @@ function getTagSearchDisplay(div) {
 					values.push(val);
 				}
 			});
-			if (values.length == 1) {
-				query.push(ops[op] + ' ' + values.join(', '));
+			if (values.length > 0) {
+				var pred = new Object();
+				pred['op'] = ops[op];
+				pred['vals'] = values;
+				queryFilter[tag].push(pred);
 			}
-			else if (values.length > 0) {
-				query.push(ops[op] + ' {' + values.join(', ') + '}');
-			}
+		} else if (op == 'Tagged') {
+			var pred = new Object();
+			pred['vals'] = new Array();
+			queryFilter[tag].push(pred);
 		} else {
-			query.push(ops[op]);
+			var pred = new Object();
+			pred['op'] = ops[op];
+			pred['vals'] = new Array();
+			queryFilter[tag].push(pred);
 		}
 	});
-	var divConstraint = $('<div>');
-	divConstraint.attr('ALIGN', 'LEFT');
-	var table = $('<table>');
-	divConstraint.append(table);
-	$.each(query, function(i, val) {
-		var tr = $('<tr>');
-		table.append(tr);
-		var td = $('<td>');
-		tr.append(td);
-		if (val == '') {
-			td.html(':tagged:');
-		} else {
-			td.html(val);
-		}
-	});
-	makeAttributes(divConstraint,
-				   'onclick', makeFunction('editQuery', str(searchTag)));
-	return divConstraint;
+	if (queryFilter[tag].length == 0) {
+		delete queryFilter[tag];
+	}
 }
 
