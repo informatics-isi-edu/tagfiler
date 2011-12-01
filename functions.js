@@ -2011,9 +2011,6 @@ function deleteValue(id, tableId) {
 }
 
 function getSelectTagOperator(tag, type) {
-	if (select_tags[tag] == null) {
-		showPreviewSync();
-	}
 	var select = $('<select>');
 	var id = makeId('select', ROW_COUNTER);
 	makeAttributes(select,
@@ -2227,11 +2224,7 @@ function encodeURIArray(tags) {
 	return ret;
 }
 
-function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns, offset) {
-	var retTags = '(' + encodedResultColumns.join(';') + ')';
-	var encodedResultColumns = new Array();
-	var sortTags = encodedSortedColumns.join(',');
-	var latest = '?versions=' + $('#versions').val();
+function getQueryPredUrl() {
 	var query = new Array();
 	var divs = $('#queryDiv').children();
 	if (confirmQueryEditDialog != null) {
@@ -2294,7 +2287,16 @@ function getQueryUrl(limit, encodedResultColumns, encodedSortedColumns, offset) 
 	if (query.length > 0) {
 		url = query.join(';');
 	}
-	url = HOME + '/query/' + url + retTags + sortTags + latest + limit + offset;
+	url = HOME + '/query/' + url;
+	return url;
+}
+
+function getQueryUrl(predUrl, limit, encodedResultColumns, encodedSortedColumns, offset) {
+	var retTags = '(' + encodedResultColumns.join(';') + ')';
+	var encodedResultColumns = new Array();
+	var sortTags = encodedSortedColumns.join(',');
+	var latest = '?versions=' + $('#versions').val();
+	var url = predUrl + retTags + sortTags + latest + limit + offset;
 	return url;
 }
 
@@ -2348,20 +2350,16 @@ function deleteTag(tableId, id) {
 
 function showPreview() {
 	PREVIEW_COUNTER++;
-	showQueryResults('', true);
+	showQueryResults('');
 }
 
-function showPreviewSync() {
-	PREVIEW_COUNTER++;
-	showQueryResults('', false);
-}
-
-function showQueryResults(limit, sync) {
+function showQueryResults(limit) {
 	var offset = '';
 	if (!editInProgress) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
-	var queryUrl = getQueryUrl(limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
+	var predUrl = getQueryPredUrl();
+	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
 	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
@@ -2369,60 +2367,67 @@ function showQueryResults(limit, sync) {
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
 	$('#Query_URL').attr('href', queryUrl);
+	var totalRows = getTotalRows();
+	showQueryResultsTable(predUrl, limit, totalRows, offset);
+}
+
+function getTotalRows() {
+	var predUrl = getQueryPredUrl();
 	var totalRows = 0;
-	var currentTagInEditValues = null;
-	queryUrl = getQueryUrl('&range=count', encodeURIArray(resultColumns), new Array(), '');
+	var columnArray = new Array();
+	columnArray.push('id');
+	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
+	select_tags = new Object();
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: sync,
+		async: false,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
 			totalRows = data[0]['id'];
-			if (select_tags != null && tagInEdit != null) {
-				currentTagInEditValues = select_tags[tagInEdit];
-				if (!currentTagInEditValues) {
-					currentTagInEditValues = null;
-				}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			if (!disableAjaxAlert) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
 			}
-			select_tags = new Object();
-			if (totalRows > 0) {
-				var selectedResults = new Array();
-				$.each(data[0], function(tag, value) {
-					if (value > 0 && value <= SELECT_LIMIT) {
-						selectedResults.push(tag);
-					} 
-				});
-				if (selectedResults.length > 0) {
-					queryUrl = getQueryUrl('&range=values', encodeURIArray(selectedResults), new Array(), '');
-					$.ajax({
-						url: queryUrl,
-						headers: {'User-agent': 'Tagfiler/1.0'},
-						async: sync,
-						accepts: {text: 'application/json'},
-						dataType: 'json',
-						success: function(data, textStatus, jqXHR) {
-							$.each(data[0], function(tag, values) {
-								if (tag == tagInEdit && currentTagInEditValues != null) {
-									select_tags[tag] = currentTagInEditValues;
-								} else {
-									select_tags[tag] = values;
-								}
-							});
-							showQueryResultsTable(limit, totalRows, offset);
-						},
-						error: function(jqXHR, textStatus, errorThrown) {
-							if (!disableAjaxAlert) {
-								handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
-							}
+		}
+	});
+	return totalRows;
+}
+
+function initDropDownList(tag) {
+	var predUrl = getQueryPredUrl();
+	var totalRows = 0;
+	var columnArray = new Array();
+	columnArray.push(tag);
+	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
+	select_tags = new Object();
+	$.ajax({
+		url: queryUrl,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		success: function(data, textStatus, jqXHR) {
+			totalRows = data[0][tag];
+			if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
+				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray), new Array(), '');
+				$.ajax({
+					url: queryUrl,
+					headers: {'User-agent': 'Tagfiler/1.0'},
+					async: false,
+					accepts: {text: 'application/json'},
+					dataType: 'json',
+					success: function(data, textStatus, jqXHR) {
+						select_tags[tag] = data[0][tag];
+					},
+					error: function(jqXHR, textStatus, errorThrown) {
+						if (!disableAjaxAlert) {
+							handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
 						}
-					});
-				} else {
-					showQueryResultsTable(limit, totalRows, offset);
-				}
-			} else {
-				showQueryResultsTable(limit, totalRows, offset);
+					}
+				});
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -2455,9 +2460,9 @@ function hideColumnDetails(column, count) {
 	$('#' + id).css('display', 'none');
 }
 
-function showQueryResultsTable(limit, totalRows, offset) {
+function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 	var previewRows = 0;
-	var queryUrl = getQueryUrl(limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
+	var queryUrl = getQueryUrl(predUrl, limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
 	var queryPreview = $('#Query_Preview');
 	var table = getChild(queryPreview, 1);
 	if (table.get(0) == null) {
@@ -2999,10 +3004,10 @@ function editQuery(tag) {
 	if (editInProgress) {
 		return;
 	}
+	initDropDownList(tag);
 	editInProgress = true;
 	LAST_PAGE_PREVIEW = PAGE_PREVIEW;
 	PAGE_PREVIEW = 0;
-	select_tags = new Object();
 	tagInEdit = tag;
 	disableAjaxAlert = true;
 	var tagId = makeId(tag.split(' ').join('_'));
@@ -3236,13 +3241,18 @@ function getTagSearchDisplay(tag) {
 			table.append(tr);
 			var td = $('<td>');
 			tr.append(td);
-			var val = item['op'] == null ? ':tagged:' : item['op'];
+			var val = item['opUser'] == 'Between' ? '' : item['op'];
 			switch (item['vals'].length) {
-			case 0: break;
-			case 1: val += ' ' + item['vals'][0];
-					break;
-			default: val += ' {' + item['vals'].join(', ') + '}';
-					 break;
+			case 0:
+				break;
+			case 1:
+				val += ' ' + item['vals'][0];
+				break;
+			default:
+				val += item['opUser'] == 'Between' ? '[' : '{';
+				val += item['vals'].join(', ');
+				val += item['opUser'] == 'Between' ? ']' : '}';
+				break;
 				
 			}
 			td.html(val);
@@ -3278,14 +3288,11 @@ function saveTagPredicate(tag, div) {
 			var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
 			if (val1 != '' && val2 != '') {
 				var pred = new Object();
-				pred['op'] = ':geq:';
+				pred['opUser'] = op;
 				pred['vals'] = new Array();
 				pred['vals'].push(val1);
-				queryFilter[tag].push(pred);
-				pred = new Object();
-				pred['op'] = ':leq:';
-				pred['vals'] = new Array();
 				pred['vals'].push(val2);
+				queryFilter[tag].push(pred);
 			}
 		} else if (op != 'Tagged' && op != 'Tag absent') {
 			// values column
@@ -3303,16 +3310,19 @@ function saveTagPredicate(tag, div) {
 			});
 			if (values.length > 0) {
 				var pred = new Object();
+				pred['opUser'] = op;
 				pred['op'] = ops[op];
 				pred['vals'] = values;
 				queryFilter[tag].push(pred);
 			}
 		} else if (op == 'Tagged') {
 			var pred = new Object();
+			pred['opUser'] = op;
 			pred['vals'] = new Array();
 			queryFilter[tag].push(pred);
 		} else {
 			var pred = new Object();
+			pred['opUser'] = op;
 			pred['op'] = ops[op];
 			pred['vals'] = new Array();
 			queryFilter[tag].push(pred);
