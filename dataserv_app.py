@@ -807,7 +807,7 @@ class Application:
             self.query_range = None
 
         # this ordered list can be pruned to optimize transactions
-        self.needed_db_globals = [ 'tagdefsdict', 'roleinfo', 'typeinfo', 'typesdict' ]
+        self.needed_db_globals = [  'typeinfo', 'typesdict', 'tagdefsdict', 'roleinfo' ]
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -829,9 +829,6 @@ class Application:
 
         #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
-        
-        #self.config = self.select_config()
-        #self.config['policy remappings'] = buildPolicyRules(self.config['policy remappings'])
         
         self.render = web.template.render(self.config['template path'], globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
@@ -1106,9 +1103,6 @@ class Application:
     def preDispatchFake(self, uri, app):
         self.db = app.db
         self.set_authn(app.authn)
-        # we need to re-do this after having proper authn info
-        #self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
-        #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
 
     def preDispatchCore(self, uri, setcookie=True):
         self.request_uri = uri
@@ -1137,10 +1131,6 @@ class Application:
                 roles = set()
             self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
 
-        # we need to re-do this after having proper authn info
-        #self.globals['tagdefsdict'] = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef()) ])
-        #self.globals['tagdefsdict'] = dict ([ (tagdef.tagname, tagdef) for tagdef in self.select_tagdef() ])
-
     def preDispatch(self, uri):
         self.preDispatchCore(uri)
 
@@ -1163,10 +1153,9 @@ class Application:
         self.dbtransact(body, postCommit)
 
     def midDispatch(self):
-        return
-        #now = datetime.datetime.now()
-        #if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
-        #    self.preDispatchCore(web.ctx.homepath, setcookie=False)
+        now = datetime.datetime.now()
+        if self.middispatchtime == None or (now - self.middispatchtime).seconds > 30:
+            self.preDispatchCore(web.ctx.homepath, setcookie=False)
 
     def setNoCache(self):
         now = datetime.datetime.now(pytz.timezone('UTC'))
@@ -1681,10 +1670,18 @@ class Application:
         else:
             ordertags = []
 
-        def add_authz(tagdef):
+        def augment(tagdef):
             for mode in ['read', 'write']:
                 tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef)
 
+            try:
+                typedef = self.globals['typesdict'][tagdef.typestr]
+            except:
+                typedef = Application.static_typedefs[tagdef.typestr]
+                
+            tagdef['tagref'] = typedef['typedef tagref']
+            tagdef['dbtype'] = typedef['typedef dbtype']
+            
             return tagdef
             
         if tagname:
@@ -1692,7 +1689,7 @@ class Application:
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ add_authz(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ augment(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
         #web.debug(results)
         return results
 
@@ -2169,11 +2166,10 @@ class Application:
 
             return pd
         
-        def tag_query(tagdef, dbtype, preds, values, final=True, tprefix='_', spred=False):
+        def tag_query(tagdef, preds, values, final=True, tprefix='_', spred=False):
             """Compile preds for one tag into a query fetching all satisfactory triples.
 
                Returns (tagdef, querystring, subject_wheres)
-                 -- tagdef is pass through for convenience
                  -- querystring is compiled query
                  -- subject_wheres is list of additional WHERE
                     clauses, which caller should apply for subject
@@ -2195,7 +2191,6 @@ class Application:
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            typedef = typedefs[tagdef.typestr]
             subject_wheres = []
 
             m = dict(value='', where='', group='', table=wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
@@ -2232,7 +2227,7 @@ class Application:
                         spreds, lpreds, otags = path[-1]
                         lpreds = [ x for x in lpreds ]
                         
-                        projtag = typedef['typedef tagref']
+                        projtag = tagdef.tagref
                         if projtag:
                             lpreds.append( web.Storage(tag=projtag, op=None, vals=[]) )
                         elif tagdef.tagname == 'id':
@@ -2244,7 +2239,7 @@ class Application:
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    constants = [ '$%s' % values.add(v, dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
+                    constants = [ '$%s' % values.add(v, tagdef.dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
                     clauses = []
                     if constants:
@@ -2252,7 +2247,7 @@ class Application:
                             clauses.append( '%s %s ( %s )' % (valcol, Application.opsDB[pred.op], constants[0]) )
                         else:
                             constants = ', '.join(constants)
-                            clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, dbtype) )
+                            clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, tagdef.dbtype) )
                     if vqueries:
                         vqueries = ' UNION '.join(vqueries)
                         clauses.append( '%s %s ANY (%s)' % (valcol, Application.opsDB[pred.op], vqueries) )
@@ -2294,7 +2289,7 @@ class Application:
             if final:
                 q = '(' + q + ') AS %(alias)s'
 
-            return (tagdef, q % m, subject_wheres)
+            return (q % m, subject_wheres)
 
         def elem_query(spreds, lpreds, values, final=True):
             """Compile a query finding subjects by spreds and projecting by lpreds.
@@ -2308,7 +2303,6 @@ class Application:
             spreds = mergepreds(spreds)
             lpreds = mergepreds(lpreds)
 
-            #web.debug('files_by_predlist', '    spreds=%s' % spreds, '    lpreds=%s' % lpreds, '    listas=%s' % listas)
             subject_wheres = []
 
             for tag, preds in lpreds.items():
@@ -2319,7 +2313,6 @@ class Application:
                         del lpreds[tag]
 
             selects = []
-            #inner = ['resources_authzinfo( ARRAY[%s]::text[], %s ) resources' % (rolekeys, not enforce_read_authz)]
             inner = []
             outer = []
 
@@ -2333,7 +2326,7 @@ class Application:
                         versions_test_added.append(tag)
 
             for tag, preds in spreds.items():
-                td, sq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, tprefix='s_', spred=True)
+                sq, swheres = tag_query(tagdefs[tag], preds, values, tprefix='s_', spred=True)
                 if swheres or tag in versions_test_added:
                     outer.append(sq)
                     subject_wheres.extend(swheres)
@@ -2372,8 +2365,8 @@ class Application:
 
             finals = []
             for tag, preds in lpreds.items():
+                td = tagdefs[tag]
                 if rangemode and final:
-                    td = tagdefs[tag]
                     if len([ p for p in preds if p.op]) > 0:
                         raise BadRequest(self, 'Operators not supported in rangemode list predicates.')
                     if td.typestr != 'empty':
@@ -2401,7 +2394,7 @@ class Application:
                         td = tagdefs[tag]
                         lq = None
                     else:
-                        td, lq, swheres = tag_query(tagdefs[tag], typedefs[tagdefs[tag].typestr]['typedef dbtype'], preds, values, final, tprefix='l_')
+                        lq, swheres = tag_query(td, preds, values, final, tprefix='l_')
                         if swheres:
                             raise BadRequest(self, 'Operator ":absent:" not supported in projection list predicates.')
 
