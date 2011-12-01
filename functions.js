@@ -14,6 +14,43 @@
  * limitations under the License.
  */
 
+/**
+ * Determines identification and dtype of subject based on already probed metadata.
+ */
+function subject2identifiers(subject) {
+    var results = { datapred: "id=" + subject['id'],
+                    dataname: "id=" + subject['id'],
+                    dtype: 'blank'
+                  };
+
+    /* prefer names over raw ID numbers */
+    if (subject['vname']) {
+	results.datapred = "vname=" + encodeURIComponent(subject['vname']);
+	results.dataname = subject['vname'];
+    }
+    else {
+	/* TODO: search a prepared list of unique tagnames;
+	   if subject[tagname] is found non-NULL, override defaults and break loop...
+
+	   results.datapred = encodeURIComponent(tagname) + "=" + encodeURIComponent(subject[tagname]);
+	   results.dataname = tagname + "=" + subject[tagname];
+	   results.dtype = tagname;
+	 */
+    }
+
+    if (subject['template mode']) {
+	results.dtype = 'template';
+    }
+    else if (subject['url']) {
+	results.dtype = 'url';
+    }
+    else if (subject['bytes']) {
+	results.dtype = 'file';
+    }
+
+    return results;
+}
+
 var expiration_warning = true;
 var extend_time = 0;
 
