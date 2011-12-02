@@ -2653,18 +2653,21 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		ul.addClass('subnav');
 		th.append(ul);
 		var li = $('<li>');
+		li.addClass('item');
 		li.html('Edit column filter');
 		makeAttributes(li,
 						'onmouseup', str('event.preventDefault();'),
 						'onmousedown', makeFunction('editQuery', str(column)));
 		ul.append(li);
 		li = $('<li>');
+		li.addClass('item');
 		li.html('Delete column');
 		makeAttributes(li,
 						'onmouseup', str('event.preventDefault();'),
 						'onmousedown', makeFunction('deleteColumn', str(column)));
 		ul.append(li);
 		li = $('<li>');
+		li.addClass('item');
 		li.html((sortValue == '' ? 'Sort' : 'Unsort') + ' column');
 		makeAttributes(li,
 						'onmouseup', str('event.preventDefault();'),
@@ -2819,7 +2822,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					i--;
 				}
 			}
-			$('thead.topnav tr th ul.subnav').click(function(event) {event.preventDefault();});
+			$('thead.topnav tr th ul.subnav li.item').click(function(event) {event.preventDefault();});
 			$('thead.topnav span').click(function() {
 				var ul = $(this).parent().parent().find("ul.subnav");
 				if (ul.children().length == 0) {
@@ -2905,46 +2908,38 @@ function fillIdContextMenu(ul) {
 	if (dtype == 'template') {
 		var li = $('<li>');
 		ul.append(li);
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/file/' + results['datapred'])));
 		var a = $('<a>');
 		li.append(a);
 		makeAttributes(a,
-					   'href', '#');
+						'target', '_newtab2' + ++WINDOW_TAB,
+						'href', HOME + '/file/' + results['datapred']);
 		a.html('View ' + results['dataname']);
 	} else if (dtype == 'url') {
 		var li = $('<li>');
 		ul.append(li);
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('setWindowLocation', 'this', str(subject['url'])));
 		var a = $('<a>');
 		li.append(a);
 		makeAttributes(a,
-					   'href', '#');
+						'target', '_newtab2' + ++WINDOW_TAB,
+						'href', subject['url']);
 		a.html('View ' + results['dataname']);
 	} else if (dtype == 'file') {
 		var li = $('<li>');
 		ul.append(li);
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/file/' + results['datapred'])));
 		var a = $('<a>');
 		li.append(a);
 		makeAttributes(a,
-					   'href', '#');
+						'target', '_newtab2' + ++WINDOW_TAB,
+						'href', HOME + '/file/' + results['datapred']);
 		a.html('Download ' + results['dataname']);
 	}
 	var li = $('<li>');
 	ul.append(li);
-	makeAttributes(li,
-					'onmouseup', str('event.preventDefault();'),
-					'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/tags/' + results['datapred'])));
 	var a = $('<a>');
 	li.append(a);
 	makeAttributes(a,
-				   'href', '#');
+					'target', '_newtab2' + ++WINDOW_TAB,
+					'href', HOME + '/tags/' + results['datapred']);
 	a.html('View tags page');
 }
 
@@ -3491,10 +3486,5 @@ function saveTagPredicate(tag, div) {
 	if (queryFilter[tag].length == 0) {
 		delete queryFilter[tag];
 	}
-}
-
-function setWindowLocation(me, location) {
-	$(me).parent().parent().find("ul.subnav").slideUp('slow');
-	window.open(location, '_newtab2' + ++WINDOW_TAB);
 }
 
