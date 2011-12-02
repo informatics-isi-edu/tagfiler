@@ -2645,8 +2645,8 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		th.css('display', '');
 		th.html('');
 		th.attr('iCol', '' + i);
-		th.attr('onmousedown', makeFunction('copyColumn', 'event', str(column), str(thId)));
-		th.attr('onmouseup', makeFunction('dropColumn', 'event', str(column), str(thId), false));
+		th.mousedown(function(event) {copyColumn(event, column, thId);});
+		th.mouseup(function(event) {dropColumn(event, column, thId, false);});
 		th.attr('id', thId);
 		th.append(column);
 		var ul = $('<ul>');
@@ -2655,23 +2655,20 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		var li = $('<li>');
 		li.addClass('item');
 		li.html('Edit column filter');
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('editQuery', str(column)));
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {editQuery(column);});
 		ul.append(li);
 		li = $('<li>');
 		li.addClass('item');
 		li.html('Delete column');
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('deleteColumn', str(column)));
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {deleteColumn(column);});
 		ul.append(li);
 		li = $('<li>');
 		li.addClass('item');
 		li.html((sortValue == '' ? 'Sort' : 'Unsort') + ' column');
-		makeAttributes(li,
-						'onmouseup', str('event.preventDefault();'),
-						'onmousedown', makeFunction('sortColumn', str(column), str(columSortId), PREVIEW_COUNTER, (sortValue == ''), true));
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, (sortValue == ''), true);});
 		ul.append(li);
 		var divConstraint = getChild(td3, 1);
 		divConstraint.css('white-space', 'nowrap');
@@ -2823,6 +2820,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			}
 			$('thead.topnav tr th ul.subnav li.item').click(function(event) {event.preventDefault();});
+			$('thead.topnav tr th ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
 			$('thead.topnav span').click(function() {
 				var ul = $(this).parent().parent().find("ul.subnav");
 				if (ul.children().length == 0) {
