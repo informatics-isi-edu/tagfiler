@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+var unique_tags = [];
+
 /**
  * Determines identification and dtype of subject based on already probed metadata.
  */
@@ -25,8 +27,8 @@ function subject2identifiers(subject) {
 
     /* prefer names over raw ID numbers */
     if (subject['vname']) {
-	results.datapred = "vname=" + encodeURIComponent(subject['vname']);
-	results.dataname = subject['vname'];
+		results.datapred = "vname=" + encodeURIComponent(subject['vname']);
+		results.dataname = subject['vname'];
     }
     else {
 	/* TODO: search a prepared list of unique tagnames;
@@ -36,16 +38,24 @@ function subject2identifiers(subject) {
 	   results.dataname = tagname + "=" + subject[tagname];
 	   results.dtype = tagname;
 	 */
+		 $.each(unique_tags, function(i, tagname) {
+		 	if (subject[tagname] != null) {
+			   results.datapred = encodeURIComponent(tagname) + "=" + encodeURIComponent(subject[tagname]);
+			   results.dataname = tagname + "=" + subject[tagname];
+			   results.dtype = tagname;
+			   return false;
+		 	}
+		 });
     }
 
     if (subject['template mode']) {
-	results.dtype = 'template';
+		results.dtype = 'template';
     }
     else if (subject['url']) {
-	results.dtype = 'url';
+		results.dtype = 'url';
     }
     else if (subject['bytes']) {
-	results.dtype = 'file';
+		results.dtype = 'file';
     }
 
     return results;
@@ -1475,6 +1485,8 @@ var select_tags = null;
 var lastPreviewURL = null;
 var lastEditTag = null;
 
+var probe_tags;
+
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
 	$.each(select_tags[tag], function(i, value) {
@@ -1760,6 +1772,8 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		loadTags();
 	}
 	
+	initProbeTags();
+	
 	if (querypath != null) {
 		var querypathJSON = $.parseJSON( querypath );
 		var lpreds = querypathJSON[0]['lpreds'];
@@ -1854,6 +1868,29 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	dragAndDropBox = $('#DragAndDropBox');
 	tipBox = $('#TipBox');
 	showPreview();
+}
+
+function initProbeTags() {
+	var url = HOME + '/query/tagdef%20unique(tagdef)';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id'];
+			$.each(data, function(i, item) {
+				results.push(encodeURIComponent(item['tagdef']));
+				unique_tags.push(item['tagdef']);
+				
+			});
+			probe_tags = results.join(';');
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
 }
 
 function loadTypedefs() {
@@ -2656,26 +2693,6 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		td = getChild(trfoot, i+1);
 		td.css('display', 'none');
 	}
-	$('thead.topnav tr th ul.subnav').click(function(event) {event.preventDefault();});
-	$('thead.topnav span').click(function() {
-		var height = $(this).height();
-		var top = ($(this).position().top + height) + 'px';
-		$('ul.subnav').css('top', top);
-		
-		//Following events are applied to the subnav itself (moving subnav up and down)
-		$(this).parent().parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
-
-		$(this).parent().parent().hover(function() {
-		}, function(){	
-			$(this).parent().parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
-		});
-
-		//Following events are applied to the trigger (Hover events for the trigger)
-		}).hover(function() { 
-			$(this).addClass("subhover"); //On hover over, add class "subhover"
-		}, function(){	//On Hover Out
-			$(this).removeClass("subhover"); //On hover out, remove class "subhover"
-	});
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2726,17 +2743,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 								td.html('not set');
 							} else {
 								if (column == 'id') {
-									var a = $('<a>');
-									td.append(a);
-									makeAttributes(a,
-												   'href', HOME + '/tags/id=' + row[column]);
-									a.html(row[column]);
+									getIdContextMenuSlot(td, row[column]);
 								} else if (column == 'name') {
-									var a = $('<a>');
-									td.append(a);
-									makeAttributes(a,
-												   'href', HOME + '/tags/name=' + encodeSafeURIComponent(row[column]));
-									a.html(row[column]);
+									td.html(htmlEscape(row[column]));
 								} else if (column == 'url') {
 									var a = $('<a>');
 									td.append(a);
@@ -2809,6 +2818,30 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					i--;
 				}
 			}
+			$('thead.topnav tr th ul.subnav').click(function(event) {event.preventDefault();});
+			$('thead.topnav span').click(function() {
+				var ul = $(this).parent().parent().find("ul.subnav");
+				if (ul.children().length == 0) {
+					fillIdContextMenu(ul);
+				}
+				var height = $(this).height();
+				var top = ($(this).position().top + height) + 'px';
+				$('ul.subnav').css('top', top);
+				
+				//Following events are applied to the subnav itself (moving subnav up and down)
+				$(this).parent().parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
+		
+				$(this).parent().parent().hover(function() {
+				}, function(){	
+					$(this).parent().parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
+				});
+		
+				//Following events are applied to the trigger (Hover events for the trigger)
+				}).hover(function() { 
+					$(this).addClass("subhover"); //On hover over, add class "subhover"
+				}, function(){	//On Hover Out
+					$(this).removeClass("subhover"); //On hover out, remove class "subhover"
+			});
 			$('.tablecell').hover( function() {
 				var iCol = $('td', this.parentNode).index(this) % resultColumns.length;
 				var trs = $('.tablerow');
@@ -2847,6 +2880,94 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		}
 	});
 	document.body.style.cursor = "default";
+}
+
+function fillIdContextMenu(ul) {
+	var id = ul.attr('idVal')
+	var subject = null;
+	var idUrl = HOME + '/query/id=' + id + '(' + probe_tags + ')';
+	$.ajax({
+		url: idUrl,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(iddata, textStatus, jqXHR) {
+			subject = iddata[0];
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+		}
+	});
+	var results = subject2identifiers(subject);
+	var dtype = results['dtype'];
+	if (dtype == 'template') {
+		var li = $('<li>');
+		ul.append(li);
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/file/' + results['datapred'])));
+		var a = $('<a>');
+		li.append(a);
+		makeAttributes(a,
+					   'href', '#');
+		a.html('View ' + results['dataname']);
+	} else if (dtype == 'url') {
+		var li = $('<li>');
+		ul.append(li);
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('setWindowLocation', 'this', str(subject['url'])));
+		var a = $('<a>');
+		li.append(a);
+		makeAttributes(a,
+					   'href', '#');
+		a.html('View ' + results['dataname']);
+	} else if (dtype == 'file') {
+		var li = $('<li>');
+		ul.append(li);
+		makeAttributes(li,
+						'onmouseup', str('event.preventDefault();'),
+						'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/file/' + results['datapred'])));
+		var a = $('<a>');
+		li.append(a);
+		makeAttributes(a,
+					   'href', '#');
+		a.html('Download ' + results['dataname']);
+	}
+	var li = $('<li>');
+	ul.append(li);
+	makeAttributes(li,
+					'onmouseup', str('event.preventDefault();'),
+					'onmousedown', makeFunction('setWindowLocation', 'this', str(HOME + '/tags/' + results['datapred'])));
+	var a = $('<a>');
+	li.append(a);
+	makeAttributes(a,
+				   'href', '#');
+	a.html('View tags page');
+}
+
+function getIdContextMenuSlot(td, id) {
+	var idTable = $('<table>');
+	td.append(idTable);
+	var idThead = $('<thead>');
+	idThead.addClass('topnav');
+	idTable.append(idThead);
+	var idTr = $('<tr>');
+	idThead.append(idTr);
+	var idTh = $('<th>');
+	idTh.css('font-weight', 'normal');
+	idTr.append(idTh);
+	idTh.append(id);
+	var ul = $('<ul>');
+	ul.attr('idVal', '' + id);
+	idTh.append(ul);
+	ul.addClass('subnav');
+	idTh = $('<th>');
+	idTr.append(idTh);
+	var span = $('<span>');
+	idTh.append(span);
+	td.attr('align', 'right');
 }
 
 function htmlEscape(str) {
@@ -3368,5 +3489,10 @@ function saveTagPredicate(tag, div) {
 	if (queryFilter[tag].length == 0) {
 		delete queryFilter[tag];
 	}
+}
+
+function setWindowLocation(me, location) {
+	$(me).parent().parent().find("ul.subnav").slideUp('slow');
+	window.location = location;
 }
 
