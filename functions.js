@@ -1478,6 +1478,7 @@ var tipBox;
 var movePageX;
 
 var SELECT_LIMIT = 50;
+var WINDOW_TAB = 0;
 var PREVIEW_LIMIT;
 var LAST_PREVIEW_LIMIT;
 var select_tags = null;
@@ -3400,6 +3401,7 @@ function getTagSearchDisplay(tag) {
 			var td = $('<td>');
 			tr.append(td);
 			var val = item['opUser'] == 'Between' ? '' : item['op'];
+			val = val == null ? ':tagged:' : val;
 			switch (item['vals'].length) {
 			case 0:
 				break;
@@ -3493,6 +3495,6 @@ function saveTagPredicate(tag, div) {
 
 function setWindowLocation(me, location) {
 	$(me).parent().parent().find("ul.subnav").slideUp('slow');
-	window.location = location;
+	window.open(location, '_newtab2' + ++WINDOW_TAB);
 }
 
