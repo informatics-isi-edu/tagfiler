@@ -2250,8 +2250,12 @@ function addNewValue(row, type, selectOperatorId, tag) {
 						'src', HOME + '/static/plus.png',
 					    'width', '16',
 					    'height', '16',
-						'onclick', makeFunction('addNewValue', ROW_COUNTER, str(availableTags[tag]), str(selectOperatorId), str(tag)),
 						'alt', '+');
+		imgPlus.click({	row: ROW_COUNTER,
+						type: availableTags[tag],
+						selectOperatorId: selectOperatorId,
+						tag: tag },
+						function(event) {addNewValue(event.data.row, event.data.type, event.data.selectOperatorId, event.data.tag);});
 		td.append(imgPlus);
 		td = $('<td>');
 		tr.append(td);
@@ -2260,8 +2264,10 @@ function addNewValue(row, type, selectOperatorId, tag) {
 						'src', HOME + '/static/minus.png',
 					    'width', '16',
 					    'height', '16',
-						'onclick', makeFunction('deleteValue', str(valId), str(makeId('table', row))),
 						'alt', '-');
+		img.click({ id: valId,
+					tableId: makeId('table', row) },
+					function(event) {deleteValue(event.data.id, event.data.tableId);});
 		td.append(img);
 	}
 }
@@ -2442,17 +2448,15 @@ function showQueryResults(limit) {
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
 	$('#Query_URL').attr('href', queryUrl);
-	var totalRows = getTotalRows();
+	var totalRows = getTotalRows(predUrl);
 	showQueryResultsTable(predUrl, limit, totalRows, offset);
 }
 
-function getTotalRows() {
-	var predUrl = getQueryPredUrl();
+function getTotalRows(predUrl) {
 	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push('id');
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
-	select_tags = new Object();
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2784,25 +2788,25 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				b.append('Showing ' + minRow + ' to ' + maxRow + ' of ' + totalRows + ' results.');
 				if (minRow > PREVIEW_LIMIT) {
 					$('#pagePrevious').attr('src', HOME + '/static/back.jpg');
-					$('#pagePrevious').attr('onclick', 'setPreviousPage()');
+					$('#pagePrevious').unbind('click');
+					$('#pagePrevious').click(function(event){setPreviousPage();});
 				} else {
 					$('#pagePrevious').attr('src', HOME + '/static/back_disabled.jpg');
-					if ($('#pagePrevious').prop('onclick')) {
-						$('#pagePrevious').prop('onclick', null);
-					}
+					$('#pagePrevious').unbind('click');
 				}
 				if (maxRow < totalRows) {
 					$('#pageNext').attr('src', HOME + '/static/forward.jpg');
-					$('#pageNext').attr('onclick', 'setNextPage()');
+					$('#pageNext').unbind('click');
+					$('#pageNext').click(function(event){setNextPage();});
 				} else {
 					$('#pageNext').attr('src', HOME + '/static/forward_disabled.jpg');
-					document.getElementById('pageNext').removeAttribute('onclick');
+					$('#pageNext').unbind('click');
 				}
 			} else {
 				$('#pagePrevious').attr('src', HOME + '/static/back_disabled.jpg');
 				$('#pageNext').attr('src', HOME + '/static/forward_disabled.jpg');
-				document.getElementById('pagePrevious').removeAttribute('onclick');
-				document.getElementById('pageNext').removeAttribute('onclick');
+				$('#pagePrevious').unbind('click');
+				$('#pageNext').unbind('click');
 				b.html('Showing all ' + previewRows + ' results.');
 			}
 			var tableLength = tbody.children().length;
@@ -3363,8 +3367,10 @@ function tagTableWrapper(tag) {
 					'src', HOME + '/static/plus.png',
 				    'width', '16',
 				    'height', '16',
-					'onclick', makeFunction('javascript:addToQueryDiv', str(tag), FIELDSET_COUNTER),
 					'alt', '+');
+	img.click({	tag: tag,
+				count: FIELDSET_COUNTER },
+				function(event) {addToQueryDiv(event.data.tag, event.data.count);});
 	tdWrapper.append(img);
 	tdWrapper = $('<td>');
 	tdWrapper.attr('valign', 'top');
@@ -3374,8 +3380,11 @@ function tagTableWrapper(tag) {
 					'src', HOME + '/static/minus.png',
 				    'width', '16',
 				    'height', '16',
-					'onclick', makeFunction('deleteConstraintRow', str(makeId('queryFiledset', FIELDSET_COUNTER)), str(makeId('queryTableWrapper', FIELDSET_COUNTER)), str(tagId)),
 					'alt', '-');
+	img.click({	rowId: makeId('queryFiledset', FIELDSET_COUNTER),
+				tableId: makeId('queryTableWrapper', FIELDSET_COUNTER),
+				tagId: tagId}, 
+				function(event) {deleteConstraintRow(event.data.rowId, event.data.tableId, event.data.tagId);});
 	tdWrapper.append(img);
 	return tableWrapper;
 }
@@ -3411,9 +3420,8 @@ function getTagSearchDisplay(tag) {
 			td.html(val);
 		});
 	}
-	
-	makeAttributes(divConstraint,
-				   'onclick', makeFunction('editQuery', str(tag)));
+	divConstraint.click({	tag: tag },
+							function(event) {editQuery(event.data.tag);});
 	return divConstraint;
 }
 
