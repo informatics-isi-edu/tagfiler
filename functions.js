@@ -2090,8 +2090,11 @@ function getSelectTagOperator(tag, type) {
 	var id = makeId('select', ROW_COUNTER);
 	makeAttributes(select,
 				   'id', id,
-				   'name', id,
-				   'onchange', makeFunction('displayValuesTable', ROW_COUNTER, str(id), str(tag)));
+				   'name', id);
+	select.change({	row: ROW_COUNTER,
+					selId: id,
+					tag: tag },
+					function(event) {displayValuesTable(event.data.row, event.data.selId, event.data.tag);});
 	if (type != 'empty' && !allTagdefs[tag]['tagdef multivalue']) {
 		var option = $('<option>');
 		option.text('Between');
@@ -2170,8 +2173,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			td.css('border-width', '0px');
 			var input = $('<input>');
 			makeAttributes(input,
-							'type', 'text',
-							'onkeyup', makeFunction('showPreview'));
+							'type', 'text');
+			input.keyup(function(event) {showPreview();});
 			td.append(input);
 			td = $('<td>');
 			tr.append(td);
@@ -2182,8 +2185,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			td.css('border-width', '0px');
 			input = $('<input>');
 			makeAttributes(input,
-							'type', 'text',
-							'onkeyup', makeFunction('showPreview'));
+							'type', 'text');
+			input.keyup(function(event) {showPreview();});
 			td.append(input);
 		} else {
 			td = $('<td>');
@@ -2192,8 +2195,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			var select = $('<select>');
 			var selid = makeId('select', 'value', VAL_COUNTER);
 			makeAttributes(select,
-							'id', selid,
-							'onchange', makeFunction('showPreview'));
+							'id', selid);
+			select.change(function(event) {showPreview();});
 			var option = $('<option>');
 			option.text('Choose a value');
 			option.attr('value', '');
@@ -2204,8 +2207,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			select = $('<select>');
 			selid = makeId('select', 'value', ++VAL_COUNTER);
 			makeAttributes(select,
-							'id', selid,
-							'onchange', makeFunction('showPreview'));
+							'id', selid);
+			select.change(function(event) {showPreview();});
 			option = $('<option>');
 			option.text('Choose a value');
 			option.attr('value', '');
@@ -2219,8 +2222,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		td.css('border-width', '0px');
 		var input = $('<input>');
 		makeAttributes(input,
-						'type', 'text',
-						'onkeyup', makeFunction('showPreview'));
+						'type', 'text');
+		input.keyup(function(event) {showPreview();});
 		td.append(input);
 	} else {
 		td = $('<td>');
@@ -2229,8 +2232,8 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		var select = $('<select>');
 		var selid = makeId('select', 'value', VAL_COUNTER);
 		makeAttributes(select,
-						'id', selid,
-						'onchange', makeFunction('showPreview'));
+						'id', selid);
+		select.change(function(event) {showPreview();});
 		var option = $('<option>');
 		option.text('Choose a value');
 		option.attr('value', '');
@@ -2448,23 +2451,22 @@ function showQueryResults(limit) {
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
 	$('#Query_URL').attr('href', queryUrl);
-	var totalRows = getTotalRows(predUrl);
-	showQueryResultsTable(predUrl, limit, totalRows, offset);
+	showQueryResultsPreview(predUrl, limit, offset);
 }
 
-function getTotalRows(predUrl) {
-	var totalRows = 0;
+function showQueryResultsPreview(predUrl, limit, offset) {
 	var columnArray = new Array();
 	columnArray.push('id');
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
 		accepts: {text: 'application/json'},
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
-			totalRows = data[0]['id'];
+			var totalRows = data[0]['id'];
+			showQueryResultsTable(predUrl, limit, totalRows, offset);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
@@ -2472,7 +2474,6 @@ function getTotalRows(predUrl) {
 			}
 		}
 	});
-	return totalRows;
 }
 
 function initDropDownList(tag) {
