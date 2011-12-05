@@ -898,7 +898,7 @@ class FileTags (Node):
                 return '&'.join(body)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                return '[' + ",\n".join([ jsonWriter(jsonMunger(file, all)) for file in files ]) + ']\n'
+                return '[' + ",\n".join([ jsonWriter(jsonMunger(file, [ td.tagname for td in all])) for file in files ]) + ']\n'
             elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
                 self.header('Content-Type', 'text/plain')
                 val = files[0][self.listtags[0]]
