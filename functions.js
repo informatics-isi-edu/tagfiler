@@ -1371,7 +1371,11 @@ function chooseOptions(home, webauthnhome, typestr, id, count) {
 }
 
 function appendOptions(typestr, id, pattern) {
-	document.getElementById(id).removeAttribute('onclick');
+	if ($('#' + id).attr('clicked') != null) {
+		return;
+	} else {
+		$('#' + id).attr('clicked', 'clicked');
+	}
 	var select = $(document.getElementById(id));
 	if (pattern != '') {
 		var option = $('<option>');
@@ -1424,7 +1428,11 @@ function chooseTypedefs(home, id) {
 }
 
 function appendTypedefs(id) {
-	document.getElementById(id).removeAttribute('onclick');
+	if ($('#' + id).attr('clicked') != null) {
+		return;
+	} else {
+		$('#' + id).attr('clicked', 'clicked');
+	}
 	var select = $(document.getElementById(id));
 	$.each(typedefTags, function(i, item) {
 		if (item['typedef'] != 'empty') {
@@ -1761,13 +1769,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 			dropColumn(e, ret['tag'], ret['id'], ret['append']);
 		}
 	});
-
-	if (availableTags == null) {
-		loadTags();
-	}
-	
-	initProbeTags();
-	
+	loadTags();
 	if (querypath != null) {
 		var querypathJSON = $.parseJSON( querypath );
 		var lpreds = querypathJSON[0]['lpreds'];
@@ -1864,29 +1866,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	showPreview();
 }
 
-function initProbeTags() {
-	var url = HOME + '/query/tagdef%20unique(tagdef)';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id'];
-			$.each(data, function(i, item) {
-				results.push(encodeURIComponent(item['tagdef']));
-				unique_tags.push(item['tagdef']);
-				
-			});
-			probe_tags = results.join(';');
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
-		}
-	});
-}
-
 function loadTypedefs() {
 	var url = HOME + '/query/typedef(typedef;' + encodeURIComponent('typedef values') + ';' +encodeURIComponent('typedef dbtype') + ';' +encodeURIComponent('typedef tagref') + ')?limit=none';
 	$.ajax({
@@ -1908,7 +1887,10 @@ function loadTypedefs() {
 }
 
 function loadTags() {
-	var url = HOME + '/query/tagdef(tagdef;' + encodeURIComponent('tagdef type') + ';' + encodeURIComponent('tagdef multivalue') + ')?limit=none';
+	var url = HOME + '/query/tagdef(tagdef;' + 
+				encodeURIComponent('tagdef type') + ';' + 
+				encodeURIComponent('tagdef multivalue') + ';' +
+				encodeURIComponent('tagdef unique') + ')?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1919,12 +1901,21 @@ function loadTags() {
 			availableTags = new Object();
 			availableTagdefs = new Array();
 			allTagdefs = new Object();
+			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id'];
 			$.each(data, function(i, object) {
 				availableTagdefs.push(object['tagdef']);
 				availableTags[object['tagdef']] = object['tagdef type'];
 				allTagdefs[object['tagdef']] = object;
+				if (object['tagdef unique']) {
+					var encodeValue = encodeURIComponent(object['tagdef']);
+					if (!results.contains(encodeValue)) {
+						results.push(encodeValue);
+					}
+					unique_tags.push(object['tagdef']);
+				}
 			});
 			availableTagdefs.sort(compareIgnoreCase);
+			probe_tags = results.join(';');
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
@@ -1933,9 +1924,10 @@ function loadTags() {
 }
 
 function loadAvailableTags(id) {
-	document.getElementById(id).removeAttribute('onclick');
-	if (availableTags == null) {
-		loadTags();
+	if ($('#' + id).attr('clicked') != null) {
+		return;
+	} else {
+		$('#' + id).attr('clicked', 'clicked');
 	}
 	var select = $(document.getElementById(id));
 	$.each(availableTagdefs, function(i, value) {
@@ -1967,10 +1959,12 @@ function loadViews() {
 }
 
 function loadAvailableViews(id) {
-	document.getElementById(id).removeAttribute('onclick');
-	if (availableViews == null) {
-		loadViews();
+	if ($('#' + id).attr('clicked') != null) {
+		return;
+	} else {
+		$('#' + id).attr('clicked', 'clicked');
 	}
+	loadViews();
 	var select = $('#' + id);
 	$.each(availableViews, function(i, object) {
 		var option = $('<option>');
