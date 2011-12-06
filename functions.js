@@ -2642,7 +2642,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.addClass('item');
 		li.html('Delete column');
 		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {deleteColumn(column);});
+		li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
 		ul.append(li);
 		li = $('<li>');
 		li.addClass('item');
@@ -2991,13 +2991,15 @@ function sortColumn(column, id, count, sort) {
 			HideTipBox();
 		});
 	} else {
-		stopSortColumn(column, id, count);
+		stopSortColumn(column, count);
 		$('#' + id).unbind('mouseenter mouseleave');
 	}
 	showPreview();
 }
 
-function stopSortColumn(tag, id, count) {
+function stopSortColumn(tag, count) {
+	var id = makeId('sort', tag.split(' ').join('_'), count);
+	$('#' + id).html('&nbsp;');
 	var index = -1;
 	$.each(sortColumnsArray, function(i, column) {
 		if (column == tag) {
@@ -3006,28 +3008,28 @@ function stopSortColumn(tag, id, count) {
 		}
 	});
 	sortColumnsArray.splice(index, 1);
-	$('#' + id).html('');
 	$.each(sortColumnsArray, function(i, column) {
-		var id = makeId('sort', column.split(' ').join('_'), count);
-		var val = parseInt($('#' + id).html());
-		if (val > index) {
-			$('#' + id).html('' + --val);
-			var content = null;
-			switch(val) {
-				case 1:
-					content = 'First sorted column';
-					break;
-				case 2:
-					content = 'Second sorted column';
-					break;
-			}
-			if (content != null) {
-				$('#' + id).hover( function(e) {
-					DisplayTipBox(e, content);
-				}, function() {
-					HideTipBox();
-				});
-			}
+		if (i < index) {
+			return true;
+		}
+		var sortId = makeId('sort', column.split(' ').join('_'), count);
+		var val = parseInt($('#' + sortId).html()) - 1;
+		$('#' + sortId).html('' + val);
+		var content = null;
+		switch(val) {
+			case 1:
+				content = 'First sorted column';
+				break;
+			case 2:
+				content = 'Second sorted column';
+				break;
+		}
+		if (content != null) {
+			$('#' + id).hover( function(e) {
+				DisplayTipBox(e, content);
+			}, function() {
+				HideTipBox();
+			});
 		}
 	});
 }
@@ -3090,10 +3092,10 @@ function hideColumn(index) {
 	col.css('display', 'none');
 }
 
-function deleteColumn(column) {
+function deleteColumn(column, count) {
 	$.each(sortColumnsArray, function(i, tag) {
 		if (tag == column) {
-			sortColumnsArray.splice(i, 1);
+			stopSortColumn(column, count);
 			return false;
 		}
 	});
