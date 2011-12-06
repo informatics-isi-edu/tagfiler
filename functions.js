@@ -2284,65 +2284,24 @@ function encodeURIArray(tags) {
 }
 
 function getQueryPredUrl() {
-	var query = new Array();
-	var divs = $('#queryDiv').children();
-	if (confirmQueryEditDialog != null) {
-		divs.push(confirmQueryEditDialog);
+	if (tagInEdit != null) {
+		var tagConstraintDiv = $('#' +makeId('queryDiv', tagInEdit.split(' ').join('_')));
+		saveTagPredicate(tagInEdit, tagConstraintDiv);
 	}
-	$.each(divs, function(k, div) {
-		var searchTag = $(div).attr('tag');
-		var searchTagId = makeId(searchTag.split(' ').join('_'));
-		var divTables = $(div).children();
-		$.each(divTables, function(i, divTable) {
-			var tbody = getChild($(divTable), 1);
-			var tr = getChild(tbody, 1);
-			// tag column
-			var tag = encodeURIComponent(searchTag);
-			
-			// operator column
-			td = getChild(tr, 1);
-			var fieldset = getChild(td, 1);
-			var table = getChild(fieldset, 1);
-			tbody = getChild(table, 2);
-			tr = getChild(tbody, 1);
-			td = getChild(tr, 1);
-			var op = getChild(td, 1).val();
-			if (op == 'Between') {
-				td = getChild(tr, 2);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var tr = getChild(tbody, 1);
-				var td = getChild(tr, 1);
-				var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				td = getChild(tr, 3);
-				var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-				if (val1 != '' && val2 != '') {
-					query.push(tag + ':geq:' + encodeURIComponent(val1));
-					query.push(tag + ':leq:' + encodeURIComponent(val2));
-				}
-			} else if (op != 'Tagged' && op != 'Tag absent') {
-				// values column
-				var td = getChild(tr, 2);
-				var table = getChild(td, 1);
-				var tbody = getChild(table, 1);
-				var values = new Array();
-				$.each(tbody.children(), function(j, row) {
-					td = getChild($(row), 1);
-					var input = getChild(td, 1);
-					var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
-					if (val.length > 0) {
-						values.push(encodeURIComponent(val));
-					}
-				});
-				if (values.length > 0) {
-					query.push(tag + ops[op] + values.join(','));
-				}
+	var query = new Array();
+	var url = '';
+	$.each(queryFilter, function(tag, preds) {
+		$.each(preds, function(i, pred) {
+			if (pred['opUser'] == 'Between') {
+				query.push(tag + ':geq:' + encodeURIComponent(pred['vals'][0]));
+				query.push(tag + ':leq:' + encodeURIComponent(pred['vals'][1]));
+			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
+				query.push(tag + pred['op'] + pred['vals'].join(','));
 			} else {
-				query.push(tag + ops[op]);
+				query.push(tag + (pred['op'] != null ? pred['op'] : ''));
 			}
 		});
 	});
-	var url = '';
 	if (query.length > 0) {
 		url = query.join(';');
 	}
