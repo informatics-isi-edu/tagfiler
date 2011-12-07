@@ -2217,7 +2217,7 @@ class Application:
 
                 if pred.op == 'IN':
                     wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
-                elif pred.op != ":absent:" and pred.op:
+                elif pred.op != ":absent:" and pred.op and pred.vals:
                     if tagdef.typestr == 'empty':
                         raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
 
@@ -2239,18 +2239,17 @@ class Application:
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    constants = [ '$%s' % values.add(v, tagdef.dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
+                    constants = [ '($%s)' % values.add(v, tagdef.dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
                     clauses = []
                     if constants:
-                        if len(constants) == 1:
-                            clauses.append( '%s %s ( %s )' % (valcol, Application.opsDB[pred.op], constants[0]) )
-                        else:
-                            constants = ', '.join(constants)
-                            clauses.append( '%s %s ANY (ARRAY[ %s ]::%s[])' % (valcol, Application.opsDB[pred.op], constants, tagdef.dbtype) )
+                        constants = ', '.join(constants)
+                        clauses.append( '(SELECT bool_or(%s %s t.x) FROM (VALUES %s) AS t (x))'
+                                        %  (valcol, Application.opsDB[pred.op], constants) )
                     if vqueries:
                         vqueries = ' UNION '.join(vqueries)
-                        clauses.append( '%s %s ANY (%s)' % (valcol, Application.opsDB[pred.op], vqueries) )
+                        clauses.append( '(SELECT bool_or(%s %s t.x) FROM (%s) AS t (x))'
+                                        % (valcol, Application.opsDB[pred.op], vqueries) )
                     wheres.append( ' OR '.join(clauses) )
 
             if used_not_op:
@@ -2265,7 +2264,7 @@ class Application:
                     wheres = [ 'False' ]
                 elif tagdef.readpolicy == 'subjectowner':
                     m['table'] += ' LEFT OUTER JOIN %s o USING (subject)' % wraptag('owner')
-                    wheres.append( 'o.value = ANY (ARRAY[%s]::text[])' % rolekeys )
+                    wheres.append( 'o.value IN (%s)' % rolekeys )
 
             w = ' AND '.join([ '(%s)' % w for w in wheres ])
             if w:
@@ -2334,19 +2333,19 @@ class Application:
                     inner.append(sq)
 
             if enforce_read_authz:
-                inner += [ '(SELECT DISTINCT subject from _owner AS o WHERE o.value = ANY (%(rolekeys)s)'
-                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value = ANY (%(rolekeys)s)) AS r'
-                           % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+                inner += [ '(SELECT DISTINCT subject from _owner AS o WHERE o.value IN (%(rolekeys)s)'
+                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value IN (%(rolekeys)s)) AS r'
+                           % dict(rolekeys='%s' % rolekeys) ]
 
                 outer += [ '"_subject last tagged txid" t',
                            '"_owner" o',
-                           '(SELECT DISTINCT subject FROM "_write users" WHERE value = ANY (%(rolekeys)s)) AS wu'
-                           % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+                           '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu'
+                           % dict(rolekeys='%s' % rolekeys) ]
 
                 if final and rangemode == None:
                     selects += [ 'r.subject AS id',
                                  'True AS readok',
-                                 'wu.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS writeok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                                 'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
                                  'o.value AS owner',
                                  't.value AS txid' ]
             else:
@@ -2354,12 +2353,12 @@ class Application:
 
                 outer += [ '"_subject last tagged txid" t',
                            '"_owner" o',
-                           '(SELECT DISTINCT subject FROM "_read users" WHERE value = ANY (%(rolekeys)s)) AS ru' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
-                           '(SELECT DISTINCT subject FROM "_write users" WHERE value = ANY (%(rolekeys)s)) AS wu' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys) ]
+                           '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys='%s' % rolekeys),
+                           '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu' % dict(rolekeys='%s' % rolekeys) ]
                 if final and rangemode == None:
                     selects += [ 'r.subject AS id',
-                                 'ru.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS readok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
-                                 'wu.subject IS NOT NULL OR o.value = ANY(%(rolekeys)s) AS writeok' % dict(rolekeys='ARRAY[%s]::text[]' % rolekeys),
+                                 'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS readok' % dict(rolekeys='%s' % rolekeys),
+                                 'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
                                  'o.value AS owner',
                                  't.value AS txid' ]
 
