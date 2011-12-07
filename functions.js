@@ -1496,6 +1496,7 @@ var lastEditTag = null;
 
 var probe_tags;
 var enabledDrag = true;
+var userOp = new Object();
 
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
@@ -1795,6 +1796,11 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	LAST_PAGE_PREVIEW = 0;
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = null;
+	
+	// build the userOp dictionary
+	$.each(ops, function(key, value) {
+		userOp[value] = key;
+	});
 	$('#pagePrevious').attr('src', home + '/static/back_disabled.jpg');
 	$('#pageNext').attr('src', home + '/static/forward_disabled.jpg');
 	loadTypedefs();
@@ -1841,6 +1847,11 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 			var pred = new Object();
 			pred['op'] = item['op'];
 			pred['vals'] = item['vals'];
+			if (pred['op'] == null) {
+				pred['opUser'] = 'Tagged';
+			} else {
+				pred['opUser'] = userOp[pred['op']];
+			}
 			queryFilter[item['tag']].push(pred);
 		});
 		var otags = querypathJSON[0]['otags'];
@@ -2077,14 +2088,12 @@ function addToQueryTable(tableId, tag) {
 		var th = getChild(thead, 2);
 		th.css('display', 'none');
 	}
-	setRowsBackground(tableId);
 }
 
 function deleteRow(id) {
 	var row = $('#' + id);
 	var tableId = row.parent().parent().attr('id');
 	row.remove();
-	setRowsBackground(tableId);
 	showPreview();
 }
 
@@ -2227,8 +2236,16 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			option.attr('value', '');
 			select.append(option);
 			td.append(select);
-			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			if (select_tags[tag] != null) {
+				appendTagValuesOptions(tag, selid);
+			} else {
+				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			}
+			td = $('<td>');
+			tr.append(td);
 			td.append('AND');
+			td = $('<td>');
+			tr.append(td);
 			select = $('<select>');
 			selid = makeId('select', 'value', ++VAL_COUNTER);
 			select.attr('id', selid);
@@ -2238,7 +2255,11 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			option.attr('value', '');
 			select.append(option);
 			td.append(select);
-			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			if (select_tags[tag] != null) {
+				appendTagValuesOptions(tag, selid);
+			} else {
+				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			}
 		}
 	} else if (!isSelect(tag, type) || (selVal != 'Equal' && selVal != 'Not equal')) {
 		td = $('<td>');
@@ -2293,18 +2314,6 @@ function addNewValue(row, type, selectOperatorId, tag) {
 					function(event) {deleteValue(event.data.id, event.data.tableId);});
 		td.append(img);
 	}
-}
-
-function setRowsBackground(tableId) {
-	var table = $('#' + tableId);
-	var tbody = getChild(table, 2);
-	var odd = false;
-	$.each(tbody.children(), function(i, tr) {
-		$(tr).removeClass('odd');
-		$(tr).removeClass('even');
-		$(tr).addClass(odd ? 'odd' : 'even');
-		odd = !odd
-	});
 }
 
 function getQueryTags(tableId) {
@@ -2654,8 +2663,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		divConstraint.css('white-space', 'nowrap');
 		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
 		divConstraint.html('');
-		var searchDisplay = $('#' +makeId('queryDiv', column.split(' ').join('_')));
-		if (searchDisplay.get(0) != null) {
+		if (queryFilter[column] != null) {
 			var constraint = getTagSearchDisplay(column);
 			divConstraint.append(constraint);
 		}
@@ -3121,7 +3129,6 @@ function encodeSafeURIComponent(value) {
 	});
 	return ret;
 }
-
 function editQuery(tag) {
 	if (editInProgress) {
 		return;
@@ -3132,97 +3139,8 @@ function editQuery(tag) {
 	PAGE_PREVIEW = 0;
 	tagInEdit = tag;
 	disableAjaxAlert = true;
-	var tagId = makeId(tag.split(' ').join('_'));
-	var div = $('#queryDiv');
-	div.css('display', '');
-	
-	var tagDiv = $('#' + makeId('queryDiv', tagId));
-	if (tagDiv.get(0) == null) {
-		tagDiv = tagQueryDiv(tag);
-		div.append(tagDiv);
-	}
-	saveSearchConstraint = tagDiv.clone(true, true);
-	copySelectOperator(tag);
-	if (tagDiv.html() == '') {
-		addToQueryDiv(tag, ++FIELDSET_COUNTER);
-	}
-	tagDiv.css('display', '');
-	var width = 0;
-	for (var i=0; i<tagDiv.children().length; i++) {
-		var tbody = getChild(tagDiv, i+1).find('tbody');
-		var crtWidth = tbody.width();
-		if (crtWidth > width) {
-			width = crtWidth;
-		}
-	}
-	width += 100;
-	var height = Math.ceil($(window).height() * 2 / 3);
-	confirmQueryEditDialog = tagDiv;
-	confirmQueryEditDialog.dialog({
-		autoOpen: false,
-		title: 'Edit constraint for column "' + tag + '"',
-		buttons: {
-			"Cancel": function() {
-					$(this).dialog('close');
-				},
-			"Save": function() {
-					saveTagQuery(tag);
-					$(this).dialog('close');
-				}
-		},
-		position: 'top',
-		draggable: true,
-		height: height,
-		modal: false,
-		resizable: true,
-		width: width,
-		beforeClose: function(event, ui) {cancelEdit(tag);}
-	});
-	confirmQueryEditDialog.dialog('open');
-}
-
-function copySelectOperator(tag) {
-	var tagId = makeId(tag.split(' ').join('_'));
-	var tagDiv = $('#' + makeId('queryDiv', tagId));
-	if (tagDiv.html() == '') {
-		return;
-	}
-	var divTables = tagDiv.children();
-	var toDivTable = saveSearchConstraint.children();
-	$.each(divTables, function(i, divTable) {
-		var tbody = getChild($(divTable), 1);
-		var tr = getChild(tbody, 1);
-		var td = getChild(tr, 1);
-		var fieldset = getChild(td, 1);
-		var table = getChild(fieldset, 1);
-		tbody = getChild(table, 2);
-		tr = getChild(tbody, 1);
-		td = getChild(tr, 1);
-		
-		var toTable = $(toDivTable[i]);
-		var toTbody = getChild(toTable, 1);
-		var toTr = getChild(toTbody, 1);
-		var toTd = getChild(toTr, 1);
-		var toFieldset = getChild(toTd, 1);
-		toTable = getChild(toFieldset, 1);
-		toTbody = getChild(toTable, 2);
-		toTr = getChild(toTbody, 1);
-		toTd = getChild(toTr, 1);
-		
-		var selects = td.find('select');
-		var toSelects = toTd.find('select');
-		$.each(selects, function(j, sel) {
-			$(toSelects[j]).val($(sel).val());
-		});
-
-		td = getChild(tr, 2);
-		toTd = getChild(toTr, 2);
-		selects = td.find('select');
-		toSelects = toTd.find('select');
-		$.each(selects, function(j, sel) {
-			$(toSelects[j]).val($(sel).val());
-		});
-	});
+	saveSearchConstraint = queryFilter[tag];
+	addFilterToQueryTable(tag);
 }
 
 function cancelEdit(tag) {
@@ -3233,35 +3151,36 @@ function cancelEdit(tag) {
 		select_tags = null;
 		return true;
 	}
+	
 	confirmQueryEditDialog.remove();
 	confirmQueryEditDialog = null;
-	$('#queryDiv').append(saveSearchConstraint);
+	delete queryFilter[tag];
+	if (saveSearchConstraint != null) {
+		queryFilter[tag] = saveSearchConstraint;
+	}
 	PAGE_PREVIEW = LAST_PAGE_PREVIEW;
-	saveTagQuery(tag);
+	disableAjaxAlert = false;
+	editInProgress = false;
+	tagInEdit = null;
+	select_tags = null;
+	$('#queryDiv').html('');
+	$('#queryDiv').css('display', 'none');
+	showPreview();
 	return true;
 }
 
 function saveTagQuery(tag) {
+	var tagConstraintDiv = $('#' +makeId('queryDiv', tag.split(' ').join('_')));
+	saveTagPredicate(tag, tagConstraintDiv);
 	var tagId = makeId(tag.split(' ').join('_'));
 	var constraintDiv = getTagSearchDisplay(tag);
 	disableAjaxAlert = false;
 	editInProgress = false;
 	tagInEdit = null;
 	select_tags = null;
-	if (confirmQueryEditDialog != null) {
-		var tagDiv = $('<div>');
-		tagDiv.attr({	id: makeId('queryDiv', tagId),
-						tag: tag });
-		tagDiv.addClass('dialogfont');
-		$.each(confirmQueryEditDialog.children(), function(i, child) {
-			tagDiv.append(child);
-		});
-		confirmQueryEditDialog.remove();
-		confirmQueryEditDialog = null;
-		$('#queryDiv').append(tagDiv);
-		tagDiv.css('display', 'none');
-	}
-	$('#' +makeId('queryDiv', tagId)).css('display', 'none');
+	confirmQueryEditDialog.remove();
+	confirmQueryEditDialog = null;
+	$('#queryDiv').html('');
 	$('#queryDiv').css('display', 'none');
 	showPreview();
 }
@@ -3349,8 +3268,6 @@ function tagTableWrapper(tag) {
 }
 
 function getTagSearchDisplay(tag) {
-	var tagConstraintDiv = $('#' +makeId('queryDiv', tag.split(' ').join('_')));
-	saveTagPredicate(tag, tagConstraintDiv);
 	var divConstraint = $('<div>');
 	divConstraint.attr('ALIGN', 'LEFT');
 	var table = $('<table>');
@@ -3453,3 +3370,96 @@ function saveTagPredicate(tag, div) {
 	}
 }
 
+function addFilterToQueryTable(tag) {
+	var tagId = makeId(tag.split(' ').join('_'));
+	var div = $('#queryDiv');
+	div.css('display', '');
+	var tagDiv = tagQueryDiv(tag);
+	div.append(tagDiv);
+	if (queryFilter[tag] != null) {
+		$.each(queryFilter[tag], function(i, pred) {
+			addToQueryDiv(tag, ++FIELDSET_COUNTER);
+			var tableId = makeId(tagId, 'searchTable', FIELDSET_COUNTER);
+			var tbody = getChild($('#' + tableId), 2);
+			var tr = getChild(tbody, 1);
+			var td = getChild(tr, 1);
+			var select = getChild(td, 1);
+			var tableTbody = getChild($('#' + tableId), 2).find('tbody');
+			if (tableTbody.get(0) != null) {
+				$.each(tableTbody.children(), function(i, tr) {
+					$(tr).remove();
+				});
+			}
+			select.val(pred['opUser']);
+			if (availableTags[tag] != 'empty') {
+				if (pred['opUser'] == 'Between') {
+					var selId = select.attr('id');
+					addNewValue(ROW_COUNTER, availableTags[tag], selId, tag);
+					var valTbody = getChild($('#' + tableId), 2).find('tbody');
+					var valTr = getChild(valTbody, 1);
+					var valTd = getChild(valTr, 1);
+					var input1 = getChild(valTd, 1);
+					input1.val(pred['vals'][0]);
+					valTd = getChild(valTr, 3);
+					var input2 = getChild(valTd, 1);
+					input2.val(pred['vals'][1]);
+					//td.css('display', 'none');
+				} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
+					var selId = select.attr('id');
+					$.each(pred['vals'], function(j, value) {
+						addNewValue(ROW_COUNTER, availableTags[tag], selId, tag);
+						var valTbody = getChild($('#' + tableId), 2).find('tbody');
+						var row = getChild(valTbody, j+1);
+						var valTd = getChild(row, 1);
+						var input = getChild(valTd, 1);
+						input.val(value);
+					});
+				} else {
+					var thead = getChild($('#' + tableId), 1);
+					var thTr = getChild(thead, 1);
+					var th = getChild(thTr, 2);
+					th.css('display', 'none');
+					var td = getChild(tr, 2);
+					td.css('display', 'none');
+				}
+			}
+		});
+	} else {
+		addToQueryDiv(tag, ++FIELDSET_COUNTER);
+	}
+	tagDiv.css('display', '');
+	var width = 0;
+	for (var i=0; i<tagDiv.children().length; i++) {
+		var tbody = getChild(tagDiv, i+1).find('tbody');
+		var crtWidth = tbody.width();
+		if (crtWidth > width) {
+			width = crtWidth;
+		}
+	}
+	width += 100;
+	var height = Math.ceil($(window).height() * 2 / 3);
+	confirmQueryEditDialog = tagDiv;
+	confirmQueryEditDialog.dialog({
+		autoOpen: false,
+		title: 'Edit constraint for column "' + tag + '"',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Save": function() {
+					saveTagQuery(tag);
+					$(this).dialog('close');
+				}
+		},
+		position: 'top',
+		draggable: true,
+		height: height,
+		modal: false,
+		resizable: true,
+		width: width,
+		beforeClose: function(event, ui) {cancelEdit(tag);}
+	});
+	confirmQueryEditDialog.dialog('open');
+}
+
+	
