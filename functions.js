@@ -1226,6 +1226,7 @@ function handleError(jqXHR, textStatus, errorThrown, count) {
 	
 	if (!retry || count > MAX_RETRIES) {
 		alert(msg);
+		document.body.style.cursor = "default";
 	}
 	
 	return retry;
@@ -1795,7 +1796,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PAGE_PREVIEW = 0;
 	LAST_PAGE_PREVIEW = 0;
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
-	LAST_PREVIEW_LIMIT = null;
+	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
 	// build the userOp dictionary
 	$.each(ops, function(key, value) {
@@ -2347,12 +2348,12 @@ function getQueryPredUrl() {
 	$.each(queryFilter, function(tag, preds) {
 		$.each(preds, function(i, pred) {
 			if (pred['opUser'] == 'Between') {
-				query.push(tag + ':geq:' + encodeURIComponent(pred['vals'][0]));
-				query.push(tag + ':leq:' + encodeURIComponent(pred['vals'][1]));
+				query.push(encodeURIComponent(tag) + ':geq:' + encodeURIComponent(pred['vals'][0]));
+				query.push(encodeURIComponent(tag) + ':leq:' + encodeURIComponent(pred['vals'][1]));
 			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
-				query.push(tag + pred['op'] + pred['vals'].join(','));
+				query.push(encodeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals']).join(','));
 			} else {
-				query.push(tag + (pred['op'] != null ? pred['op'] : ''));
+				query.push(encodeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
 			}
 		});
 	});
@@ -3138,7 +3139,7 @@ function editQuery(tag) {
 	LAST_PAGE_PREVIEW = PAGE_PREVIEW;
 	PAGE_PREVIEW = 0;
 	tagInEdit = tag;
-	disableAjaxAlert = true;
+	//disableAjaxAlert = true;
 	saveSearchConstraint = queryFilter[tag];
 	addFilterToQueryTable(tag);
 }
@@ -3159,7 +3160,7 @@ function cancelEdit(tag) {
 		queryFilter[tag] = saveSearchConstraint;
 	}
 	PAGE_PREVIEW = LAST_PAGE_PREVIEW;
-	disableAjaxAlert = false;
+	//disableAjaxAlert = false;
 	editInProgress = false;
 	tagInEdit = null;
 	select_tags = null;
@@ -3174,7 +3175,7 @@ function saveTagQuery(tag) {
 	saveTagPredicate(tag, tagConstraintDiv);
 	var tagId = makeId(tag.split(' ').join('_'));
 	var constraintDiv = getTagSearchDisplay(tag);
-	disableAjaxAlert = false;
+	//disableAjaxAlert = false;
 	editInProgress = false;
 	tagInEdit = null;
 	select_tags = null;
