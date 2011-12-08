@@ -1195,36 +1195,38 @@ var tagSelectOptions = new Object();
 var typedefSelectValues = null;
 var typedefTagrefs = null;
 
-function handleError(jqXHR, textStatus, errorThrown, count) {
+function handleError(jqXHR, textStatus, errorThrown, count, url) {
 	var retry = false;
-	var msg = '';
-	var err = jqXHR.status;
-	if (err != null) {
-		msg += 'Status: ' + err + '\n';
-	}
-	err = jqXHR.responseText;
-	if (err != null) {
-		msg += 'ResponseText: ' + err + '\n';
-	}
-	err = jqXHR.getResponseHeader('X-Error-Description');
-	if (err != null) {
-		msg += 'X-Error-Description: ' + decodeURIComponent(err) + '\n';
-	}
-	if (textStatus != null) {
-		msg += 'TextStatus: ' + textStatus + '\n';
-	}
-	if (errorThrown != null) {
-		msg += 'ErrorThrown: ' + errorThrown + '\n';
-	}
+	
 	switch(jqXHR.status) {
 	case 0:		// client timeout
 	case 408:	// server timeout
 	case 503:	// Service Unavailable
 	case 504:	// Gateway Timeout
-		retry = true;
+		retry = (count <= MAX_RETRIES);
 	}
 	
-	if (!retry || count > MAX_RETRIES) {
+	if (!retry) {
+		var msg = '';
+		var err = jqXHR.status;
+		if (err != null) {
+			msg += 'Status: ' + err + '\n';
+		}
+		err = jqXHR.responseText;
+		if (err != null) {
+			msg += 'ResponseText: ' + err + '\n';
+		}
+		err = jqXHR.getResponseHeader('X-Error-Description');
+		if (err != null) {
+			msg += 'X-Error-Description: ' + decodeURIComponent(err) + '\n';
+		}
+		if (textStatus != null) {
+			msg += 'TextStatus: ' + textStatus + '\n';
+		}
+		if (errorThrown != null) {
+			msg += 'ErrorThrown: ' + errorThrown + '\n';
+		}
+		msg += 'URL: ' + url + '\n';
 		alert(msg);
 		document.body.style.cursor = "default";
 	}
@@ -1249,7 +1251,7 @@ function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count
 			initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
 				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
@@ -1279,7 +1281,7 @@ function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
 				setTimeout(function(){initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)}, delay);
@@ -1342,7 +1344,7 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 			appendOptions(typestr, id, pattern);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
 				setTimeout(function(){initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count)}, delay);
@@ -1411,7 +1413,7 @@ function initTypedefTags(home, id, count) {
 			appendTypedefs(id);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count);
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
 				setTimeout(function(){initTypedefTags(home, id, count)}, delay);
@@ -1938,7 +1940,7 @@ function loadTypedefs() {
 			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
 		}
 	});
 }
@@ -1975,7 +1977,7 @@ function loadTags() {
 			probe_tags = results.join(';');
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
 		}
 	});
 }
@@ -2010,7 +2012,7 @@ function loadViews() {
 			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
 		}
 	});
 }
@@ -2051,7 +2053,7 @@ function setViewTags(tag) {
 			viewListTags[tag].reverse();
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
 		}
 	});
 }
@@ -2459,7 +2461,7 @@ function showQueryResultsPreview(predUrl, limit, offset) {
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
 			}
 		}
 	});
@@ -2493,7 +2495,7 @@ function initDropDownList(tag) {
 					},
 					error: function(jqXHR, textStatus, errorThrown) {
 						if (!disableAjaxAlert) {
-							handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+							handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
 						}
 					}
 				});
@@ -2501,7 +2503,7 @@ function initDropDownList(tag) {
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
 			}
 		}
 	});
@@ -2865,7 +2867,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
 			}
 		}
 	});
@@ -2886,7 +2888,7 @@ function fillIdContextMenu(ul) {
 			subject = iddata[0];
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1);
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, idUrl);
 		}
 	});
 	var results = subject2identifiers(subject);
