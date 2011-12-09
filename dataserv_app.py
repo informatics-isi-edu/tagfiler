@@ -25,6 +25,7 @@ import itertools
 import socket
 import datetime
 import dateutil.parser
+import dateutil.relativedelta
 import pytz
 import traceback
 import distutils.sysconfig
@@ -57,7 +58,8 @@ import struct
 
 render = None
 
-def downcast_value(dbtype, value):
+def downcast_value(dbtype, value, range_extensions=False):
+    
     if dbtype == 'boolean':
         if hasattr(value, 'lower'):
             if value.lower() in [ 'true', 'yes', 't', 'on' ]:
@@ -67,19 +69,89 @@ def downcast_value(dbtype, value):
         elif type(value) == bool:
             return value
         raise ValueError('Value %s of type %s cannot be coerced to boolean' % (str(value), type(value)))
+    
+    elif dbtype == 'text':
+        value = '%s' % value
+        
+    elif dbtype in [ 'int8', 'float8', 'date', 'timestamptz', 'interval' ] and range_extensions and type(value) in [ str, unicode ]:
+        m = re.match(' *[(](?P<lower>[^,()]+) *, *(?P<upper>[^,()]+)[)] *', value)
+
+        if m:
+            # compound syntax: ( lower, upper )
+            lower = downcast_value(dbtype, m.group('lower'))
+            upper = downcast_value(dbtype, m.group('upper'))
+            return (lower, upper)
+        
+        elif value.count('+/-') == 1:
+            # compound syntax:  center +/- delta
+            parts = value.split('+/-')
+
+            center = downcast_value(dbtype, parts[0].strip())
+
+            if dbtype in [ 'date', 'timestamptz' ]:
+                delta = downcast_value('interval', parts[1].strip(), range_extensions=False)
+            else:
+                delta = downcast_value(dbtype, parts[1].strip(), range_extensions=False)
+
+            return (center - delta, center + delta)
+        else:
+            # treat it as a regular value
+            return downcast_value(dbtype, value, range_extensions=False)
+        
+    elif dbtype == 'interval':
+        # naively handle ISO 8601 period notation to initialize a time interval based on numbers of specific time units
+        m = re.match('P *(?P<interval>[-.:0-9TYMWDHMS ]+)', value)
+        if m:
+            interval = m.group('interval')
+
+            # check for ISO 8601 alternative notation yyyy-mm-ddThh:mm:ss
+            m = re.match('(?P<years>[0-9]{4})-(?P<months>[0-9]{2})-(?P<days>[0-9]{2}) *T *(?P<hours>[0-9]{2}):(?P<minutes>[0-9]{2}):(?P<seconds>[0-9]{2}(.[0-9]+)?)',
+                         interval)
+            if m:
+                g = dict([ (k, float(v)) for k, v in m.groupdict().items() if v != None ])
+            else:
+                # assume ISO 8601 period with designators notation yY mM dD T hH mM sS
+                datepart = ''
+                timepart = ''
+                parts = interval.split('T')
+
+                if len(parts) > 0:
+                    datepart = parts[0]
+                if len(parts) > 1:
+                    timepart = parts[1]
+                if len(parts) > 2:
+                    raise ValueError('Value %s not a valid ISO 8601 time period with designators.' % value)
+
+                g = dict([ (dict(Y='years', M='months', W='weeks', D='days')[k], float(v)) for v, k in re.findall('([.0-9]+) *([YMWD])', datepart) ])
+
+                g.update(dict([ (dict(H='hours', M='minutes', S='seconds')[k], float(v)) for v, k in re.findall('([.0-9]+) *([HMS])', timepart) ]))
+
+            if g.has_key('seconds'):
+                g['microseconds'] = g['seconds'] * 1000000.0
+                del g['seconds']
+
+            g = dict([ (k, int(v)) for k, v in g.items() ])
+
+            # TODO: convert this to timedelta so psycopg2 adaptation can convert it to interval?
+            return dateutil.relativedelta.relativedelta(**g)
+        else:
+            raise ValueError('Value %s not a valid ISO 8601 time period.' % value)
+
     elif dbtype == 'int8':
         value = int(value)
+
     elif dbtype == 'float8':
         value = float(value)
+
     elif dbtype in [ 'date', 'timestamptz' ]:
         if value == 'now':
             value = datetime.datetime.now(pytz.timezone('UTC'))
         elif type(value) == str:
             value = dateutil.parser.parse(value)
-    elif dbtype == 'text':
-        value = '%s' % value
+
     else:
         pass
+
     return value
 
 def myunicode(v):
