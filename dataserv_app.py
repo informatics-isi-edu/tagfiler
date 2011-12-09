@@ -93,6 +93,7 @@ def downcast_value(dbtype, value, range_extensions=False):
             else:
                 delta = downcast_value(dbtype, parts[1].strip(), range_extensions=False)
 
+            web.debug(dbtype, center, delta)
             return (center - delta, center + delta)
         else:
             # treat it as a regular value
@@ -146,7 +147,7 @@ def downcast_value(dbtype, value, range_extensions=False):
     elif dbtype in [ 'date', 'timestamptz' ]:
         if value == 'now':
             value = datetime.datetime.now(pytz.timezone('UTC'))
-        elif type(value) == str:
+        elif type(value) in [ str, unicode ]:
             value = dateutil.parser.parse(value)
 
     else:
@@ -205,11 +206,16 @@ class Values:
     def __init__(self):
         self.va = []
 
-    def add(self, v, dbtype='text'):
+    def add(self, v, dbtype='text', range_extensions=False):
         i = len(self.va)
-        v = downcast_value(dbtype, v)
-        self.va.append(v)
-        return 'v%d' % i
+        v = downcast_value(dbtype, v, range_extensions=range_extensions)
+        if type(v) == tuple and len(v) == 2:
+            self.va.append(v[0])
+            self.va.append(v[1])
+            return ('v%d' % i, 'v%d' % (i+1))
+        else:
+            self.va.append(v)
+            return 'v%d' % i
 
     def pack(self):
         return dict([ ('v%d' % i, self.va[i]) for i in range(0, len(self.va)) ])
@@ -2311,13 +2317,25 @@ class Application:
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    constants = [ '($%s)' % values.add(v, tagdef.dbtype) for v in pred.vals if not hasattr(v, 'is_subquery')]
+                    values = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+
+                    constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in values if type(v) != tuple ]
+                    bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in values if type(v) == tuple ]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
                     clauses = []
                     if constants:
                         constants = ', '.join(constants)
                         clauses.append( '(SELECT bool_or(%s %s t.x) FROM (VALUES %s) AS t (x))'
                                         %  (valcol, Application.opsDB[pred.op], constants) )
+
+                    if bounds:
+                        bounds = ', '.join(bounds)
+                        if pred.op in [ '=', '!=' ]:
+                            clauses.append( '(SELECT bool_or(%s %s BETWEEN t.lower AND t.upper) FROM (VALUES %s) AS t (lower, upper))'
+                                            % (valcol, { '=': '', '!=': 'NOT' }[pred.op], bounds) )
+                        else:
+                            raise Conflict(self, 'Bounded value ranges are not supported for operator %s.' % pred.op)
+                    
                     if vqueries:
                         vqueries = ' UNION '.join(vqueries)
                         clauses.append( '(SELECT bool_or(%s %s t.x) FROM (%s) AS t (x))'
