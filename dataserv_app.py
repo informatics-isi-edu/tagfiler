@@ -675,7 +675,44 @@ class Application:
                    (':ciregexp:', '~*'),
                    (':!ciregexp:', '!~*') ])
     
-    # static representation of important tagdefs
+    # static representation of core schema
+    static_typedefs = []
+    for prototype in [ ('empty', '', 'No Content', None, []),
+                       ('boolean', 'boolean', 'Boolean', None, ['T true', 'F false']),
+                       ('int8', 'int8', 'Integer', None, []),
+                       ('float8', 'float8', 'Floating point', None, []),
+                       ('date', 'date', 'Date', None, []),
+                       ('timestamptz', 'timestamptz', 'Date and time with timezone', None, []),
+                       ('text', 'text', 'Text', None, []),
+                       ('role', 'text', 'Role', None, []),
+                       ('rolepat', 'text', 'Role pattern', None, []),
+                       ('dtype', 'text', 'Dataset type', None, ['blank Dataset node for metadata-only',
+                                                                'file Named dataset for locally stored file',
+                                                                'url Named dataset for URL redirecting']),
+                       ('url', 'text', 'URL', None, []),
+                       ('id', 'int8', 'Subject ID or subquery', None, []),
+                       ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
+                                                                        'subject Subject authorization is observed',
+                                                                        'subjectowner Subject owner may access',
+                                                                        'tag Tag authorization is observed',
+                                                                        'tagorsubject Tag or subject authorization is sufficient',
+                                                                        'tagandsubject Tag and subject authorization are required',
+                                                                        'system No client can access']),
+                       ('type', 'text', 'Scalar value type', 'typedef', []),
+                       ('tagdef', 'text', 'Tag definition', 'tagdef', []),
+                       ('name', 'text', 'Subject name', 'latest with name', []),
+                       ('vname', 'text', 'Subject name@version', 'vname', []),
+                       ('view', 'text', 'View name', 'view', []),
+                       ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
+                                                                                   'page Standalone document']) ]:
+        typedef, dbtype, desc, tagref, enum = prototype
+        static_typedefs.append(web.Storage({'typedef' : typedef,
+                                            'typedef description' : desc,
+                                            'typedef dbtype' : dbtype,
+                                            'typedef tagref' : tagref,
+                                            'typedef values' : enum}))
+
+    static_typedefs = dict( [ (typedef.typedef, typedef) for typedef in static_typedefs ] )
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
     for prototype in [ ('config', 'text', False, 'subject', True),
@@ -738,6 +775,7 @@ class Application:
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
                                           typestr=typestr,
+                                          dbtype=static_typedefs[typestr]['typedef dbtype'],
                                           multivalue=multivalue,
                                           active=True,
                                           readpolicy='anonymous',
@@ -748,44 +786,6 @@ class Application:
                                           tagwriters=[]))
 
     static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
-
-    static_typedefs = []
-    for prototype in [ ('empty', '', 'No Content', None, []),
-                       ('boolean', 'boolean', 'Boolean', None, ['T true', 'F false']),
-                       ('int8', 'int8', 'Integer', None, []),
-                       ('float8', 'float8', 'Floating point', None, []),
-                       ('date', 'date', 'Date', None, []),
-                       ('timestamptz', 'timestamptz', 'Date and time with timezone', None, []),
-                       ('text', 'text', 'Text', None, []),
-                       ('role', 'text', 'Role', None, []),
-                       ('rolepat', 'text', 'Role pattern', None, []),
-                       ('dtype', 'text', 'Dataset type', None, ['blank Dataset node for metadata-only',
-                                                                'file Named dataset for locally stored file',
-                                                                'url Named dataset for URL redirecting']),
-                       ('url', 'text', 'URL', None, []),
-                       ('id', 'int8', 'Subject ID or subquery', None, []),
-                       ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
-                                                                        'subject Subject authorization is observed',
-                                                                        'subjectowner Subject owner may access',
-                                                                        'tag Tag authorization is observed',
-                                                                        'tagorsubject Tag or subject authorization is sufficient',
-                                                                        'tagandsubject Tag and subject authorization are required',
-                                                                        'system No client can access']),
-                       ('type', 'text', 'Scalar value type', 'typedef', []),
-                       ('tagdef', 'text', 'Tag definition', 'tagdef', []),
-                       ('name', 'text', 'Subject name', 'latest with name', []),
-                       ('vname', 'text', 'Subject name@version', 'vname', []),
-                       ('view', 'text', 'View name', 'view', []),
-                       ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
-                                                                                   'page Standalone document']) ]:
-        typedef, dbtype, desc, tagref, enum = prototype
-        static_typedefs.append(web.Storage({'typedef' : typedef,
-                                            'typedef description' : desc,
-                                            'typedef dbtype' : dbtype,
-                                            'typedef tagref' : tagref,
-                                            'typedef values' : enum}))
-
-    static_typedefs = dict( [ (typedef.typedef, typedef) for typedef in static_typedefs ] )
 
     rfc1123 = '%a, %d %b %Y %H:%M:%S UTC%z'
 
