@@ -1500,13 +1500,18 @@ var lastEditTag = null;
 var probe_tags;
 var enabledDrag = true;
 var userOp = new Object();
+var localeTimezone;
 
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
 	$.each(select_tags[tag], function(i, value) {
 		var option = $('<option>');
-		option.text(value);
-		option.attr('value', value);
+		var optionVal = htmlEscape(value);
+		if (availableTags[tag] == 'timestamptz') {
+			optionVal = getLocaleTimestamp(optionVal);
+		}
+		option.text(optionVal);
+		option.attr('value', optionVal);
 		select.append(option);
 	});
 }
@@ -1922,6 +1927,14 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	});
 	dragAndDropBox = $('#DragAndDropBox');
 	tipBox = $('#TipBox');
+	
+	// set the locale timezone
+	var now = new Date();
+	localeTimezone = now.getTimezoneOffset();
+	var tzsign = localeTimezone > 0 ? '-' : '+';
+	localeTimezone = Math.abs(localeTimezone);
+	var tzmin = localeTimezone % 60
+	localeTimezone = tzsign + ('0' + (localeTimezone - tzmin) / 60).slice(-2) + ':' + ('0' + tzmin).slice(-2);
 	showPreview();
 }
 
@@ -2212,8 +2225,14 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			tr.append(td);
 			td.css('border-width', '0px');
 			var input = $('<input>');
+			if (availableTags[tag] == 'timestamptz') {
+				input.addClass('datetimepicker');
+			} else if (availableTags[tag] == 'date') {
+				input.addClass('datepicker');
+			}
 			input.attr('type', 'text');
 			input.keyup(function(event) {showPreview();});
+			input.change(function(event) {showPreview();});
 			td.append(input);
 			td = $('<td>');
 			tr.append(td);
@@ -2223,8 +2242,14 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			tr.append(td);
 			td.css('border-width', '0px');
 			input = $('<input>');
+			if (availableTags[tag] == 'timestamptz') {
+				input.addClass('datetimepicker');
+			} else if (availableTags[tag] == 'date') {
+				input.addClass('datepicker');
+			}
 			input.attr('type', 'text');
 			input.keyup(function(event) {showPreview();});
+			input.change(function(event) {showPreview();});
 			td.append(input);
 		} else {
 			td = $('<td>');
@@ -2269,8 +2294,14 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		tr.append(td);
 		td.css('border-width', '0px');
 		var input = $('<input>');
+		if (availableTags[tag] == 'timestamptz') {
+			input.addClass('datetimepicker');
+		} else if (availableTags[tag] == 'date') {
+			input.addClass('datepicker');
+		}
 		input.attr('type', 'text');
 		input.keyup(function(event) {showPreview();});
+		input.change(function(event) {showPreview();});
 		td.append(input);
 	} else {
 		td = $('<td>');
@@ -2317,6 +2348,26 @@ function addNewValue(row, type, selectOperatorId, tag) {
 					function(event) {deleteValue(event.data.id, event.data.tableId);});
 		td.append(img);
 	}
+	var now = new Date();
+	$('.datetimepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+											timeFormat: 'hh:mm:ss.l',
+											hour: now.getHours(),
+											minute: now.getMinutes(),
+											second: now.getSeconds(),
+											millisec: now.getMilliseconds(),
+											showSecond: true,
+											showMillisec: true,
+											changeYear: true,
+											millisecText: 'Millisec'
+	});
+	$('.datepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+										timeFormat: '',
+										separator: '',
+										changeYear: true,
+										showTime: false,
+										showHour: false,
+										showMinute: false
+	});
 }
 
 function getQueryTags(tableId) {
@@ -2332,10 +2383,10 @@ function getQueryTags(tableId) {
 	return ret;
 }
 
-function encodeURIArray(tags) {
+function encodeURIArray(values, suffix) {
 	var ret = new Array();
-	for (var i=0; i < tags.length; i++) {
-		ret.push(encodeURIComponent(tags[i]));
+	for (var i=0; i < values.length; i++) {
+		ret.push(encodeURIComponent(values[i] + suffix));
 	}
 	return ret;
 }
@@ -2348,12 +2399,16 @@ function getQueryPredUrl() {
 	var query = new Array();
 	var url = '';
 	$.each(queryFilter, function(tag, preds) {
+		var suffix = '';
+		if (availableTags[tag] == 'timestamptz') {
+			suffix = localeTimezone;
+		}
 		$.each(preds, function(i, pred) {
 			if (pred['opUser'] == 'Between') {
-				query.push(encodeURIComponent(tag) + ':geq:' + encodeURIComponent(pred['vals'][0]));
-				query.push(encodeURIComponent(tag) + ':leq:' + encodeURIComponent(pred['vals'][1]));
+				query.push(encodeURIComponent(tag) + ':geq:' + encodeURIComponent(pred['vals'][0] + suffix));
+				query.push(encodeURIComponent(tag) + ':leq:' + encodeURIComponent(pred['vals'][1] + suffix));
 			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
-				query.push(encodeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals']).join(','));
+				query.push(encodeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
 			} else {
 				query.push(encodeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
 			}
@@ -2434,7 +2489,7 @@ function showQueryResults(limit) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
 	var predUrl = getQueryPredUrl();
-	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
+	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
 	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
@@ -2448,7 +2503,7 @@ function showQueryResults(limit) {
 function showQueryResultsPreview(predUrl, limit, offset) {
 	var columnArray = new Array();
 	columnArray.push('id');
-	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
+	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2472,7 +2527,7 @@ function initDropDownList(tag) {
 	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push(tag);
-	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray), new Array(), '');
+	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	select_tags = new Object();
 	$.ajax({
 		url: queryUrl,
@@ -2483,7 +2538,7 @@ function initDropDownList(tag) {
 		success: function(data, textStatus, jqXHR) {
 			totalRows = data[0][tag];
 			if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
-				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray), new Array(), '');
+				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
 				$.ajax({
 					url: queryUrl,
 					headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2533,7 +2588,7 @@ function hideColumnDetails(column, count) {
 
 function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 	var previewRows = 0;
-	var queryUrl = getQueryUrl(predUrl, limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(resultColumns), encodeURIArray(sortColumnsArray), offset);
+	var queryUrl = getQueryUrl(predUrl, limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
 	var queryPreview = $('#Query_Preview');
 	var table = getChild(queryPreview, 1);
 	if (table.get(0) == null) {
@@ -2745,7 +2800,11 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 									a.attr('href', row[column]);
 									a.html(row[column]);
 								} else {
-									td.html(htmlEscape(row[column]));
+									var cellVal = htmlEscape(row[column]);
+									if (availableTags[column] == 'timestamptz') {
+										cellVal = getLocaleTimestamp(cellVal);
+									}
+									td.html(cellVal);
 								}
 							}
 						} else {
@@ -3406,7 +3465,6 @@ function addFilterToQueryTable(tag) {
 					valTd = getChild(valTr, 3);
 					var input2 = getChild(valTd, 1);
 					input2.val(pred['vals'][1]);
-					//td.css('display', 'none');
 				} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
 					var selId = select.attr('id');
 					$.each(pred['vals'], function(j, value) {
@@ -3465,4 +3523,50 @@ function addFilterToQueryTable(tag) {
 	confirmQueryEditDialog.dialog('open');
 }
 
+/**
+ * Returns the locale string of a timestamp having the format 'yyyy-mm-dd hh:mm:ss[.llllll]{+|-}HH:MM'.
+ * .llllll represents microseconds and is optional
+ * the last part represents the timezone offset and it has the + or - sign followed by the number of hours and minutes
+ * Example: '2011-12-02 09:33:34.784133-08:00'
+ */
+function getLocaleTimestamp(s) {
+	var values = s.split(' ');
+	var date = new Date(values[0]).getTime();
+	var utc = values[1].slice(-6);
+	var time = values[1].slice(0, values[1].length - 6);
+	var timeValues = time.split('.');
+	var ms = 0;
+	var msText = '';
+	if (timeValues.length > 1) {
+		msText = '.' + timeValues[1];
+		ms = Math.floor(parseInt(timeValues[1]) / 1000, 10);
+	}
+	var hms = timeValues[0].split(':');
+	var hours = parseInt(hms[0], 10);
+	var minutes = parseInt(hms[1], 10);
+	var seconds = parseInt(hms[2], 10);
+	var utcValues = utc.split(':');
+	var utcDelta = -parseInt(utcValues[0], 10) * 60 + parseInt(utcValues[1], 10);
+	date += hours * 60 * 60 * 1000 +
+			(minutes + utcDelta) * 60 * 1000 +
+			seconds * 1000 +
+			ms;
+	var newDate = new Date(date);
+	var ret = 	newDate.getFullYear() + '-' +
+				('0' + (newDate.getMonth() + 1)).slice(-2) + '-' +
+				('0' + newDate.getDate()).slice(-2) + ' ' +
+				('0' + newDate.getHours()).slice(-2) + ':' +
+				('0' + newDate.getMinutes()).slice(-2) + ':' +
+				('0' + newDate.getSeconds()).slice(-2) +
+				msText;
+	return ret;
 	
+}
+
+function setTimepickerOptions(input, dp_inst, tp_inst){
+	var now = new Date();
+	tp_inst.hour = now.getHours();
+	tp_inst.minute = now.getMinutes();
+	tp_inst.second = now.getSeconds();
+	tp_inst.millisec = now.getMilliseconds();
+}

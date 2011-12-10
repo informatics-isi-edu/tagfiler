@@ -29,6 +29,7 @@ WSGIFILE=tagfiler.wsgi
 SCRIPTFILES=functions.js \
 			jquery.js \
 			jquery-ui.js \
+			jquery-ui-timepicker-addon.js \
 			main.css \
 			jquery-ui.css \
 			calendar.gif \
@@ -55,6 +56,7 @@ WEBSTATICFILES=logo.png \
 	functions.js \
 	jquery.js \
 	jquery-ui.js \
+	jquery-ui-timepicker-addon.js \
 	main.css \
 	jquery-ui.css \
 	calendar.gif \
