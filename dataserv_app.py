@@ -2015,20 +2015,6 @@ class Application:
             if fire_doPolicyRule:
                 self.doPolicyRule(subject)
 
-    def downcast_value(self, dbtype, value):
-        if dbtype == 'int8':
-            value = int(value)
-        elif dbtype == 'float8':
-            value = float(value)
-        elif dbtype in [ 'date', 'timestamptz' ]:
-            if value == 'now':
-                value = datetime.datetime.now(pytz.timezone('UTC'))
-            elif type(value) == str:
-                value = dateutil.parser.parse(value)
-        else:
-            pass
-        return value
-
     def set_tag(self, subject, tagdef, value=None):
         typedef = self.globals['typesdict'].get(tagdef.typestr, None)
         if typedef == None:
