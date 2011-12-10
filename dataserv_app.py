@@ -93,7 +93,6 @@ def downcast_value(dbtype, value, range_extensions=False):
             else:
                 delta = downcast_value(dbtype, parts[1].strip(), range_extensions=False)
 
-            web.debug(dbtype, center, delta)
             return (center - delta, center + delta)
         else:
             # treat it as a regular value
@@ -2303,11 +2302,10 @@ class Application:
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    values = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
-
-                    constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in values if type(v) != tuple ]
-                    bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in values if type(v) == tuple ]
+                    vkeys = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
+                    constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in vkeys if type(v) != tuple ]
+                    bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vkeys if type(v) == tuple ]
                     clauses = []
                     if constants:
                         constants = ', '.join(constants)
