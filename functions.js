@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+var confirmLogoutDialog;
+var warn_window_is_open = false;
 var unique_tags = [];
 
 /**
@@ -242,10 +244,6 @@ function processLogoutRequest() {
 function redirectNow() {
     var node = document.getElementById("javascriptlog");
     clearSessionTimer();
-    if (warn_window) {
-	log("redirectNow: closing warning window");
-	warn_window.close();
-    }
     if (node) {
 	alert("About to redirect at end of session");
     }
@@ -295,11 +293,10 @@ function processSessionRequest() {
 	  	startExtendSessionTimer(1000);
 	  	return;
 	  }
-	  if (((new Date()).getTime() - extend_time) > (expiration_warn_mins * 60 * 1000) && (!warn_window || warn_window.closed)) {
+	  if (((new Date()).getTime() - extend_time) > (expiration_warn_mins * 60 * 1000) && !warn_window_is_open) {
 	      log("processSessionRequest: raising warning window");
-	      warn_window = (window.open(expiration_warn_url,
-					 warn_window_name,
-					 warn_window_features));
+	      warn_window_is_open = true;
+	      confirmLogoutDialog.dialog('open');
 	  }
 	  startSessionTimer(secsremain * 1000);
       }
@@ -875,11 +872,7 @@ var timerset = 0;
 var expiration_poll_mins = 1;
 var expiration_warn_mins = 2;
 var expiration_check_url = "/webauthn/session";
-var expiration_warn_url = "/webauthn/session?action=prompt";
-var warn_window_name = "SessionIdleWarning";
-var warn_window_features = "height=400,width=600,resizable=yes,scrollbars=yes,status=yes,location=no";
 var ajax_request = null;
-var warn_window = null;
 var until = null;
 var width = 0;
 var hasSize = false;
@@ -1789,7 +1782,6 @@ function setPreviousPage() {
 }
 
 function initPSOC(home, user, webauthnhome, basepath, querypath) {
-	expiration_warning = false;
 	HOME = home;
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
@@ -3570,3 +3562,30 @@ function setTimepickerOptions(input, dp_inst, tp_inst){
 	tp_inst.second = now.getSeconds();
 	tp_inst.millisec = now.getMilliseconds();
 }
+
+function initIdleWarning() {
+	$('#Idle_Session_Warning').css('display', '');
+	confirmLogoutDialog = $('#Idle_Session_Warning');
+	confirmLogoutDialog.dialog({
+		autoOpen: false,
+		title: 'Idle Session Warning',
+		buttons: {
+			"Log out now": function() {
+					runLogoutRequest();
+					$(this).dialog('close');
+				},
+			"Extend session": function() {
+					runExtendRequest();
+					setExtendTime();
+					$(this).dialog('close');
+				}
+		},
+		draggable: true,
+		height: $(window).height() - 50,
+		modal: true,
+		resizable: true,
+		width: $(window).width() - 50,
+		beforeClose: function(event, ui) {warn_window_is_open = false;}
+	});
+}
+

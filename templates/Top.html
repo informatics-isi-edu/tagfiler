@@ -39,9 +39,17 @@ $else:
     	runSessionPolling(${pollmins}, ${2 * pollmins});
     $if webauthnrequire:
     	redirectToLogin = true;
+	\$(document).ready(function() {
+		initIdleWarning();
+	});
   </script>
 </head>
 <body>
+<div id="Idle_Session_Warning" style="display: none">
+<p>
+<h1>Warning, your session will soon expire due to idle timeout...</h1>
+</p>
+</div>
 <table class="topmargin">
 <tr>
 $if logo:
