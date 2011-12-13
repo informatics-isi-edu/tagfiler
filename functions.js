@@ -29,20 +29,20 @@ function subject2identifiers(subject) {
 
     /* prefer names over raw ID numbers */
     if (subject['vname']) {
-		results.datapred = "vname=" + encodeURIComponent(subject['vname']);
+		results.datapred = "vname=" + encodeSafeURIComponent(subject['vname']);
 		results.dataname = subject['vname'];
     }
     else {
 	/* TODO: search a prepared list of unique tagnames;
 	   if subject[tagname] is found non-NULL, override defaults and break loop...
 
-	   results.datapred = encodeURIComponent(tagname) + "=" + encodeURIComponent(subject[tagname]);
+	   results.datapred = encodeSafeURIComponent(tagname) + "=" + encodeSafeURIComponent(subject[tagname]);
 	   results.dataname = tagname + "=" + subject[tagname];
 	   results.dtype = tagname;
 	 */
 		 $.each(unique_tags, function(i, tagname) {
 		 	if (subject[tagname] != null) {
-			   results.datapred = encodeURIComponent(tagname) + "=" + encodeURIComponent(subject[tagname]);
+			   results.datapred = encodeSafeURIComponent(tagname) + "=" + encodeSafeURIComponent(subject[tagname]);
 			   results.dataname = tagname + "=" + subject[tagname];
 			   results.dtype = tagname;
 			   return false;
@@ -179,7 +179,7 @@ function getCookie(name) {
 }
 
 function setCookie(name, val) {
-    val = encodeURIComponent(decodeURIComponent(val));
+    val = encodeSafeURIComponent(decodeURIComponent(val));
     //log("setCookie: " + name + " = " + val);
     document.cookie = name + "=" + val + "; path=/";
 }
@@ -248,7 +248,7 @@ function redirectNow() {
 	alert("About to redirect at end of session");
     }
     if (redirectToLogin) {
-	window.location='/webauthn/login?referer=' + encodeURIComponent(window.location);
+	window.location='/webauthn/login?referer=' + encodeSafeURIComponent(window.location);
     }
     else {
 	window.location = window.location;
@@ -281,7 +281,7 @@ function processSessionRequest() {
 
       cookie = getCookie("webauthn");
       parts = cookie.split("|");
-      setCookie("webauthn", encodeURIComponent(parts[0] + "|" + until.toGMTString() + "|" + secsremain));
+      setCookie("webauthn", encodeSafeURIComponent(parts[0] + "|" + until.toGMTString() + "|" + secsremain));
 
       if (secsremain < 1) {
 	  secsremain = 1;
@@ -805,7 +805,7 @@ function validateNameForm(op, suffix) {
 		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
 		var action = document.NameForm.getAttribute('action');
 		if (data_id.length > 0) {
-			action += '/name=' + encodeURIComponent(data_id);
+			action += '/name=' + encodeSafeURIComponent(data_id);
 		}
 		var prefix = '?';
 		if (document.getElementById('read users'+suffix).value == '*') {
@@ -818,7 +818,7 @@ function validateNameForm(op, suffix) {
 		}
 		var defaultView = document.getElementById('defaultView'+suffix).value;
 		if (defaultView != '') {
-			action += prefix + 'default%20view=' + encodeURIComponent(defaultView);
+			action += prefix + 'default%20view=' + encodeSafeURIComponent(defaultView);
 			prefix = '&'
 		}
 		if (document.getElementById('incomplete'+suffix).checked) {
@@ -929,7 +929,7 @@ function renderTagdefs(home, table) {
 	    var cells = rows[i].children;
 	    var namecell = cells[columnmap["tagname"]];
 	    var tagname = namecell.innerHTML;
-	    namecell.innerHTML = '<a href="' + home + '/file/tagdef=' + encodeURIComponent(tagname) + '">' + tagname + '</a>';
+	    namecell.innerHTML = '<a href="' + home + '/file/tagdef=' + encodeSafeURIComponent(tagname) + '">' + tagname + '</a>';
 	    var typecell = cells[columnmap["typestr"]];
 	    typecell.innerHTML = typedescs[typecell.innerHTML];
 	    var cardcell = cells[columnmap["multivalue"]];
@@ -1228,7 +1228,7 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 }
 
 function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count) {
-	var url = home + '/query/' + encodeURIComponent('typedef values') + '(typedef)?limit=none';
+	var url = home + '/query/' + encodeSafeURIComponent('typedef values') + '(typedef)?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1254,7 +1254,7 @@ function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count
 }
 
 function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
-	var url = home + '/query/' + encodeURIComponent('typedef tagref') + '(typedef;' + encodeURIComponent('typedef tagref') + ')?limit=none';
+	var url = home + '/query/' + encodeSafeURIComponent('typedef tagref') + '(typedef;' + encodeSafeURIComponent('typedef tagref') + ')?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1288,9 +1288,9 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 	if (typestr == 'role') {
 		url = webauthnhome + '/role';
 	} else if (typedefSelectValues.contains(typestr)) {
-		url = home + '/tags/typedef=' + encodeURIComponent(typestr) + '(' + encodeURIComponent('typedef values') + ')?limit=none';
+		url = home + '/tags/typedef=' + encodeSafeURIComponent(typestr) + '(' + encodeSafeURIComponent('typedef values') + ')?limit=none';
 	} else if (typedefTagrefs[typestr] != null) {
-		url = home + '/query/' + encodeURIComponent(typedefTagrefs[typestr]) + '(' + encodeURIComponent(typedefTagrefs[typestr]) + ')' + encodeURIComponent(typedefTagrefs[typestr]) + '?limit=none';
+		url = home + '/query/' + encodeSafeURIComponent(typedefTagrefs[typestr]) + '(' + encodeSafeURIComponent(typedefTagrefs[typestr]) + ')' + encodeSafeURIComponent(typedefTagrefs[typestr]) + '?limit=none';
 	} else {
 		alert('Invalid typestr: "' + typestr + '"');
 		return;
@@ -1390,7 +1390,7 @@ function appendOptions(typestr, id, pattern) {
 var typedefTags = null;
 
 function initTypedefTags(home, id, count) {
-	var url = home + '/query/typedef(typedef;' + encodeURIComponent('typedef description') + ')' + encodeURIComponent('typedef description') + '?limit=none';
+	var url = home + '/query/typedef(typedef;' + encodeSafeURIComponent('typedef description') + ')' + encodeSafeURIComponent('typedef description') + '?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1560,10 +1560,10 @@ function HideTipBox() {
 }
 
 function copyColumn(e, column, id) {
+	e.preventDefault();
 	if (!enabledDrag) {
 		return;
 	}
-	e.preventDefault();
 	tagToMove = column;
 	movePageX = e.pageX;
 }
@@ -1931,7 +1931,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 }
 
 function loadTypedefs() {
-	var url = HOME + '/query/typedef(typedef;' + encodeURIComponent('typedef values') + ';' +encodeURIComponent('typedef dbtype') + ';' +encodeURIComponent('typedef tagref') + ')?limit=none';
+	var url = HOME + '/query/typedef(typedef;' + encodeSafeURIComponent('typedef values') + ';' +encodeSafeURIComponent('typedef dbtype') + ';' +encodeSafeURIComponent('typedef tagref') + ')?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1952,9 +1952,9 @@ function loadTypedefs() {
 
 function loadTags() {
 	var url = HOME + '/query/tagdef(tagdef;' + 
-				encodeURIComponent('tagdef type') + ';' + 
-				encodeURIComponent('tagdef multivalue') + ';' +
-				encodeURIComponent('tagdef unique') + ')?limit=none';
+				encodeSafeURIComponent('tagdef type') + ';' + 
+				encodeSafeURIComponent('tagdef multivalue') + ';' +
+				encodeSafeURIComponent('tagdef unique') + ')?limit=none';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1971,7 +1971,7 @@ function loadTags() {
 				availableTags[object['tagdef']] = object['tagdef type'];
 				allTagdefs[object['tagdef']] = object;
 				if (object['tagdef unique']) {
-					var encodeValue = encodeURIComponent(object['tagdef']);
+					var encodeValue = encodeSafeURIComponent(object['tagdef']);
 					if (!results.contains(encodeValue)) {
 						results.push(encodeValue);
 					}
@@ -2042,7 +2042,7 @@ function setViewTags(tag) {
 	if (viewListTags[tag] != null) {
 		return;
 	}
-	var url = HOME + '/query/view=' + encodeURIComponent(tag) + '(' + encodeURIComponent('_cfg_file list tags') + ')' + encodeURIComponent('_cfg_file list tags');
+	var url = HOME + '/query/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('_cfg_file list tags') + ')' + encodeSafeURIComponent('_cfg_file list tags');
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -2366,7 +2366,7 @@ function getQueryTags(tableId) {
 	var ret = new Array();
 	var tbody = getChild($('#' + tableId), 1);
 	$.each(tbody.children(), function(i, tr) {
-		ret.push(encodeURIComponent(getChild($(tr), 2).html()));
+		ret.push(encodeSafeURIComponent(getChild($(tr), 2).html()));
 	});
 	if (ret.length == 0) {
 		ret = '';
@@ -2378,7 +2378,7 @@ function getQueryTags(tableId) {
 function encodeURIArray(values, suffix) {
 	var ret = new Array();
 	for (var i=0; i < values.length; i++) {
-		ret.push(encodeURIComponent(values[i] + suffix));
+		ret.push(encodeSafeURIComponent(values[i] + suffix));
 	}
 	return ret;
 }
@@ -2397,12 +2397,12 @@ function getQueryPredUrl() {
 		}
 		$.each(preds, function(i, pred) {
 			if (pred['opUser'] == 'Between') {
-				query.push(encodeURIComponent(tag) + ':geq:' + encodeURIComponent(pred['vals'][0] + suffix));
-				query.push(encodeURIComponent(tag) + ':leq:' + encodeURIComponent(pred['vals'][1] + suffix));
+				query.push(encodeSafeURIComponent(tag) + ':geq:' + encodeSafeURIComponent(pred['vals'][0] + suffix));
+				query.push(encodeSafeURIComponent(tag) + ':leq:' + encodeSafeURIComponent(pred['vals'][1] + suffix));
 			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
-				query.push(encodeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
+				query.push(encodeSafeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
 			} else {
-				query.push(encodeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
+				query.push(encodeSafeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
 			}
 		});
 	});
@@ -3580,11 +3580,10 @@ function initIdleWarning() {
 					$(this).dialog('close');
 				}
 		},
-		draggable: true,
-		height: $(window).height() - 50,
+		draggable: false,
 		modal: true,
-		resizable: true,
-		width: $(window).width() - 50,
+		resizable: false,
+		width: 350,
 		beforeClose: function(event, ui) {warn_window_is_open = false;}
 	});
 }

@@ -26,6 +26,22 @@ WEBSTATICDIR=$(WEBROOTDIR)/html/$(INSTALLSVC)/static
 
 WSGIFILE=tagfiler.wsgi
 
+IMAGEBASES= \
+	ui-bg_diagonals-thick_18_b81900_40x40.png \
+	ui-bg_diagonals-thick_20_666666_40x40.png \
+	ui-bg_flat_10_000000_40x100.png \
+	ui-bg_glass_100_f6f6f6_1x400.png \
+	ui-bg_glass_100_fdf5ce_1x400.png \
+	ui-bg_glass_65_ffffff_1x400.png \
+	ui-bg_gloss-wave_35_f6a828_500x100.png \
+	ui-bg_highlight-soft_100_eeeeee_1x100.png \
+	ui-bg_highlight-soft_75_ffe45c_1x100.png \
+	ui-icons_222222_256x240.png \
+	ui-icons_228ef1_256x240.png \
+	ui-icons_ef8c08_256x240.png \
+	ui-icons_ffd27a_256x240.png \
+	ui-icons_ffffff_256x240.png
+
 SCRIPTFILES=functions.js \
 			jquery.js \
 			jquery-ui.js \
@@ -91,6 +107,7 @@ TEMPLATEBASES=Top.html Bottom.html Commands.html \
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)
+IMAGEFILES=$(IMAGEBASES:%=images/%)
 
 # turn off annoying built-ins
 .SUFFIXES:
@@ -106,6 +123,7 @@ deploy: $(HOME)/.tagfiler.predeploy install
 	./register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
+	mkdir -p /var/www/html/$(INSTALLSVC)/static/images
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/
@@ -116,6 +134,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
+	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
 	./register-software-version.sh $(INSTALLSVC)
 
 restart: force install
