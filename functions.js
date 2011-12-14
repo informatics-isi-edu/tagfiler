@@ -297,6 +297,7 @@ function processSessionRequest() {
 	      log("processSessionRequest: raising warning window");
 	      warn_window_is_open = true;
 	      confirmLogoutDialog.dialog('open');
+	      $('.ui-widget-overlay').css('opacity', 1.0);
 	  }
 	  startSessionTimer(secsremain * 1000);
       }
@@ -1495,6 +1496,8 @@ var enabledDrag = true;
 var userOp = new Object();
 var localeTimezone;
 
+var intervalPattern = new RegExp('\\((.+),(.+)\\)');
+
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
 	$.each(select_tags[tag], function(i, value) {
@@ -1841,14 +1844,32 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		});
 		var spreds = querypathJSON[0]['spreds'];
 		$.each(spreds, function(i, item) {
-			if (queryFilter[item['tag']] == null) {
-				queryFilter[item['tag']] = new Array();
+			var tag = item['tag'];
+			if (queryFilter[tag] == null) {
+				queryFilter[tag] = new Array();
+			}
+			if (availableTags[tag] == 'timestamptz' || 
+				availableTags[tag] == 'date' ||
+				availableTags[tag] == 'int8' ||
+				availableTags[tag] == 'float8') {
+				var m = intervalPattern.exec(item['vals'][0]);
+				if (m != null && m.length > 2) {
+					var val1 = m[1];
+					var val2 = m[2];
+					item['vals'] = new Array();
+					item['vals'].push(val1);
+					item['vals'].push(val2);
+					item['op'] = 'Between';
+					item['opUser'] = 'Between';
+				}
 			}
 			var pred = new Object();
 			pred['op'] = item['op'];
 			pred['vals'] = item['vals'];
 			if (pred['op'] == null) {
 				pred['opUser'] = 'Tagged';
+			} else if (pred['op'] == 'Between') {
+				pred['opUser'] = item['opUser'];
 			} else {
 				pred['opUser'] = userOp[pred['op']];
 			}
@@ -1925,7 +1946,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	localeTimezone = now.getTimezoneOffset();
 	var tzsign = localeTimezone > 0 ? '-' : '+';
 	localeTimezone = Math.abs(localeTimezone);
-	var tzmin = localeTimezone % 60
+	var tzmin = localeTimezone % 60;
 	localeTimezone = tzsign + ('0' + (localeTimezone - tzmin) / 60).slice(-2) + ':' + ('0' + tzmin).slice(-2);
 	showPreview();
 }
@@ -2397,8 +2418,8 @@ function getQueryPredUrl() {
 		}
 		$.each(preds, function(i, pred) {
 			if (pred['opUser'] == 'Between') {
-				query.push(encodeSafeURIComponent(tag) + ':geq:' + encodeSafeURIComponent(pred['vals'][0] + suffix));
-				query.push(encodeSafeURIComponent(tag) + ':leq:' + encodeSafeURIComponent(pred['vals'][1] + suffix));
+				query.push(encodeSafeURIComponent(tag) + '=' + encodeSafeURIComponent('(' + pred['vals'][0] + suffix + ',' +
+																pred['vals'][1] + suffix + ')'));
 			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
 				query.push(encodeSafeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
 			} else {
@@ -3332,7 +3353,7 @@ function getTagSearchDisplay(tag) {
 			table.append(tr);
 			var td = $('<td>');
 			tr.append(td);
-			var val = item['opUser'] == 'Between' ? '' : item['op'];
+			var val = item['opUser'] == 'Between' ? '=' : item['op'];
 			val = val == null ? ':tagged:' : val;
 			switch (item['vals'].length) {
 			case 0:
@@ -3341,9 +3362,9 @@ function getTagSearchDisplay(tag) {
 				val += ' ' + item['vals'][0];
 				break;
 			default:
-				val += item['opUser'] == 'Between' ? '[' : '{';
-				val += item['vals'].join(', ');
-				val += item['opUser'] == 'Between' ? ']' : '}';
+				val += item['opUser'] == 'Between' ? '(' : '{';
+				val += item['vals'].join(',');
+				val += item['opUser'] == 'Between' ? ')' : '}';
 				break;
 				
 			}
