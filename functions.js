@@ -3510,15 +3510,17 @@ function addFilterToQueryTable(tag) {
 	}
 	tagDiv.css('display', '');
 	var width = 0;
+	var height = 0;
 	for (var i=0; i<tagDiv.children().length; i++) {
 		var tbody = getChild(tagDiv, i+1).find('tbody');
 		var crtWidth = tbody.width();
 		if (crtWidth > width) {
 			width = crtWidth;
 		}
+		height += tbody.height() + 10;
 	}
 	width += 100;
-	var height = Math.ceil($(window).height() * 2 / 3);
+	height += 200;
 	confirmQueryEditDialog = tagDiv;
 	confirmQueryEditDialog.dialog({
 		autoOpen: false,
