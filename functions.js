@@ -2248,7 +2248,7 @@ function addNewValue(row, type, selectOperatorId, tag) {
 				input.addClass('datepicker');
 			}
 			input.attr('type', 'text');
-			input.keyup(function(event) {showPreview();});
+			input.mouseout(function(event) {showPreview();});
 			input.change(function(event) {showPreview();});
 			td.append(input);
 			td = $('<td>');
@@ -2265,7 +2265,7 @@ function addNewValue(row, type, selectOperatorId, tag) {
 				input.addClass('datepicker');
 			}
 			input.attr('type', 'text');
-			input.keyup(function(event) {showPreview();});
+			input.mouseout(function(event) {showPreview();});
 			input.change(function(event) {showPreview();});
 			td.append(input);
 		} else {
@@ -2317,7 +2317,7 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			input.addClass('datepicker');
 		}
 		input.attr('type', 'text');
-		input.keyup(function(event) {showPreview();});
+		input.mouseout(function(event) {showPreview();});
 		input.change(function(event) {showPreview();});
 		td.append(input);
 	} else {
