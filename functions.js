@@ -1856,6 +1856,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 				if (m != null && m.length > 2) {
 					var val1 = m[1];
 					var val2 = m[2];
+					if (availableTags[tag] == 'timestamptz') {
+						val1 = getLocaleTimestamp(val1);
+						val2 = getLocaleTimestamp(val2);
+					}
 					item['vals'] = new Array();
 					item['vals'].push(val1);
 					item['vals'].push(val2);
@@ -2405,13 +2409,16 @@ function encodeURIArray(values, suffix) {
 }
 
 function getQueryPredUrl() {
-	if (tagInEdit != null) {
+	if (tagInEdit != null && editInProgress) {
 		var tagConstraintDiv = $('#' +makeId('queryDiv', tagInEdit.split(' ').join('_')));
 		saveTagPredicate(tagInEdit, tagConstraintDiv);
 	}
 	var query = new Array();
 	var url = '';
 	$.each(queryFilter, function(tag, preds) {
+		if (tag == tagInEdit && !editInProgress) {
+			return true;
+		}
 		var suffix = '';
 		if (availableTags[tag] == 'timestamptz') {
 			suffix = localeTimezone;
@@ -3208,11 +3215,11 @@ function editQuery(tag) {
 	if (editInProgress) {
 		return;
 	}
+	tagInEdit = tag;
 	initDropDownList(tag);
 	editInProgress = true;
 	LAST_PAGE_PREVIEW = PAGE_PREVIEW;
 	PAGE_PREVIEW = 0;
-	tagInEdit = tag;
 	//disableAjaxAlert = true;
 	saveSearchConstraint = queryFilter[tag];
 	addFilterToQueryTable(tag);
@@ -3596,6 +3603,7 @@ function initIdleWarning() {
 					$(this).dialog('close');
 				},
 			"Extend session": function() {
+					$('.ui-widget-overlay').css('opacity', 0.0);
 					runExtendRequest();
 					setExtendTime();
 					$(this).dialog('close');
