@@ -3605,7 +3605,6 @@ function initIdleWarning() {
 					$(this).dialog('close');
 				},
 			"Extend session": function() {
-					$('.ui-widget-overlay').css('opacity', 0.0);
 					runExtendRequest();
 					setExtendTime();
 					$(this).dialog('close');
