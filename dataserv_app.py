@@ -2722,11 +2722,7 @@ class Application:
             # shallow copy
             path = [ x for x in path ]
 
-        writetags = []
-        listtags = []
-        
         subjpreds, listpreds, ordertags = path[-1]
-        save_listpreds = []
         
         unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
         if unique == False:
@@ -2738,78 +2734,118 @@ class Application:
         versions = self.queryopts.get('versions', versions)
         if versions not in [ 'latest', 'any' ]:
             versions = 'latest'
+
+        def wrap_results(listtags=None, listpreds=None, writetags=[], ordered=False):
+            # build full results tuple from derived listtags or listpreds, reordering a bit if ordered=False
+            if listpreds:
+                have_tags = set([ p.tag for p in listpreds ])
+            else:
+                if not listtags:
+                    listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
+                listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
+                have_tags = set(listtags)
+
+            listpreds += [ web.Storage(tag=tag, op=None, vals=[]) for tag in extra_tags if tag not in have_tags ]
+            have_tags.update( set(extra_tags) )
+
+            if not ordered:
+                # apply re-ordering hack
+                suffix = [ x for x in [ 'base name', 'name', 'id' ] if x in have_tags ]
+                listpreds_new = [ p for p in listpreds if p.tag not in suffix ]
+                for tag in suffix:
+                    listpreds_new += [ p for p in listpreds if p.tag == tag ]
+                listpreds = listpreds_new
+
+            listtags = [ p.tag for p in listpreds ]
+            path[-1] = ( subjpreds, listpreds, ordertags )
+
+            limit = self.queryopts.get('limit', 'default')
             
-        listopt = self.queryopts.get('list')
-        viewopt = self.queryopts.get('view')
-        view = self.select_view(viewopt)
-        default = self.select_view()
+            if limit == 'none':
+                limit = None
+            elif type(limit) == type('text'):
+                try:
+                    limit = int(limit)
+                except:
+                    limit = 25
+
+            offset = self.queryopts.get('offset', None)
+            if offset:
+                try:
+                    offset = int(offset)
+                except:
+                    offset = None
+
+            return (path, listtags, writetags, limit, offset, versions)
+
+        # each source-specific function conditionally derives listpreds only if source is present and valid in the request...
+
+        def derive_from_path():
+            # derive from query path's listpreds
+            if listpreds:
+                return wrap_results(listpreds=listpreds, ordered=True)
+            return None
+
         listname = '%s list tags' % list_prefix
         writename = '%s list tags write' % list_prefix
 
-        sview = None
-        if 'subject' in list_priority:
+        def derive_from_listopt():
+            # derive from 'list' query opt
+            listopt = self.queryopts.get('list')
+            if listopt:
+                if type(listopt) in [ list, set ]:
+                    return wrap_results(listtags=[ x for x in listopt if x ])
+                else:
+                    return wrap_results(listtags=[ listopt ])
+            return None
+
+        def derive_from_view():
+            # derive from view named by 'view' list opt
+            viewopt = self.queryopts.get('view')
+            view = self.select_view(viewopt)
+            if viewopt and view:
+                return wrap_results(listtags=view.get(listname, []), writetags=view.get(writename, []))
+            return None
+
+        def derive_from_default():
+            # derive from default view
+            default = self.select_view()
+            if default:
+                return wrap_results(listtags=default.get(listname, []), writetags=default.get(writename, []))
+            return None
+
+        def derive_from_subject():
+            # derive from first result's default_view tag
+            sview = None
             test_path = [ x for x in path ]
             test_path[-1] = (subjpreds, [web.Storage(tag='default view', op=None, vals=[])], [])
             results = self.select_files_by_predlist_path(test_path, versions=versions, limit=1)
             if len(results) > 0:
                 subject = results[0]
                 sview = self.select_view(subject['default view'])
+            if sview:
+                listtags = sview.get(listname, [])
+                if listtags:
+                    return wrap_results(listtags=listtags, writetags=sview.get(writename, []))
+            return None
+
+        def derive_from_all():
+            # get full list of tags, which is default behavior of wrap_results
+            return wrap_results()
 
         for source in list_priority:
-            if source == 'path' and listpreds:
-                listtags = [ pred.tag for pred in listpreds ]
-                save_listpreds = listpreds
-                break
-            elif source == 'list' and listopt:
-                if type(listopt) in [ list, set ]:
-                    listtags = [ x for x in listopt if x ]
-                else:
-                    listtags = [ listopt ]
-                break
-            elif source == 'view' and viewopt and view:
-                listtags = view.get(listname, [])
-                writetags = view.get(writename, [])
-                break
-            elif source == 'default' and default:
-                listtags = default.get(listname, [])
-                writetags = default.get(writename, [])
-                break
-            elif source == 'all':
-                listtags == None
-                break
-            elif source == 'subject' and sview and sview.get(listname, []):
-                listtags = sview.get(listname, [])
-                writetags = view.get(writename, [])
-                break
+            # dispatch each per-source function in prioritized source list, until we find one that works
+            result = dict(path=derive_from_path,
+                          list=derive_from_listopt,
+                          view=derive_from_view,
+                          default=derive_from_default,
+                          subject=derive_from_subject,
+                          all=derive_from_all).get(source, derive_from_all)()
+            if result != None:
+                return result
 
-        if not listtags:
-            listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
-
-        if save_listpreds:
-            listpreds = save_listpreds + [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags ]
-        else:
-            listpreds = [ web.Storage(tag=tag,op=None,vals=[]) for tag in extra_tags + listtags ]
-
-        path[-1] = ( subjpreds, listpreds, ordertags )
-
-        limit = self.queryopts.get('limit', 'default')
-        if limit == 'none':
-            limit = None
-        elif type(limit) == type('text'):
-            try:
-                limit = int(limit)
-            except:
-                limit = 25
-
-        offset = self.queryopts.get('offset', None)
-        if offset:
-            try:
-                offset = int(offset)
-            except:
-                offset = None
-                
-        return (path, listtags, writetags, limit, offset, versions)
-
+        return derive_from_all()
+                          
     # static class fields
     tagnameValidators = { 'owner' : validateRole,
                           'read users' : validateRolePattern,

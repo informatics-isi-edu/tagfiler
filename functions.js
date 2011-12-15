@@ -1460,8 +1460,8 @@ var ops = new Object();
 var opsExcludeTypes = new Object();
 var typedefSubjects = null;
 
-var headerTags = ['name', 'id'];
-var relocateColumns = ['base name'];
+var headerTags = [];
+var relocateColumns = [];
 var resultColumns = [];
 var viewListTags = new Object();
 var disableAjaxAlert = false;
