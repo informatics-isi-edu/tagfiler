@@ -1498,6 +1498,23 @@ var localeTimezone;
 
 var intervalPattern = new RegExp('\\((.+),(.+)\\)');
 
+function hasTagValueOption(tag, val) {
+	var ret = false;
+	if (select_tags[tag] != null) {
+		$.each(select_tags[tag], function(i, value) {
+			var optionVal = htmlEscape(value);
+			if (availableTags[tag] == 'timestamptz') {
+				optionVal = getLocaleTimestamp(optionVal);
+			}
+			if (optionVal == val) {
+				ret = true;
+				return false;
+			}
+		});
+	}
+	return ret;
+}
+
 function appendTagValuesOptions(tag, id) {
 	var select = $(document.getElementById(id));
 	$.each(select_tags[tag], function(i, value) {
@@ -2112,7 +2129,7 @@ function addToQueryTable(tableId, tag) {
 		td.css('margin-bottom', '0px');
 		td.css('padding', '0px');
 		tr.append(td);
-		addNewValue(ROW_COUNTER, availableTags[tag], selId, tag);
+		addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, null);
 		if ($('#' + selId).val() == 'Between') {
 			td.css('display', 'none');
 		}
@@ -2228,7 +2245,7 @@ function clearValues(tag, op, oldOp) {
 	return ret;
 }
 
-function addNewValue(row, type, selectOperatorId, tag) {
+function addNewValue(row, type, selectOperatorId, tag, values) {
 	var selVal = $('#' + selectOperatorId).val();
 	var valId = makeId('vals', ++VAL_COUNTER);
 	var table = $('#' + makeId('table', row));
@@ -2238,7 +2255,7 @@ function addNewValue(row, type, selectOperatorId, tag) {
 	table.append(tr);
 	if (selVal == 'Between') {
 		if (!isSelect(tag, type)) {
-			td = $('<td>');
+			var td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
 			var input = $('<input>');
@@ -2269,41 +2286,67 @@ function addNewValue(row, type, selectOperatorId, tag) {
 			input.change(function(event) {showPreview();});
 			td.append(input);
 		} else {
-			td = $('<td>');
+			var td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
-			var select = $('<select>');
-			var selid = makeId('select', 'value', VAL_COUNTER);
-			select.attr('id', selid);
-			select.change(function(event) {showPreview();});
-			var option = $('<option>');
-			option.text('Choose a value');
-			option.attr('value', '');
-			select.append(option);
-			td.append(select);
-			if (select_tags[tag] != null) {
-				appendTagValuesOptions(tag, selid);
+			if (values != null && !hasTagValueOption(tag, values[0])) {
+				var input = $('<input>');
+				if (availableTags[tag] == 'timestamptz') {
+					input.addClass('datetimepicker');
+				} else if (availableTags[tag] == 'date') {
+					input.addClass('datepicker');
+				}
+				input.attr('type', 'text');
+				input.mouseout(function(event) {showPreview();});
+				input.change(function(event) {showPreview();});
+				td.append(input);
 			} else {
-				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+				var select = $('<select>');
+				var selid = makeId('select', 'value', VAL_COUNTER);
+				select.attr('id', selid);
+				select.change(function(event) {showPreview();});
+				var option = $('<option>');
+				option.text('Choose a value');
+				option.attr('value', '');
+				select.append(option);
+				td.append(select);
+				if (select_tags[tag] != null) {
+					appendTagValuesOptions(tag, selid);
+				} else {
+					chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+				}
 			}
 			td = $('<td>');
 			tr.append(td);
 			td.append('AND');
 			td = $('<td>');
 			tr.append(td);
-			select = $('<select>');
-			selid = makeId('select', 'value', ++VAL_COUNTER);
-			select.attr('id', selid);
-			select.change(function(event) {showPreview();});
-			option = $('<option>');
-			option.text('Choose a value');
-			option.attr('value', '');
-			select.append(option);
-			td.append(select);
-			if (select_tags[tag] != null) {
-				appendTagValuesOptions(tag, selid);
+			if (values != null && !hasTagValueOption(tag, values[1])) {
+				var input = $('<input>');
+				if (availableTags[tag] == 'timestamptz') {
+					input.addClass('datetimepicker');
+				} else if (availableTags[tag] == 'date') {
+					input.addClass('datepicker');
+				}
+				input.attr('type', 'text');
+				input.mouseout(function(event) {showPreview();});
+				input.change(function(event) {showPreview();});
+				td.append(input);
 			} else {
-				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+				var select = $('<select>');
+				var selid = makeId('select', 'value', ++VAL_COUNTER);
+				select.attr('id', selid);
+				select.change(function(event) {showPreview();});
+				var option = $('<option>');
+				option.text('Choose a value');
+				option.attr('value', '');
+				select.append(option);
+				td.append(select);
+				if (select_tags[tag] != null) {
+					appendTagValuesOptions(tag, selid);
+				} else {
+					chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+				}
 			}
 		}
 	} else if (!isSelect(tag, type) || (selVal != 'Equal' && selVal != 'Not equal')) {
@@ -2324,19 +2367,32 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		td = $('<td>');
 		tr.append(td);
 		td.css('border-width', '0px');
-		var select = $('<select>');
-		var selid = makeId('select', 'value', VAL_COUNTER);
-		select.attr('id', selid);
-		select.change(function(event) {showPreview();});
-		var option = $('<option>');
-		option.text('Choose a value');
-		option.attr('value', '');
-		select.append(option);
-		td.append(select);
-		if (select_tags[tag] != null) {
-			appendTagValuesOptions(tag, selid);
+		if (values != null && !hasTagValueOption(tag, values[0])) {
+			var input = $('<input>');
+			if (availableTags[tag] == 'timestamptz') {
+				input.addClass('datetimepicker');
+			} else if (availableTags[tag] == 'date') {
+				input.addClass('datepicker');
+			}
+			input.attr('type', 'text');
+			input.mouseout(function(event) {showPreview();});
+			input.change(function(event) {showPreview();});
+			td.append(input);
 		} else {
-			chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			var select = $('<select>');
+			var selid = makeId('select', 'value', VAL_COUNTER);
+			select.attr('id', selid);
+			select.change(function(event) {showPreview();});
+			var option = $('<option>');
+			option.text('Choose a value');
+			option.attr('value', '');
+			select.append(option);
+			td.append(select);
+			if (select_tags[tag] != null) {
+				appendTagValuesOptions(tag, selid);
+			} else {
+				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+			}
 		}
 	}
 	if (selVal != 'Between') {
@@ -2350,8 +2406,9 @@ function addNewValue(row, type, selectOperatorId, tag) {
 		imgPlus.click({	row: ROW_COUNTER,
 						type: availableTags[tag],
 						selectOperatorId: selectOperatorId,
-						tag: tag },
-						function(event) {addNewValue(event.data.row, event.data.type, event.data.selectOperatorId, event.data.tag);});
+						tag: tag,
+						values: null },
+						function(event) {addNewValue(event.data.row, event.data.type, event.data.selectOperatorId, event.data.tag, event.data.values);});
 		td.append(imgPlus);
 		td = $('<td>');
 		tr.append(td);
@@ -2476,7 +2533,7 @@ function displayValuesTable(row, selId, tag) {
 			var th = getChild(tr, 2);
 			th.css('display', '');
 			if (clearValuesTable) {
-				addNewValue(row, availableTags[tag], selId, tag);
+				addNewValue(row, availableTags[tag], selId, tag, null);
 			}
 	}
 	$('#' + makeId('select', row)).attr('prevVal', op);
@@ -3476,7 +3533,7 @@ function addFilterToQueryTable(tag) {
 			if (availableTags[tag] != 'empty') {
 				if (pred['opUser'] == 'Between') {
 					var selId = select.attr('id');
-					addNewValue(ROW_COUNTER, availableTags[tag], selId, tag);
+					addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, pred['vals']);
 					var valTbody = getChild($('#' + tableId), 2).find('tbody');
 					var valTr = getChild(valTbody, 1);
 					var valTd = getChild(valTr, 1);
@@ -3488,7 +3545,9 @@ function addFilterToQueryTable(tag) {
 				} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
 					var selId = select.attr('id');
 					$.each(pred['vals'], function(j, value) {
-						addNewValue(ROW_COUNTER, availableTags[tag], selId, tag);
+						var arr = new Array();
+						arr.push(value);
+						addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, arr);
 						var valTbody = getChild($('#' + tableId), 2).find('tbody');
 						var row = getChild(valTbody, j+1);
 						var valTd = getChild(row, 1);
