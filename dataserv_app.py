@@ -378,7 +378,7 @@ def path_linearize(path, quotefunc=urlquote):
         if elem[1]:
             linear += u'(' + predlist_linearize(elem[1], quotefunc) + u')'
             if elem[2]:
-                linear += u','.join(myunicode(quotefunc(elem[2])))
+                linear += u','.join([ myunicode(quotefunc(otag)) for otag in elem[2] ])
         return linear
     return u'/' + u'/'.join([ elem_linearize(elem) for elem in path ])
 
