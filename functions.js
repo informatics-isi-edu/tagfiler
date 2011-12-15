@@ -1546,6 +1546,9 @@ function appendTagValuesOptions(tag, id) {
 		option.attr('value', optionVal);
 		select.append(option);
 	});
+	if (select_tags[tag].length == 0) {
+		alert("Warning: No values available for the operator.");
+	}
 }
 
 function DisplayDragAndDropBox(e) {
@@ -2142,19 +2145,26 @@ function addToQueryTable(tableId, tag) {
 		var table = $('<table>');
 		table.attr('id', makeId('table', ROW_COUNTER));
 		td.append(table);
-		td = $('<td>');
-		td.css('text-align', 'center');
-		td.css('margin-top', '0px');
-		td.css('margin-bottom', '0px');
-		td.css('padding', '0px');
-		tr.append(td);
+		var tdTable = $('<td>');
+		tdTable.css('text-align', 'center');
+		tdTable.css('margin-top', '0px');
+		tdTable.css('margin-bottom', '0px');
+		tdTable.css('padding', '0px');
+		tr.append(tdTable);
 		addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, null);
 		if ($('#' + selId).val() == 'Between') {
+			tdTable.css('display', 'none');
+		} else if ($('#' + selId).val() == 'Tag absent') {
 			td.css('display', 'none');
+			var thead = getChild($('#' + tableId), 1);
+			var tr = getChild(thead, 1);
+			var th = getChild(tr, 2);
+			th.css('display', 'none');
 		}
 	} else {
 		var thead = getChild($('#' + tableId), 1);
-		var th = getChild(thead, 2);
+		var tr = getChild(thead, 1);
+		var th = getChild(tr, 2);
 		th.css('display', 'none');
 	}
 }
@@ -2216,7 +2226,10 @@ function getSelectTagOperator(tag, type) {
 				select.append(option);
 		}
 	});
-	if (type == 'timestamptz' || type == 'date') {
+	if (select_tags[tag] != null && select_tags[tag].length == 0) {
+		select.val('Tag absent');
+		select.attr('prevVal', 'Tag absent');
+	} else if (type == 'timestamptz' || type == 'date') {
 		select.val('Between');
 		select.attr('prevVal', 'Between');
 	} else if (type == 'empty') {
@@ -2383,7 +2396,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		input.change(function(event) {showPreview();});
 		td.append(input);
 	} else {
-		td = $('<td>');
+		var td = $('<td>');
 		tr.append(td);
 		td.css('border-width', '0px');
 		if (values != null && !hasTagValueOption(tag, values[0])) {
@@ -2633,7 +2646,9 @@ function initDropDownList(tag) {
 		dataType: 'json',
 		success: function(data, textStatus, jqXHR) {
 			totalRows = data[0][tag];
-			if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
+			if (totalRows == 0) {
+				select_tags[tag] = new Array();
+			} else if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
 				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
 				$.ajax({
 					url: queryUrl,
