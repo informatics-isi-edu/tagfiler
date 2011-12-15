@@ -568,13 +568,13 @@ tagacl "homepage order" write "${admin}"
 homepath="https://${HOME_HOST}/${SVCPREFIX}"
 
 homelinks=(
+$(dataset "Query by tags"                        url "${homepath}/query"                           "${admin}" "${curator}" "${downloader}")
 $(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}")
-$(dataset "Upload study"                         url "${homepath}/study?action=upload"             "${admin}" "${curator}" "${uploader}")
-$(dataset "Download study"                       url "${homepath}/study?action=download"           "${admin}" "${curator}" "${downloader}")
-$(dataset "Query by tags, latest versions"       url "${homepath}/query?action=edit&versions=latest"	"${admin}" "${curator}" "${downloader}")
-$(dataset "Query by tags, all versions"          url "${homepath}/query?action=edit&versions=any"  "${admin}" "${curator}" "${downloader}")
 $(dataset "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*")
+$(dataset "View type definitions"                url "${homepath}/query/typedef?view=typedef"      "${admin}" "*")
+$(dataset "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*")
 $(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}")
+$(dataset "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}")
 $(dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}")
 )
 
@@ -670,7 +670,7 @@ cfgtag "client socket timeout" int8 '120'
 cfgtag "file write users" text "*" "admin"
 cfgtag "tagdef write users" text "*" "admin"
 
-cfgtag "file list tags" text bytes owner 'read users' 'write users'
+cfgtag "file list tags" text 'id' 'name' bytes owner 'read users' 'write users'
 #cfgtag "file list tags write" text 'read users' 'write users' 'owner'
 
 #cfgtag "applet tags" text ...
@@ -678,50 +678,32 @@ cfgtag "file list tags" text bytes owner 'read users' 'write users'
 #cfgtag "applet properties" text 'tagfiler.properties'
 
 tagdeftags=$(dataset "tagdef" view "${admin}" "*")
-for tagname in "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
-do
-   tag "$tagdeftags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$tagdeftags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$tagdeftags" "_cfg_file list tags" tagdef 'id' 'tagdef' "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
+tag "$tagdeftags" "_cfg_tag list tags" tagdef 'id' 'tagdef' "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 
 typedeftags=$(dataset "typedef" view "${admin}" "*")
-for tagname in "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
-do
-   tag "$typedeftags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$typedeftags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$typedeftags" "_cfg_file list tags" tagdef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
+tag "$typedeftags" "_cfg_tag list tags" tagdef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
 
 filetags=$(dataset "file" view "${admin}" "*")
-tag "$filetags" "_cfg_file list tags" tagdef 'bytes' 'owner' 'read users' 'write users'
-tag "$filetags" "_cfg_tag list tags" tagdef 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'name' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
+tag "$filetags" "_cfg_file list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users'
+tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
 
 viewtags=$(dataset "view" view "${admin}" "*")
-for tagname in "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
-do
-   tag "$viewtags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$viewtags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$viewtags" "_cfg_file list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
+tag "$viewtags" "_cfg_tag list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
 
 vcontainstags=$(dataset "vcontains" view "${admin}" "*")
-for tagname in "vcontains"
-do
-   tag "$vcontainstags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$vcontainstags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$vcontainstags" "_cfg_file list tags" tagdef 'id' 'name' 'version' 'vcontains'
+tag "$vcontainstags" "_cfg_tag list tags" tagdef 'id' 'name' 'version' 'vcontains'
 
 containstags=$(dataset "contains" view "${admin}" "*")
-for tagname in "contains"
-do
-   tag "$containstags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$containstags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$containstags" "_cfg_file list tags" tagdef 'id' 'name' 'contains'
+tag "$containstags" "_cfg_tag list tags" tagdef 'id' 'name' 'contains'
 
 urltags=$(dataset "url" view "${admin}" "*")
-for tagname in "url"
-do
-   tag "$urltags" "_cfg_file list tags" tagdef "$tagname"
-   tag "$urltags" "_cfg_tag list tags" tagdef "$tagname"
-done
+tag "$urltags" "_cfg_file list tags" tagdef 'id' 'name' 'url'
+tag "$urltags" "_cfg_tag list tags" tagdef 'id' 'name' 'url'
 
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...
