@@ -2751,15 +2751,11 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		var td = getChild(tr1, i+1);
 		if (td.get(0) == null) {
 			var td = $('<td>');
-			if (i < (resultColumns.length - 1)) {
-				td.addClass('separator');
-			}
+			td.addClass('separator');
 			td.css('text-align', 'center');
 			tr1.append(td);
 			var th = $('<th>');
-			if (i < (resultColumns.length - 1)) {
-				th.addClass('separator');
-			}
+			th.addClass('separator');
 			tr2.append(th);
 			var table = $('<table>');
 			th.append(table);
@@ -2779,9 +2775,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			th.append(span);
 			
 			td = $('<td>');
-			if (i < (resultColumns.length - 1)) {
-				td.addClass('separator');
-			}
+			td.addClass('separator');
 			tr3.append(td);
 			var divConstraint = $('<div>');
 			td.append(divConstraint);
@@ -2789,6 +2783,24 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			th = $('<th>');
 			trfoot.append(th);
 			th.html('&nbsp;');
+		}
+		var td = getChild(tr1, i+1);
+		if (i < (resultColumns.length - 1)) {
+			if (!td.hasClass('separator')) {
+				td.addClass('separator');
+				td = getChild(tr2, i+1);
+				td.addClass('separator');
+				td = getChild(tr3, i+1);
+				td.addClass('separator');
+			}
+		} else {
+			if (td.hasClass('separator')) {
+				td.removeClass('separator');
+				td = getChild(tr2, i+1);
+				td.removeClass('separator');
+				td = getChild(tr3, i+1);
+				td.removeClass('separator');
+			}
 		}
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
 		var tdSort = getChild(tr1, i+1);
