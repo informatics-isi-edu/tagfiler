@@ -1721,12 +1721,15 @@ function dropColumn(e, tag, id, append) {
 	insertColumn(tagToMoveIndex, tagToDropIndex, append);
 	resetColumnsIndex();
 	$('td.highlighted').removeClass('highlighted');
-	
-	// update the permanent link
+	updatePreviewURL();
+}
+
+function updatePreviewURL() {
 	var predUrl = getQueryPredUrl();
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '', encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
 	$('#Query_URL').attr('href', queryUrl);
+	lastPreviewURL = queryUrl;
 }
 
 function str(value) {
@@ -3321,6 +3324,7 @@ function deleteColumn(column, count) {
 	resetColumnsIndex();
 	hideColumn(resultColumns.length - 1);
 	resultColumns.splice(deleteIndex, 1);
+	updatePreviewURL();
 }
 
 function encodeSafeURIComponent(value) {
