@@ -1721,6 +1721,12 @@ function dropColumn(e, tag, id, append) {
 	insertColumn(tagToMoveIndex, tagToDropIndex, append);
 	resetColumnsIndex();
 	$('td.highlighted').removeClass('highlighted');
+	
+	// update the permanent link
+	var predUrl = getQueryPredUrl();
+	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
+	var queryUrl = getQueryUrl(predUrl, '', encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
+	$('#Query_URL').attr('href', queryUrl);
 }
 
 function str(value) {
