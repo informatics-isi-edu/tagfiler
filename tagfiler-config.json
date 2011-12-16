@@ -1,0 +1,21 @@
+{
+
+   "_general instructions" : {
+     "format"   : "This file is a Javascript Object Notation (JSON) string",
+     "behavior" : "Enabled parameters override built-in defaults",
+     "disable"  : "Disable parameters with a leading underscore in key..."
+   },
+
+   "_per-parameter instructions" : {
+     "db" : "The name of the database (default 'tagfiler')",
+     "dbnstr" : "The type of RDBMS (default 'postgres')",
+     "dbmaxconnections" : "Limit the number of SQL connections when pooling"
+   },
+
+   "_db" : "tagfiler",
+
+   "_dbnstr" : "postgres",
+
+   "_dbmaxconnections" : "8"
+
+}

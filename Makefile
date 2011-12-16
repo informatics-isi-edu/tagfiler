@@ -68,6 +68,8 @@ FILES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
 
+SBINFILES=runuser-rsh
+
 WEBSTATICFILES=logo.png \
 	functions.js \
 	jquery.js \
@@ -115,6 +117,7 @@ IMAGEFILES=$(IMAGEBASES:%=images/%)
 $(HOME)/.tagfiler.predeploy:
 	yum -y --skip-broken install postgresql{,-devel,-server} || true
 	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil,-json} || true
+	postgresql-setup initdb || true
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
 
@@ -123,6 +126,7 @@ deploy: $(HOME)/.tagfiler.predeploy install
 	./register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
+	mkdir -p /usr/local/sbin
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/images
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
@@ -135,6 +139,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
 	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
+	rsync -av $(SBINFILES) /usr/local/sbin/.
 	./register-software-version.sh $(INSTALLSVC)
 
 restart: force install

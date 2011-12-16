@@ -320,10 +320,14 @@ logger.setLevel(logging.INFO)
 
 if hasattr(json, 'write'):
     jsonWriter = json.write
+    jsonReader = json.read
 elif hasattr(json, 'dumps'):
     jsonWriter = json.dumps
+    jsonReader = json.loads
 else:
     raise RuntimeError(ast=None, data='Could not configure JSON library.')
+
+
 
 def urlquote(url, safe=""):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -515,11 +519,18 @@ class RuntimeError (WebException):
         desc = u'The request execution encountered a runtime error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
+try:
+    # allow a per-daemon account set of configuration parameters to override hard-coded defaults
+    homedir = os.environ.get('HOME', './')
+    f = open('%s/tagfiler-config.json' % homedir)
+    s = f.read()
+    f.close()
+    global_env = jsonReader(s)
+except:
+    global_env = {}
+
 def getParamEnv(suffix, default=None):
-    if hasattr(web.ctx, 'env'):
-        return web.ctx.env.get(suffix, default)
-    else:
-        return default
+    return global_env.get(suffix, default)
 
 try:
     p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)

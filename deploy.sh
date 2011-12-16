@@ -80,6 +80,13 @@ then
     useradd -m -r ${SVCUSER}
 fi
 
+SVCHOME=$(eval "echo ~${SVCUSER}")
+
+# allow httpd/mod_wsgi based daemon process to access its homedir
+semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+semanage fcontext --add --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+restorecon -rv "${SVCHOME}"
+
 chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
 chown ${SVCUSER}: ${LOGDIR}
@@ -113,7 +120,9 @@ runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
 
-SVCHOME=$(eval "echo ~${SVCUSER}")
+sed -e "s/svcuser/$SVCUSER/" tagfiler-config.json > ${SVCHOME}/tagfiler-config.json
+chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
+chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 
 cp dbsetup.sh ${SVCHOME}/dbsetup.sh
 chown ${SVCUSER}: ${SVCHOME}/dbsetup.sh
@@ -133,12 +142,11 @@ cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
 # need this for some of the RESTful URIs we can generate
 AllowEncodedSlashes On
 
-WSGIDaemonProcess ${SVCPREFIX} processes=32 threads=4 user=${SVCUSER} maximum-requests=200
-
+WSGIPythonOptimize 1
+WSGIDaemonProcess ${SVCPREFIX} processes=4 threads=4 user=${SVCUSER} maximum-requests=2000
 WSGIScriptAlias /${SVCPREFIX} ${TAGFILERDIR}/wsgi/tagfiler.wsgi
 
 WSGISocketPrefix ${RUNDIR}/wsgi
-WSGIChunkedRequest On
 
 Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
 
@@ -171,16 +179,6 @@ Alias /${SVCPREFIX}/static /var/www/html/${SVCPREFIX}/static
    UnsetEnv dontlog
 
 </Location>
-
-<Directory ${TAGFILERDIR}/wsgi>
-
-#    SetEnv dbnstr postgres
-#    SetEnv dbstr  ${SVCUSER}
-#    SetEnv dbmaxconnections 4
-
-     # All other settings are tagged on dataset 'tagfiler configuration' now
-
-</Directory>
 
 EOF
 
@@ -219,82 +217,20 @@ chmod -R a+r ${deploydir}
 EOF
 fi
 
-cat > /usr/sbin/runuser-rsh <<EOF
-#!/bin/sh
-
-# support basic RSH args on top of runuser for local commands like rsync
-
-in_options=true
-TARGET_USER=
-
-usage()
+detect_service()
 {
-    cat <<E2OF
-usage: \$0 [-l <user>] hostname cmd [arg]...
-
-Runs "cmd arg..." locally, using runuser if a target user is specified.
-Hostname is ignored for compatibility with RSH for localhost.
-
-E2OF
+    [[ -x /sbin/chkconfig ]] && { /sbin/chkconfig --list "$1" 2> /dev/null | grep :on ; } && return 0
+    [[ -x /bin/systemctl ]] && { /bin/systemctl is-enabled "$1".service 2> /dev/null | grep enabled ; } && return 0
+    return 1
 }
 
-error()
-{
-    cat <<E2OF
-\$0: \$@
-E2OF
-    usage
+SYSLOGSVC=
+[[ -f /etc/syslog.conf ]] && detect_service "syslog" && SYSLOGSVC=syslog
+[[ -f /etc/rsyslog.conf ]] && detect_service "rsyslog" && SYSLOGSVC=rsyslog
+[[ -z "$SYSLOGSVC" ]] && {
+    echo "Failed to detect system logging service, cannot enable logging properly" >&2
     exit 1
 }
-
-while [[ -n "\${in_options}" ]]
-do
-  case "\$1" in
-      -l)
-	  TARGET_USER="\$2"
-	  shift 2
-	  ;;
-
-      --)
-	  shift
-	  in_options=
-	  ;;
-
-      -*)
-	  error Unsupported option flag "\\"\$1\\"".
-	  ;;
-
-      *)
-	  in_options=
-	  ;;
-  esac
-done
-
-# discard hostname
-shift
-
-[[ \$# -gt 0 ]] || error Expected command and argument list
-
-if [[ -n "\${TARGET_USER}" ]]
-then
-    # run via runuser with target user
-    commandstring="\$1"
-    shift
-
-    for arg in "\$@"
-    do
-      commandstring+=" \\"\$(sed -e 's/\\"/\\\\\\"/g' <<< "\$arg")\\""
-    done
-
-    runuser -c "\${commandstring}" - "\${TARGET_USER}"
-else
-    # run command directly since there is no target user to switch to
-    exec "\$@"
-fi
-EOF
-
-chmod a+x /usr/sbin/runuser-rsh
-
 
 if [[ -d /etc/logrotate.d/ ]]
 then
@@ -309,8 +245,8 @@ then
     ifempty
     sharedscripts
     postrotate
-	/bin/kill -HUP \`cat /var/run/syslogd.pid 2> /dev/null\` 2> /dev/null || true
-	rsync --delete-after -a -e /usr/sbin/runuser-rsh /var/log/${SVCPREFIX}-* ${SVCUSER}@localhost:/var/www/${SVCPREFIX}-logs/ 2>/dev/null || true
+	/sbin/service $SYSLOGSVC restart 2> /dev/null\` 2> /dev/null || true
+	/usr/bin/rsync --delete-after -a -e /usr/local/sbin/runuser-rsh /var/log/${SVCPREFIX}-* ${SVCUSER}@localhost:/var/www/${SVCPREFIX}-logs/ 2>/dev/null || true
     endscript
 }
 EOF
@@ -318,6 +254,7 @@ fi
 
 # clean up old logging hacks
 [[ -f /etc/sysconfig/${SVCPREFIX}-log ]] && rm -f /etc/sysconfig/${SVCPREFIX}-log
+[[ -f /usr/sbin/runuser-rsh ]] && rm -f /usr/sbin/runuser-rsh
 [[ -f /usr/sbin/${SVCPREFIX}-log ]] && rm -f /usr/sbin/${SVCPREFIX}-log 
 [[ -f /etc/rc.d/init.d/${SVCPREFIX}-log ]] && {
 
@@ -326,26 +263,27 @@ fi
     rm /etc/rc.d/init.d/${SVCPREFIX}-log
 
 }
-if grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/syslog.conf
+
+if grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/${SYSLOGSVC}.conf
 then
     # disable old, conflicting entry
-    TMPF=$(mktemp syslog.conf.XXXXXXXXXX)
-    cat /etc/syslog.conf | sed -e 's:^\( *# *\)\(.*local1\..*|/var/log/${SVCPREFIX}\):# \2:' > $TMPF && cat $TMPF > /etc/syslog.conf
+    TMPF=$(mktemp ${SYSLOGSVC}.conf.XXXXXXXXXX)
+    cat /etc/${SYSLOGSVC}.conf | sed -e 's:^\( *# *\)\(.*local1\..*|/var/log/${SVCPREFIX}\):# \2:' > $TMPF && cat $TMPF > /etc/${SYSLOGSVC}.conf
     rm $TMPF
-    service syslog restart
+    service ${SYSLOGSVC} restart
 fi
 [[ -p /var/log/${SVCPREFIX} ]] && rm -f /var/log/${SVCPREFIX}
 
 
 # enable new logging entry
-if ! grep -q "^ *local1\..*/var/log/${SVCPREFIX}" /etc/syslog.conf
+if ! grep -q "^ *local1\..*/var/log/${SVCPREFIX}" /etc/${SYSLOGSVC}.conf
 then
-    cat >> /etc/syslog.conf <<EOF
+    cat >> /etc/${SYSLOGSVC}.conf <<EOF
 
 # ${SVCPREFIX} log entries
 local1.*                                        /var/log/${SVCPREFIX}
 
 EOF
-    service syslog restart
+    service ${SYSLOGSVC} restart
 fi
 
