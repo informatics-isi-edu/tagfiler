@@ -1612,8 +1612,8 @@ function insertColumn(index1, index2, append) {
 	var thead = $('#Query_Preview_header');
 	for (var i=0; i < thead.children().length; i++) {
 		var tr = getChild(thead, i+1);
-		var col1 = getChild(tr, index1 + 1);
-		var col2 = getChild(tr, index2 + 1);
+		var col1 = getChild(tr, index1 + 2);
+		var col2 = getChild(tr, index2 + 2);
 		if (append) {
 			col2.addClass('separator');
 			col1.removeClass('separator');
@@ -1635,8 +1635,8 @@ function insertColumn(index1, index2, append) {
 		if (tr.css('display') == 'none') {
 			break;
 		}
-		var col1 = getChild(tr, index1 + 1);
-		var col2 = getChild(tr, index2 + 1);
+		var col1 = getChild(tr, index1 + 2);
+		var col2 = getChild(tr, index2 + 2);
 		if (append) {
 			col2.addClass('separator');
 			col1.removeClass('separator');
@@ -1658,9 +1658,9 @@ function resetColumnsIndex() {
 	var thead = $('#Query_Preview_header');
 	var tr = getChild(thead, 2);
 	for (var i=0; i < resultColumns.length; i++) {
-		var tr1 = getChild(tr, i+1).find('tr');
+		var tr1 = getChild(tr, i+2).find('tr');
 		var th1 = getChild(tr1, 1);
-		th1.attr('iCol', '' + i);
+		th1.attr('iCol', '' + (i+1));
 	}
 	var tbody = $('#Query_Preview_tbody');
 	for (var i=0; i < tbody.children().length; i++) {
@@ -1669,13 +1669,13 @@ function resetColumnsIndex() {
 			break;
 		}
 		for (var j=0; j < resultColumns.length; j++) {
-			var td = getChild(tr, j+1);
-			th1.attr('iCol', '' + j);
+			var td = getChild(tr, j+2);
+			th1.attr('iCol', '' + (j+1));
 		}
 	}
 }
 
-function dropColumn(e, tag, id, append) {
+function dropColumn(e, tag, append) {
 	if (tagToMove == null) {
 		return;
 	}
@@ -1764,54 +1764,45 @@ function getColumnOver(e) {
 	var x = parseInt(e.pageX);
 	var y = parseInt(e.pageY);
 	var tr = getChild(header, 2);
+	minX += getChild(tr, 1).width();
 	if (y < minY || y > maxY) {
 		$('td.highlighted').removeClass('highlighted');
 	} else if (x <= minX) {
 		var children = tr.children();
 		var tag = resultColumns[0];
-		var th = $(children[0]).find('th');
-		var id = th.attr('id');
+		var th = $(children[1]).find('th');
 		ret['tag'] = tag;
-		ret['id'] = id;
 		ret['append'] = false;
-		ret['index'] = 0;
 		var trs = $('.tablerow');
 		$('td.highlighted').removeClass('highlighted');
-		$('td:nth-child('+1+')', trs).addClass('highlighted');
+		$('td:nth-child(' + 2 + ')', trs).addClass('highlighted');
 	} else if (x >= maxX) {
 		var children = tr.children();
 		var i = resultColumns.length;
 		var tag = resultColumns[i-1];
-		var th = $(children[i-1]).find('th');
-		var id = th.attr('id');
+		var th = $(children[i]).find('th');
 		ret['tag'] = tag;
-		ret['id'] = id;
 		ret['append'] = true;
-		ret['index'] = i - 1;
 	} else {
 		var children = tr.children();
-		for (var i=1; i <= resultColumns.length; i++) {
-			var j = (i < resultColumns.length) ? i : (i-1);
-			var left = parseInt($(children[j]).offset().left);
-			if (left >= x || i == resultColumns.length) {
-				j = (j == i) ? i - 1 : j;
+		for (var i=2; i <= resultColumns.length + 1; i++) {
+			var left = (i <= resultColumns.length) ? parseInt($(children[i]).offset().left) : maxX;
+			if (left >= x || i == resultColumns.length + 1) {
 				var append = false;
-				if (i == resultColumns.length) {
+				if (i == resultColumns.length + 1) {
+					left = parseInt($(children[resultColumns.length]).offset().left);
 					if (x >= (maxX + left)/2) {
 						append = true;
 					}
 				}
-				var tag = resultColumns[j];
-				var th = $(children[j]).find('th');
-				var id = th.attr('id');
+				var tag = resultColumns[(i < resultColumns.length + 1) ? i-2 : resultColumns.length - 1];
+				var th = $(children[i]).find('th');
 				ret['tag'] = tag;
-				ret['id'] = id;
 				ret['append'] = append;
-				ret['index'] = j;
 				var trs = $('.tablerow');
 				$('td.highlighted').removeClass('highlighted');
 				if (!append) {
-					$('td:nth-child('+(j+1)+')', trs).addClass('highlighted');
+					$('td:nth-child(' +  i + ')', trs).addClass('highlighted');
 				}
 				break;
 			}
@@ -1866,7 +1857,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 			HideDragAndDropBox();
 			tagToMove = null;
 		} else {
-			dropColumn(e, ret['tag'], ret['id'], ret['append']);
+			dropColumn(e, ret['tag'], ret['append']);
 		}
 	});
 	loadTags();
