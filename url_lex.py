@@ -98,5 +98,5 @@ def t_error(t):
     raise LexicalError()
 
 def make_lexer():
-    return lex.lex(debug=False, optimize=0, lextab='urllextab')
+    return lex.lex(debug=False, optimize=1, lextab='urllextab')
 
