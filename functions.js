@@ -1719,15 +1719,17 @@ function dropColumn(e, tag, append) {
 	insertColumn(tagToMoveIndex, tagToDropIndex, append);
 	resetColumnsIndex();
 	$('td.highlighted').removeClass('highlighted');
-	updatePreviewURL();
+	updatePreviewURL(true);
 }
 
-function updatePreviewURL() {
+function updatePreviewURL(force) {
 	var predUrl = getQueryPredUrl();
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
-	var queryUrl = getQueryUrl(predUrl, '', encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
+	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
 	$('#Query_URL').attr('href', queryUrl);
-	lastPreviewURL = queryUrl;
+	if (force) {
+		lastPreviewURL = queryUrl;
+	}
 }
 
 function str(value) {
@@ -1821,6 +1823,27 @@ function setPreviousPage() {
 	showPreview();
 }
 
+function initPreview() {
+	var searchString = window.location.search;
+	if (searchString != null && searchString.length > 1) {
+		searchString = searchString.substring(1);
+		var searchOptions = searchString.split('&');
+		var offset = 0;
+		$.each(searchOptions, function(i, option) {
+			var value = option.split('=');
+			if (value[0] == 'limit') {
+				PREVIEW_LIMIT = parseInt(value[1]);
+				LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
+				$('#previewLimit').val(value[1]);
+			} else if (value[0] == 'offset') {
+				offset = parseInt(value[1]);
+			}
+		});
+		PAGE_PREVIEW = offset / PREVIEW_LIMIT;
+		LAST_PAGE_PREVIEW = PAGE_PREVIEW;
+	}
+}
+
 function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	HOME = home;
 	USER = user;
@@ -1837,6 +1860,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
+	initPreview();
 	// build the userOp dictionary
 	$.each(ops, function(key, value) {
 		userOp[value] = key;
@@ -2581,14 +2605,14 @@ function showQueryResults(limit) {
 	document.body.style.cursor = "wait";
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
-	$('#Query_URL').attr('href', queryUrl);
+	updatePreviewURL(false);
 	showQueryResultsPreview(predUrl, limit, offset);
 }
 
 function showQueryResultsPreview(predUrl, limit, offset) {
 	var columnArray = new Array();
 	columnArray.push('id');
-	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
+	var queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -3311,7 +3335,7 @@ function deleteColumn(column, count) {
 	resetColumnsIndex();
 	hideColumn(resultColumns.length - 1);
 	resultColumns.splice(deleteIndex, 1);
-	updatePreviewURL();
+	updatePreviewURL(true);
 }
 
 function encodeSafeURIComponent(value) {
