@@ -3273,7 +3273,7 @@ function hideColumn(index) {
 	var thead = $('#Query_Preview_header');
 	for (var i=0; i < thead.children().length; i++) {
 		var tr = getChild(thead, i+1);
-		var col = getChild(tr, index + 1);
+		var col = getChild(tr, index + 2);
 		col.css('display', 'none');
 	}
 	var tbody = $('#Query_Preview_tbody');
@@ -3282,12 +3282,12 @@ function hideColumn(index) {
 		if (tr.css('display') == 'none') {
 			break;
 		}
-		var col = getChild(tr, index + 1);
+		var col = getChild(tr, index + 2);
 		col.css('display', 'none');
 	}
 	var tfoot = $('#Query_Preview_tfoot');
 	var tr = getChild(tfoot, 1);
-	var col = getChild(tr, resultColumns.length);
+	var col = getChild(tr, index + 2);
 	col.css('display', 'none');
 }
 
