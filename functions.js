@@ -2762,30 +2762,19 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		var td = getChild(tr1, i+2);
 		if (td.get(0) == null) {
 			var td = $('<td>');
-			td.addClass('separator');
-			td.css('text-align', 'center');
 			tr1.append(td);
+			td.addClass('separator');
+			td.addClass('tableheadercell');
+			td.addClass('topnav');
+			td.css('text-align', 'center');
+			
 			var th = $('<th>');
 			th.addClass('separator');
-			tr2.append(th);
-			var table = $('<table>');
-			th.append(table);
-			var thead1 = $('<thead>');
-			thead1.addClass('topnav');
-			table.append(thead1);
-			var tr = $('<tr>');
-			thead1.append(tr);
-			tr = $('<tr>');
-			thead1.append(tr);
-			var th = $('<th>');
 			th.addClass('tableheadercell');
-			tr.append(th);
-			th = $('<th>');
-			tr.append(th);
-			var span = $('<span>');
-			th.append(span);
+			tr2.append(th);
 			
 			td = $('<td>');
+			td.addClass('tableheadercell');
 			td.addClass('separator');
 			tr3.append(td);
 			var divConstraint = $('<div>');
@@ -2815,30 +2804,20 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		}
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
 		var tdSort = getChild(tr1, i+2);
+		tdSort.html('');
 		tdSort.attr('id', columSortId);
+		tdSort.attr('iCol', '' + (i+1));
 		var sortValue = getSortOrder(column);
+		var label = $('<label>');
+		tdSort.append(label);
 		if (sortValue != '') {
-			tdSort.html(sortValue);
+			label.html(sortValue);
 		} else {
-			tdSort.html('&nbsp;');
+			label.html('&nbsp;');
 		}
-		var tr = getChild(tr2, i+2).find('tr');
-		var td3 = getChild(tr3, i+2);
-		td3.css('display', '');
-		var tdfoot = getChild(trfoot, i+2);
-		tdfoot.css('display', '');
-		
-		var th = getChild(tr, 1);
-		th.css('display', '');
-		th.html('');
-		th.attr('iCol', '' + (i+1));
-		th.mousedown(function(event) {copyColumn(event, column, thId);});
-		th.mouseup(function(event) {dropColumn(event, column, thId, false);});
-		th.attr('id', thId);
-		th.append(column);
 		var ul = $('<ul>');
 		ul.addClass('subnav');
-		th.append(ul);
+		tdSort.append(ul);
 		var li = $('<li>');
 		li.addClass('item');
 		li.html('Clear column filter');
@@ -2866,6 +2845,21 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, (sortValue == ''), true);});
 		ul.append(li);
+		var span = $('<span>');
+		tdSort.append(span);
+		
+		var th = getChild(tr2, i+2);
+		th.css('display', '');
+		th.html('');
+		th.attr('iCol', '' + (i+1));
+		th.mousedown(function(event) {copyColumn(event, column, thId);});
+		th.mouseup(function(event) {dropColumn(event, column, thId, false);});
+		th.attr('id', thId);
+		th.append(column);
+		
+		var td3 = getChild(tr3, i+2);
+		td3.css('display', '');
+		td3.attr('iCol', '' + (i+1));
 		var divConstraint = getChild(td3, 1);
 		divConstraint.css('white-space', 'nowrap');
 		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
@@ -2874,6 +2868,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			var constraint = getTagSearchDisplay(column);
 			divConstraint.append(constraint);
 		}
+		
+		var tdfoot = getChild(trfoot, i+2);
+		tdfoot.css('display', '');
 	});
 	var columnLength = tr1.children().length;
 	for (var i=columnLimit; i < columnLength; i++) {
@@ -2919,6 +2916,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					// context menu here
 					var td = $('<td>');
 					td.addClass('separator');
+					td.attr('valign', 'top');
 					tr.append(td);
 				}
 				var td = getChild(tr, 1);
@@ -2930,6 +2928,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 						td = $('<td>');
 						td.addClass('tablecell');
 						td.addClass('separator');
+						td.attr('valign', 'top');
 						tr.append(td);
 					}
 					td.css('display', '');
@@ -3025,18 +3024,18 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					i--;
 				}
 			}
-			$('thead.topnav tr th ul.subnav li.item').click(function(event) {event.preventDefault();});
-			$('thead.topnav tr th ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
-			$('thead.topnav span').click(function() {
+			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
+			$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
+			$('td.topnav span').click(function() {
 				enabledDrag = false;
-				var ul = $(this).parent().parent().find("ul.subnav");
+				var ul = $(this).parent().find("ul.subnav");
 				if (ul.children().length == 0) {
 					fillIdContextMenu(ul);
 				}
 				var height = $(this).height();
 				var top = ($(this).position().top + height) + 'px';
 				$('ul.subnav').css('top', top);
-				var left = $(this).position().left - 170;
+				var left = $(this).position().left + $(this).width() - 170;
 				if (left < 0) {
 					left = 0;
 				}
@@ -3044,11 +3043,11 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				$('ul.subnav').css('left', left);
 				
 				//Following events are applied to the subnav itself (moving subnav up and down)
-				$(this).parent().parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
+				$(this).parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
 		
-				$(this).parent().parent().hover(function() {
+				$(this).parent().hover(function() {
 				}, function(){	
-					$(this).parent().parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
+					$(this).parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
 					enabledDrag = true;
 				});
 		
@@ -3073,11 +3072,6 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				if (tagToMove == null) {
 					$('td.highlighted').removeClass('highlighted');
 				}
-			});
-			$('.tablecolumnsort').hover( function(e) {
-				DisplayTipBox(e, 'Sort column');
-			}, function() {
-				HideTipBox();
 			});
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
 		},
@@ -3144,22 +3138,13 @@ function fillIdContextMenu(ul) {
 }
 
 function getIdContextMenuSlot(td, id) {
-	var idTable = $('<table>');
-	td.append(idTable);
-	var idThead = $('<thead>');
-	idThead.addClass('topnav');
-	idTable.append(idThead);
-	var idTr = $('<tr>');
-	idThead.append(idTr);
-	var idTh = $('<th>');
-	idTr.append(idTh);
+	td.addClass('topnav');
 	var ul = $('<ul>');
 	ul.attr('idVal', '' + id);
-	idTh.append(ul);
+	td.append(ul);
 	ul.addClass('subnav');
 	var span = $('<span>');
-	idTh.append(span);
-	td.attr('align', 'right');
+	td.append(span);
 }
 
 function htmlEscape(str) {
@@ -3171,31 +3156,11 @@ function htmlEscape(str) {
             .replace(/>/g, '&gt;');
 }
 
-function setSortTipBox(id, index) {
-	var content;
-	switch(index) {
-		case 1:
-			content = 'First sorted column';
-			break;
-		case 2:
-			content = 'Second sorted column';
-			break;
-		default:
-			content = 'n-th sorted column';
-			break;
-	}
-	$('#' + id).hover( function(e) {
-		DisplayTipBox(e, content);
-	}, function() {
-		HideTipBox();
-	});
-}
-
 function sortColumn(column, id, count, sort) {
 	if (sort) {
 		sortColumnsArray.push(column);
 		var length = sortColumnsArray.length;
-		$('#' + id).html('' + length);
+		getChild($('#' + id), 1).html('' + length);
 		var content;
 		switch(length) {
 			case 1:
@@ -3208,21 +3173,21 @@ function sortColumn(column, id, count, sort) {
 				content = 'n-th sorted column';
 				break;
 		}
-		$('#' + id).hover( function(e) {
+		getChild($('#' + id), 1).hover( function(e) {
 			DisplayTipBox(e, content);
 		}, function() {
 			HideTipBox();
 		});
 	} else {
 		stopSortColumn(column, count);
-		$('#' + id).unbind('mouseenter mouseleave');
+		getChild($('#' + id), 1).unbind('mouseenter mouseleave');
 	}
 	showPreview();
 }
 
 function stopSortColumn(tag, count) {
 	var id = makeId('sort', tag.split(' ').join('_'), count);
-	$('#' + id).html('&nbsp;');
+	getChild($('#' + id), 1).html('&nbsp;');
 	var index = -1;
 	$.each(sortColumnsArray, function(i, column) {
 		if (column == tag) {
@@ -3236,8 +3201,8 @@ function stopSortColumn(tag, count) {
 			return true;
 		}
 		var sortId = makeId('sort', column.split(' ').join('_'), count);
-		var val = parseInt($('#' + sortId).html()) - 1;
-		$('#' + sortId).html('' + val);
+		var val = parseInt(getChild($('#' + sortId), 1).html()) - 1;
+		getChild($('#' + sortId), 1).html('' + val);
 		var content = null;
 		switch(val) {
 			case 1:
@@ -3248,7 +3213,7 @@ function stopSortColumn(tag, count) {
 				break;
 		}
 		if (content != null) {
-			$('#' + id).hover( function(e) {
+			getChild($('#' + id), 1).hover( function(e) {
 				DisplayTipBox(e, content);
 			}, function() {
 				HideTipBox();

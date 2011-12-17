@@ -194,14 +194,14 @@ tr.odd.gradeA:hover, tr.odd.gradeA td.highlighted {
 	border-right: 2px solid #FFFFFF;
 }
 
-thead.topnav tr th span { /*--Drop down trigger styles--*/
+td.topnav span { /*--Drop down trigger styles--*/
 	width: 10px;
 	height: 10px;
-	float: left;
+	float: right;
 	background: url(arrow_down.gif)  no-repeat center top;
 }
-thead.topnav tr th span.subhover {cursor: pointer;} /*--Hover effect for trigger--*/
-thead.topnav tr th ul.subnav {
+td.topnav span.subhover {cursor: pointer;} /*--Hover effect for trigger--*/
+td.topnav ul.subnav {
 	list-style: none;
 	float: left;
 	position: absolute;
@@ -211,7 +211,7 @@ thead.topnav tr th ul.subnav {
 	width: 170px;
 	border: 1px solid #FFFFFF;
 }
-thead.topnav tr th ul.subnav li{
+td.topnav ul.subnav li{
 	margin: 0; padding: 0;
 	border-top: 1px solid #FFFFFF; /*--Create bevel effect--*/
 	border-bottom: 1px solid #FFFFFF; /*--Create bevel effect--*/
@@ -220,7 +220,7 @@ thead.topnav tr th ul.subnav li{
 	text-align: left;
 	font-weight: normal;
 }
-thead.topnav tr th ul.subnav li:hover { /*--Hover effect for subnav links--*/
+td.topnav ul.subnav li:hover { /*--Hover effect for subnav links--*/
 	background: #8E8E8E; 
 	cursor: pointer;
 }
