@@ -70,16 +70,24 @@ PGCONF=/var/lib/pgsql/data/postgresql.conf
 chkconfig httpd on
 chkconfig postgresql on
 
+# clean up old broken rules
+semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}"
+semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}/[^/]+tab\.py"
+semanage fcontext --delete ftype "" --type httpd_sys_content_t "${LOGDIR}(/.*)?"
+
+
 # finish initializing system for our service
-semanage fcontext --add -ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?"
+semanage fcontext --add -ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?" \
+    || semanage fcontext --add -ftype "" --type httpd_sys_script_rw_t "${DATADIR}(/.*)?"
 mkdir -p ${DATADIR}
-restorecon -rv ${DATADIR}
+restorecon -rvF ${DATADIR}
 
 mkdir -p ${RUNDIR}
 
-semanage fcontext --add ftype "" --type httpd_sys_content_t "${LOGDIR}(/.*)?"
 mkdir -p ${LOGDIR}
-restorecon -rv ${LOGDIR}
+restorecon -rvF ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -90,19 +98,15 @@ SVCHOME=$(eval "echo ~${SVCUSER}")
 
 # allow httpd/mod_wsgi based daemon process to access its homedir
 
-# clean up old broken rule
-semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
-semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
-
 semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}/tagfiler-config\.json"
 
 semanage fcontext --add --ftype -d --type httpd_sys_rw_content_t "${SVCHOME}" \
-    || semanage fcontext --add --ftype -d --type httpd_sys_content_t "${SVCHOME}"
+    || semanage fcontext --add --ftype -d --type httpd_sys_script_rw_t "${SVCHOME}"
 
 semanage fcontext --add --ftype -- --type httpd_sys_rw_content_t "${SVCHOME}/[^/]+tab\.py" \
-    || semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}/[^/]+tab\.py"
+    || semanage fcontext --add --ftype -- --type httpd_sys_script_rw_t "${SVCHOME}/[^/]+tab\.py"
 
-restorecon -rv "${SVCHOME}"
+restorecon -rvF "${SVCHOME}"
 
 chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
