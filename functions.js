@@ -2812,6 +2812,23 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		tdSort.append(label);
 		if (sortValue != '') {
 			label.html(sortValue);
+			var content;
+			switch(parseInt(sortValue)) {
+				case 1:
+					content = 'First sorted column';
+					break;
+				case 2:
+					content = 'Second sorted column';
+					break;
+				default:
+					content = 'n-th sorted column';
+					break;
+			}
+			label.hover( function(e) {
+				DisplayTipBox(e, content);
+			}, function() {
+				HideTipBox();
+			});
 		} else {
 			label.html('&nbsp;');
 		}
