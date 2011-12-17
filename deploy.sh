@@ -71,9 +71,15 @@ chkconfig httpd on
 chkconfig postgresql on
 
 # finish initializing system for our service
+semanage fcontext --add -ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?"
 mkdir -p ${DATADIR}
+restorecon -rv ${DATADIR}
+
 mkdir -p ${RUNDIR}
+
+semanage fcontext --add ftype "" --type httpd_sys_content_t "${LOGDIR}(/.*)?"
 mkdir -p ${LOGDIR}
+restorecon -rv ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
