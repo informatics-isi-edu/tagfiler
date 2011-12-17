@@ -83,8 +83,19 @@ fi
 SVCHOME=$(eval "echo ~${SVCUSER}")
 
 # allow httpd/mod_wsgi based daemon process to access its homedir
-semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
-semanage fcontext --add --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+
+# clean up old broken rule
+semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
+
+semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}/tagfiler-config\.json"
+
+semanage fcontext --add --ftype -d --type httpd_sys_rw_content_t "${SVCHOME}" \
+    || semanage fcontext --add --ftype -d --type httpd_sys_content_t "${SVCHOME}"
+
+semanage fcontext --add --ftype -- --type httpd_sys_rw_content_t "${SVCHOME}/[^/]+tab\.py" \
+    || semanage fcontext --add --ftype -- --type httpd_sys_content_t "${SVCHOME}/[^/]+tab\.py"
+
 restorecon -rv "${SVCHOME}"
 
 chown ${SVCUSER}: ${DATADIR}
