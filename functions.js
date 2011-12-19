@@ -2870,6 +2870,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		th.css('display', '');
 		th.html('');
 		th.attr('iCol', '' + (i+1));
+		th.unbind('mousedown mouseup');
 		th.mousedown(function(event) {copyColumn(event, column, thId);});
 		th.mouseup(function(event) {dropColumn(event, column, thId, false);});
 		th.attr('id', thId);
