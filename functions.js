@@ -1656,11 +1656,16 @@ function insertColumn(index1, index2, append) {
 
 function resetColumnsIndex() {
 	var thead = $('#Query_Preview_header');
-	var tr = getChild(thead, 2);
+	var tr1 = getChild(thead, 1);
+	var tr2 = getChild(thead, 2);
+	var tr3 = getChild(thead, 3);
 	for (var i=0; i < resultColumns.length; i++) {
-		var tr1 = getChild(tr, i+2).find('tr');
-		var th1 = getChild(tr1, 1);
-		th1.attr('iCol', '' + (i+1));
+		var td = getChild(tr1, (i+2));
+		td.attr('iCol', '' + (i+1));
+		td = getChild(tr2, (i+2));
+		td.attr('iCol', '' + (i+1));
+		td = getChild(tr3, (i+2));
+		td.attr('iCol', '' + (i+1));
 	}
 	var tbody = $('#Query_Preview_tbody');
 	for (var i=0; i < tbody.children().length; i++) {
@@ -1670,7 +1675,7 @@ function resetColumnsIndex() {
 		}
 		for (var j=0; j < resultColumns.length; j++) {
 			var td = getChild(tr, j+2);
-			th1.attr('iCol', '' + (j+1));
+			td.attr('iCol', '' + (j+1));
 		}
 	}
 }
