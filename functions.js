@@ -2804,6 +2804,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		}
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
 		var tdSort = getChild(tr1, i+2);
+		tdSort.css('display', '');
 		tdSort.html('');
 		tdSort.attr('id', columSortId);
 		tdSort.attr('iCol', '' + (i+1));
