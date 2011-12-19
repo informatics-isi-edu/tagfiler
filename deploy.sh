@@ -79,8 +79,8 @@ semanage fcontext --delete ftype "" --type httpd_sys_content_t "${LOGDIR}(/.*)?"
 
 
 # finish initializing system for our service
-semanage fcontext --add -ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?" \
-    || semanage fcontext --add -ftype "" --type httpd_sys_script_rw_t "${DATADIR}(/.*)?"
+semanage fcontext --add --ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?" \
+    || semanage fcontext --add --ftype "" --type httpd_sys_script_rw_t "${DATADIR}(/.*)?"
 mkdir -p ${DATADIR}
 restorecon -rvF ${DATADIR}
 
