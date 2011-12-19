@@ -2849,7 +2849,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.addClass('item');
 		li.html('Edit column filter');
 		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {editQuery(column);});
+		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
 		li = $('<li>');
 		li.addClass('item');
@@ -3497,7 +3497,7 @@ function getTagSearchDisplay(tag) {
 		});
 	}
 	divConstraint.click({	tag: tag },
-							function(event) {editQuery(event.data.tag);});
+							function(event) {event.preventDefault(); editQuery(event.data.tag);});
 	return divConstraint;
 }
 
