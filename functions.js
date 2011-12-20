@@ -3678,7 +3678,8 @@ function addFilterToQueryTable(tag) {
  */
 function getLocaleTimestamp(s) {
 	var values = s.split(' ');
-	var date = new Date(values[0]).getTime();
+	var localValues = values[0].split('-');
+	var date = (new Date(parseInt(localValues[0], 10), parseInt(localValues[1], 10) - 1, parseInt(localValues[2], 10))).getTime();
 	var utc = values[1].slice(-6);
 	var time = values[1].slice(0, values[1].length - 6);
 	var timeValues = time.split('.');
@@ -3693,7 +3694,7 @@ function getLocaleTimestamp(s) {
 	var minutes = parseInt(hms[1], 10);
 	var seconds = parseInt(hms[2], 10);
 	var utcValues = utc.split(':');
-	var utcDelta = -parseInt(utcValues[0], 10) * 60 + parseInt(utcValues[1], 10);
+	var utcDelta = (new Date()).getTimezoneOffset() + parseInt(utcValues[0], 10) * 60 + parseInt(utcValues[1], 10);
 	date += hours * 60 * 60 * 1000 +
 			(minutes + utcDelta) * 60 * 1000 +
 			seconds * 1000 +
