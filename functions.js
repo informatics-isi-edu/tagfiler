@@ -2751,12 +2751,15 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 	if (getChild(tr1, 1).get(0) == null) {
 		// first column for context menu
 		var td = $('<td>');
+		td.attr('width', '1%');
 		td.css('background-color', 'white');
 		tr1.append(td);
 		td = $('<td>');
+		td.attr('width', '1%');
 		td.css('background-color', 'white');
 		tr2.append(td);
 		td = $('<td>');
+		td.attr('width', '1%');
 		td.css('background-color', 'white');
 		tr3.append(td);
 	}
@@ -2940,6 +2943,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				if (getChild(tr, 1).get(0) == null) {
 					// context menu here
 					var td = $('<td>');
+					td.attr('width', '1%');
 					td.addClass('separator');
 					td.attr('valign', 'top');
 					tr.append(td);
