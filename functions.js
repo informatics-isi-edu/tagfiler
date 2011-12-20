@@ -2860,12 +2860,14 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
-		li = $('<li>');
-		li.addClass('item');
-		li.html('Delete column');
-		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
-		ul.append(li);
+		if (resultColumns.length > 1) {
+			li = $('<li>');
+			li.addClass('item');
+			li.html('Delete column');
+			li.mouseup(function(event) {event.preventDefault();});
+			li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
+			ul.append(li);
+		}
 		li = $('<li>');
 		li.addClass('item');
 		li.html((sortValue == '' ? 'Sort' : 'Unsort') + ' column');
@@ -3330,6 +3332,13 @@ function deleteColumn(column, count) {
 	hideColumn(resultColumns.length - 1);
 	resultColumns.splice(deleteIndex, 1);
 	updatePreviewURL(true);
+	if (resultColumns.length == 1) {
+		var thead = $('#Query_Preview_header');
+		var tr1 = getChild(thead, 1);
+		var td = getChild(tr1, 2);
+		var ul = td.find('ul');
+		getChild(ul, 3).css('display', 'none');
+	}
 }
 
 function encodeSafeURIComponent(value) {
