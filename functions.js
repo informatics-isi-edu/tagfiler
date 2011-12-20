@@ -1624,7 +1624,7 @@ function insertColumn(index1, index2, append) {
 			}
 			col1.insertBefore(col2);
 			if (index1 == (resultColumns.length - 1)) {
-				var col = getChild(tr, resultColumns.length);
+				var col = getChild(tr, resultColumns.length+1);
 				col.removeClass('separator');
 			}
 		}
@@ -1647,7 +1647,7 @@ function insertColumn(index1, index2, append) {
 			}
 			col1.insertBefore(col2);
 			if (index1 == (resultColumns.length - 1)) {
-				var col = getChild(tr, resultColumns.length);
+				var col = getChild(tr, resultColumns.length+1);
 				col.removeClass('separator');
 			}
 		}
@@ -1681,10 +1681,10 @@ function resetColumnsIndex() {
 }
 
 function dropColumn(e, tag, append) {
+	e.preventDefault();
 	if (tagToMove == null) {
 		return;
 	}
-	e.preventDefault();
 	HideDragAndDropBox();
 	if (tagToMove == tag) {
 		tagToMove = null;
