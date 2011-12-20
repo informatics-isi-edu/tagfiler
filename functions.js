@@ -1874,6 +1874,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	$('#pageNext').attr('src', home + '/static/forward_disabled.jpg');
 	loadTypedefs();
 	$(document).mousemove(function(e){
+		e.preventDefault();
 		if (tagToMove == null) {
 			return;
 		}
