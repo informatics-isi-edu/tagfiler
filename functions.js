@@ -1599,7 +1599,7 @@ function HideTipBox() {
 	tipBox.css('display', 'none');
 }
 
-function copyColumn(e, column, id) {
+function copyColumn(e, column) {
 	e.preventDefault();
 	if (!enabledDrag) {
 		return;
@@ -2876,8 +2876,8 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		th.html('');
 		th.attr('iCol', '' + (i+1));
 		th.unbind('mousedown mouseup');
-		th.mousedown(function(event) {copyColumn(event, column, thId);});
-		th.mouseup(function(event) {dropColumn(event, column, thId, false);});
+		th.mousedown(function(event) {copyColumn(event, column);});
+		th.mouseup(function(event) {dropColumn(event, column, false);});
 		th.attr('id', thId);
 		th.append(column);
 		
