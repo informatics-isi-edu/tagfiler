@@ -1936,7 +1936,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		});
 		var otags = querypathJSON[0]['otags'];
 		$.each(otags, function(i, item) {
-			sortColumnsArray.push(item);
+			   var otag = item[0];
+			   var direction = item[1];
+			   /* TODO: preserve direction flag and send it in REST queries */
+			sortColumnsArray.push(otag);
 		});
 	} else {
 		setViewTags('default');

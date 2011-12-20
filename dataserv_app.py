@@ -382,7 +382,10 @@ def path_linearize(path, quotefunc=urlquote):
         if elem[1]:
             linear += u'(' + predlist_linearize(elem[1], quotefunc) + u')'
             if elem[2]:
-                linear += u','.join([ myunicode(quotefunc(otag)) for otag in elem[2] ])
+                linear += u','.join([ u"%s%s" % (myunicode(quotefunc(otag)), {':asc:': u':asc:',
+                                                                              ':desc:': u':desc:',
+                                                                              None: ''}[dir])
+                                      for otag, dir in elem[2] ])
         return linear
     return u'/' + u'/'.join([ elem_linearize(elem) for elem in path ])
 
@@ -1754,7 +1757,10 @@ class Application:
         listtags = listtags + Application.tagdef_listas.keys()
 
         if order:
-            ordertags = [ order ]
+            if type(order) == tuple:
+                ordertags = [ order ]
+            else:
+                ordertags = [ ( order, ':asc:') ]
         else:
             ordertags = []
 
@@ -2572,19 +2578,11 @@ class Application:
             if i == len(path) - 1:
                 lpreds = [ p for p in lpreds ]
                 if rangemode == None:
-                    lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag in otags ])
-                    order_suffix = []
-                    for tag in ['txid', 'name', 'config', 'view', 'tagdef', 'typedef', 'id']:
-                        if tag in set([p.tag for p in lpreds] + ['txid', 'id']):
-                            orderstmt = wraptag(listas.get(tag, tag), prefix='')
-                            if tag in [ 'modified', 'txid', 'id' ]:
-                                orderstmt += ' DESC'
-                            else:
-                                orderstmt += ' ASC'
-                            orderstmt += ' NULLS LAST'
-                            order_suffix.append(orderstmt)
-                    if otags != None and (len(otags) > 0 or len(order_suffix) > 0):
-                        order = ' ORDER BY %s' % ', '.join([ wraptag(listas.get(t, t), prefix='') for t in otags] + order_suffix)
+                    lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag, dir in otags ])
+                    if otags != None and len(otags):
+                        order = ' ORDER BY %s' % ', '.join([ '%s %s NULLS LAST' % (wraptag(listas.get(t, t), prefix=''),
+                                                                        { ':asc:': 'ASC', ':desc:': 'DESC', None: 'ASC'}[dir])
+                                                             for t, dir in otags])
 
             cq = elem_query(spreds, lpreds, values, i==len(path)-1)
 
@@ -2688,7 +2686,7 @@ class Application:
                     if not spreds:
                         # without tag constraints, we have an implicit result set defined by the resources table a.k.a. 'id' tag
                         tags.add('id')
-                    tags.update(set([ p.tag for p in spreds + lpreds ] + otags))
+                    tags.update(set([ p.tag for p in spreds + lpreds ] + [ o[0] for o in otags ]))
                     for vals in [ p.vals for p in (spreds + lpreds) if p.vals ]:
                         for v in vals:
                             if hasattr(v, 'is_subquery'):

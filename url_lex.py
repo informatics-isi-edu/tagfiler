@@ -52,7 +52,9 @@ keywords = {
     'study' : 'STUDY',
     'appleterror' : 'APPLETERROR',
     'log' : 'LOG',
-    'contact' : 'CONTACT'
+    'contact' : 'CONTACT',
+    'asc' : 'ASC',
+    'desc' : 'DESC'
 }
 
 tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())

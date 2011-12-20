@@ -380,7 +380,7 @@ class FileList (Node):
                                                                                                                      'config', 'view', 'url'])) ]
 
             if self.globals['tagdefsdict'].has_key('homepage order') and self.homepage:
-                ordertags = ['homepage order']
+                ordertags = [('homepage order', ':asc:')]
             else:
                 ordertags = []
 

@@ -185,9 +185,27 @@ def p_ordertags_empty(p):
     """ordertags : """
     p[0] = []
 
-def p_ordertags_nonempty(p):
-    """ordertags : vallist"""
+def p_ordertags_one(p):
+    """ordertags : ordertag"""
+    p[0] = [ p[1] ]
+
+def p_ordertags_grow(p):
+    """ordertags : ordertags ',' ordertag"""
     p[0] = p[1]
+    p[0].append(p[3])
+
+def p_ordertag_default(p):
+    """ordertag : val"""
+    p[0] = ( p[1], None )
+
+def p_ordertag_directional(p):
+    """ordertag : val direction """
+    p[0] = ( p[1], p[2] )
+
+def p_direction(p):
+    """direction : ':' ASC ':'
+                 | ':' DESC ':' """
+    p[0] = ':' + p[2].lower() + ':'
 
 def p_predlist_empty(p):
     """predlist : """
