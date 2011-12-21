@@ -208,7 +208,7 @@ td.topnav ul.subnav {
 	background: #CACACA;
 	margin: 0; padding: 0;
 	display: none;
-	width: 170px;
+	width: 180px;
 	border: 1px solid #FFFFFF;
 }
 td.topnav ul.subnav li{
@@ -216,7 +216,7 @@ td.topnav ul.subnav li{
 	border-top: 1px solid #FFFFFF; /*--Create bevel effect--*/
 	border-bottom: 1px solid #FFFFFF; /*--Create bevel effect--*/
 	clear: both;
-	width: 170px;
+	width: 180px;
 	text-align: left;
 	font-weight: normal;
 }

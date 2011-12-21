@@ -1656,9 +1656,9 @@ function insertColumn(index1, index2, append) {
 
 function resetColumnsIndex() {
 	var thead = $('#Query_Preview_header');
-	var tr1 = getChild(thead, 1);
-	var tr2 = getChild(thead, 2);
-	var tr3 = getChild(thead, 3);
+	var tr1 = thead.find('.sortAndContextMenu');
+	var tr2 = thead.find('.columnName');;
+	var tr3 = thead.find('.columnFilter');;
 	for (var i=0; i < resultColumns.length; i++) {
 		var td = getChild(tr1, (i+2));
 		td.attr('iCol', '' + (i+1));
@@ -1730,7 +1730,7 @@ function dropColumn(e, tag, append) {
 function updatePreviewURL(force) {
 	var predUrl = getQueryPredUrl();
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
-	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
+	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	$('#Query_URL').attr('href', queryUrl);
 	if (force) {
 		lastPreviewURL = queryUrl;
@@ -1936,10 +1936,11 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		});
 		var otags = querypathJSON[0]['otags'];
 		$.each(otags, function(i, item) {
-			   var otag = item[0];
-			   var direction = item[1];
-			   /* TODO: preserve direction flag and send it in REST queries */
-			sortColumnsArray.push(otag);
+			var sortObject = new Object();
+			sortObject['name'] = item[0];
+			sortObject['direction'] = item[1];
+			sortObject['index'] = '' + (i + 1);
+			sortColumnsArray.push(sortObject);
 		});
 	} else {
 		setViewTags('default');
@@ -2506,6 +2507,14 @@ function encodeURIArray(values, suffix) {
 	return ret;
 }
 
+function encodeURISortArray() {
+	var ret = new Array();
+	$.each(sortColumnsArray, function(i, column) {
+		ret.push(encodeSafeURIComponent(column['name']) + column['direction']);
+	});
+	return ret;
+}
+
 function getQueryPredUrl() {
 	if (tagInEdit != null && editInProgress) {
 		var tagConstraintDiv = $('#' +makeId('queryDiv', tagInEdit.split(' ').join('_')));
@@ -2607,7 +2616,7 @@ function showQueryResults(limit) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
 	var predUrl = getQueryPredUrl();
-	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURIArray(sortColumnsArray, ''), offset);
+	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
@@ -2713,7 +2722,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 	if (!resultColumns.contains('id')) {
 		predList = predList.concat('id');
 	}
-	var queryUrl = getQueryUrl(predUrl, limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(predList, ''), encodeURIArray(sortColumnsArray, ''), offset);
+	var queryUrl = getQueryUrl(predUrl, limit == '' ? '&limit=' + (PREVIEW_LIMIT != -1 ? PREVIEW_LIMIT : 'none') : limit, encodeURIArray(predList, ''), encodeURISortArray(), offset);
 	var queryPreview = $('#Query_Preview');
 	var table = getChild(queryPreview, 1);
 	if (table.get(0) == null) {
@@ -2728,10 +2737,13 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		table.append(thead);
 		thead.attr('id', 'Query_Preview_header');
 		var tr = $('<tr>');
+		tr.addClass('sortAndContextMenu');
 		thead.append(tr);
 		tr = $('<tr>');
+		tr.addClass('columnName');
 		thead.append(tr);
 		tr = $('<tr>');
+		tr.addClass('columnFilter');
 		thead.append(tr);
 		var tbody = $('<tbody>');
 		tbody.attr('id', 'Query_Preview_tbody');
@@ -2747,9 +2759,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 	// build the table header
 	var thead = getChild(table, 1);
 	var tfoot = getChild(table, 3);
-	var tr1 = getChild(thead, 1);
-	var tr2 = getChild(thead, 2);
-	var tr3 = getChild(thead, 3);
+	var tr1 = thead.find('.sortAndContextMenu');
+	var tr2 = thead.find('.columnName');
+	var tr3 = thead.find('.columnFilter');
 	var trfoot = getChild(tfoot, 1);
 	if (getChild(tr1, 1).get(0) == null) {
 		// first column for context menu
@@ -2823,18 +2835,19 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		var sortValue = getSortOrder(column);
 		var label = $('<label>');
 		tdSort.append(label);
-		if (sortValue != '') {
-			label.html(sortValue);
+		if (sortValue != null) {
+			label.html(sortValue['index']);
 			var content;
-			switch(parseInt(sortValue)) {
+			var direction = (sortValue['direction'] == ':asc:') ? 'ascending order' : 'descending order';
+			switch(parseInt(sortValue['index'])) {
 				case 1:
-					content = 'First sorted column';
+					content = 'First sorted column: ' + direction;
 					break;
 				case 2:
-					content = 'Second sorted column';
+					content = 'Second sorted column: ' + direction;
 					break;
 				default:
-					content = 'n-th sorted column';
+					content = 'n-th sorted column: ' + direction;
 					break;
 			}
 			label.hover( function(e) {
@@ -2849,7 +2862,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		ul.addClass('subnav');
 		tdSort.append(ul);
 		var li = $('<li>');
-		li.addClass('item');
+		li.addClass('item clearColumnFilter');
 		li.html('Clear column filter');
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {clearFilter(column);});
@@ -2858,25 +2871,51 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			li.css('display', 'none');
 		}
 		li = $('<li>');
-		li.addClass('item');
+		li.addClass('item editColumnFilter');
 		li.html('Edit column filter');
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
 		if (resultColumns.length > 1) {
 			li = $('<li>');
-			li.addClass('item');
+			li.addClass('item deleteColumn');
 			li.html('Delete column');
 			li.mouseup(function(event) {event.preventDefault();});
 			li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
 			ul.append(li);
 		}
+		
 		li = $('<li>');
-		li.addClass('item');
-		li.html((sortValue == '' ? 'Sort' : 'Unsort') + ' column');
+		li.addClass('item sortAscending');
+		li.html('Sort column ascending');
 		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, (sortValue == ''), true);});
+		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, ':asc:');});
 		ul.append(li);
+		if (sortValue != null && sortValue['direction'] == ':asc:') {
+			li.css('display', 'none');
+		}
+		
+		li = $('<li>');
+		li.addClass('item sortDescending');
+		li.html('Sort column descending');
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, ':desc:');});
+		ul.append(li);
+		if (sortValue != null && sortValue['direction'] == ':desc:') {
+			li.css('display', 'none');
+		}
+		
+		li = $('<li>');
+		li.addClass('item unsort');
+		li.html('Unsort column');
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {sortColumn(column, columSortId, PREVIEW_COUNTER, 'unsort');});
+		ul.append(li);
+		if (sortValue == null) {
+			li.css('display', 'none');
+		}
+		
+		
 		var span = $('<span>');
 		tdSort.append(span);
 		
@@ -3069,7 +3108,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				var height = $(this).height();
 				var top = ($(this).position().top + height) + 'px';
 				$('ul.subnav').css('top', top);
-				var left = $(this).position().left + $(this).width() - 170;
+				var left = $(this).position().left + $(this).width() - 180;
 				if (left < 0) {
 					left = 0;
 				}
@@ -3191,20 +3230,33 @@ function htmlEscape(str) {
 }
 
 function sortColumn(column, id, count, sort) {
-	if (sort) {
-		sortColumnsArray.push(column);
-		var length = sortColumnsArray.length;
-		getChild($('#' + id), 1).html('' + length);
+	if (sort == 'unsort') {
+		stopSortColumn(column, count);
+		getChild($('#' + id), 1).unbind('mouseenter mouseleave');
+	} else {
+		var sortObject = getSortOrder(column);
+		if (sortObject == null) {
+			sortObject = new Object();
+			sortColumnsArray.push(sortObject);
+			var length = sortColumnsArray.length;
+			sortObject['name'] = column;
+			sortObject['index'] = '' + length;
+			getChild($('#' + id), 1).html('' + length);
+		} else {
+			sortObject = sortColumnsArray[parseInt(sortObject['index']) - 1];
+		}
+		sortObject['direction'] = '' + sort;
 		var content;
-		switch(length) {
+		var direction = (sort == ':asc:') ? 'ascending order' : 'descending order';
+		switch(parseInt(sortObject['index'])) {
 			case 1:
-				content = 'First sorted column';
+				content = 'First sorted column: ' + direction;
 				break;
 			case 2:
-				content = 'Second sorted column';
+				content = 'Second sorted column: ' + direction;
 				break;
 			default:
-				content = 'n-th sorted column';
+				content = 'n-th sorted column: ' + direction;
 				break;
 		}
 		getChild($('#' + id), 1).hover( function(e) {
@@ -3212,9 +3264,6 @@ function sortColumn(column, id, count, sort) {
 		}, function() {
 			HideTipBox();
 		});
-	} else {
-		stopSortColumn(column, count);
-		getChild($('#' + id), 1).unbind('mouseenter mouseleave');
 	}
 	showPreview();
 }
@@ -3224,7 +3273,7 @@ function stopSortColumn(tag, count) {
 	getChild($('#' + id), 1).html('&nbsp;');
 	var index = -1;
 	$.each(sortColumnsArray, function(i, column) {
-		if (column == tag) {
+		if (column['name'] == tag) {
 			index = i;
 			return false;
 		}
@@ -3234,20 +3283,21 @@ function stopSortColumn(tag, count) {
 		if (i < index) {
 			return true;
 		}
-		var sortId = makeId('sort', column.split(' ').join('_'), count);
+		var sortId = makeId('sort', column['name'].split(' ').join('_'), count);
 		var val = parseInt(getChild($('#' + sortId), 1).html()) - 1;
 		getChild($('#' + sortId), 1).html('' + val);
 		var content = null;
+		var direction = (column['direction'] == ':asc:') ? 'ascending order' : 'descending order';
 		switch(val) {
 			case 1:
-				content = 'First sorted column';
+				content = 'First sorted column: ' + direction;
 				break;
 			case 2:
-				content = 'Second sorted column';
+				content = 'Second sorted column: ' + direction;
 				break;
 		}
 		if (content != null) {
-			getChild($('#' + id), 1).hover( function(e) {
+			getChild($('#' + sortId), 1).hover( function(e) {
 				DisplayTipBox(e, content);
 			}, function() {
 				HideTipBox();
@@ -3257,10 +3307,13 @@ function stopSortColumn(tag, count) {
 }
 
 function getSortOrder(tag) {
-	var ret = '';
+	var ret = null;
 	$.each(sortColumnsArray, function(i, column) {
-		if (column == tag) {
-			ret += (i + 1);
+		if (column['name'] == tag) {
+			ret = new Object();
+			ret['name'] = tag;
+			ret['direction'] = column['direction'];
+			ret['index'] = '' + (i + 1);
 			return false;
 		}
 	});
@@ -3316,7 +3369,7 @@ function hideColumn(index) {
 
 function deleteColumn(column, count) {
 	$.each(sortColumnsArray, function(i, tag) {
-		if (tag == column) {
+		if (tag['name'] == column) {
 			stopSortColumn(column, count);
 			return false;
 		}
@@ -3337,10 +3390,10 @@ function deleteColumn(column, count) {
 	updatePreviewURL(true);
 	if (resultColumns.length == 1) {
 		var thead = $('#Query_Preview_header');
-		var tr1 = getChild(thead, 1);
+		var tr1 = thead.find('.sortAndContextMenu');
 		var td = getChild(tr1, 2);
 		var ul = td.find('ul');
-		getChild(ul, 3).css('display', 'none');
+		ul.find('.deleteColumn').css('display', 'none');
 	}
 }
 
