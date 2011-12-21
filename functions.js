@@ -1823,6 +1823,11 @@ function setNextPage() {
 	showPreview();
 }
 
+function accessNextPage() {
+	PAGE_PREVIEW = parseInt($('#showRange').val());
+	showPreview();
+}
+
 function setPreviousPage() {
 	PAGE_PREVIEW--;
 	showPreview();
@@ -1870,8 +1875,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	$.each(ops, function(key, value) {
 		userOp[value] = key;
 	});
-	$('#pagePrevious').attr('src', home + '/static/back_disabled.jpg');
-	$('#pageNext').attr('src', home + '/static/forward_disabled.jpg');
 	loadTypedefs();
 	$(document).mousemove(function(e){
 		e.preventDefault();
@@ -3051,7 +3054,11 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			var b = $('#ViewResults');
 			b.html('');
 			if (previewRows == 0) {
-				b.html('There are no results to list with your current query.');
+				b.html('&nbsp;&nbsp;&nbsp;There are no results to list with your current query.');
+				$('#pagePrevious').css('display', 'none');
+				$('#resultsRange').html('');
+				$('#pageNext').css('display', 'none');
+				$('#totalResults').html('');
 			} else if (previewRows < totalRows) {
 				var minRow = 1;
 				if (offset != '') {
@@ -3059,29 +3066,28 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					minRow = offset + 1;
 				}
 				var maxRow = minRow + PREVIEW_LIMIT - 1;
-				b.append('Showing ' + minRow + ' to ' + maxRow + ' of ' + totalRows + ' results.');
+				if (maxRow > totalRows) {
+					maxRow = totalRows;
+				}
+				b.html('Showing&nbsp;');
+				getSelectRange(totalRows);
 				if (minRow > PREVIEW_LIMIT) {
-					$('#pagePrevious').attr('src', HOME + '/static/back.jpg');
-					$('#pagePrevious').unbind('click');
-					$('#pagePrevious').click(function(event){setPreviousPage();});
+					$('#pagePrevious').css('display', '');
 				} else {
-					$('#pagePrevious').attr('src', HOME + '/static/back_disabled.jpg');
-					$('#pagePrevious').unbind('click');
+					$('#pagePrevious').css('display', 'none');
 				}
 				if (maxRow < totalRows) {
-					$('#pageNext').attr('src', HOME + '/static/forward.jpg');
-					$('#pageNext').unbind('click');
-					$('#pageNext').click(function(event){setNextPage();});
+					$('#pageNext').css('display', '');
 				} else {
-					$('#pageNext').attr('src', HOME + '/static/forward_disabled.jpg');
-					$('#pageNext').unbind('click');
+					$('#pageNext').css('display', 'none');
 				}
+				$('#totalResults').html('of ' + totalRows + ' results.');
 			} else {
-				$('#pagePrevious').attr('src', HOME + '/static/back_disabled.jpg');
-				$('#pageNext').attr('src', HOME + '/static/forward_disabled.jpg');
-				$('#pagePrevious').unbind('click');
-				$('#pageNext').unbind('click');
+				$('#pagePrevious').css('display', 'none');
+				$('#pageNext').css('display', 'none');
 				b.html('Showing all ' + previewRows + ' results.');
+				$('#resultsRange').html('');
+				$('#totalResults').html('');
 			}
 			var tableLength = tbody.children().length;
 			for (var i=rowLimit; i < tableLength; i++) {
@@ -3812,5 +3818,71 @@ function initIdleWarning() {
 		width: 350,
 		beforeClose: function(event, ui) {warn_window_is_open = false;}
 	});
+}
+
+function getSelectRange(totalRows) {
+	var select = $('#resultsRange').find('select');
+	if (select.get(0) == null) {
+		$('#resultsRange').html('');
+		select = $('<select>');
+		select.attr('id', 'showRange');
+		select.change(function(event) {accessNextPage();});
+		$('#resultsRange').append(select);
+	}
+	var totalPages = Math.ceil(totalRows / PREVIEW_LIMIT);
+	var minPage = PAGE_PREVIEW - 9;
+	var maxPage = PAGE_PREVIEW + 11;
+	if (minPage < 0) {
+		minPage = 0;
+		maxPage = 20;
+		if (maxPage > totalPages) {
+			maxPage = totalPages;
+		}
+	} else if (maxPage > totalPages) {
+		maxPage = totalPages;
+		minPage = maxPage - 20;
+		if (minPage < 0) {
+			minPage = 0;
+		}
+	}
+	var options = select.children().length;
+	var entries = maxPage - minPage;
+	if (minPage > 0) {
+		entries++;
+	}
+	if (maxPage < totalPages) {
+		entries++;
+	}
+	if (options < entries) {
+		var delta = entries - options;
+		for (var i=0; i < delta; i++) {
+			select.append($('<option>'));
+		}
+	}
+	var index = 0;
+	for (var i=0; i < entries; i++) {
+		var option = getChild(select, i+1);
+		option.css('display', '');
+		if (i == 0 && minPage > 0) {
+			option.text('1 to ' + PREVIEW_LIMIT);
+			option.attr('value', '0');
+		} else if (i == (entries - 1) && maxPage < totalPages) {
+			option.text('' + ((totalPages - 1) * PREVIEW_LIMIT  + 1) + ' to ' + totalRows);
+			option.attr('value', '' + (totalPages - 1));
+		} else {
+			var maxVal = (minPage + index + 1) * PREVIEW_LIMIT;
+			if (maxVal > totalRows) {
+				maxVal = totalRows;
+			}
+			option.text('' + ((minPage + index) * PREVIEW_LIMIT + 1) + ' to ' + maxVal);
+			option.attr('value', '' + (minPage + index));
+			index++;
+		}
+	}
+	options = select.children().length;
+	for (var i = entries; i < options; i++) {
+		getChild(select, i+1).css('display', 'none');
+	}
+	select.val('' + PAGE_PREVIEW);
 }
 
