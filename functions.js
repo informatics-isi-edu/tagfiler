@@ -2879,7 +2879,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		if (resultColumns.length > 1) {
 			li = $('<li>');
 			li.addClass('item deleteColumn');
-			li.html('Delete column');
+			li.html('Hide column');
 			li.mouseup(function(event) {event.preventDefault();});
 			li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
 			ul.append(li);
