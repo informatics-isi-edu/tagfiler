@@ -22,10 +22,12 @@ $if None:
 <thead>
 <tr>
 <td class="topnav"><b>Actions</b>
-<ul class="subnav">
+<ul id="GlobalMenu" class="subnav">
 	<li class="item" onmousedown="addTagToQuery();" >Add a column</li>
 	<li class="item" onmousedown="addViewTagsToQuery();" >Add multiple columns</li>
 	<li class="item" id="clearAllFilters" onmousedown="clearAllFilters();" >Clear all filters</li>
+	<li class="item" id="enableEdit" onmousedown="enableEdit();" >Enable edit</li>
+	<li class="item" id="disableEdit" onmousedown="disableEdit();" style="display: none" >Disable edit</li>
 </ul>
 <span></span>
 </td>

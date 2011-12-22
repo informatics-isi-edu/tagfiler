@@ -1468,6 +1468,9 @@ var editInProgress = false;
 var tagInEdit = null;
 var saveSearchConstraint;
 var tagToMove = null;
+var editCellInProgress = false;
+var clickedCancelOK = false;
+var enabledEdit = false;
 
 var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
@@ -1512,6 +1515,7 @@ function clearFilter(tag) {
 
 function clearAllFilters() {
 	queryFilter = new Object();
+	$('#GlobalMenu').slideUp('slow');
 	showPreview();
 }
 
@@ -2986,6 +2990,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					}
 				}
 				tr.css('display', '');
+				tr.attr('recordId', row['id'])
 				odd = !odd;
 				if (getChild(tr, 1).get(0) == null) {
 					// context menu here
@@ -3008,6 +3013,13 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 						tr.append(td);
 					}
 					td.css('display', '');
+					if (enabledEdit) {
+						td.unbind('click');
+						td.click({	td: td,
+									column: column,
+									id: row['id'] },
+									function(event) {editCell(event.data.td, event.data.column, event.data.id);});
+					}
 					td.removeClass();
 					td.addClass(column.replace(/ /g, ''));
 					td.addClass('tablecell');
@@ -3886,3 +3898,149 @@ function getSelectRange(totalRows) {
 	select.val('' + PAGE_PREVIEW);
 }
 
+function editCell(td, column, id) {
+	if (clickedCancelOK) {
+		// we are in the case when a click Cancel or OK button has propagated to the td
+		// so ignore this event
+		clickedCancelOK = false;
+		return;
+	}
+	if (editCellInProgress) {
+		return;
+	}
+	editCellInProgress = true;
+	var origValue = td.html();
+	var input = $('<input>');
+	input.attr('type', 'text');
+	td.html('');
+	td.css('white-space', 'nowrap');
+	td.append(input);
+	input.val(origValue);
+	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date') {
+		var button = $('<input>');
+		button.attr('type', 'button');
+		button.val('Cancel');
+		td.append(button);
+		button.click({	origValue: origValue,
+						td: td },
+						function(event) {clickedCancelOK = true; editCellInProgress = false; event.data.td.html(event.data.origValue); event.data.td.css('white-space', 'normal');});
+		button = $('<input>');
+		button.attr('type', 'button');
+		button.val('OK');
+		td.append(button);
+		button.click({	td: td,
+						input: input,
+						origValue: origValue,
+						column: column,
+						id: id },
+						function(event) {clickedCancelOK = true; updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+	}
+	if (availableTags[column] == 'timestamptz') {
+		input.addClass('datetimepicker');
+		var now = new Date();
+		$('.datetimepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+												timeFormat: 'hh:mm:ss.l',
+												hour: now.getHours(),
+												minute: now.getMinutes(),
+												second: now.getSeconds(),
+												millisec: now.getMilliseconds(),
+												showSecond: true,
+												showMillisec: true,
+												changeYear: true,
+												millisecText: 'Millisec'
+		});
+	} else if (availableTags[column] == 'date') {
+		input.addClass('datepicker');
+		$('.datepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+											timeFormat: '',
+											separator: '',
+											changeYear: true,
+											showTime: false,
+											showHour: false,
+											showMinute: false
+		});
+	} else {
+		input.change({	input: input,
+						origValue: origValue,
+						td: td ,
+						column: column,
+						id: id },
+						function(event) {updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+		input.mouseout({	input: input,
+							origValue: origValue,
+							td: td ,
+							column: column,
+							id: id },
+						function(event) {updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+	}
+	input.focus();
+}
+
+function updateCell(td, input, origValue, column, id) {
+	editCellInProgress = false;
+	td.css('white-space', 'normal');
+	var value = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+	td.html(value);
+	if (value != origValue) {
+		if (value != '') {
+			// update value
+			var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+			$.ajax({
+				url: url,
+				type: 'PUT',
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				async: true,
+				success: function(data, textStatus, jqXHR) {
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+				}
+			});
+		} else {
+			// delete value
+			var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(origValue) + ')';
+			$.ajax({
+				url: url,
+				type: 'DELETE',
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				async: true,
+				success: function(data, textStatus, jqXHR) {
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+				}
+			});
+		}
+	}
+}
+
+function enableEdit() {
+	enabledEdit = true;
+	$('#enableEdit').css('display', 'none');
+	$('#disableEdit').css('display', '');
+	var tbody = $('#Query_Preview_tbody');
+	$.each(tbody.children(), function(i, tr) {
+		if ($(tr).css('display') == 'none') {
+			return false;
+		}
+		var id = $(tr).attr('recordId');
+		$.each(resultColumns, function(j, column) {
+			var td = getChild($(tr), j+2);
+			td.click({	td: td,
+						column: column,
+						id:  id },
+						function(event) {editCell(event.data.td, event.data.column, event.data.id);});
+		});
+	});
+	$('#GlobalMenu').slideUp('slow');
+}
+
+function disableEdit() {
+	enabledEdit = true;
+	$('#disableEdit').css('display', 'none');
+	$('#enableEdit').css('display', '');
+	$('.tablecell').unbind('click');
+	$('#GlobalMenu').slideUp('slow');
+}
+
+					
