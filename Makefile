@@ -46,8 +46,11 @@ SCRIPTFILES=functions.js \
 			jquery.js \
 			jquery-ui.js \
 			jquery-ui-timepicker-addon.js \
+			jquery.contextMenu.js \
 			main.css \
 			jquery-ui.css \
+			StyleSheet.css \
+			jquery.contextMenu.css \
 			calendar.gif \
 			new.png \
 			delete.png \
@@ -75,8 +78,11 @@ WEBSTATICFILES=logo.png \
 	jquery.js \
 	jquery-ui.js \
 	jquery-ui-timepicker-addon.js \
+	jquery.contextMenu.js \
 	main.css \
 	jquery-ui.css \
+	StyleSheet.css \
+	jquery.contextMenu.css \
 	calendar.gif \
 	new.png \
 	delete.png \

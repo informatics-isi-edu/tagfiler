@@ -3009,8 +3009,8 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 						tr.append(td);
 					}
 					td.css('display', '');
+					td.unbind();
 					if (enabledEdit) {
-						td.unbind('click');
 						td.click({	td: td,
 									column: column,
 									id: row['id'] },
@@ -3023,6 +3023,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 						td.addClass('separator');
 					}
 					td.attr('iCol', '' + (j+1));
+					td.attr('tag', column);
 					td.html('');
 					if (row[column] != null) {
 						if (!allTagdefs[column]['tagdef multivalue']) {
@@ -3161,6 +3162,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			});
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
+			if (enabledEdit) {
+				$(".tablecell").contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (!disableAjaxAlert) {
@@ -4167,6 +4171,7 @@ function enableEdit() {
 						function(event) {editCell(event.data.td, event.data.column, event.data.id);});
 		});
 	});
+	$(".tablecell").contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 	$('#GlobalMenu').slideUp('slow');
 }
 
@@ -4174,7 +4179,7 @@ function disableEdit() {
 	enabledEdit = true;
 	$('#disableEdit').css('display', 'none');
 	$('#enableEdit').css('display', '');
-	$('.tablecell').unbind('click');
+	$('.tablecell').unbind();
 	$('#GlobalMenu').slideUp('slow');
 }
 
@@ -4202,6 +4207,44 @@ function bindDatePicker() {
 										showHour: false,
 										showMinute: false
 	});
+}
+
+function contextMenuWork(action, el, pos) {
+	switch (action) {
+	case "delete":
+		//alert('Delete: ' + el.html());
+		//alert(el.parent().attr('recordId'));
+		var id = el.parent().attr('recordId');
+		var value = el.html();
+		var column = el.attr('tag');
+		var predUrl = HOME + '/tags/id=' + encodeSafeURIComponent(id);
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + 
+						((value != '') ? '=' + encodeSafeURIComponent(value) : '') + 
+						')';
+		$.ajax({
+			url: url,
+			type: 'DELETE',
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: true,
+			success: function(data, textStatus, jqXHR) {
+				// force a preview "refresh"
+				editBulkInProgress = true;
+				showPreview();
+				editBulkInProgress = false;
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+			}
+		});
+		break;
+	case "bulkdelete":
+		//alert('Delete bulk-value: ' + el.html());
+		alert('Not yet implemented.');
+		break;
+	case "edit":
+		el.click();
+		break;
+	}
 }
 
 					
