@@ -1469,12 +1469,16 @@ var tagInEdit = null;
 var saveSearchConstraint;
 var tagToMove = null;
 var editCellInProgress = false;
+var editBulkInProgress = false;
 var clickedCancelOK = false;
 var enabledEdit = false;
 
 var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
 var confirmAddMultipleTagsDialog = null;
+var confirmTagValuesEditDialog = null;
+
+var editTagValuesTemplate = null;
 
 var queryFilter = new Object();
 
@@ -1732,7 +1736,7 @@ function dropColumn(e, tag, append) {
 }
 
 function updatePreviewURL(force) {
-	var predUrl = getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl();
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	$('#Query_URL').attr('href', queryUrl);
@@ -1875,6 +1879,9 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
 	initPreview();
+	
+	editTagValuesTemplate = $('#editTagValuesDiv');
+	
 	// build the userOp dictionary
 	$.each(ops, function(key, value) {
 		userOp[value] = key;
@@ -2471,26 +2478,8 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 					function(event) {deleteValue(event.data.id, event.data.tableId);});
 		td.append(img);
 	}
-	var now = new Date();
-	$('.datetimepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
-											timeFormat: 'hh:mm:ss.l',
-											hour: now.getHours(),
-											minute: now.getMinutes(),
-											second: now.getSeconds(),
-											millisec: now.getMilliseconds(),
-											showSecond: true,
-											showMillisec: true,
-											changeYear: true,
-											millisecText: 'Millisec'
-	});
-	$('.datepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
-										timeFormat: '',
-										separator: '',
-										changeYear: true,
-										showTime: false,
-										showHour: false,
-										showMinute: false
-	});
+	bindDateTimePicker();
+	bindDatePicker();
 }
 
 function getQueryTags(tableId) {
@@ -2551,7 +2540,6 @@ function getQueryPredUrl() {
 	if (query.length > 0) {
 		url = query.join(';');
 	}
-	url = HOME + '/query/' + url;
 	return url;
 }
 
@@ -2622,9 +2610,9 @@ function showQueryResults(limit) {
 	if (!editInProgress) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
-	var predUrl = getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl();
 	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
-	if (lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
+	if (!editBulkInProgress && lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
 	document.body.style.cursor = "wait";
@@ -2657,7 +2645,7 @@ function showQueryResultsPreview(predUrl, limit, offset) {
 }
 
 function initDropDownList(tag) {
-	var predUrl = getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl();
 	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push(tag);
@@ -2883,13 +2871,22 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
-		if (resultColumns.length > 1) {
-			li = $('<li>');
-			li.addClass('item deleteColumn');
-			li.html('Hide column');
-			li.mouseup(function(event) {event.preventDefault();});
-			li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
-			ul.append(li);
+
+		li = $('<li>');
+		li.addClass('item editValue');
+		li.html('Edit column values');
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {editTagValues(column);});
+		ul.append(li);
+		
+		li = $('<li>');
+		li.addClass('item deleteColumn');
+		li.html('Hide column');
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {deleteColumn(column, PREVIEW_COUNTER);});
+		ul.append(li);
+		if (resultColumns.length <= 1) {
+			li.css('display', 'none');
 		}
 		
 		li = $('<li>');
@@ -2921,7 +2918,6 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		if (sortValue == null) {
 			li.css('display', 'none');
 		}
-		
 		
 		var span = $('<span>');
 		tdSort.append(span);
@@ -3758,6 +3754,163 @@ function addFilterToQueryTable(tag) {
 	confirmQueryEditDialog.dialog('open');
 }
 
+function editTagValues(tag) {
+	initDropDownList(tag);
+	var div = $('#editTagValuesWrapperDiv');
+	div.html('');
+	div.css('display', '');
+	var tagDiv = editTagValuesTemplate.clone();
+	div.append(tagDiv);
+	if (confirmTagValuesEditDialog != null) {
+		confirmTagValuesEditDialog.remove();
+		confirmTagValuesEditDialog = null;
+	}
+	if (availableTags[tag] == 'timestamptz') {
+		$('#tagValueInput').addClass('datetimepicker');
+		bindDateTimePicker();
+	} else if (availableTags[tag] == 'date') {
+		$('#tagValueInput').addClass('datepicker');
+		bindDatePicker();
+	}
+	if (select_tags[tag] != null) {
+		var select = $('#tagValueSelect');
+		$.each(select_tags[tag], function(i, value) {
+			var option = $('<option>');
+			var optionVal = htmlEscape(value);
+			if (availableTags[tag] == 'timestamptz') {
+				optionVal = getLocaleTimestamp(optionVal);
+			}
+			option.text(optionVal);
+			option.attr('value', optionVal);
+			select.append(option);
+		});
+	} else {
+		$('#tagValueSelect').css('display', 'none');
+	}
+	
+	var width = 0;
+	var height = 0;
+	for (var i=0; i < tagDiv.children().length; i++) {
+		var child = getChild(tagDiv, i+1);
+		var crtWidth = child.width();
+		if (child.is('p')) {
+			crtWidth = 0;
+			for (var j=0; j < child.children().length; j++) {
+				crtWidth += getChild(child, j+1).width();
+			}
+			crtWidth += 100;
+		}
+		if (crtWidth > width) {
+			width = crtWidth;
+		}
+		height += child.height() + 10;
+	}
+	width += 100;
+	height += 200;
+	confirmTagValuesEditDialog = tagDiv;
+	confirmTagValuesEditDialog.dialog({
+		autoOpen: false,
+		title: 'Edit values for column "' + tag + '"',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Apply": function() {
+					applyTagValuesUpdate(tag);
+				}
+		},
+		position: 'top',
+		draggable: true,
+		height: height,
+		modal: false,
+		resizable: true,
+		width: width,
+		beforeClose: function(event, ui) {div.css('display', 'none');}
+	});
+	confirmTagValuesEditDialog.dialog('open');
+}
+
+function copyTagValue() {
+	$('#tagValueInput').val($('#tagValueSelect').val());
+}
+
+function applyTagValuesUpdate(column) {
+	var scope = $('input:radio[name=valuesScope]:checked').val();
+	if (scope == null) {
+		alert('Please check a Scope button.');
+		return;
+	}
+	var action = $('input:radio[name=valuesAction]:checked').val();
+	if (action == null) {
+		alert('Please check an Action button.');
+		return;
+	}
+	var value = $('#tagValueInput').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (action == 'delete' && value == '') {
+		alert('Please enter a value to be deleted.');
+		return;
+	}
+	editBulkInProgress = true;
+	if (scope == 'filter') {
+		var predUrl = HOME + '/tags/' + getQueryPredUrl();
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+		$.ajax({
+			url: url,
+			type: action,
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: true,
+			success: function(data, textStatus, jqXHR) {
+				showPreview();
+				editBulkInProgress = false;
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+			}
+		});
+	} else {
+		// update each row from the page
+		var tbody = $('#Query_Preview_tbody');
+		
+		// get the number of rows
+		var requestsCount = 0;
+		var rowsCount = 0;
+		$.each(tbody.children(), function(i, tr) {
+			if ($(tr).css('display') == 'none') {
+				return false;
+			} else {
+				rowsCount++;
+			}
+		});
+		
+		// sent the requests
+		$.each(tbody.children(), function(i, tr) {
+			if ($(tr).css('display') == 'none') {
+				return false;
+			}
+			var id = $(tr).attr('recordId');
+			var predUrl = HOME + '/tags/id=' + encodeSafeURIComponent(id);
+			var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+			requestsCount++;
+			$.ajax({
+				url: url,
+				type: action,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				async: true,
+				success: function(data, textStatus, jqXHR) {
+					if (requestsCount == rowsCount) {
+						showPreview();
+						editBulkInProgress = false;
+					}
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+				}
+			});
+		});
+	}
+	confirmTagValuesEditDialog.dialog('close');
+}
+
 /**
  * Returns the locale string of a timestamp having the format 'yyyy-mm-dd hh:mm:ss[.llllll]{+|-}HH:MM'.
  * .llllll represents microseconds and is optional
@@ -3937,28 +4090,10 @@ function editCell(td, column, id) {
 	}
 	if (availableTags[column] == 'timestamptz') {
 		input.addClass('datetimepicker');
-		var now = new Date();
-		$('.datetimepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
-												timeFormat: 'hh:mm:ss.l',
-												hour: now.getHours(),
-												minute: now.getMinutes(),
-												second: now.getSeconds(),
-												millisec: now.getMilliseconds(),
-												showSecond: true,
-												showMillisec: true,
-												changeYear: true,
-												millisecText: 'Millisec'
-		});
+		bindDateTimePicker();
 	} else if (availableTags[column] == 'date') {
 		input.addClass('datepicker');
-		$('.datepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
-											timeFormat: '',
-											separator: '',
-											changeYear: true,
-											showTime: false,
-											showHour: false,
-											showMinute: false
-		});
+		bindDatePicker();
 	} else {
 		input.change({	input: input,
 						origValue: origValue,
@@ -4041,6 +4176,32 @@ function disableEdit() {
 	$('#enableEdit').css('display', '');
 	$('.tablecell').unbind('click');
 	$('#GlobalMenu').slideUp('slow');
+}
+
+function bindDateTimePicker() {
+	var now = new Date();
+	$('.datetimepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+											timeFormat: 'hh:mm:ss.l',
+											hour: now.getHours(),
+											minute: now.getMinutes(),
+											second: now.getSeconds(),
+											millisec: now.getMilliseconds(),
+											showSecond: true,
+											showMillisec: true,
+											changeYear: true,
+											millisecText: 'Millisec'
+	});
+}
+
+function bindDatePicker() {
+	$('.datepicker').datetimepicker({	dateFormat: 'yy-mm-dd',
+										timeFormat: '',
+										separator: '',
+										changeYear: true,
+										showTime: false,
+										showHour: false,
+										showMinute: false
+	});
 }
 
 					
