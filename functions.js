@@ -2867,14 +2867,14 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		}
 		li = $('<li>');
 		li.addClass('item editColumnFilter');
-		li.html('Edit column filter');
+		li.html('Edit column filter...');
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
 
 		li = $('<li>');
 		li.addClass('item editValue');
-		li.html('Edit column values');
+		li.html('Edit column values...');
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {editTagValues(column);});
 		ul.append(li);
