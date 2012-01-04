@@ -3878,41 +3878,32 @@ function applyTagValuesUpdate(column) {
 		// update each row from the page
 		var tbody = $('#Query_Preview_tbody');
 		
-		// get the number of rows
-		var requestsCount = 0;
-		var rowsCount = 0;
+		// get the rows ids
+		var ids = new Array();
 		$.each(tbody.children(), function(i, tr) {
 			if ($(tr).css('display') == 'none') {
 				return false;
 			} else {
-				rowsCount++;
+				ids.push(encodeSafeURIComponent($(tr).attr('recordId')));
 			}
 		});
 		
-		// sent the requests
-		$.each(tbody.children(), function(i, tr) {
-			if ($(tr).css('display') == 'none') {
-				return false;
+		// sent the request
+		var id = ids.join(',');
+		var predUrl = HOME + '/tags/id=' + id;
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+		$.ajax({
+			url: url,
+			type: action,
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: true,
+			success: function(data, textStatus, jqXHR) {
+				showPreview();
+				editBulkInProgress = false;
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
 			}
-			var id = $(tr).attr('recordId');
-			var predUrl = HOME + '/tags/id=' + encodeSafeURIComponent(id);
-			var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
-			requestsCount++;
-			$.ajax({
-				url: url,
-				type: action,
-				headers: {'User-agent': 'Tagfiler/1.0'},
-				async: true,
-				success: function(data, textStatus, jqXHR) {
-					if (requestsCount == rowsCount) {
-						showPreview();
-						editBulkInProgress = false;
-					}
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-				}
-			});
 		});
 	}
 	confirmTagValuesEditDialog.dialog('close');
