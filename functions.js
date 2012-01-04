@@ -4073,15 +4073,15 @@ function editCell(td, column, id) {
 	td.css('white-space', 'nowrap');
 	td.append(input);
 	input.val(origValue);
+	var button = $('<input>');
+	button.attr('type', 'button');
+	button.val('Cancel');
+	td.append(button);
+	button.click({	origValue: origValue,
+					td: td },
+					function(event) {clickedCancelOK = true; editCellInProgress = false; event.data.td.html(event.data.origValue); event.data.td.css('white-space', 'normal');});
 	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date') {
 		var button = $('<input>');
-		button.attr('type', 'button');
-		button.val('Cancel');
-		td.append(button);
-		button.click({	origValue: origValue,
-						td: td },
-						function(event) {clickedCancelOK = true; editCellInProgress = false; event.data.td.html(event.data.origValue); event.data.td.css('white-space', 'normal');});
-		button = $('<input>');
 		button.attr('type', 'button');
 		button.val('OK');
 		td.append(button);
@@ -4099,18 +4099,12 @@ function editCell(td, column, id) {
 		input.addClass('datepicker');
 		bindDatePicker();
 	} else {
-		input.change({	input: input,
+		input.keypress({input: input,
 						origValue: origValue,
 						td: td ,
 						column: column,
 						id: id },
-						function(event) {updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
-		input.mouseout({	input: input,
-							origValue: origValue,
-							td: td ,
-							column: column,
-							id: id },
-						function(event) {updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+						function(event) {if (event.which == 13) updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
 	}
 	input.focus();
 }
