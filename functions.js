@@ -2876,7 +2876,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.addClass('item editValue');
 		li.html('Edit column values...');
 		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {editTagValues(column);});
+		li.mousedown(function(event) {event.preventDefault(); editTagValues(column);});
 		ul.append(li);
 		
 		li = $('<li>');
