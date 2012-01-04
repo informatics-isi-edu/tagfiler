@@ -3163,7 +3163,10 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			});
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
 			if (enabledEdit) {
-				$(".tablecell").contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+			} else {
+				$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
+				$('.tablecell').mouseout(function(event) {HideTipBox();});
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -4151,6 +4154,7 @@ function enableEdit() {
 	enabledEdit = true;
 	$('#enableEdit').css('display', 'none');
 	$('#disableEdit').css('display', '');
+	$('.tablecell').unbind('click');
 	var tbody = $('#Query_Preview_tbody');
 	$.each(tbody.children(), function(i, tr) {
 		if ($(tr).css('display') == 'none') {
@@ -4165,7 +4169,7 @@ function enableEdit() {
 						function(event) {editCell(event.data.td, event.data.column, event.data.id);});
 		});
 	});
-	$(".tablecell").contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+	$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 	$('#GlobalMenu').slideUp('slow');
 }
 
@@ -4175,6 +4179,8 @@ function disableEdit() {
 	$('#enableEdit').css('display', '');
 	$('.tablecell').unbind();
 	$('#GlobalMenu').slideUp('slow');
+	$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
+	$('.tablecell').mouseout(function(event) {HideTipBox();});
 }
 
 function bindDateTimePicker() {
