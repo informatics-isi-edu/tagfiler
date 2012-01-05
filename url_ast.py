@@ -1287,12 +1287,6 @@ class Query (Node):
             if self.action in set(['add', 'delete']):
                 raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )
 
-            if self.title == None:
-                if self.action == 'query':
-                    self.title = "Query Results"
-                else:
-                    self.title = "Query by Tags"
-
             #self.log('TRACE', value='Query::body postCommit dispatching on content type')
 
             if contentType == 'text/uri-list':

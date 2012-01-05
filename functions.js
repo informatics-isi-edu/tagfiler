@@ -3076,7 +3076,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			var b = $('#ViewResults');
 			b.html('');
 			if (previewRows == 0) {
-				b.html('&nbsp;&nbsp;&nbsp;There are no results to list with your current query.');
+				b.html('No matches');
 				$('#pagePrevious').css('display', 'none');
 				$('#resultsRange').html('');
 				$('#pageNext').css('display', 'none');
@@ -3091,7 +3091,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				if (maxRow > totalRows) {
 					maxRow = totalRows;
 				}
-				b.html('Showing&nbsp;');
+				b.html('Showing ');
 				getSelectRange(totalRows);
 				if (minRow > PREVIEW_LIMIT) {
 					$('#pagePrevious').css('display', '');
@@ -3103,11 +3103,11 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				} else {
 					$('#pageNext').css('display', 'none');
 				}
-				$('#totalResults').html('of ' + totalRows + ' results.');
+				$('#totalResults').html('of ' + totalRows + ' matches');
 			} else {
 				$('#pagePrevious').css('display', 'none');
 				$('#pageNext').css('display', 'none');
-				b.html('Showing all ' + previewRows + ' results.');
+				b.html('Showing all ' + previewRows + ' matches');
 				$('#resultsRange').html('');
 				$('#totalResults').html('');
 			}

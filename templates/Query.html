@@ -26,8 +26,6 @@ $if None:
 <ul id="tablecellEditMenu" class="contextMenu">
     <li><a href="#edit">Edit value</a></li>			
 </ul>
-<a id="Query_URL" href="" >Permanent link</a>
-<br/><br/>
 <table>
 <thead>
 <tr>
@@ -41,25 +39,24 @@ $if None:
 </ul>
 <span></span>
 </td>
-</tr>
-</thead>
-</table>
-<div>
-<br/>
-Show&nbsp;
+<td>
+<span id="ViewResults"></span>
+<img id="pagePrevious" src="${home}/static/back.jpg" alt="Previous" class="margin" onclick="setPreviousPage();" ></img>
+<label id="resultsRange" ></label>
+<img id="pageNext" src="${home}/static/forward.jpg" alt="Next" class="margin" onclick="setNextPage();" ></img>
+<span id="totalResults" ></span>
+with
 <select id="previewLimit" name="previewLimit" onchange="updatePreviewLimit()" >
 <option value="10">10</option>
 <option value="25">25</option>
 <option value="50">50</option>
 <option value="100">100</option>
-</select>&nbsp;entries&nbsp;&nbsp;&nbsp;
-<b id="ViewResults"></b>
-<img id="pagePrevious" src="${home}/static/back.jpg" alt="Previous" class="margin" onclick="setPreviousPage();" ></img>
-<label id="resultsRange" ></label>
-<img id="pageNext" src="${home}/static/forward.jpg" alt="Next" class="margin" onclick="setNextPage();" ></img>
-<b id="totalResults" ></b>
-<br/><br/>
-</div>
+</select>&nbsp;per page.
+</td>
+<td><a id="Query_URL" href="" >Bookmarkable link</a>.</td>
+</tr>
+</thead>
+</table>
 
 <div id="customizedViewDiv" style="display: none">
 <fieldset>
