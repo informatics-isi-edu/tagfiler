@@ -23,6 +23,9 @@ $if None:
     <li><a href="#bulkdelete">Delete values...</a></li>			        
     <li><a href="#edit">Edit value</a></li>			
 </ul>
+<ul id="tablecellEditMenu" class="contextMenu">
+    <li><a href="#edit">Edit value</a></li>			
+</ul>
 <a id="Query_URL" href="" >Permanent link</a>
 <br/><br/>
 <table>
@@ -100,6 +103,23 @@ Show&nbsp;
 <option value=''>Choose a value</option>
 </select>
 </p>
+</div>
+</div>
+
+<div id="deleteTagValuesWrapperDiv" style="display: none; width:25%" >
+<div id="deleteTagValuesDiv">
+<fieldset>
+<legend>Scope</legend>
+<input type="radio" name="deleteValuesScope" value="page" />Edit all subjects showing on this page<br/>
+<input type="radio" name="deleteValuesScope" value="filter" />Edit all subjects matching filters<br/>
+</fieldset>
+<br/>
+Values:
+<br/>
+<table>
+<tbody  id="deleteTagValuesTableBody">
+</tbody>
+</table>
 </div>
 </div>
 

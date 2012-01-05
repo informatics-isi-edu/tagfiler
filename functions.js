@@ -1477,8 +1477,10 @@ var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
 var confirmAddMultipleTagsDialog = null;
 var confirmTagValuesEditDialog = null;
+var confirmTagValuesDeleteDialog = null;
 
 var editTagValuesTemplate = null;
+var deleteTagValuesTemplate = null;
 
 var queryFilter = new Object();
 
@@ -1881,6 +1883,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	initPreview();
 	
 	editTagValuesTemplate = $('#editTagValuesDiv');
+	deleteTagValuesTemplate = $('#deleteTagValuesDiv');
 	
 	// build the userOp dictionary
 	$.each(ops, function(key, value) {
@@ -3048,8 +3051,10 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 								}
 							}
 						} else {
-							td.html(row[column].join('<br/>'));
+							td.html(row[column].join('<br>'));
 						}
+					} else {
+						td.addClass('tablecelledit');
 					}
 				});
 				for (var k=columnLimit; k < columnLength; k++) {
@@ -3164,6 +3169,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
 			if (enabledEdit) {
 				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+				$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 			} else {
 				$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
 				$('.tablecell').mouseout(function(event) {HideTipBox();});
@@ -3857,10 +3863,101 @@ function applyTagValuesUpdate(column) {
 		alert('Please enter a value to be deleted.');
 		return;
 	}
+	var values = new Array();
+	values.push( encodeSafeURIComponent(value));
+	sendBulkRequest(column, scope, action, values);
+	confirmTagValuesEditDialog.dialog('close');
+}
+
+function deleteTagValues(tag, values) {
+	initDropDownList(tag);
+	var div = $('#deleteTagValuesWrapperDiv');
+	div.html('');
+	div.css('display', '');
+	var tagDiv = deleteTagValuesTemplate.clone();
+	div.append(tagDiv);
+	if (confirmTagValuesDeleteDialog != null) {
+		confirmTagValuesDeleteDialog.remove();
+		confirmTagValuesDeleteDialog = null;
+	}
+	var tbody = $('#deleteTagValuesTableBody');
+	$.each(values, function(i, value) {
+		var tr = $('<tr>');
+		tbody.append(tr);
+		var td = $('<td>');
+		tr.append(td);
+		var input = $('<input>');
+		input.attr('type', 'checkbox');
+		td.append(input);
+		td = $('<td>');
+		tr.append(td);
+		td.html(value);
+	});
+	
+	var width = 0;
+	var height = 0;
+	for (var i=0; i < tagDiv.children().length; i++) {
+		var child = getChild(tagDiv, i+1);
+		var crtWidth = child.width();
+		if (crtWidth > width) {
+			width = crtWidth;
+		}
+		height += child.height() + 10;
+	}
+	width += 100;
+	height += 200;
+	confirmTagValuesDeleteDialog = tagDiv;
+	confirmTagValuesDeleteDialog.dialog({
+		autoOpen: false,
+		title: 'Delete values for column "' + tag + '"',
+		buttons: {
+			"Cancel": function() {
+					$(this).dialog('close');
+				},
+			"Apply": function() {
+					applyTagValuesDelete(tag);
+				}
+		},
+		position: 'top',
+		draggable: true,
+		height: height,
+		modal: false,
+		resizable: true,
+		width: width,
+		beforeClose: function(event, ui) {div.css('display', 'none');}
+	});
+	confirmTagValuesDeleteDialog.dialog('open');
+}
+
+function applyTagValuesDelete(column) {
+	var scope = $('input:radio[name=deleteValuesScope]:checked').val();
+	if (scope == null) {
+		alert('Please check a Scope button.');
+		return;
+	}
+	var tbody = $('#deleteTagValuesTableBody');
+	var values = new Array();
+	$.each(tbody.children(), function(i, tr) {
+		var td = getChild($(tr), 1);
+		var check = getChild(td, 1);
+		if (check.prop('checked')) {
+			values.push(encodeSafeURIComponent(getChild($(tr), 2).html()));
+		}
+	});
+	if (values.length == 0) {
+		alert('Please check the values to be deleted.');
+		return;
+	}
+	sendBulkRequest(column, scope, 'DELETE', values);
+	confirmTagValuesDeleteDialog.dialog('close');
+}
+
+function sendBulkRequest(column, scope, action, values) {
 	editBulkInProgress = true;
+	var value = values.join(',');
 	if (scope == 'filter') {
 		var predUrl = HOME + '/tags/' + getQueryPredUrl();
-		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
 		$.ajax({
 			url: url,
 			type: action,
@@ -3891,7 +3988,7 @@ function applyTagValuesUpdate(column) {
 		// sent the request
 		var id = ids.join(',');
 		var predUrl = HOME + '/tags/id=' + id;
-		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
 		$.ajax({
 			url: url,
 			type: action,
@@ -3906,7 +4003,6 @@ function applyTagValuesUpdate(column) {
 			}
 		});
 	}
-	confirmTagValuesEditDialog.dialog('close');
 }
 
 /**
@@ -4138,6 +4234,13 @@ function updateCell(td, input, origValue, column, id) {
 				}
 			});
 		}
+		if (origValue.length == 0) {
+			td.removeClass('tablecelledit');
+			td.contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+		} else if (value.length == 0) {
+			td.addClass('tablecelledit');
+			td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+		}
 	}
 }
 
@@ -4161,6 +4264,7 @@ function enableEdit() {
 		});
 	});
 	$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+	$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 	$('#GlobalMenu').slideUp('slow');
 }
 
@@ -4203,8 +4307,6 @@ function bindDatePicker() {
 function contextMenuWork(action, el, pos) {
 	switch (action) {
 	case "delete":
-		//alert('Delete: ' + el.html());
-		//alert(el.parent().attr('recordId'));
 		var id = el.parent().attr('recordId');
 		var value = el.html();
 		var column = el.attr('tag');
@@ -4229,8 +4331,9 @@ function contextMenuWork(action, el, pos) {
 		});
 		break;
 	case "bulkdelete":
-		//alert('Delete bulk-value: ' + el.html());
-		alert('Not yet implemented.');
+		var tag = el.attr('tag');
+		var values = el.html().split('<br>');
+		deleteTagValues(tag, values);
 		break;
 	case "edit":
 		el.click();
