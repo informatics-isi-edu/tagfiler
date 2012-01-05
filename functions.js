@@ -1505,6 +1505,46 @@ var localeTimezone;
 
 var intervalPattern = new RegExp('\\((.+),(.+)\\)');
 
+var bulk_value_edit = false;
+var cell_value_edit = false;
+var file_download = false;
+var view_tags = false;
+var view_URL = false;
+
+function setGUIConfig() {
+	var url = HOME + '/query/config=tagfiler(' + encodeSafeURIComponent('enabled GUI features') + ')';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+		success: function(data, textStatus, jqXHR) {
+			var values = data[0]['enabled GUI features'];
+			if (values.contains('bulk_value_edit')) {
+				bulk_value_edit = true;
+			}
+			if (values.contains('cell_value_edit')) {
+				cell_value_edit = true;
+				$('#enableEdit').css('display', '');
+			}
+			if (values.contains('file_download')) {
+				file_download = true;
+			}
+			if (values.contains('view_tags')) {
+				view_tags = true;
+			}
+			if (values.contains('view_URL')) {
+				view_URL = true;
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			// ignore for now until the tag will be defined 'enabled GUI features'
+			//handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+		}
+	});
+}
+
 function queryHasFilters() {
 	var ret = false;
 	$.each(queryFilter, function(tag, value) {
@@ -1881,6 +1921,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
 	initPreview();
+	setGUIConfig();
 	
 	editTagValuesTemplate = $('#editTagValuesDiv');
 	deleteTagValuesTemplate = $('#deleteTagValuesDiv');
@@ -2883,12 +2924,14 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
 		ul.append(li);
 
-		li = $('<li>');
-		li.addClass('item editValue');
-		li.html('Edit column values...');
-		li.mouseup(function(event) {event.preventDefault();});
-		li.mousedown(function(event) {event.preventDefault(); editTagValues(column);});
-		ul.append(li);
+		if (bulk_value_edit) {
+			li = $('<li>');
+			li.addClass('item editValue');
+			li.html('Edit column values...');
+			li.mouseup(function(event) {event.preventDefault();});
+			li.mousedown(function(event) {event.preventDefault(); editTagValues(column);});
+			ul.append(li);
+		}
 		
 		li = $('<li>');
 		li.addClass('item deleteColumn');
@@ -3178,7 +3221,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			if (enabledEdit) {
 				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 				$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-			} else {
+			} else if (cell_value_edit) {
 				$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
 				$('.tablecell').mouseout(function(event) {HideTipBox();});
 			}
@@ -3193,6 +3236,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 }
 
 function fillIdContextMenu(ul) {
+	if (!view_tags && !view_URL && !file_download) {
+		return;
+	}
 	var id = ul.attr('idVal')
 	var subject = null;
 	var idUrl = HOME + '/query/id=' + id + '(' + probe_tags + ')';
@@ -3211,7 +3257,7 @@ function fillIdContextMenu(ul) {
 	});
 	var results = subject2identifiers(subject);
 	var dtype = results['dtype'];
-	if (dtype == 'template') {
+	if (dtype == 'template' && view_URL) {
 		var li = $('<li>');
 		ul.append(li);
 		var a = $('<a>');
@@ -3219,7 +3265,7 @@ function fillIdContextMenu(ul) {
 		a.attr({	target: '_newtab2' + ++WINDOW_TAB,
 					href: HOME + '/file/' + results['datapred'] });
 		a.html('View ' + results['dataname']);
-	} else if (dtype == 'url') {
+	} else if (dtype == 'url' && view_URL) {
 		var li = $('<li>');
 		ul.append(li);
 		var a = $('<a>');
@@ -3227,7 +3273,7 @@ function fillIdContextMenu(ul) {
 		a.attr({	target: '_newtab2' + ++WINDOW_TAB,
 					href: subject['url'] });
 		a.html('View ' + results['dataname']);
-	} else if (dtype == 'file') {
+	} else if (dtype == 'file' && file_download) {
 		var li = $('<li>');
 		ul.append(li);
 		var a = $('<a>');
@@ -3236,13 +3282,15 @@ function fillIdContextMenu(ul) {
 					href: HOME + '/file/' + results['datapred'] });
 		a.html('Download ' + results['dataname']);
 	}
-	var li = $('<li>');
-	ul.append(li);
-	var a = $('<a>');
-	li.append(a);
-	a.attr({	target: '_newtab2' + ++WINDOW_TAB,
-				href: HOME + '/tags/' + results['datapred'] });
-	a.html('View tags page');
+	if (view_tags) {
+		var li = $('<li>');
+		ul.append(li);
+		var a = $('<a>');
+		li.append(a);
+		a.attr({	target: '_newtab2' + ++WINDOW_TAB,
+					href: HOME + '/tags/' + results['datapred'] });
+		a.html('View tags page');
+	}
 }
 
 function getIdContextMenuSlot(td, id) {
@@ -4290,7 +4338,7 @@ function enableEdit() {
 }
 
 function disableEdit() {
-	enabledEdit = true;
+	enabledEdit = false;
 	$('#disableEdit').css('display', 'none');
 	$('#enableEdit').css('display', '');
 	$('.tablecell').unbind();
