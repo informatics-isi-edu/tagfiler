@@ -64,6 +64,10 @@ Show&nbsp;
 <div id="customizedViewDiv" style="display: none">
 <fieldset>
 <p>Select an available tag and click 'Add to query':</p>
+<p>
+<input type="radio" name="showAnotherColumn" value="add" />Add to visible columns<br/>
+<input type="radio" name="showAnotherColumn" value="replace" />Replace previously visible columns<br/>
+</p>
 <select id="customizedViewSelect" name="customizedViewSelect" onclick="loadAvailableTags('customizedViewSelect')" >
 <option value=''>Available tags</option>
 </select>
@@ -73,6 +77,10 @@ Show&nbsp;
 <div id="selectViewDiv" style="display: none">
 <fieldset>
 <p>Select an available view and click 'Add to query':</p>
+<p>
+<input type="radio" name="showColumnSet" value="add" />Add to visible columns<br/>
+<input type="radio" name="showColumnSet" value="replace" />Replace previously visible columns<br/>
+</p>
 <select id="selectViews" name="selectViews"  onclick="loadAvailableViews('selectViews')" >
 <option value=''>Available Views</option>
 </select>

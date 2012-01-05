@@ -1555,7 +1555,7 @@ function appendTagValuesOptions(tag, id) {
 		select.append(option);
 	});
 	if (select_tags[tag].length == 0) {
-		alert("Warning: No values available for the operator.");
+		alert('Warning: No values available for the operator.');
 	}
 }
 
@@ -1970,19 +1970,18 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	confirmAddTagDialog = $('#customizedViewDiv');
 	confirmAddTagDialog.dialog({
 		autoOpen: false,
-		title: 'Add a column',
+		title: 'Show another column',
 		buttons: {
-			"Cancel": function() {
+			'Cancel': function() {
 					$(this).dialog('close');
 				},
-			"Add to query": function() {
+			'Add to query': function() {
 					addToListColumns('customizedViewSelect');
-					$(this).dialog('close');
 				}
 		},
 		draggable: true,
 		position: 'top',
-		height: ($(window).height() < 250 ? $(window).height() : 250),
+		height: ($(window).height() < 300 ? $(window).height() : 300),
 		modal: false,
 		resizable: true,
 		width: ($(window).width() < 450 ? $(window).width() : 450),
@@ -1991,19 +1990,18 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	confirmAddMultipleTagsDialog = $('#selectViewDiv');
 	confirmAddMultipleTagsDialog.dialog({
 		autoOpen: false,
-		title: 'Add columns from a view',
+		title: 'Show columns from a view',
 		buttons: {
-			"Cancel": function() {
+			'Cancel': function() {
 					$(this).dialog('close');
 				},
-			"Add to query": function() {
+			'Add to query': function() {
 					addViewToListColumns('selectViews');
-					$(this).dialog('close');
 				}
 		},
 		draggable: true,
 		position: 'top',
-		height: ($(window).height() < 250 ? $(window).height() : 250),
+		height: ($(window).height() < 300 ? $(window).height() : 300),
 		modal: false,
 		resizable: true,
 		width: ($(window).width() < 450 ? $(window).width() : 450),
@@ -2590,7 +2588,17 @@ function displayValuesTable(row, selId, tag) {
 
 function addToListColumns(selectId) {
 	var column = $('#' + selectId).val();
+	if (column == '') {
+		alert('Please select an available tag.');
+		return;
+	}
 	confirmAddTagDialog.dialog('close');
+	var choice = $('input:radio[name=showAnotherColumn]:checked').val();
+	if (choice == 'replace') {
+		resultColumns = new Array();
+		sortColumnsArray = new Array();
+		queryFilter = new Object();
+	}
 	if (!resultColumns.contains(column)) {
 		resultColumns.unshift(column);
 		showPreview();
@@ -2618,7 +2626,7 @@ function showQueryResults(limit) {
 	if (!editBulkInProgress && lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
 	}
-	document.body.style.cursor = "wait";
+	document.body.style.cursor = 'wait';
 	lastPreviewURL = queryUrl;
 	lastEditTag = tagInEdit;
 	updatePreviewURL(false);
@@ -3121,7 +3129,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
 			$('td.topnav span').click(function() {
 				enabledDrag = false;
-				var ul = $(this).parent().find("ul.subnav");
+				var ul = $(this).parent().find('ul.subnav');
 				if (ul.children().length == 0) {
 					fillIdContextMenu(ul);
 				}
@@ -3136,19 +3144,19 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				$('ul.subnav').css('left', left);
 				
 				//Following events are applied to the subnav itself (moving subnav up and down)
-				$(this).parent().find("ul.subnav").slideDown('fast').show(); //Drop down the subnav on click
+				$(this).parent().find('ul.subnav').slideDown('fast').show(); //Drop down the subnav on click
 		
 				$(this).parent().hover(function() {
 				}, function(){	
-					$(this).parent().find("ul.subnav").slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
+					$(this).parent().find('ul.subnav').slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
 					enabledDrag = true;
 				});
 		
 				//Following events are applied to the trigger (Hover events for the trigger)
 				}).hover(function() { 
-					$(this).addClass("subhover"); //On hover over, add class "subhover"
+					$(this).addClass('subhover'); //On hover over, add class 'subhover'
 				}, function(){	//On Hover Out
-					$(this).removeClass("subhover"); //On hover out, remove class "subhover"
+					$(this).removeClass('subhover'); //On hover out, remove class 'subhover'
 			});
 			$('.tablecell').hover( function() {
 				var iCol = parseInt($(this).attr('iCol'));
@@ -3181,7 +3189,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			}
 		}
 	});
-	document.body.style.cursor = "default";
+	document.body.style.cursor = 'default';
 }
 
 function fillIdContextMenu(ul) {
@@ -3350,16 +3358,29 @@ function getSortOrder(tag) {
 function addTagToQuery() {
 	confirmAddTagDialog.dialog('open');
 	$('#customizedViewSelect').val('');
+	$('input:radio[name=showAnotherColumn][value=add]').click();
 }
 
 function addViewTagsToQuery() {
 	confirmAddMultipleTagsDialog.dialog('open');
 	$('#selectViews').val('');
+	$('input:radio[name=showColumnSet][value=replace]').click();
 }
 
 function addViewToListColumns(id) {
 	var val = $('#' + id).val();
+	if (val == '') {
+		alert('Please select an available view.');
+		return;
+	}
 	setViewTags(val);
+	var choice = $('input:radio[name=showColumnSet]:checked').val();
+	if (choice == 'replace') {
+		resultColumns = new Array();
+		sortColumnsArray = new Array();
+		queryFilter = new Object();
+	}
+	confirmAddMultipleTagsDialog.dialog('close');
 	var preview = false; 
 	$.each(viewListTags[val], function(i, tag) {
 		if (!resultColumns.contains(tag)) {
@@ -3748,10 +3769,10 @@ function addFilterToQueryTable(tag) {
 		autoOpen: false,
 		title: 'Edit constraint for column "' + tag + '"',
 		buttons: {
-			"Cancel": function() {
+			'Cancel': function() {
 					$(this).dialog('close');
 				},
-			"Save": function() {
+			'Save': function() {
 					saveTagQuery(tag);
 					$(this).dialog('close');
 				}
@@ -3825,10 +3846,10 @@ function editTagValues(tag) {
 		autoOpen: false,
 		title: 'Edit values for column "' + tag + '"',
 		buttons: {
-			"Cancel": function() {
+			'Cancel': function() {
 					$(this).dialog('close');
 				},
-			"Apply": function() {
+			'Apply': function() {
 					applyTagValuesUpdate(tag);
 				}
 		},
@@ -3911,10 +3932,10 @@ function deleteTagValues(tag, values) {
 		autoOpen: false,
 		title: 'Delete values for column "' + tag + '"',
 		buttons: {
-			"Cancel": function() {
+			'Cancel': function() {
 					$(this).dialog('close');
 				},
-			"Apply": function() {
+			'Apply': function() {
 					applyTagValuesDelete(tag);
 				}
 		},
@@ -4061,11 +4082,11 @@ function initIdleWarning() {
 		autoOpen: false,
 		title: 'Idle Session Warning',
 		buttons: {
-			"Log out now": function() {
+			'Log out now': function() {
 					runLogoutRequest();
 					$(this).dialog('close');
 				},
-			"Extend session": function() {
+			'Extend session': function() {
 					runExtendRequest();
 					setExtendTime();
 					$(this).dialog('close');
@@ -4306,21 +4327,19 @@ function bindDatePicker() {
 
 function contextMenuWork(action, el, pos) {
 	switch (action) {
-	case "delete":
+	case 'delete':
 		var id = el.parent().attr('recordId');
 		var value = el.html();
 		var column = el.attr('tag');
 		var predUrl = HOME + '/tags/id=' + encodeSafeURIComponent(id);
-		var url = predUrl + '(' + encodeSafeURIComponent(column) + 
-						((value != '') ? '=' + encodeSafeURIComponent(value) : '') + 
-						')';
+		var url = predUrl + '(' + encodeSafeURIComponent(column) + ')';
 		$.ajax({
 			url: url,
 			type: 'DELETE',
 			headers: {'User-agent': 'Tagfiler/1.0'},
 			async: true,
 			success: function(data, textStatus, jqXHR) {
-				// force a preview "refresh"
+				// force a preview 'refresh'
 				editBulkInProgress = true;
 				showPreview();
 				editBulkInProgress = false;
@@ -4330,12 +4349,12 @@ function contextMenuWork(action, el, pos) {
 			}
 		});
 		break;
-	case "bulkdelete":
+	case 'bulkdelete':
 		var tag = el.attr('tag');
 		var values = el.html().split('<br>');
 		deleteTagValues(tag, values);
 		break;
-	case "edit":
+	case 'edit':
 		el.click();
 		break;
 	}
