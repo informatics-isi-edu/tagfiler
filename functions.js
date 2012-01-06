@@ -1445,6 +1445,7 @@ var HOME;
 var USER;
 var WEBAUTHNHOME;
 var ROW_COUNTER;
+var MULTI_VALUED_ROW_COUNTER;
 var VAL_COUNTER;
 var PREVIEW_COUNTER;
 var ROW_TAGS_COUNTER;
@@ -2000,6 +2001,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
 	ROW_COUNTER = 0;
+	MULTI_VALUED_ROW_COUNTER = 0;
 	VAL_COUNTER = 0;
 	ROW_TAGS_COUNTER = 0;
 	ROW_SORTED_COUNTER = 0;
@@ -4349,12 +4351,26 @@ function editCell(td, column, id) {
 	}
 	editCellInProgress = true;
 	var origValue = td.html();
-	var input = $('<input>');
-	input.attr('type', 'text');
+	var table = null;
+	var input = null;
 	td.html('');
 	td.css('white-space', 'nowrap');
-	td.append(input);
-	input.val(origValue);
+	if (allTagdefs[column]['tagdef multivalue']) {
+		table = $('<table>');
+		td.append(table);
+		var values = origValue.split('<br>');
+		if (values.length == 0) {
+			values.push('');
+		}
+		$.each(values, function(i, value) {
+			addMultiValueRow(table, column, value);
+		});
+	} else {
+		input = $('<input>');
+		input.attr('type', 'text');
+		td.append(input);
+		input.val(origValue);
+	}
 	var button = $('<input>');
 	button.attr('type', 'button');
 	button.val('Cancel');
@@ -4362,7 +4378,7 @@ function editCell(td, column, id) {
 	button.click({	origValue: origValue,
 					td: td },
 					function(event) {clickedCancelOK = true; editCellInProgress = false; event.data.td.html(event.data.origValue); event.data.td.css('white-space', 'normal');});
-	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date') {
+	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date' || allTagdefs[column]['tagdef multivalue']) {
 		var button = $('<input>');
 		button.attr('type', 'button');
 		button.val('OK');
@@ -4372,67 +4388,115 @@ function editCell(td, column, id) {
 						origValue: origValue,
 						column: column,
 						id: id },
-						function(event) {clickedCancelOK = true; updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+						function(event) {clickedCancelOK = true; updateCell(event.data.td, event.data.origValue, event.data.column, event.data.id);});
 	}
-	if (availableTags[column] == 'timestamptz') {
-		input.addClass('datetimepicker');
-		bindDateTimePicker();
-	} else if (availableTags[column] == 'date') {
-		input.addClass('datepicker');
-		bindDatePicker();
+	if (!allTagdefs[column]['tagdef multivalue']) {
+		if (availableTags[column] == 'timestamptz') {
+			input.addClass('datetimepicker');
+			bindDateTimePicker();
+		} else if (availableTags[column] == 'date') {
+			input.addClass('datepicker');
+			bindDatePicker();
+		} else {
+			input.keypress({input: input,
+							origValue: origValue,
+							td: td ,
+							column: column,
+							id: id },
+							function(event) {if (event.which == 13) updateCell(event.data.td, event.data.origValue, event.data.column, event.data.id);});
+		}
+		input.focus();
 	} else {
-		input.keypress({input: input,
-						origValue: origValue,
-						td: td ,
-						column: column,
-						id: id },
-						function(event) {if (event.which == 13) updateCell(event.data.td, event.data.input, event.data.origValue, event.data.column, event.data.id);});
+		table.focus();
 	}
-	input.focus();
 }
 
-function updateCell(td, input, origValue, column, id) {
+function updateCell(td, origValue, column, id) {
 	editCellInProgress = false;
+	var child = getChild(td, 1);
 	td.css('white-space', 'normal');
-	var value = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+	var value = null;
+	var values = new Array();
+	if (child.is('INPUT')) {
+		value = child.val().replace(/^\s*/, "").replace(/\s*$/, "");
+		if (value != '') {
+			values.push(value); 
+		}
+	} else if (child.is('TABLE')) {
+		var trs = child.find('tr');
+		$.each(trs, function(i, tr) {
+			var td = getChild($(tr), 1);
+			var crtVal = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+			if (crtVal != '') {
+				values.push(crtVal); 
+			}
+		});
+		value = values.join('<br>');
+	}
 	td.html(value);
 	if (value != origValue) {
 		if (value != '') {
-			// update value
-			var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(value) + ')';
-			$.ajax({
-				url: url,
-				type: 'PUT',
-				headers: {'User-agent': 'Tagfiler/1.0'},
-				async: true,
-				success: function(data, textStatus, jqXHR) {
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-				}
-			});
+			if (child.is('TABLE') && origValue != '') {
+				// delete all old values
+				var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
+				$.ajax({
+					url: url,
+					type: 'DELETE',
+					headers: {'User-agent': 'Tagfiler/1.0'},
+					async: true,
+					success: function(data, textStatus, jqXHR) {
+						modifyCell(td, origValue, column, id, value, values);
+					},
+					error: function(jqXHR, textStatus, errorThrown) {
+						handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+					}
+				});
+			} else {
+				modifyCell(td, origValue, column, id, value, values);
+			}
 		} else {
-			// delete value
-			var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + encodeSafeURIComponent(origValue) + ')';
-			$.ajax({
-				url: url,
-				type: 'DELETE',
-				headers: {'User-agent': 'Tagfiler/1.0'},
-				async: true,
-				success: function(data, textStatus, jqXHR) {
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-				}
-			});
+			modifyCell(td, origValue, column, id, value, values);
 		}
-		if (origValue.length == 0) {
-			td.removeClass('tablecelledit');
-			td.contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-		} else if (value.length == 0) {
-			td.addClass('tablecelledit');
-			td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-		}
+	}
+}
+
+function modifyCell(td, origValue, column, id, newValue, values) {
+	if (newValue != '') {
+		// update value
+		var value = encodeURIArray(values, '').join(',');
+		var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
+		$.ajax({
+			url: url,
+			type: 'PUT',
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: true,
+			success: function(data, textStatus, jqXHR) {
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+			}
+		});
+	} else {
+		// delete value(s)
+		var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
+		$.ajax({
+			url: url,
+			type: 'DELETE',
+			headers: {'User-agent': 'Tagfiler/1.0'},
+			async: true,
+			success: function(data, textStatus, jqXHR) {
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+			}
+		});
+	}
+	if (origValue.length == 0) {
+		td.removeClass('tablecelledit');
+		td.contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+	} else if (newValue.length == 0) {
+		td.addClass('tablecelledit');
+		td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 	}
 }
 
@@ -4546,4 +4610,45 @@ function hideRange() {
 	$('#hideRange').css('display', 'none');
 }
 
+function deleteMultiValueRow(id) {
+	$('#' + id).remove();
+}
+
+function addMultiValueRow(table, tag, value) {
+	var tr = $('<tr>');
+	var id = makeId('multi_valued', ++MULTI_VALUED_ROW_COUNTER);
+	tr.attr('id', id);
+	table.append(tr);
+	var td = $('<td>');
+	td.css('white-space', 'nowrap');
+	tr.append(td);
+	var input = $('<input>');
+	if (availableTags[tag] == 'timestamptz') {
+		input.addClass('datetimepicker');
+		bindDateTimePicker();
+	} else if (availableTags[tag] == 'date') {
+		input.addClass('datepicker');
+		bindDatePicker();
+	}
+	input.attr('type', 'text');
+	td.append(input);
+	input.val(value);
+	var imgPlus = $('<img>');
+	imgPlus.attr({	src: HOME + '/static/plus.png',
+				    width: '16',
+				    height: '16',
+					alt: '+' });
+	imgPlus.click({	table: table,
+					tag: tag },
+					function(event) {addMultiValueRow(event.data.table, event.data.tag, '');});
+	td.append(imgPlus);
+	var img = $('<img>');
+	img.attr({	src: HOME + '/static/minus.png',
+			    width: '16',
+			    height: '16',
+				alt: '-' });
+	img.click({ id: id },
+				function(event) {deleteMultiValueRow(event.data.id);});
+	td.append(img);
+}
 			
