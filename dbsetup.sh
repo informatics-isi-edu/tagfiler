@@ -501,6 +501,7 @@ tagdef "Study Type"          text        "${admin}" subject     subject      fal
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
+tagdef 'enabled GUI features' text       "${admin}" anonymous   tag          false      'GUI features'
 tagdef 'template query'      text        "${admin}" subjectowner tag         true       ""
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
@@ -525,6 +526,7 @@ typedef vname        text          'Subject name@version'          vname
 typedef config       text          'Study Type'                    config
 typedef view         text          'View name'                     view
 typedef 'template mode' text       'Template rendering mode'       ""                 'embedded Embedded in Tagfiler HTML' 'page Standalone document'
+typedef 'GUI features' text       'GUI configuration mode'       ""                 'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
 
 # complete split-phase definitions and redefine as combined phase
