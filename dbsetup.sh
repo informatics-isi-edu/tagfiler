@@ -501,7 +501,6 @@ tagdef "Study Type"          text        "${admin}" subject     subject      fal
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
-tagdef 'enabled GUI features' text       "${admin}" anonymous   tag          false      'GUI features'
 tagdef 'template query'      text        "${admin}" subjectowner tag         true       ""
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
@@ -642,6 +641,7 @@ cfgtagdef 'applet custom properties'  text  ""      subject     subject       tr
 cfgtagdef 'applet test log'           text  ""      subject     subject       false
 cfgtagdef 'applet test properties'    text  ""      subject     subject       true
 cfgtagdef 'system software'           text  ""      anonymous   system        false
+cfgtagdef 'enabled GUI features' 	  text "${admin}" anonymous   tag         true      'GUI features'
 
 #      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY  TAGREF
 

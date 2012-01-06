@@ -1512,7 +1512,7 @@ var view_tags = false;
 var view_URL = false;
 
 function setGUIConfig() {
-	var url = HOME + '/query/config=tagfiler(' + encodeSafeURIComponent('enabled GUI features') + ')';
+	var url = HOME + '/query/config=tagfiler(' + encodeSafeURIComponent('_cfg_enabled GUI features') + ')';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -1520,7 +1520,7 @@ function setGUIConfig() {
 		headers: {'User-agent': 'Tagfiler/1.0'},
 		async: false,
 		success: function(data, textStatus, jqXHR) {
-			var values = data[0]['enabled GUI features'];
+			var values = data[0]['_cfg_enabled GUI features'];
 			if (values.contains('bulk_value_edit')) {
 				bulk_value_edit = true;
 			}
