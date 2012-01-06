@@ -641,7 +641,7 @@ cfgtagdef 'applet custom properties'  text  ""      subject     subject       tr
 cfgtagdef 'applet test log'           text  ""      subject     subject       false
 cfgtagdef 'applet test properties'    text  ""      subject     subject       true
 cfgtagdef 'system software'           text  ""      anonymous   system        false
-cfgtagdef 'enabled GUI features' 	  text "${admin}" anonymous   tag         true      'GUI features'
+cfgtagdef 'enabled GUI features' 	  text  "" 		subject   	subject       true      'GUI features'
 
 #      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY  TAGREF
 

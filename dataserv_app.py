@@ -599,6 +599,7 @@ class Application:
                                     ('client retry count', 10),
                                     ('client upload chunks', False),
                                     ('contact', None),
+                                    ('enabled GUI features', []),
                                     ('file list tags', []),
                                     ('file list tags write', []),
                                     ('file write users', []),
@@ -769,6 +770,7 @@ class Application:
                        ('_cfg_client retry count', 'int8', False, 'subject', False),
                        ('_cfg_client upload chunks', 'boolean', False, 'subject', False),
                        ('_cfg_contact', 'text', False, 'subject', False),
+                       ('_cfg_enabled GUI features', 'text', True, 'subject', False),
                        ('_cfg_file list tags', 'tagdef', True, 'subject', False),
                        ('_cfg_file list tags write', 'tagdef', True, 'subject', False),
                        ('_cfg_file write users', 'rolepat', True, 'subject', False),
@@ -964,6 +966,7 @@ class Application:
         self.globals['clientDownloadChunks'] = self.config['client download chunks']
         self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
         self.globals['clientRetryCount'] = self.config['client retry count']
+        self.globals['enabledGUIFeatures'] = self.config['enabled GUI features']
         self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
         
         # END: get runtime parameters from database
