@@ -3972,47 +3972,19 @@ function editTagValues(tag) {
 		confirmTagValuesEditDialog.remove();
 		confirmTagValuesEditDialog = null;
 	}
-	if (availableTags[tag] == 'timestamptz') {
-		$('#tagValueInput').addClass('datetimepicker');
-		bindDateTimePicker();
-	} else if (availableTags[tag] == 'date') {
-		$('#tagValueInput').addClass('datepicker');
-		bindDatePicker();
-	}
-	if (select_tags[tag] != null) {
-		var select = $('#tagValueSelect');
-		$.each(select_tags[tag], function(i, value) {
-			var option = $('<option>');
-			var optionVal = htmlEscape(value);
-			if (availableTags[tag] == 'timestamptz') {
-				optionVal = getLocaleTimestamp(optionVal);
-			}
-			option.text(optionVal);
-			option.attr('value', optionVal);
-			select.append(option);
-		});
-	} else {
-		$('#tagValueSelect').css('display', 'none');
-	}
-	
+	var table = $('#bulk_edit_table');
+	addBulkMultiValueRow(table, tag);
 	var width = 0;
 	var height = 0;
 	for (var i=0; i < tagDiv.children().length; i++) {
 		var child = getChild(tagDiv, i+1);
 		var crtWidth = child.width();
-		if (child.is('p')) {
-			crtWidth = 0;
-			for (var j=0; j < child.children().length; j++) {
-				crtWidth += getChild(child, j+1).width();
-			}
-			crtWidth += 100;
-		}
 		if (crtWidth > width) {
 			width = crtWidth;
 		}
 		height += child.height() + 10;
 	}
-	width += 100;
+	width += 200;
 	height += 200;
 	confirmTagValuesEditDialog = tagDiv;
 	confirmTagValuesEditDialog.dialog({
@@ -4037,8 +4009,70 @@ function editTagValues(tag) {
 	confirmTagValuesEditDialog.dialog('open');
 }
 
-function copyTagValue() {
-	$('#tagValueInput').val($('#tagValueSelect').val());
+function addBulkMultiValueRow(table, tag) {
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	var id = makeId('multi_valued', ++MULTI_VALUED_ROW_COUNTER);
+	tr.attr('id', id);
+	td.css('white-space', 'nowrap');
+	td.append('Value: ');
+	var input = $('<input>');
+	input.attr('type', 'text');
+	input.attr({	type: 'text' });
+	td.append(input);
+	if (select_tags[tag] != null && select_tags[tag].length > 0) {
+		var select = $('<select>');
+		select.change({	to: input,
+						from: select },
+						function(event) {copyTagValue(event.data.to, event.data.from);});
+		td.append(select);
+		var option = $('<option>');
+		option.text('Choose a value');
+		option.attr('value', '');
+		select.append(option);
+		if (availableTags[tag] == 'timestamptz') {
+			input.addClass('datetimepicker');
+			bindDateTimePicker();
+		} else if (availableTags[tag] == 'date') {
+			input.addClass('datepicker');
+			bindDatePicker();
+		}
+		$.each(select_tags[tag], function(i, value) {
+			var option = $('<option>');
+			var optionVal = htmlEscape(value);
+			if (availableTags[tag] == 'timestamptz') {
+				optionVal = getLocaleTimestamp(optionVal);
+			}
+			option.text(optionVal);
+			option.attr('value', optionVal);
+			select.append(option);
+		});
+	}
+	if (allTagdefs[tag]['tagdef multivalue']) {
+		var imgPlus = $('<img>');
+		imgPlus.attr({	src: HOME + '/static/plus.png',
+					    width: '16',
+					    height: '16',
+						alt: '+' });
+		imgPlus.click({	table: table,
+						tag: tag },
+						function(event) {addBulkMultiValueRow(event.data.table, event.data.tag);});
+		td.append(imgPlus);
+		var img = $('<img>');
+		img.attr({	src: HOME + '/static/minus.png',
+				    width: '16',
+				    height: '16',
+					alt: '-' });
+		img.click({ id: id },
+					function(event) {deleteMultiValueRow(event.data.id);});
+		td.append(img);
+	}
+}
+
+function copyTagValue(to, from) {
+	to.val(from.val());
 }
 
 function applyTagValuesUpdate(column) {
@@ -4052,13 +4086,21 @@ function applyTagValuesUpdate(column) {
 		alert('Please check an Action button.');
 		return;
 	}
-	var value = $('#tagValueInput').val().replace(/^\s*/, "").replace(/\s*$/, "");
-	if (action == 'delete' && value == '') {
+	var values = new Array();
+	var trs = $('#bulk_edit_table').find('tr');
+	$.each(trs, function(i, tr) {
+		var td = getChild($(tr), 1);
+		var input = getChild(td, 1);
+		var value = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+		if (value != '') {
+			values.push(value);
+		}
+	});
+	if (action == 'DELETE' && values.length == 0) {
 		alert('Please enter a value to be deleted.');
 		return;
 	}
-	var values = new Array();
-	values.push( encodeSafeURIComponent(value));
+	values = encodeURIArray(values, '');
 	sendBulkRequest(column, scope, action, values);
 	confirmTagValuesEditDialog.dialog('close');
 }
