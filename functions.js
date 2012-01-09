@@ -4395,6 +4395,7 @@ function editCell(td, column, id) {
 	var origValue = td.html();
 	var table = null;
 	var input = null;
+	var select = null;
 	td.html('');
 	td.css('white-space', 'nowrap');
 	if (allTagdefs[column]['tagdef multivalue']) {
@@ -4407,6 +4408,18 @@ function editCell(td, column, id) {
 		$.each(values, function(i, value) {
 			addMultiValueRow(table, column, value);
 		});
+	} else if (availableTags[column] == 'empty') {
+		select = $('<select>');
+		var option = $('<option>');
+		option.text('Tag absent');
+		option.attr('value', 'not set');
+		select.append(option);
+		option = $('<option>');
+		option.text('Tagged');
+		option.attr('value', 'is set');
+		select.append(option);
+		select.val(origValue);
+		td.append(select);
 	} else {
 		input = $('<input>');
 		input.attr('type', 'text');
@@ -4420,7 +4433,7 @@ function editCell(td, column, id) {
 	button.click({	origValue: origValue,
 					td: td },
 					function(event) {clickedCancelOK = true; editCellInProgress = false; event.data.td.html(event.data.origValue); event.data.td.css('white-space', 'normal');});
-	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date' || allTagdefs[column]['tagdef multivalue']) {
+	if (availableTags[column] == 'timestamptz' || availableTags[column] == 'date' || allTagdefs[column]['tagdef multivalue'] || select != null) {
 		var button = $('<input>');
 		button.attr('type', 'button');
 		button.val('OK');
@@ -4432,7 +4445,9 @@ function editCell(td, column, id) {
 						id: id },
 						function(event) {clickedCancelOK = true; updateCell(event.data.td, event.data.origValue, event.data.column, event.data.id);});
 	}
-	if (!allTagdefs[column]['tagdef multivalue']) {
+	if (select != null) {
+		select.focus();
+	} else if (!allTagdefs[column]['tagdef multivalue']) {
 		if (availableTags[column] == 'timestamptz') {
 			input.addClass('datetimepicker');
 			bindDateTimePicker();
@@ -4458,8 +4473,18 @@ function updateCell(td, origValue, column, id) {
 	var child = getChild(td, 1);
 	td.css('white-space', 'normal');
 	var value = null;
+	var tagAbsent = false;
 	var values = new Array();
-	if (child.is('INPUT')) {
+	if (child.is('SELECT')) {
+		value = child.val();
+		if (availableTags[column] == 'empty') {
+			if (value == 'is set') {
+				values.push(ops['Tagged']); 
+			} else {
+				tagAbsent = true;
+			}
+		}
+	} else if (child.is('INPUT')) {
 		value = child.val().replace(/^\s*/, "").replace(/\s*$/, "");
 		if (value != '') {
 			values.push(value); 
@@ -4478,7 +4503,7 @@ function updateCell(td, origValue, column, id) {
 	td.html(value);
 	if (value != origValue) {
 		if (value != '') {
-			if (child.is('TABLE') && origValue != '') {
+			if (child.is('TABLE') && origValue != '' || tagAbsent) {
 				// delete all old values
 				var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
 				$.ajax({
@@ -4487,7 +4512,9 @@ function updateCell(td, origValue, column, id) {
 					headers: {'User-agent': 'Tagfiler/1.0'},
 					async: true,
 					success: function(data, textStatus, jqXHR) {
-						modifyCell(td, origValue, column, id, value, values);
+						if (!tagAbsent) {
+							modifyCell(td, origValue, column, id, value, values);
+						}
 					},
 					error: function(jqXHR, textStatus, errorThrown) {
 						handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
