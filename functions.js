@@ -3410,6 +3410,11 @@ function fillIdContextMenu(ul) {
 					href: HOME + '/tags/' + results['datapred'] });
 		a.html('View tags page');
 	}
+	if (ul.children().length == 0) {
+		var li = $('<li>');
+		ul.append(li);
+		li.html('No available actions');
+	}
 }
 
 function getIdContextMenuSlot(td, id) {
