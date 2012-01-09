@@ -1654,12 +1654,15 @@ class Application:
     def get_type(self, typename=None):
         def valexpand(res):
             # replace raw "key desc" string with (key, desc) pair
+            dbtype = res['typedef dbtype']
+            if dbtype == None:
+                dbtype = ''
+                res['typedef dbtype'] = dbtype
             if res['typedef values'] != None:
                 vals = []
                 for val in res['typedef values']:
                     key, desc = val.split(" ", 1)
                     key = urlunquote(key)
-                    dbtype = res['typedef dbtype']
                     key = downcast_value(dbtype, key)
                     vals.append( (key, desc) )
                 res['typedef values'] = dict(vals)
