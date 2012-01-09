@@ -3197,9 +3197,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					td.html('');
 					if (row[column] != null) {
 						if (!allTagdefs[column]['tagdef multivalue']) {
-							if (row[column] === true) {
+							if (row[column] === true && availableTags[column] == 'empty') {
 								td.html('is set');
-							} else if (row[column] === false) {
+							} else if (row[column] === false && availableTags[column] == 'empty') {
 								td.html('not set');
 							} else {
 								if (column == 'name') {
@@ -4408,7 +4408,20 @@ function editCell(td, column, id) {
 		$.each(values, function(i, value) {
 			addMultiValueRow(table, column, value);
 		});
-	} else if (availableTags[column] == 'empty') {
+	} else if (availableTags[column] == 'boolean') {
+		select = $('<select>');
+		var option = $('<option>');
+		option.text('false');
+		option.attr('value', 'false');
+		select.append(option);
+		option = $('<option>');
+		option.text('true');
+		option.attr('value', 'true');
+		select.append(option);
+		select.val(origValue);
+		td.append(select);
+	}
+	else if (availableTags[column] == 'empty') {
 		select = $('<select>');
 		var option = $('<option>');
 		option.text('Tag absent');
@@ -4483,6 +4496,8 @@ function updateCell(td, origValue, column, id) {
 			} else {
 				tagAbsent = true;
 			}
+		} else if (availableTags[column] == 'boolean') {
+			values.push(value); 
 		}
 	} else if (child.is('INPUT')) {
 		value = child.val().replace(/^\s*/, "").replace(/\s*$/, "");
