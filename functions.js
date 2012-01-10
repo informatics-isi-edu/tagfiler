@@ -1474,6 +1474,7 @@ var editBulkInProgress = false;
 var clickedCancelOK = false;
 var enabledEdit = false;
 var displayRangeValues = false;
+var rangeFilterInProgress = false;
 
 var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
@@ -1485,6 +1486,7 @@ var editTagValuesTemplate = null;
 var deleteTagValuesTemplate = null;
 
 var queryFilter = new Object();
+var saveQueryFilter = null;
 
 var dragAndDropBox;
 var tipBox;
@@ -1518,8 +1520,26 @@ function setRangeValues(range) {
 	var trRange = getChild(theadRange, 1);
 	$.each(resultColumns, function(i, column) {
 		var tdRange = getChild(trRange, i+2);
+		tdRange.html('');
+		tdRange.attr('tag', column);
 		if (range[column] != null) {
-			tdRange.html(range[column].join('<br>'));
+			if (range[column].length == 1 && range[column][0] == 'too many values to display') {
+				tdRange.html(range[column][0]);
+			} else {
+				var table = $('<table>');
+				tdRange.append(table);
+				$.each(range[column], function(j, value) {
+					var tr = $('<tr>');
+					table.append(tr);
+					var td = $('<td>');
+					tr.append(td);
+					td.css('padding', '0px 0px 0px 0px');
+					td.attr('tag', column);
+					td.html(value);
+					td.click({	td: td },
+								function(event) {rangeFilter(event.data.td);});
+				});
+			}
 		} else {
 			tdRange.html('&nbsp;');
 		}
@@ -1619,10 +1639,12 @@ function setGUIConfig() {
 
 function queryHasFilters() {
 	var ret = false;
-	$.each(queryFilter, function(tag, value) {
-		ret = true;
-		return false;
-	});
+	if (!rangeFilterInProgress) {
+		$.each(queryFilter, function(tag, value) {
+			ret = true;
+			return false;
+		});
+	}
 	return ret;
 }
 
@@ -3284,7 +3306,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					i--;
 				}
 			}
-			if (displayRangeValues) {
+			if (displayRangeValues && !rangeFilterInProgress) {
 				loadRange();
 			}
 			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
@@ -4684,19 +4706,67 @@ function contextMenuWork(action, el, pos) {
 	}
 }
 
+function contextRangeWork(action, el, pos) {
+	var tag = el.attr('tag');
+	$('.range').removeClass('range');
+	switch (action) {
+	case 'apply':
+		queryFilter[tag] = saveQueryFilter[tag].concat(queryFilter[tag]);
+		break;
+	case 'clear':
+		delete queryFilter[tag];
+		if (saveQueryFilter[tag].length > 0) {
+			queryFilter[tag] = saveQueryFilter[tag];
+		}
+		break;
+	}
+	el.unbind();
+	saveQueryFilter[tag] = null;
+	rangeFilterInProgress = false;
+	showPreview();
+}
+
 function showRange() {
 	displayRangeValues = true;
 	loadRange();
 	$('#Query_Preview_range').css('display', '');
 	$('#showRange').css('display', 'none');
 	$('#hideRange').css('display', '');
+	saveQueryFilter = new Object();
 }
 
 function hideRange() {
+	$('.range').removeClass('range');
 	displayRangeValues = false;
 	$('#Query_Preview_range').css('display', 'none');
 	$('#showRange').css('display', '');
 	$('#hideRange').css('display', 'none');
+	if (rangeFilterInProgress) {
+		// get the tag
+		var tag;
+		$.each(saveQueryFilter, function(column, value) {
+			tag = column;
+			return false;
+		});
+		if (saveQueryFilter[tag].length > 0) {
+			queryFilter[tag] = saveQueryFilter[tag];
+		}
+		// get the column index
+		var index = -1;
+		$.each(resultColumns, function(i, column) {
+			if (column == tag) {
+				index = i;
+				return false;
+			}
+		});
+		var theadRange = $('#Query_Preview_range');
+		var trRange = getChild(theadRange, 1);
+		var tdRange = getChild(trRange, index+2);
+		tdRange.unbind();
+		rangeFilterInProgress = false;
+		showPreview();
+	}
+	saveQueryFilter = null;
 }
 
 function deleteMultiValueRow(id) {
@@ -4740,4 +4810,56 @@ function addMultiValueRow(table, tag, value) {
 				function(event) {deleteMultiValueRow(event.data.id);});
 	td.append(img);
 }
-			
+
+function rangeFilter(td) {
+	var tag = td.attr('tag');
+	if (rangeFilterInProgress && saveQueryFilter[tag] == null) {
+		return;
+	}
+	rangeFilterInProgress = true;
+	if (saveQueryFilter[tag] == null) {
+		// first click
+		if (queryFilter[tag] != null) {
+			saveQueryFilter[tag] = queryFilter[tag];
+		} else {
+			saveQueryFilter[tag] = new Array();
+		}
+		queryFilter[tag] = null;
+	}
+	if (td.hasClass('range')) {
+		td.removeClass('range');
+		// remove the value from the filter
+		var values = queryFilter[tag][0]['vals'];
+		var index = -1;
+		$.each(values, function(i, value) {
+			if (value == td.html()) {
+				index = i;
+				return false;
+			}
+		});
+		values.splice(index, 1);
+		if (values.length == 0) {
+			delete queryFilter[tag];
+			if (saveQueryFilter[tag].length > 0) {
+				queryFilter[tag] = saveQueryFilter[tag];
+			}
+			td.parent().parent().parent().parent().unbind();
+			saveQueryFilter[tag] = null;
+			rangeFilterInProgress = false;
+		}
+	} else {
+		td.addClass('range');
+		if (queryFilter[tag] == null) {
+			queryFilter[tag] = new Array();
+			var pred = new Object();
+			pred['op'] = '=';
+			pred['vals'] = [];
+			pred['opUser'] = 'Equal';
+			queryFilter[tag].push(pred);
+		}
+		queryFilter[tag][0]['vals'].push(td.html());
+		td.parent().parent().parent().parent().contextMenu({ menu: 'rangeColumn' }, function(action, el, pos) { contextRangeWork(action, el, pos); });
+	}
+	showPreview();
+}
+

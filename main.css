@@ -225,6 +225,10 @@ td.topnav ul.subnav li:hover { /*--Hover effect for subnav links--*/
 	cursor: pointer;
 }
 
+td.range {
+	background: #8E8E8E;
+}
+
 /* css for timepicker */
 .ui-timepicker-div .ui-widget-header { margin-bottom: 8px; }
 .ui-timepicker-div dl { text-align: left; }
