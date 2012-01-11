@@ -1520,6 +1520,9 @@ function setRangeValues(range) {
 	var trRange = getChild(theadRange, 1);
 	$.each(resultColumns, function(i, column) {
 		var tdRange = getChild(trRange, i+2);
+		if (tdRange.hasClass('disableFilter')) {
+			return true;
+		}
 		tdRange.html('');
 		tdRange.attr('tag', column);
 		if (range[column] != null) {
@@ -1536,6 +1539,12 @@ function setRangeValues(range) {
 					td.css('padding', '0px 0px 0px 0px');
 					td.attr('tag', column);
 					td.html(value);
+					if (saveQueryFilter[column] != null) {
+						var last = queryFilter[column].length - 1;
+						if (queryFilter[column][last]['vals'].contains(value)) {
+							td.addClass('range');
+						}
+					}
 					td.click({	td: td },
 								function(event) {rangeFilter(event.data.td);});
 				});
@@ -1574,6 +1583,8 @@ function loadRange() {
 			if (columnArray.length == 0) {
 				setRangeValues(range);
 			} else {
+				// if we want sorted by frequency ascended use '&range=values' + encodeSafeURIComponent('<') or
+				// descending use '&range=values' + encodeSafeURIComponent('>')
 				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
 				$.ajax({
 					url: queryUrl,
@@ -1639,12 +1650,10 @@ function setGUIConfig() {
 
 function queryHasFilters() {
 	var ret = false;
-	if (!rangeFilterInProgress) {
-		$.each(queryFilter, function(tag, value) {
-			ret = true;
-			return false;
-		});
-	}
+	$.each(queryFilter, function(tag, value) {
+		ret = true;
+		return false;
+	});
 	return ret;
 }
 
@@ -1655,6 +1664,9 @@ function clearFilter(tag) {
 
 function clearAllFilters() {
 	queryFilter = new Object();
+	if (rangeFilterInProgress) {
+		saveQueryFilter = new Object();
+	}
 	$('#GlobalMenu').slideUp('slow');
 	showPreview();
 }
@@ -2963,6 +2975,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			var tdRange = $('<td>');
 			tdRange.css('white-space', 'nowrap');
 			tdRange.addClass('separator');
+			tdRange.addClass('rangeHeader');
 			tdRange.attr('valign', 'top');
 			trRange.append(tdRange);
 
@@ -3306,7 +3319,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 					i--;
 				}
 			}
-			if (displayRangeValues && !rangeFilterInProgress) {
+			if (displayRangeValues) {
 				loadRange();
 			}
 			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
@@ -3359,6 +3372,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			});
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
+			$('#applyAllFilters').css('display', rangeFilterInProgress ? '' : 'none');
 			if (enabledEdit) {
 				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 				$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
@@ -4708,21 +4722,22 @@ function contextMenuWork(action, el, pos) {
 
 function contextRangeWork(action, el, pos) {
 	var tag = el.attr('tag');
-	$('.range').removeClass('range');
+	el.find('.range').removeClass('range');
 	switch (action) {
 	case 'apply':
-		queryFilter[tag] = saveQueryFilter[tag].concat(queryFilter[tag]);
 		break;
 	case 'clear':
-		delete queryFilter[tag];
-		if (saveQueryFilter[tag].length > 0) {
-			queryFilter[tag] = saveQueryFilter[tag];
+		var last = queryFilter[tag].length - 1;
+		queryFilter[tag].splice(last, 1);
+		if (queryFilter[tag].length == 0) {
+			delete queryFilter[tag];
 		}
 		break;
 	}
 	el.unbind();
-	saveQueryFilter[tag] = null;
-	rangeFilterInProgress = false;
+	el.removeClass('disableFilter');
+	delete saveQueryFilter[tag];
+	updateRangeFilterInProgress();
 	showPreview();
 }
 
@@ -4742,31 +4757,8 @@ function hideRange() {
 	$('#showRange').css('display', '');
 	$('#hideRange').css('display', 'none');
 	if (rangeFilterInProgress) {
-		// get the tag
-		var tag;
-		$.each(saveQueryFilter, function(column, value) {
-			tag = column;
-			return false;
-		});
-		if (saveQueryFilter[tag].length > 0) {
-			queryFilter[tag] = saveQueryFilter[tag];
-		}
-		// get the column index
-		var index = -1;
-		$.each(resultColumns, function(i, column) {
-			if (column == tag) {
-				index = i;
-				return false;
-			}
-		});
-		var theadRange = $('#Query_Preview_range');
-		var trRange = getChild(theadRange, 1);
-		var tdRange = getChild(trRange, index+2);
-		tdRange.unbind();
-		rangeFilterInProgress = false;
-		showPreview();
+		cleanupRangeFilter();
 	}
-	saveQueryFilter = null;
 }
 
 function deleteMultiValueRow(id) {
@@ -4813,9 +4805,7 @@ function addMultiValueRow(table, tag, value) {
 
 function rangeFilter(td) {
 	var tag = td.attr('tag');
-	if (rangeFilterInProgress && saveQueryFilter[tag] == null) {
-		return;
-	}
+	var tdRange = td.parent().parent().parent().parent();
 	rangeFilterInProgress = true;
 	if (saveQueryFilter[tag] == null) {
 		// first click
@@ -4823,13 +4813,24 @@ function rangeFilter(td) {
 			saveQueryFilter[tag] = queryFilter[tag];
 		} else {
 			saveQueryFilter[tag] = new Array();
+			queryFilter[tag] = new Array();
 		}
-		queryFilter[tag] = null;
+		var pred = new Object();
+		pred['op'] = '=';
+		pred['vals'] = [];
+		pred['opUser'] = 'Equal';
+		queryFilter[tag].push(pred);
+		tdRange.addClass('disableFilter');
+		tdRange.mouseover({	td: tdRange },
+							function(event) {if (!event.data.td.hasClass('disableFilter')) event.data.td.addClass('disableFilter');});
+		tdRange.mouseout({	td: tdRange },
+							function(event) {event.data.td.removeClass('disableFilter'); loadRange();});
 	}
 	if (td.hasClass('range')) {
 		td.removeClass('range');
 		// remove the value from the filter
-		var values = queryFilter[tag][0]['vals'];
+		var last = queryFilter[tag].length - 1;
+		var values = queryFilter[tag][last]['vals'];
 		var index = -1;
 		$.each(values, function(i, value) {
 			if (value == td.html()) {
@@ -4839,27 +4840,55 @@ function rangeFilter(td) {
 		});
 		values.splice(index, 1);
 		if (values.length == 0) {
-			delete queryFilter[tag];
-			if (saveQueryFilter[tag].length > 0) {
-				queryFilter[tag] = saveQueryFilter[tag];
+			queryFilter[tag].splice(last, 1);
+			if (queryFilter[tag].length == 0) {
+				delete queryFilter[tag];
 			}
-			td.parent().parent().parent().parent().unbind();
-			saveQueryFilter[tag] = null;
-			rangeFilterInProgress = false;
+			delete saveQueryFilter[tag];
+			tdRange.unbind();
+			tdRange.removeClass('disableFilter');
+			updateRangeFilterInProgress();
 		}
 	} else {
 		td.addClass('range');
-		if (queryFilter[tag] == null) {
-			queryFilter[tag] = new Array();
-			var pred = new Object();
-			pred['op'] = '=';
-			pred['vals'] = [];
-			pred['opUser'] = 'Equal';
-			queryFilter[tag].push(pred);
-		}
-		queryFilter[tag][0]['vals'].push(td.html());
-		td.parent().parent().parent().parent().contextMenu({ menu: 'rangeColumn' }, function(action, el, pos) { contextRangeWork(action, el, pos); });
+		var last = queryFilter[tag].length - 1;
+		queryFilter[tag][last]['vals'].push(td.html());
+		tdRange.contextMenu({ menu: 'rangeColumn' }, function(action, el, pos) { contextRangeWork(action, el, pos); });
 	}
+	showPreview();
+}
+
+function updateRangeFilterInProgress() {
+	rangeFilterInProgress = false;
+	$.each(saveQueryFilter, function(key, value) {
+		rangeFilterInProgress = true;
+		return false;
+	});
+	$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
+}
+
+function applyAllFilters() {
+	$('.range').removeClass('range');
+	$('.rangeHeader').removeClass('disableFilter');
+	$('.rangeHeader').unbind();
+	rangeFilterInProgress = false;
+	saveQueryFilter = new Object();
+	$('#applyAllFilters').css('display', 'none');
+	showPreview();
+}
+
+function cleanupRangeFilter() {
+	$.each(saveQueryFilter, function(tag, value) {
+		var last = queryFilter[tag].length - 1;
+		queryFilter[tag].splice(last, 1);
+		if (queryFilter[tag].length == 0) {
+			delete queryFilter[tag];
+		}
+	});
+	$('.rangeHeader').removeClass('disableFilter');
+	$('.rangeHeader').unbind();
+	rangeFilterInProgress = false;
+	saveQueryFilter = null;
 	showPreview();
 }
 
