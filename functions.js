@@ -1487,6 +1487,7 @@ var deleteTagValuesTemplate = null;
 
 var queryFilter = new Object();
 var saveQueryFilter = null;
+var rangeQueryFilter = null;
 
 var dragAndDropBox;
 var tipBox;
@@ -1515,51 +1516,70 @@ var file_download = false;
 var view_tags = false;
 var view_URL = false;
 
-function setRangeValues(range) {
+function setRangeValues(range, columnRange) {
 	var theadRange = $('#Query_Preview_range');
 	var trRange = getChild(theadRange, 1);
-	$.each(resultColumns, function(i, column) {
-		var tdRange = getChild(trRange, i+2);
-		if (tdRange.hasClass('disableFilter')) {
-			return true;
-		}
-		tdRange.html('');
-		tdRange.attr('tag', column);
-		if (range[column] != null) {
-			if (range[column].length == 1 && range[column][0] == 'too many values to display') {
-				tdRange.html(range[column][0]);
-			} else {
-				var table = $('<table>');
-				tdRange.append(table);
-				$.each(range[column], function(j, value) {
-					var tr = $('<tr>');
-					table.append(tr);
-					var td = $('<td>');
-					tr.append(td);
-					td.css('padding', '0px 0px 0px 0px');
-					td.attr('tag', column);
-					td.html(value);
-					if (saveQueryFilter[column] != null) {
-						var last = queryFilter[column].length - 1;
-						if (queryFilter[column][last]['vals'].contains(value)) {
-							td.addClass('range');
-						}
-					}
-					td.click({	td: td },
-								function(event) {rangeFilter(event.data.td);});
-				});
+	if (columnRange != null) {
+		columnRange.html('');
+		var column = columnRange.attr('tag');
+		appendRangeValues(range, columnRange, column);
+	} else {
+		$.each(resultColumns, function(i, column) {
+			var tdRange = getChild(trRange, i+2);
+			tdRange.attr('tag', column);
+			tdRange.attr('iCol', '' + i);
+			if (tdRange.attr('rangeClicked')) {
+				tdRange.removeAttr('rangeClicked');
+				return true;
 			}
-		} else {
-			tdRange.html('&nbsp;');
+			tdRange.html('');
+			if (range[column] != null) {
+				if (range[column].length == 1 && range[column][0] == 'too many values to display') {
+					tdRange.html(range[column][0]);
+				} else {
+					appendRangeValues(range, tdRange, column);
+				}
+			} else {
+				tdRange.html('&nbsp;');
+			}
+		});
+	}
+}
+
+function appendRangeValues(range, tdRange, column) {
+	var table = $('<table>');
+	tdRange.append(table);
+	$.each(range[column], function(j, value) {
+		var tr = $('<tr>');
+		table.append(tr);
+		var td = $('<td>');
+		tr.append(td);
+		td.css('padding', '0px 0px 0px 0px');
+		td.attr('tag', column);
+		td.html(value);
+		if (saveQueryFilter[column] != null) {
+			var last = queryFilter[column].length - 1;
+			if (queryFilter[column][last]['vals'].contains(value)) {
+				td.addClass('range');
+			}
 		}
+		td.click({	td: td },
+					function(event) {rangeFilter(event.data.td);});
 	});
 }
 
-function loadRange() {
+function loadRange(tdRange) {
+	var tag = '';
+	if (tdRange != null) {
+		tag = tdRange.attr('tag');
+	}
 	var range = new Object();
-	var predUrl = HOME + '/query/' + getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl(tag);
 	var columnArray = new Array();
-	columnArray = columnArray.concat(resultColumns);
+	if (tag == '') {
+	} else {
+		columnArray = columnArray.push(tag);
+	}
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	$.ajax({
 		url: queryUrl,
@@ -1581,7 +1601,7 @@ function loadRange() {
 				}
 			});
 			if (columnArray.length == 0) {
-				setRangeValues(range);
+				setRangeValues(range, tdRange);
 			} else {
 				// if we want sorted by frequency ascended use '&range=values' + encodeSafeURIComponent('<') or
 				// descending use '&range=values' + encodeSafeURIComponent('>')
@@ -1596,7 +1616,7 @@ function loadRange() {
 						$.each(data[0], function(key, value) {
 							range[key] = value;
 						});
-						setRangeValues(range);
+						setRangeValues(range, tdRange);
 					},
 					error: function(jqXHR, textStatus, errorThrown) {
 						if (!disableAjaxAlert) {
@@ -1666,6 +1686,7 @@ function clearAllFilters() {
 	queryFilter = new Object();
 	if (rangeFilterInProgress) {
 		saveQueryFilter = new Object();
+		rangeQueryFilter = new Object();
 	}
 	$('#GlobalMenu').slideUp('slow');
 	showPreview();
@@ -1904,7 +1925,7 @@ function dropColumn(e, tag, append) {
 }
 
 function updatePreviewURL(force) {
-	var predUrl = HOME + '/query/' + getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl('');
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	$('#Query_URL').attr('href', queryUrl);
@@ -2680,7 +2701,7 @@ function encodeURISortArray() {
 	return ret;
 }
 
-function getQueryPredUrl() {
+function getQueryPredUrl(excludeTag) {
 	if (tagInEdit != null && editInProgress) {
 		var tagConstraintDiv = $('#' +makeId('queryDiv', tagInEdit.split(' ').join('_')));
 		saveTagPredicate(tagInEdit, tagConstraintDiv);
@@ -2688,7 +2709,7 @@ function getQueryPredUrl() {
 	var query = new Array();
 	var url = '';
 	$.each(queryFilter, function(tag, preds) {
-		if (tag == tagInEdit && !editInProgress) {
+		if (tag == tagInEdit && !editInProgress || tag == excludeTag) {
 			return true;
 		}
 		var suffix = '';
@@ -2789,7 +2810,7 @@ function showQueryResults(limit) {
 	if (!editInProgress) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
-	var predUrl = HOME + '/query/' + getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl('');
 	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	if (!editBulkInProgress && lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
@@ -2824,7 +2845,7 @@ function showQueryResultsPreview(predUrl, limit, offset) {
 }
 
 function initDropDownList(tag) {
-	var predUrl = HOME + '/query/' + getQueryPredUrl();
+	var predUrl = HOME + '/query/' + getQueryPredUrl('');
 	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push(tag);
@@ -3320,7 +3341,7 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			}
 			if (displayRangeValues) {
-				loadRange();
+				loadRange(null);
 			}
 			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
 			$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
@@ -3814,6 +3835,7 @@ function getTagSearchDisplay(tag) {
 			var tr = $('<tr>');
 			table.append(tr);
 			var td = $('<td>');
+			td.attr('iRow', '' + i);
 			tr.append(td);
 			var val = item['opUser'] == 'Between' ? '=' : item['op'];
 			val = val == null ? ':tagged:' : val;
@@ -3831,11 +3853,25 @@ function getTagSearchDisplay(tag) {
 				
 			}
 			td.html(val);
+			if (rangeQueryFilter != null && rangeQueryFilter[tag] != null && rangeQueryFilter[tag] == i) {
+				td.addClass('rangeConstraint');
+			}
+			td.click({	td: td },
+						function(event) {event.preventDefault(); updateColumnFilter(event.data.td); });
 		});
 	}
-	divConstraint.click({	tag: tag },
-							function(event) {event.preventDefault(); editQuery(event.data.tag);});
 	return divConstraint;
+}
+
+function updateColumnFilter(td) {
+	return;
+	if (td.hasClass('rangeConstraint')) {
+		td.removeClass('rangeConstraint');
+	} else {
+		var tbody = td.parent().parent();
+		tbody.find('.rangeConstraint').removeClass('rangeConstraint');
+		td.addClass('rangeConstraint');
+	}
 }
 
 function saveTagPredicate(tag, div) {
@@ -4233,7 +4269,7 @@ function sendBulkRequest(column, scope, action, values) {
 	editBulkInProgress = true;
 	var value = values.join(',');
 	if (scope == 'filter') {
-		var predUrl = HOME + '/tags/' + getQueryPredUrl();
+		var predUrl = HOME + '/tags/' + getQueryPredUrl('');
 		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
 		$.ajax({
 			url: url,
@@ -4734,20 +4770,27 @@ function contextRangeWork(action, el, pos) {
 		}
 		break;
 	}
+	var iCol = parseInt(el.attr('iCol'));
+	var thead = $('#Query_Preview_header');
+	var tr3 = thead.find('.columnFilter');
+	var td3 = getChild(tr3, iCol+2);
+	td3.find('.rangeConstraint').removeClass('rangeConstraint');
 	el.unbind();
 	el.removeClass('disableFilter');
 	delete saveQueryFilter[tag];
+	delete rangeQueryFilter[tag];
 	updateRangeFilterInProgress();
 	showPreview();
 }
 
 function showRange() {
 	displayRangeValues = true;
-	loadRange();
+	loadRange(null);
 	$('#Query_Preview_range').css('display', '');
 	$('#showRange').css('display', 'none');
 	$('#hideRange').css('display', '');
 	saveQueryFilter = new Object();
+	rangeQueryFilter = new Object();
 }
 
 function hideRange() {
@@ -4806,6 +4849,7 @@ function addMultiValueRow(table, tag, value) {
 function rangeFilter(td) {
 	var tag = td.attr('tag');
 	var tdRange = td.parent().parent().parent().parent();
+	tdRange.attr('rangeClicked', true);
 	rangeFilterInProgress = true;
 	if (saveQueryFilter[tag] == null) {
 		// first click
@@ -4815,16 +4859,17 @@ function rangeFilter(td) {
 			saveQueryFilter[tag] = new Array();
 			queryFilter[tag] = new Array();
 		}
+		rangeQueryFilter[tag] = saveQueryFilter[tag].length;
 		var pred = new Object();
 		pred['op'] = '=';
 		pred['vals'] = [];
 		pred['opUser'] = 'Equal';
 		queryFilter[tag].push(pred);
 		tdRange.addClass('disableFilter');
-		tdRange.mouseover({	td: tdRange },
-							function(event) {if (!event.data.td.hasClass('disableFilter')) event.data.td.addClass('disableFilter');});
-		tdRange.mouseout({	td: tdRange },
-							function(event) {event.data.td.removeClass('disableFilter'); loadRange();});
+		tdRange.mouseleave({	td: tdRange },
+								function(event) {event.preventDefault(); loadRange(null);});
+		tdRange.mouseenter({	td: tdRange },
+							function(event) {event.preventDefault(); loadRange(event.data.td);});
 	}
 	if (td.hasClass('range')) {
 		td.removeClass('range');
@@ -4845,6 +4890,7 @@ function rangeFilter(td) {
 				delete queryFilter[tag];
 			}
 			delete saveQueryFilter[tag];
+			delete rangeQueryFilter[tag];
 			tdRange.unbind();
 			tdRange.removeClass('disableFilter');
 			updateRangeFilterInProgress();
@@ -4865,6 +4911,7 @@ function updateRangeFilterInProgress() {
 		return false;
 	});
 	$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
+	$('#applyAllFilters').css('display', rangeFilterInProgress ? '' : 'none');
 }
 
 function applyAllFilters() {
@@ -4873,6 +4920,7 @@ function applyAllFilters() {
 	$('.rangeHeader').unbind();
 	rangeFilterInProgress = false;
 	saveQueryFilter = new Object();
+	rangeQueryFilter = new Object();
 	$('#applyAllFilters').css('display', 'none');
 	showPreview();
 }
@@ -4889,6 +4937,7 @@ function cleanupRangeFilter() {
 	$('.rangeHeader').unbind();
 	rangeFilterInProgress = false;
 	saveQueryFilter = null;
+	rangeQueryFilter = null;
 	showPreview();
 }
 
