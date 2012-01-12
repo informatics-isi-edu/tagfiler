@@ -3046,6 +3046,8 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				tdRange.removeClass('separator');
 			}
 		}
+		var tdRange = getChild(trRange, i+2);
+		tdRange.css('display', '');
 		var columSortId = makeId('sort', column.split(' ').join('_'), PREVIEW_COUNTER);
 		var tdSort = getChild(tr1, i+2);
 		tdSort.css('display', '');
@@ -3186,6 +3188,8 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		td = getChild(tr3, i+1);
 		td.css('display', 'none');
 		td = getChild(trfoot, i+1);
+		td.css('display', 'none');
+		td = getChild(trRange, i+1);
 		td.css('display', 'none');
 	}
 	$.ajax({
