@@ -1577,6 +1577,7 @@ function loadRange(tdRange) {
 	var predUrl = HOME + '/query/' + getQueryPredUrl(tag);
 	var columnArray = new Array();
 	if (tag == '') {
+		columnArray = columnArray.concat(resultColumns);
 	} else {
 		columnArray = columnArray.push(tag);
 	}
