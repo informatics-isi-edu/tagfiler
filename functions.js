@@ -1488,6 +1488,8 @@ var deleteTagValuesTemplate = null;
 var queryFilter = new Object();
 var saveQueryFilter = null;
 var rangeQueryFilter = null;
+var predicateTable = null;
+var savePredicateFilter = null;
 
 var dragAndDropBox;
 var tipBox;
@@ -2505,6 +2507,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 			var td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
+			td.css('padding', '0px 0px 0px 0px');
 			var input = $('<input>');
 			if (availableTags[tag] == 'timestamptz') {
 				input.addClass('datetimepicker');
@@ -2518,10 +2521,12 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 			td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
+			td.css('padding', '0px 0px 0px 0px');
 			td.append('AND');
 			td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
+			td.css('padding', '0px 0px 0px 0px');
 			input = $('<input>');
 			if (availableTags[tag] == 'timestamptz') {
 				input.addClass('datetimepicker');
@@ -2536,6 +2541,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 			var td = $('<td>');
 			tr.append(td);
 			td.css('border-width', '0px');
+			td.css('padding', '0px 0px 0px 0px');
 			if (values != null && !hasTagValueOption(tag, values[0])) {
 				var input = $('<input>');
 				if (availableTags[tag] == 'timestamptz') {
@@ -2564,9 +2570,11 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 				}
 			}
 			td = $('<td>');
+			td.css('padding', '0px 0px 0px 0px');
 			tr.append(td);
 			td.append('AND');
 			td = $('<td>');
+			td.css('padding', '0px 0px 0px 0px');
 			tr.append(td);
 			if (values != null && !hasTagValueOption(tag, values[1])) {
 				var input = $('<input>');
@@ -2600,6 +2608,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		td = $('<td>');
 		tr.append(td);
 		td.css('border-width', '0px');
+		td.css('padding', '0px 0px 0px 0px');
 		var input = $('<input>');
 		if (availableTags[tag] == 'timestamptz') {
 			input.addClass('datetimepicker');
@@ -2612,6 +2621,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		td.append(input);
 	} else {
 		var td = $('<td>');
+		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		td.css('border-width', '0px');
 		if (values != null && !hasTagValueOption(tag, values[0])) {
@@ -2644,6 +2654,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 	}
 	if (selVal != 'Between') {
 		td = $('<td>');
+		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		var imgPlus = $('<img>');
 		imgPlus.attr({	src: HOME + '/static/plus.png',
@@ -2658,6 +2669,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 						function(event) {addNewValue(event.data.row, event.data.type, event.data.selectOperatorId, event.data.tag, event.data.values);});
 		td.append(imgPlus);
 		td = $('<td>');
+		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		var img = $('<img>');
 		img.attr({	src: HOME + '/static/minus.png',
@@ -2707,6 +2719,9 @@ function getQueryPredUrl(excludeTag) {
 		var tagConstraintDiv = $('#' +makeId('queryDiv', tagInEdit.split(' ').join('_')));
 		saveTagPredicate(tagInEdit, tagConstraintDiv);
 	}
+	if (predicateTable != null) {
+		updateTagPredicate();
+	}
 	var query = new Array();
 	var url = '';
 	$.each(queryFilter, function(tag, preds) {
@@ -2718,13 +2733,15 @@ function getQueryPredUrl(excludeTag) {
 			suffix = localeTimezone;
 		}
 		$.each(preds, function(i, pred) {
-			if (pred['opUser'] == 'Between') {
-				query.push(encodeSafeURIComponent(tag) + '=' + encodeSafeURIComponent('(' + pred['vals'][0] + suffix + ',' +
-																pred['vals'][1] + suffix + ')'));
-			} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
-				query.push(encodeSafeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
-			} else {
-				query.push(encodeSafeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
+			if (pred['opUser'] != 'None') {
+				if (pred['opUser'] == 'Between') {
+					query.push(encodeSafeURIComponent(tag) + '=' + encodeSafeURIComponent('(' + pred['vals'][0] + suffix + ',' +
+																	pred['vals'][1] + suffix + ')'));
+				} else if (pred['opUser'] != 'Tagged' && pred['opUser'] != 'Tag absent') {
+					query.push(encodeSafeURIComponent(tag) + pred['op'] + encodeURIArray(pred['vals'], suffix).join(','));
+				} else {
+					query.push(encodeSafeURIComponent(tag) + (pred['op'] != null ? pred['op'] : ''));
+				}
 			}
 		});
 	});
@@ -3084,6 +3101,16 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		ul.addClass('subnav');
 		tdSort.append(ul);
 		var li = $('<li>');
+		li.addClass('item addFilter');
+		li.html('Add filter');
+		li.mouseup(function(event) {event.preventDefault();});
+		li.mousedown(function(event) {event.preventDefault(); addFilter(column, -1);});
+		if (predicateTable != null) {
+			li.css('display', 'none');
+		}
+		ul.append(li);
+
+		li = $('<li>');
 		li.addClass('item clearColumnFilter');
 		li.html('Clear column filter');
 		li.mouseup(function(event) {event.preventDefault();});
@@ -3097,6 +3124,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		li.html('Edit column filter...');
 		li.mouseup(function(event) {event.preventDefault();});
 		li.mousedown(function(event) {event.preventDefault(); editQuery(column);});
+		if (predicateTable != null) {
+			li.css('display', 'none');
+		}
 		ul.append(li);
 
 		if (bulk_value_edit) {
@@ -3162,15 +3192,17 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		th.append(column);
 		
 		var td3 = getChild(tr3, i+2);
-		td3.css('display', '');
-		td3.attr('iCol', '' + (i+1));
-		var divConstraint = getChild(td3, 1);
-		divConstraint.css('white-space', 'nowrap');
-		divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
-		divConstraint.html('');
-		if (queryFilter[column] != null) {
-			var constraint = getTagSearchDisplay(column);
-			divConstraint.append(constraint);
+		if (predicateTable == null || predicateTable.attr('tag') != column) {
+			td3.css('display', '');
+			td3.attr('iCol', '' + (i+1));
+			var divConstraint = getChild(td3, 1);
+			divConstraint.css('white-space', 'nowrap');
+			divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
+			divConstraint.html('');
+			if (queryFilter[column] != null) {
+				var constraint = getTagSearchDisplay(column);
+				divConstraint.append(constraint);
+			}
 		}
 		
 		var tdfoot = getChild(trfoot, i+2);
@@ -3841,6 +3873,7 @@ function getTagSearchDisplay(tag) {
 			table.append(tr);
 			var td = $('<td>');
 			td.attr('iRow', '' + i);
+			td.attr('tag', tag);
 			tr.append(td);
 			var val = item['opUser'] == 'Between' ? '=' : item['op'];
 			val = val == null ? ':tagged:' : val;
@@ -3869,14 +3902,9 @@ function getTagSearchDisplay(tag) {
 }
 
 function updateColumnFilter(td) {
-	return;
-	if (td.hasClass('rangeConstraint')) {
-		td.removeClass('rangeConstraint');
-	} else {
-		var tbody = td.parent().parent();
-		tbody.find('.rangeConstraint').removeClass('rangeConstraint');
-		td.addClass('rangeConstraint');
-	}
+	var tag = td.attr('tag');
+	var index = parseInt(td.attr('iRow'));
+	addFilter(tag, index);
 }
 
 function saveTagPredicate(tag, div) {
@@ -3889,57 +3917,8 @@ function saveTagPredicate(tag, div) {
 		var fieldset = getChild(td, 1);
 		var table = getChild(fieldset, 1);
 		tbody = getChild(table, 2);
-		tr = getChild(tbody, 1);
-		td = getChild(tr, 1);
-		var op = getChild(td, 1).val();
-		if (op == 'Between') {
-			td = getChild(tr, 2);
-			var table = getChild(td, 1);
-			var tbody = getChild(table, 1);
-			var tr = getChild(tbody, 1);
-			var td = getChild(tr, 1);
-			var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-			td = getChild(tr, 3);
-			var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
-			if (val1 != '' && val2 != '') {
-				var pred = new Object();
-				pred['opUser'] = op;
-				pred['vals'] = new Array();
-				pred['vals'].push(val1);
-				pred['vals'].push(val2);
-				queryFilter[tag].push(pred);
-			}
-		} else if (op != 'Tagged' && op != 'Tag absent') {
-			// values column
-			var td = getChild(tr, 2);
-			var table = getChild(td, 1);
-			var tbody = getChild(table, 1);
-			var values = new Array();
-			$.each(tbody.children(), function(j, row) {
-				td = getChild($(row), 1);
-				var input = getChild(td, 1);
-				var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
-				if (val.length > 0) {
-					values.push(val);
-				}
-			});
-			if (values.length > 0) {
-				var pred = new Object();
-				pred['opUser'] = op;
-				pred['op'] = ops[op];
-				pred['vals'] = values;
-				queryFilter[tag].push(pred);
-			}
-		} else if (op == 'Tagged') {
-			var pred = new Object();
-			pred['opUser'] = op;
-			pred['vals'] = new Array();
-			queryFilter[tag].push(pred);
-		} else {
-			var pred = new Object();
-			pred['opUser'] = op;
-			pred['op'] = ops[op];
-			pred['vals'] = new Array();
+		var pred = getPredicate(tbody);
+		if (pred != null) {
 			queryFilter[tag].push(pred);
 		}
 	});
@@ -4944,5 +4923,229 @@ function cleanupRangeFilter() {
 	saveQueryFilter = null;
 	rangeQueryFilter = null;
 	showPreview();
+}
+
+function addFilter(tag, predIndex) {
+	$('.editColumnFilter').css('display', 'none');
+	$('.addFilter').css('display', 'none');
+	savePredicateFilter = (predIndex != -1) ? queryFilter[tag][predIndex] : null;
+	initDropDownList(tag);
+	var index = -1;
+	$.each(resultColumns, function(i, column) {
+		if (column == tag) {
+			index = i;
+			return false;
+		}
+	});
+	var filterIndex = predIndex;
+	if (predIndex == -1) {
+		if (queryFilter[tag] == null) {
+			queryFilter[tag] = new Array();
+		}
+		filterIndex = queryFilter[tag].length;
+	}
+	var thead = $('#Query_Preview_header');
+	var tr3 = thead.find('.columnFilter');
+	var td3 = getChild(tr3, index+2);
+	var divConstraint = getChild(td3, 1);
+	predicateTable = $('<table>');
+	predicateTable.attr('tag', tag);
+	predicateTable.attr('filterIndex', filterIndex);
+	var fieldset = $('<fieldset>');
+	fieldset.addClass('rangeConstraint');
+	fieldset.append(predicateTable);
+	if (predIndex == -1) {
+		divConstraint.append(fieldset);
+	} else {
+		var div = getChild(divConstraint, 1);
+		var table = getChild(div, 1);
+		var tbody = getChild(table, 1);
+		var tr = getChild(tbody, predIndex+1);
+		var td = getChild(tr, 1);
+		var newTd = $('<td>');
+		tr.append(newTd);
+		newTd.append(fieldset);
+		newTd.insertAfter(td);
+		td.remove();
+	}
+	var id = makeId('row', ++ROW_COUNTER);
+	var tr = $('<tr>');
+	tr.attr('id', id);
+	predicateTable.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.css('padding', '0px 0px 0px 0px');
+	td.attr('valign', 'top');
+	var select = getSelectTagOperator(tag, availableTags[tag]);
+	var selId = select.attr('id');
+	td.append(select);
+	if (predIndex != -1) {
+		var op = savePredicateFilter['opUser'];
+		select.val(op);
+	}
+	td = $('<td>');
+	td.css('padding', '0px 0px 0px 0px');
+	tr.append(td);
+	var tableId = makeId('table', ROW_COUNTER);
+	if (availableTags[tag] != 'empty') {
+		var table = $('<table>');
+		table.attr('id', tableId);
+		td.append(table);
+		var tdTable = $('<td>');
+		tdTable.css('text-align', 'center');
+		tdTable.css('margin-top', '0px');
+		tdTable.css('margin-bottom', '0px');
+		tdTable.css('padding', '0px 0px 0px 0px');
+		tr.append(tdTable);
+		addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, null);
+		if ($('#' + selId).val() == 'Between') {
+			tdTable.css('display', 'none');
+		} else if ($('#' + selId).val() == 'Tag absent') {
+			td.css('display', 'none');
+		}
+	}
+	if (predIndex != -1) {
+		var values = savePredicateFilter['vals'];
+		var table = $('#' + tableId);
+		var tbody = getChild(table, 1);
+		$.each(values, function(i, value) {
+			if (i > 0) {
+				addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, null);
+			}
+			var tr = getChild(tbody, i+1);
+			var td = getChild(tr, 1);
+			var input = getChild(td, 1);
+			input.val(value);
+		});
+	}
+	var buttonTable = $('<table>');
+	buttonTable.css('float', 'right');
+	fieldset.append(buttonTable);
+	tr = $('<tr>');
+	buttonTable.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.css('padding', '0px 0px 0px 0px');
+	td.css('text-align', 'right');
+	var button = $('<input>');
+	button.attr('type', 'button');
+	button.val('Cancel');
+	td.append(button);
+	button.click(function(event) {cancelPredicate();});
+	button = $('<input>');
+	button.attr('type', 'button');
+	button.val('OK');
+	button.click(function(event) {savePredicate();});
+	td.append(button);
+}
+
+function cancelPredicate() {
+	$('.editColumnFilter').css('display', '');
+	$('.addFilter').css('display', '');
+	var tag = predicateTable.attr('tag');
+	var index = parseInt(predicateTable.attr('filterIndex'));
+	if (savePredicateFilter == null) {
+		if (queryFilter[tag].length > index) {
+			queryFilter[tag].splice(index, 1);
+		}
+		if (queryFilter[tag].length == 0) {
+			delete queryFilter[tag];
+		}
+	} else {
+		queryFilter[tag][index] = savePredicateFilter;
+	}
+	predicateTable = null;
+	// force a preview 'refresh'
+	editBulkInProgress = true;
+	showPreview();
+	editBulkInProgress = false;
+}
+
+function savePredicate() {
+	$('.editColumnFilter').css('display', '');
+	$('.addFilter').css('display', '');
+	var tag = predicateTable.attr('tag');
+	var index = parseInt(predicateTable.attr('filterIndex'));
+	updateTagPredicate();
+	var pred = queryFilter[tag][index];
+	if (pred['opUser'] == 'None') {
+		if (queryFilter[tag].length > index) {
+			queryFilter[tag].splice(index, 1);
+		}
+		if (queryFilter[tag].length == 0) {
+			delete queryFilter[tag];
+		}
+	}
+	predicateTable = null;
+	// force a preview 'refresh'
+	editBulkInProgress = true;
+	showPreview();
+	editBulkInProgress = false;
+}
+
+function updateTagPredicate() {
+	var tag = predicateTable.attr('tag');
+	var index = parseInt(predicateTable.attr('filterIndex'));
+	var tbody = getChild(predicateTable, 1);
+	var pred = getPredicate(tbody);
+	if (pred == null) {
+		pred = new Object();
+		pred['opUser'] = 'None';
+	}
+	queryFilter[tag][index] = pred;
+}
+
+function getPredicate(tbody) {
+	var pred = null;
+	tr = getChild(tbody, 1);
+	td = getChild(tr, 1);
+	var op = getChild(td, 1).val();
+	if (op == 'Between') {
+		td = getChild(tr, 2);
+		var table = getChild(td, 1);
+		var tbody = getChild(table, 1);
+		var tr = getChild(tbody, 1);
+		var td = getChild(tr, 1);
+		var val1 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+		td = getChild(tr, 3);
+		var val2 = getChild(td, 1).val().replace(/^\s*/, "").replace(/\s*$/, "");
+		if (val1 != '' && val2 != '') {
+			pred = new Object();
+			pred['opUser'] = op;
+			pred['vals'] = new Array();
+			pred['vals'].push(val1);
+			pred['vals'].push(val2);
+		}
+	} else if (op != 'Tagged' && op != 'Tag absent') {
+		// values column
+		var td = getChild(tr, 2);
+		var table = getChild(td, 1);
+		var tbody = getChild(table, 1);
+		var values = new Array();
+		$.each(tbody.children(), function(j, row) {
+			td = getChild($(row), 1);
+			var input = getChild(td, 1);
+			var val = input.val().replace(/^\s*/, "").replace(/\s*$/, "");
+			if (val.length > 0) {
+				values.push(val);
+			}
+		});
+		if (values.length > 0) {
+			pred = new Object();
+			pred['opUser'] = op;
+			pred['op'] = ops[op];
+			pred['vals'] = values;
+		}
+	} else if (op == 'Tagged') {
+		pred = new Object();
+		pred['opUser'] = op;
+		pred['vals'] = new Array();
+	} else {
+		pred = new Object();
+		pred['opUser'] = op;
+		pred['op'] = ops[op];
+		pred['vals'] = new Array();
+	}
+	return pred;
 }
 

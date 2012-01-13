@@ -229,7 +229,7 @@ td.range {
 	background: #8E8E8E;
 }
 
-td.rangeConstraint {
+td.rangeConstraint, fieldset.rangeConstraint {
 	background: #FFFFE6;
 }
 
