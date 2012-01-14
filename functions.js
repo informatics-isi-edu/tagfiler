@@ -1546,6 +1546,7 @@ function setRangeValues(range, columnRange) {
 			}
 		});
 	}
+	setTimeout('enableRangeEvents()', 1);
 }
 
 function appendRangeValues(range, tdRange, column) {
@@ -1571,6 +1572,7 @@ function appendRangeValues(range, tdRange, column) {
 }
 
 function loadRange(tdRange) {
+	$('.disableFilter').unbind('mouseenter mouseleave');
 	var tag = '';
 	if (tdRange != null) {
 		tag = tdRange.attr('tag');
@@ -4850,10 +4852,6 @@ function rangeFilter(td) {
 		pred['opUser'] = 'Equal';
 		queryFilter[tag].push(pred);
 		tdRange.addClass('disableFilter');
-		tdRange.mouseleave({	td: tdRange },
-								function(event) {event.preventDefault(); loadRange(null);});
-		tdRange.mouseenter({	td: tdRange },
-							function(event) {event.preventDefault(); loadRange(event.data.td);});
 	}
 	if (td.hasClass('range')) {
 		td.removeClass('range');
@@ -5149,3 +5147,7 @@ function getPredicate(tbody) {
 	return pred;
 }
 
+function enableRangeEvents() {
+	$('.disableFilter').mouseleave(function(event) {event.preventDefault(); loadRange(null);});
+	$('.disableFilter').mouseenter(function(event) {event.preventDefault(); loadRange($(this));});
+}
