@@ -351,12 +351,8 @@ tagdef_phase1()
       psql -q -t >&2 <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
-$(if [[ "$uniqueval" = "UNIQUE(subject)" ]] ; then 
-     echo "CREATE INDEX \"_$1_subject_value_idx\" ON \"_$1\" (subject, value);" ;
-     echo "CLUSTER \"_$1\" USING \"_$1_subject_value_idx\";" ;
-  else 
-     echo "CLUSTER \"_$1\" USING \"_$1_subject_key\";" ;
-  fi)
+CREATE INDEX "_$1_value_idx" ON "_$1" (value) ;
+CLUSTER "_$1" USING "_$1_subject_key" ;
 EOF
    else
       psql -q -t >&2 <<EOF

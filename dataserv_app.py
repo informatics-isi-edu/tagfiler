@@ -1837,6 +1837,7 @@ class Application:
         tabledef = "CREATE TABLE %s" % (self.wraptag(tagdef.tagname))
         tabledef += " ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE"
         indexdef = ''
+        clustercmd = ''
 
         type = self.globals['typesdict'].get(tagdef.typestr, None)
         if type == None:
@@ -1872,18 +1873,21 @@ class Application:
                 tabledef += ", UNIQUE(subject)"
             else:
                 tabledef += ", UNIQUE(subject, value)"
-                
+
             indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
             indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
             indexdef += ' (value)'
         else:
             tabledef += ', UNIQUE(subject)'
+
+        clustercmd = 'CLUSTER %s USING %s' % (self.wraptag(tagdef.tagname), self.wraptag(tagdef.tagname, '_subject_key'))
             
         tabledef += " )"
         #web.debug(tabledef)
         self.dbquery(tabledef)
         if indexdef:
             self.dbquery(indexdef)
+        self.dbquery(clustercmd)
 
     def delete_tagdef(self, tagdef):
         self.undeploy_tagdef(tagdef)
