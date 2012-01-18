@@ -2103,6 +2103,8 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	
 	editTagValuesTemplate = $('#editTagValuesDiv');
 	deleteTagValuesTemplate = $('#deleteTagValuesDiv');
+
+	$.ajaxSetup({ cache: true });
 	
 	// build the userOp dictionary
 	$.each(ops, function(key, value) {
