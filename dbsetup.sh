@@ -40,6 +40,7 @@ CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
 CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
+CREATE INDEX subjecttags_tagname_idx ON subjecttags (tagname);
 CLUSTER subjecttags USING subjecttags_subject_key;
 EOF
 
