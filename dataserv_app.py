@@ -2429,35 +2429,20 @@ class Application:
                 else:
                     inner.append(sq)
 
+            outer += [ '"_subject last tagged txid" txid',
+                       '"_owner" o',
+                       '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys='%s' % rolekeys),
+                       '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu' % dict(rolekeys='%s' % rolekeys) ]
+
+            if final and rangemode == None:
+                selects += [ 'subject AS id',
+                             'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS readok' % dict(rolekeys='%s' % rolekeys),
+                             'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
+                             'o.value AS owner',
+                             'txid.value AS txid' ]
+
             if enforce_read_authz:
-                inner += [ '(SELECT DISTINCT subject from _owner AS o WHERE o.value IN (%(rolekeys)s)'
-                           ' UNION SELECT DISTINCT subject from "_read users" AS ru WHERE ru.value IN (%(rolekeys)s)) AS r'
-                           % dict(rolekeys='%s' % rolekeys) ]
-
-                outer += [ '"_subject last tagged txid" t',
-                           '"_owner" o',
-                           '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu'
-                           % dict(rolekeys='%s' % rolekeys) ]
-
-                if final and rangemode == None:
-                    selects += [ 'r.subject AS id',
-                                 'True AS readok',
-                                 'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
-                                 'o.value AS owner',
-                                 't.value AS txid' ]
-            else:
-                inner += [ 'resources AS r' ]
-
-                outer += [ '"_subject last tagged txid" t',
-                           '"_owner" o',
-                           '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys='%s' % rolekeys),
-                           '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu' % dict(rolekeys='%s' % rolekeys) ]
-                if final and rangemode == None:
-                    selects += [ 'r.subject AS id',
-                                 'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS readok' % dict(rolekeys='%s' % rolekeys),
-                                 'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
-                                 'o.value AS owner',
-                                 't.value AS txid' ]
+                subject_wheres.append( 'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s)' % dict(rolekeys='%s' % rolekeys) )
 
             finals = []
             for tag, preds in lpreds.items():
@@ -2545,19 +2530,21 @@ class Application:
             else:
                 where = ''
 
+            if len(inner) == 0:
+                tables = [ 'resources AS r' ]
+            else:
+                tables = [ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
+            tables += [ '%s USING (subject)' % o for o in outer ]
+            tables = ' LEFT OUTER JOIN '.join(tables)
             if rangemode == None or not final:
                 q = ('SELECT %(selects)s FROM %(tables)s %(where)s' 
                      % dict(selects=', '.join([ s for s in selects ]),
-                            tables=' LEFT OUTER JOIN ' \
-                            .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
-                                  + [ '%s USING (subject)' % o for o in outer ]),
+                            tables=tables,
                             where=where))
             else:
-                q = ('WITH resources AS ( SELECT r.subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
+                q = ('WITH resources AS ( SELECT subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
                      % dict(selects=', '.join([ s for s in selects ]),
-                            tables=' LEFT OUTER JOIN ' \
-                            .join([ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
-                                  + [ '%s USING (subject)' % o for o in outer ]),
+                            tables=tables,
                             where=where))
             
             return q
