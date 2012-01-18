@@ -303,6 +303,24 @@ view_cache = PerUserDbCache('view')
 def wraptag(tagname, suffix='', prefix='_'):
     return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
+def wrapval(value, dbtype=None, range_extensions=False):
+    if dbtype:
+        value = downcast_value(dbtype, value, range_extensions)
+
+    if type(value) == tuple:
+        return ( '%s' % wrapval(value[0], dbtype),
+                 '%s' % wrapval(value[1], dbtype) )
+    if dbtype == None:
+        value = downcast_value('text', value)
+    else:
+        value = '%s' % value
+
+    if dbtype in [ 'boolean', 'int8', 'float8' ]:
+        return '%s' % value
+    else:
+        return "'%s'" % value.replace("'", "''")
+    
+
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
 
@@ -2294,7 +2312,8 @@ class Application:
         roles = [ r for r in self.authn.roles ]
         roles.append('*')
         roles = set(roles)
-        rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])
+        #rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])
+        rolekeys = ','.join([ wrapval(r, 'text') for r in roles ])
 
         prohibited = set(listas.itervalues()).intersection(set(['id', 'readok', 'writeok', 'txid', 'owner', 'dtype']))
         if len(prohibited) > 0:
@@ -2412,10 +2431,16 @@ class Application:
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    vkeys = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
-                    vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(v, 'is_subquery') ]
-                    constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in vkeys if type(v) != tuple ]
-                    bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vkeys if type(v) == tuple ]
+                    #vkeys = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+                    #vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
+                    #constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in vkeys if type(v) != tuple ]
+                    #bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vkeys if type(v) == tuple ]
+
+                    vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+                    vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
+                    constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
+                    bounds = [ '(%s::%s, %s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vals if type(v) == tuple ]
+
                     clauses = []
                     if constants:
                         constants = ', '.join(constants)
