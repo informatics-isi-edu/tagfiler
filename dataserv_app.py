@@ -2149,6 +2149,89 @@ class Application:
         self.set_tag_lastmodified(subject, tagdef)
         
 
+    def bulk_update(self, subject_iter, path=None, on_missing='create', on_existing='', enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=True):
+        """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
+
+           'subject_iter'    is the set of input table rows describing subjects
+           
+           'path'            query path (default from request context) defines shape of update
+                             -- tags in subjpreds are used as primary keys to find existing subjects
+                             -- tags in subjpreds and listpreds are set using values from input table row
+                             -- input rows must match any constraints in subjpreds and listpreds?
+                             -- updated or created subjects must match any constraints in subjpreds?
+
+           'on_missing'      what to do for input rows without corresponding graph subjects
+                             -- 'create' a new subject
+                             -- 'ignore' input row
+                             -- 'abort' bulk_update process
+           
+           'on_existing'     what to do for input rows with corresponding graph subjects
+                             -- 'merge' input row tag-values on top of existing subject tags
+                             -- 'reset' subject tags to match input row
+                             -- 'unbind' identifying tags from existing subject and then treat as if missing
+                             -- 'ignore' input row
+                             -- 'abort' bulk_update process
+
+        """
+        # TODO: implement this logic...
+        # (S)-marked steps must consider subjpreds constraints when enforcing path constraints
+        # (L)-marked steps must consider listpreds constraints
+        # (SZ)-marked steps must consider subject authz constraints
+        # (LZ)-marked steps must consider tuple authz constraints
+        
+        # pre-evaluate static authz checks where possible and abort on conflicts (LZ)
+        # -- for tags with subject-independent policies
+
+        # create a transaction-local temporary table of the right shape for input data
+        # -- unique table name in case multiple calls are happening
+        # -- row_id, tag1, tag2, ... for all subjpred and listpred tags
+
+        # load all input rows into the temporary input table
+        # -- one INSERT per iterated dictionary, and use dictionary as query values mapping?
+
+        # test input data against input constraints, aborting on conflict (L)
+        # -- test in python during preceding insert loop?  or compile one SQL test?
+
+        # create a transaction-local temporary table for subject-row map including authz columns and updated flag
+        # -- or manage as extra columns on input table?
+
+        # find existing subjects as result into subject-row map (S) (SZ)
+        # -- join graph to input table using complex composition of all subjpreds
+
+        # prune graph tags based on 'unbind' conditions, tracking set of modified tags (S) (SZ) (LZ) (L)
+        # -- delete subjpred tags on subjects mapped to rows?
+        # -- what about partial matches, e.g. unique pred collisions not satisfying full subjpreds set?
+
+        # find existing subjects as result into subject-row map (S) (SZ)
+        # -- join graph to input table using complex composition of all subjpreds
+        # -- repeat operation after graph was pruned above
+
+        # test for 'abort' conditions
+        # -- on_missing=abort and some rows not mapped
+        # -- on_existing=abort and some rows mapped
+
+        # prune input table based on 'ignore' conditions
+        # -- delete mapped rows
+
+        # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
+        # -- bulk allocate new IDs?  or loop doing INSERT DEFAULTS?
+
+        # update graph tags based on input data, tracking set of modified tags (SZ) (LZ)
+        # -- loop over tag columns
+        # -- ignore tags with existing and equal values
+        # -- update single-value tags with new values and old values
+        # -- insert single-value tags with new values only
+        # -- insert multivalue tags with new values
+        # -- delete tags with only old values, for 'clear' case only
+
+        # update subject metadata based on updated flag
+
+        # update tagdef metadata based on set of modified tags
+
+        # destroy temporary table(s)
+
+        return
+
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"
         vars = dict()
