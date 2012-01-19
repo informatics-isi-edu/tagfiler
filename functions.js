@@ -2996,6 +2996,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		thead.append(tr);
 		var tbody = $('<tbody>');
 		tbody.attr('id', 'Query_Preview_tbody');
+		var height = Math.ceil($(window).height() * 2 / 3) + 'px';
+		tbody.css('height', height);
+		tbody.css('overflow', 'auto');
 		table.append(tbody);
 		var tfoot = $('<tfoot>');
 		tfoot.attr('id', 'Query_Preview_tfoot');
