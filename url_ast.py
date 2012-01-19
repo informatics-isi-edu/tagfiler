@@ -803,18 +803,18 @@ class FileTags (Node):
         self.globals['queryAllTags'] = None
 
     def qAllTags(self):
-        if self.queryopts.get('view') == 'alltags':
+        if self.queryopts.get('view') == 'default':
             return None
 
         url = self.config['home'] + web.ctx.homepath + '/tags' + path_linearize(self.path)
         opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() if k != 'view' ])
-        url += '?view=alltags'
+        url += '?view=default'
         if opts:
             url += opts
         return url
 
     def qtarget(self):
-        if self.queryopts.get('view') == 'alltags':
+        if self.queryopts.get('view') == 'default':
             return None
 
         url = self.config['home'] + web.ctx.homepath + '/tags/' + path_linearize(self.path)
@@ -840,7 +840,7 @@ class FileTags (Node):
         
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
 
-        if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'alltags':
+        if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
             try_default_view = True
         else:
             try_default_view = False
@@ -919,7 +919,7 @@ class FileTags (Node):
 
         tagdefs = [ x for x in all if x.tagname in self.listtags ]
 
-        title = u'Subject "' + path_linearize(simplepath, lambda x: x) + u'"'
+        title = u'Tag(s) for subject matching "' + path_linearize(simplepath, lambda x: x) + u'"'
         if len(files) == 1:
             return self.renderlist(title,
                                    [self.render.FileTagExisting('', files[0], tagdefs)])

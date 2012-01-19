@@ -56,7 +56,7 @@ Warning, your session will soon expire due to idle timeout...
 <table class="topmargin">
 <tr>
 $if logo:
-	<td class="logo"><a href="${home}/">$:{logo}</a></td>
+	<td class="logo">$:{logo}</td>
 $if subtitle:
 	<td class="title"><h1>${subtitle}</h1></td>
 <td class="authninfo">
@@ -70,12 +70,12 @@ $if authn.role:
 		<tr><td></td><td><a href="${logouturl}">log&nbsp;out</a></td></tr>
 	$if passwdurl:
 		<tr><td></td><td><a href="${passwdurl}">change&nbsp;password</a></td></tr>
-	$if False and authn.since:
+	$if authn.since:
 		<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span>
 		<script type="text/javascript">
 		localizeDate("sincetime");
 		</script></td></tr>
-	$if False and authn.until:
+	$if authn.until:
 		<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span>
 		<script type="text/javascript">
 		localizeDate("untiltime");
@@ -90,8 +90,7 @@ $else:
 </tr>
 </table>
 <div class="page">
-$if False:
-  <table class="topmenu">
+<table class="topmenu">
   <tr>
     <td>
       <a href="${home}/">Home</a>
@@ -123,7 +122,7 @@ $if False:
 	<a href="${home}/log">Logs</a>
 	</td>
   </tr>
-  </table>
+</table>
 $if title:
 	<h2>${title}</h2>
 <div class="content">

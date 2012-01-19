@@ -36,7 +36,7 @@ $if len(files) > 0:
 		$if tag == 'id':
 			<th class="file-tag subject">subject</th>
 		$else:
-			<th class="file-tag ${idquote(tag)}">${tag}</th>
+			<th class="file-tag ${idquote(tag)}">$:{tag.replace(" ", "&nbsp;")}</th>
 	</tr>
 	$for file in files:
 		$if odd:

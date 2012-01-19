@@ -2205,7 +2205,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		height: ($(window).height() < 300 ? $(window).height() : 300),
 		modal: false,
 		resizable: true,
-		width: ($(window).width() < 450 ? $(window).width() : 450)
+		width: ($(window).width() < 450 ? $(window).width() : 450),
 	});
 	$('#selectViewDiv').css('display', '');
 	confirmAddMultipleTagsDialog = $('#selectViewDiv');
@@ -2225,7 +2225,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 		height: ($(window).height() < 300 ? $(window).height() : 300),
 		modal: false,
 		resizable: true,
-		width: ($(window).width() < 450 ? $(window).width() : 450)
+		width: ($(window).width() < 450 ? $(window).width() : 450),
 	});
 	dragAndDropBox = $('#DragAndDropBox');
 	tipBox = $('#TipBox');
