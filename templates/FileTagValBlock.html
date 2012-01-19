@@ -35,6 +35,7 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
+$ itervals.sort()
 $ writeok = tagdef.writeok
 $if file['write users'] == None:
 	$ file['write users'] = []

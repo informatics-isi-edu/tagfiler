@@ -43,7 +43,7 @@ $else:
 		$ datapred, dataid, dataname, dtype = subject2identifiers(filerecord, showversions)
 		$if filerecord.get('Image Set', False):
 			$ dtype = 'file'
-		<table><tr><td><a href="${home}/file/${datapred}">${dataname}</a> <a href="${home}/tags/${datapred}">(tags)</a>
+		<table><tr><td><a href="${home}/tags/${datapred}">${dataname}</a>
 		$if filerecord.get('Image Set', False):
 			$ studyType=filerecord.get('Study Type', None)
 			$if studyType == None:
@@ -52,25 +52,6 @@ $else:
 				$ studyType='&type='+studyType
 			<a href="${home}/study/${dataid}?action=download${studyType}">(all&nbsp;parts)</a>
 		</td>
-		$if filerecord.writeok and dtype != 'tagdef':
-			<td>
-					<button type="button" name="Delete" id="Delete" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}')" >Delete</button>
-			</td>
-			$if filerecord.get('Image Set', False):
-				<td>
-					<button type="button" name="Delete Contents" id="Delete Contents" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}/')" >Delete Contents</button>
-				</td>
-				<td>
-					<button type="button" name="Delete All" id="Delete All" onclick="deleteAll('${dataname}', '${home}/file/${datapred}')" >Delete All</button>
-				</td>
-			</tr>
-			</table>
-			<table>
-			<tr>
-		$if filerecord.writeok and dtype != 'tagdef':
-			<td colspan="2">
-				$:{render.DatasetForm(putpred, filerecord)}
-			</td>
 		</tr>
 		</table>
 	$elif tagname == 'tagdef':

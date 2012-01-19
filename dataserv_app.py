@@ -2702,7 +2702,7 @@ class Application:
 
         def dbquote(s):
             return s.replace("'", "''")
-        
+
         #traceInChunks(cq)
         #web.debug('values', values.pack())
 
@@ -2804,7 +2804,7 @@ class Application:
             path = [ ( [ web.Storage(tag='tagdef', op='=', vals=[ t for t in tags ]) ],
                        [ web.Storage(tag='tag last modified txid', op=None, vals=[]) ],
                        [] ) ]
-            query, values = self.build_files_by_predlist_path(path)
+            query, values = self.build_files_by_predlist_path(path, enforce_read_authz=False)
             query = 'SELECT max("tag last modified txid") AS txid FROM (%s) AS sq' % query
             return max(self.dbquery(query, vars=values)[0].txid, self.config['subject last tagged txid'])
 

@@ -21,6 +21,21 @@ $if title == 'User' and datapred:
 $if title != '':
 	<h2>${title}</h2>
 $if len(tagdefs) > 0:
+	$ putpred, dataid, dataname, dtype =  subject2identifiers(file, False)
+        $ datapred, dataid, dataname, dtype = subject2identifiers(file, True)
+	$if dtype in ['file', 'url']:
+		<p><a href="${home}/file/${datapred}">View ${dataname}</a></p>
+        $if file.get('Image Set', False):
+        	$ dtype = 'file'
+	$if file.writeok and dtype != 'tagdef':
+		<button type="button" name="Delete" id="Delete" onclick="deleteDataset('${dataname}','${home}/file/${datapred}')" >Delete ${dataname}</button>
+		<br />
+		$if file.get('Image Set', False):
+			<button type="button" name="Delete Contents" id="Delete Contents" onclick="deleteDataset('${dataname}', '${home}/file/${datapred}/')" >Delete Contents</button>
+                        <button type="button" name="Delete All" id="Delete All" onclick="deleteAll('${dataname}', '${home}/file/${datapred}')" >Delete All</button>
+			<br />
+		$if file.writeok and dtype != 'tagdef':
+                        $:{render.DatasetForm(putpred, file)}
 	$if queryAllTags:
 		<p>This is a limited tag view. <a href="${queryAllTags}">View all tags.</a></p>
 	<table class="file-list">
