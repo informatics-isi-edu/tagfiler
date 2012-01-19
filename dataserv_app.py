@@ -2859,6 +2859,7 @@ class Application:
                 listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
                 have_tags = set(listtags)
 
+            listtags = [ p.tag for p in listpreds ]
             listpreds += [ web.Storage(tag=tag, op=None, vals=[]) for tag in extra_tags if tag not in have_tags ]
             have_tags.update( set(extra_tags) )
 
@@ -2870,7 +2871,6 @@ class Application:
                     listpreds_new += [ p for p in listpreds if p.tag == tag ]
                 listpreds = listpreds_new
 
-            listtags = [ p.tag for p in listpreds ]
             path[-1] = ( subjpreds, listpreds, ordertags )
 
             limit = self.queryopts.get('limit', 'default')
