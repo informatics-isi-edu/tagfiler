@@ -1504,6 +1504,7 @@ var WINDOW_TAB = 0;
 var PREVIEW_LIMIT;
 var LAST_PREVIEW_LIMIT;
 var select_tags = null;
+var select_tags_count = null;
 
 var lastPreviewURL = null;
 var lastEditTag = null;
@@ -2653,7 +2654,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		td.css('border-width', '0px');
-		if (values != null && !hasTagValueOption(tag, values[0])) {
+		if (values != null && !hasTagValueOption(tag, values[0]) || select_tags_count[tag] != null) {
 			var input = $('<input>');
 			if (availableTags[tag] == 'timestamptz') {
 				input.addClass('datetimepicker');
@@ -2898,6 +2899,7 @@ function initDropDownList(tag) {
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	select_tags = new Object();
+	select_tags_count = new Object();
 	$.ajax({
 		url: queryUrl,
 		headers: {'User-agent': 'Tagfiler/1.0'},
@@ -2925,6 +2927,8 @@ function initDropDownList(tag) {
 						}
 					}
 				});
+			} else {
+				select_tags_count[tag] = totalRows;
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -3778,6 +3782,7 @@ function cancelEdit(tag) {
 		confirmQueryEditDialog = null;
 		tagInEdit = null;
 		select_tags = null;
+		select_tags_count = null;
 		return true;
 	}
 	
@@ -3792,6 +3797,7 @@ function cancelEdit(tag) {
 	editInProgress = false;
 	tagInEdit = null;
 	select_tags = null;
+	select_tags_count = null;
 	$('#queryDiv').html('');
 	$('#queryDiv').css('display', 'none');
 	showPreview();
@@ -3807,6 +3813,7 @@ function saveTagQuery(tag) {
 	editInProgress = false;
 	tagInEdit = null;
 	select_tags = null;
+	select_tags_count = null;
 	confirmQueryEditDialog.remove();
 	confirmQueryEditDialog = null;
 	$('#queryDiv').html('');
