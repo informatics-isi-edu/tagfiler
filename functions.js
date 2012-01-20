@@ -1534,6 +1534,7 @@ function setRangeValues(range, columnRange) {
 			columnRangeValues[column] = range[column];
 			appendRangeValues(range, columnRange, column, true);
 		} else {
+			columnRangeValues[column] = new Array();
 			columnRange.html('&nbsp;');
 		}
 	} else {
