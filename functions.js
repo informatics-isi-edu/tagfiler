@@ -1610,7 +1610,7 @@ function loadRange(tdRange) {
 	if (tag == '') {
 		columnArray = columnArray.concat(resultColumns);
 	} else {
-		columnArray = columnArray.push(tag);
+		columnArray.push(tag);
 	}
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	$.ajax({
@@ -2784,7 +2784,6 @@ function getQueryPredUrl(excludeTag) {
 
 function getQueryUrl(predUrl, limit, encodedResultColumns, encodedSortedColumns, offset) {
 	var retTags = '(' + encodedResultColumns.join(';') + ')';
-	var encodedResultColumns = new Array();
 	var sortTags = encodedSortedColumns.join(',');
 	var latest = '?versions=' + $('#versions').val();
 	var url = predUrl + retTags + sortTags + latest + limit + offset;
