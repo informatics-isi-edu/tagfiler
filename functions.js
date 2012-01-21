@@ -1499,6 +1499,7 @@ var tipBox;
 
 var movePageX;
 
+var SCROLL_BAR_WIDTH;
 var SELECT_LIMIT = 50;
 var WINDOW_TAB = 0;
 var PREVIEW_LIMIT;
@@ -1532,45 +1533,63 @@ function setRangeValues(range, columnRange) {
 		var column = columnRange.attr('tag');
 		if (range[column] != null) {
 			columnRangeValues[column] = range[column];
-			appendRangeValues(range, columnRange, column, true);
+			appendColumnRangeValues(columnRange);
 		} else {
 			columnRangeValues[column] = new Array();
 			columnRange.html('&nbsp;');
 		}
 	} else {
 		headerRangeValues = range;
-		var saveColumnRangeValues = columnRangeValues;
-		columnRangeValues = new Object();
+		if (columnRangeValues == null) {
+			columnRangeValues = new Object();
+		}
+		$.each(resultColumns, function(i, column) {
+			if (queryFilter[column] == null) {
+				columnRangeValues[column] = headerRangeValues[column];
+			}
+		});
 		$.each(resultColumns, function(i, column) {
 			var tdRange = getChild(trRange, i+2);
 			if (tdRange.attr('rangeClicked')) {
 				tdRange.removeAttr('rangeClicked');
-				columnRangeValues[column] = saveColumnRangeValues[column];
-				appendRangeValues(saveColumnRangeValues, tdRange, column, false);
+				replaceColumnRangeValues(tdRange);
 				return true;
 			}
 			if (range[column] != null) {
 				if (range[column].length == 1 && range[column][0] == 'too many values to display') {
 					tdRange.html(range[column][0]);
 				} else {
-					appendRangeValues(range, tdRange, column, false);
+					appendRangeValues(tdRange);
 				}
 			} else {
 				tdRange.html('&nbsp;');
 			}
 		});
 	}
-	theadRange.mousemove(function(event){event.preventDefault(); $(this).unbind('mousemove'); enableRangeEvents();});
 	if (columnRange == null) {
 		//theadRange.show('slow');
 	}
+	document.body.style.cursor = 'default';
 }
 
-function appendRangeValues(range, tdRange, column, overflow) {
-	var width = tdRange.width();
+function initColumnRange(tdRange) {
 	tdRange.html('');
+	var width = tdRange.width() - SCROLL_BAR_WIDTH;
+	var div = $('<div>');
+	div.css('height', '200px');
+	div.css('overflow', 'auto');
+	tdRange.append(div);
+	div = $('<div>');
+	div.css('height', '200px');
+	div.css('overflow', 'auto');
+	tdRange.append(div);
+}
+
+function appendDivRange(range, tdRange, div) {
+	var width = tdRange.width() - SCROLL_BAR_WIDTH;
+	var column = tdRange.attr('tag');
 	var table = $('<table>');
-	tdRange.append(table);
+	div.append(table);
 	$.each(range[column], function(j, value) {
 		var tr = $('<tr>');
 		table.append(tr);
@@ -1586,20 +1605,59 @@ function appendRangeValues(range, tdRange, column, overflow) {
 				td.addClass('range');
 			}
 		}
-		if (overflow) {
-			var text = value;
-			while(text.length > 0 && td.width() > width){
-				text = text.substr(0, text.length - 1);
-				td.html(text + "...");
-			}
+		var text = value;
+		while(text.length > 0 && td.width() > width){
+			text = text.substr(0, text.length - 1);
+			td.html(text + "...");
 		}
 		td.click({	td: td },
 					function(event) {rangeFilter(event.data.td);});
 	});
 }
 
+function appendRangeValues(tdRange) {
+	initColumnRange(tdRange);
+	appendDivRange(headerRangeValues, tdRange, getChild(tdRange, 1));
+	var column = tdRange.attr('tag');
+	if (columnRangeValues[column] != null) {
+		appendDivRange(columnRangeValues, tdRange, getChild(tdRange, 2));
+	}
+	getChild(tdRange, 2).css('display', 'none');
+}
+
+function appendColumnRangeValues(tdRange) {
+	var column = tdRange.attr('tag');
+	var width = tdRange.width() - SCROLL_BAR_WIDTH;
+	var div1 = getChild(tdRange, 1);
+	var div2 = getChild(tdRange, 2);
+	appendDivRange(columnRangeValues, tdRange, div2);
+	div1.css('display', 'none');
+	div2.css('display', '');
+}
+
+function replaceColumnRangeValues(tdRange) {
+	var column = tdRange.attr('tag');
+	var width = tdRange.width() - SCROLL_BAR_WIDTH;
+	var div = getChild(tdRange, 1);
+	div.html('');
+	appendDivRange(headerRangeValues, tdRange, div);
+	// adjust new values
+	var div2 = getChild(tdRange, 2);
+	var trs = div2.find('tr');
+	$.each(trs, function(j, tr) {
+		var td = getChild($(tr), 1);;
+		var value = td.attr('originalValue');
+		td.html(value);
+		var text = value;
+		while(text.length > 0 && td.width() > width){
+			text = text.substr(0, text.length - 1);
+			td.html(text + "...");
+		}
+	});
+}
+
 function loadRange(tdRange) {
-	$('.rangeHeader').unbind('mouseenter mouseleave');
+	document.body.style.cursor = 'wait';
 	var tag = '';
 	if (tdRange != null) {
 		tag = tdRange.attr('tag');
@@ -2100,6 +2158,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
+	SCROLL_BAR_WIDTH = scrollbarWidth();
 	initPreview();
 	setGUIConfig();
 	
@@ -4809,12 +4868,20 @@ function contextRangeWork(action, el, pos) {
 
 function showRange() {
 	displayRangeValues = true;
-	loadRange(null);
 	$('#Query_Preview_range').css('display', '');
+	var trRange = getChild($('#Query_Preview_range'), 1);
+	var trBody = getChild($('#Query_Preview_tbody'), 1);
+	$.each(resultColumns, function(i, column) {
+		var tdRange = getChild(trRange, i+2);
+		var tdBody = getChild(trBody, i+2);
+		tdRange.attr('width', tdBody.width() + 'px');
+	});
+	loadRange(null);
 	$('#showRange').css('display', 'none');
 	$('#hideRange').css('display', '');
 	saveQueryFilter = new Object();
 	rangeQueryFilter = new Object();
+	enableRangeEvents();
 }
 
 function hideRange() {
@@ -4872,7 +4939,7 @@ function addMultiValueRow(table, tag, value) {
 
 function rangeFilter(td) {
 	var tag = td.attr('tag');
-	var tdRange = td.parent().parent().parent().parent();
+	var tdRange = td.parent().parent().parent().parent().parent();
 	tdRange.attr('rangeClicked', true);
 	rangeFilterInProgress = true;
 	if (columnRangeValues[tag] == null) {
@@ -5186,21 +5253,39 @@ function getPredicate(tbody) {
 }
 
 function enableRangeEvents() {
-	$('.rangeHeader').mouseleave(function(event) {event.preventDefault(); resetColumnRange(event, $(this));});
-	$('.rangeHeader').mouseenter(function(event) {event.preventDefault(); setColumnRange(event, $(this));});
+	$('.rangeHeader').hover(function(event) {setColumnRange(event, $(this));},
+							function(event) {resetColumnRange(event, $(this));});
 }
 
 function setColumnRange(event, tdRange) {
+	tdRange.addClass('rangehover');
 	var tag = tdRange.attr('tag');
 	if (columnRangeValues[tag] == null) {
 		loadRange(tdRange);
 	} else {
-		appendRangeValues(columnRangeValues, tdRange, tag, true);
+		var div1 = getChild(tdRange, 1);
+		var div2 = getChild(tdRange, 2);
+		div1.css('display', 'none');
+		div2.css('display', '');
 	}
 }
 
 function resetColumnRange(event, tdRange) {
+	tdRange.removeClass('rangehover');
 	var tag = tdRange.attr('tag');
-	appendRangeValues(headerRangeValues, tdRange, tag, true);
+		var div1 = getChild(tdRange, 1);
+		var div2 = getChild(tdRange, 2);
+		div1.css('display', '');
+		div2.css('display', 'none');
 }
 
+function scrollbarWidth() {
+    var div = $('<div style="width:50px;height:50px;overflow:hidden;position:absolute;top:-200px;left:-200px;"><div style="height:100px;"></div>');
+    // Append our div, do our calculation and then remove it
+    $('body').append(div);
+    var w1 = $('div', div).innerWidth();
+    div.css('overflow-y', 'scroll');
+    var w2 = $('div', div).innerWidth();
+    $(div).remove();
+    return Math.ceil((w1 - w2) * 3 / 2);
+}

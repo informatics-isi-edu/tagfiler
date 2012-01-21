@@ -186,6 +186,10 @@ tr.even.gradeA:hover, tr.even.gradeA td.highlighted {
 	background-color: #ECFFB3;
 }
 
+td.rangehover:hover {
+	background-color: #ECFFB3;
+}
+
 tr.odd.gradeA:hover, tr.odd.gradeA td.highlighted {
 	background-color: #E6FF99;
 }
