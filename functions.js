@@ -1491,8 +1491,8 @@ var rangeQueryFilter = null;
 var predicateTable = null;
 var savePredicateFilter = null;
 
-var columnRangeValues;
-var headerRangeValues;
+var columnRangeValues = new Object;
+var headerRangeValues = new Object();
 
 var dragAndDropBox;
 var tipBox;
@@ -1523,7 +1523,7 @@ var file_download = false;
 var view_tags = false;
 var view_URL = false;
 
-function setRangeValues(range, columnRange) {
+function setRangeValues(range, columnRange, tag) {
 	var theadRange = $('#Query_Preview_range');
 	if (columnRange == null) {
 		//theadRange.hide('slow');
@@ -1539,32 +1539,33 @@ function setRangeValues(range, columnRange) {
 			columnRange.html('&nbsp;');
 		}
 	} else {
-		headerRangeValues = range;
-		if (columnRangeValues == null) {
-			columnRangeValues = new Object();
+		headerRangeValues[tag] = range[tag];
+		if (queryFilter[tag] == null) {
+			columnRangeValues[tag] = headerRangeValues[tag];
 		}
+		var iCol = -1;
 		$.each(resultColumns, function(i, column) {
-			if (queryFilter[column] == null) {
-				columnRangeValues[column] = headerRangeValues[column];
+			if (tag == column) {
+				iCol = i;
+				return false;
 			}
 		});
-		$.each(resultColumns, function(i, column) {
-			var tdRange = getChild(trRange, i+2);
-			if (tdRange.attr('rangeClicked')) {
-				tdRange.removeAttr('rangeClicked');
-				replaceColumnRangeValues(tdRange);
-				return true;
-			}
-			if (range[column] != null) {
-				if (range[column].length == 1 && range[column][0] == 'too many values to display') {
-					tdRange.html(range[column][0]);
+		iCol += 2;
+		var tdRange = getChild(trRange, iCol);
+		if (tdRange.attr('rangeClicked')) {
+			tdRange.removeAttr('rangeClicked');
+			replaceColumnRangeValues(tdRange);
+		} else {
+			if (range[tag] != null) {
+				if (range[tag].length == 1 && range[tag][0] == 'too many values to display') {
+					tdRange.html(range[tag][0]);
 				} else {
 					appendRangeValues(tdRange);
 				}
 			} else {
 				tdRange.html('&nbsp;');
 			}
-		});
+		}
 	}
 	if (columnRange == null) {
 		//theadRange.show('slow');
@@ -1576,12 +1577,8 @@ function initColumnRange(tdRange) {
 	tdRange.html('');
 	var width = tdRange.width() - SCROLL_BAR_WIDTH;
 	var div = $('<div>');
-	div.css('height', '200px');
-	div.css('overflow', 'auto');
 	tdRange.append(div);
 	div = $('<div>');
-	div.css('height', '200px');
-	div.css('overflow', 'auto');
 	tdRange.append(div);
 }
 
@@ -1604,11 +1601,6 @@ function appendDivRange(range, tdRange, div) {
 			if (queryFilter[column][last]['vals'].contains(value)) {
 				td.addClass('range');
 			}
-		}
-		var text = value;
-		while(text.length > 0 && td.width() > width){
-			text = text.substr(0, text.length - 1);
-			td.html(text + "...");
 		}
 		td.click({	td: td },
 					function(event) {rangeFilter(event.data.td);});
@@ -1648,28 +1640,26 @@ function replaceColumnRangeValues(tdRange) {
 		var td = getChild($(tr), 1);;
 		var value = td.attr('originalValue');
 		td.html(value);
-		var text = value;
-		while(text.length > 0 && td.width() > width){
-			text = text.substr(0, text.length - 1);
-			td.html(text + "...");
-		}
 	});
 }
 
 function loadRange(tdRange) {
-	document.body.style.cursor = 'wait';
-	var tag = '';
 	if (tdRange != null) {
-		tag = tdRange.attr('tag');
-	}
-	var range = new Object();
-	var predUrl = HOME + '/query/' + getQueryPredUrl(tag);
-	var columnArray = new Array();
-	if (tag == '') {
-		columnArray = columnArray.concat(resultColumns);
+		var tag = tdRange.attr('tag');
+		loadTagRange(tdRange, tag, true);
 	} else {
-		columnArray.push(tag);
+		$.each(resultColumns, function(i, tag) {
+			loadTagRange(tdRange, tag, false);
+		});
 	}
+}
+
+function loadTagRange(tdRange, tag, exclude) {
+	document.body.style.cursor = 'wait';
+	var range = new Object();
+	var predUrl = HOME + '/query/' + getQueryPredUrl(exclude ? tag : '');
+	var columnArray = new Array();
+	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
 	$.ajax({
 		url: queryUrl,
@@ -1691,7 +1681,7 @@ function loadRange(tdRange) {
 				}
 			});
 			if (columnArray.length == 0) {
-				setRangeValues(range, tdRange);
+				setRangeValues(range, tdRange, tag);
 			} else {
 				// if we want sorted by frequency ascended use '&range=values' + encodeSafeURIComponent('<') or
 				// descending use '&range=values' + encodeSafeURIComponent('>')
@@ -1706,7 +1696,7 @@ function loadRange(tdRange) {
 						$.each(data[0], function(key, value) {
 							range[key] = value;
 						});
-						setRangeValues(range, tdRange);
+						setRangeValues(range, tdRange, tag);
 					},
 					error: function(jqXHR, textStatus, errorThrown) {
 						if (!disableAjaxAlert) {
