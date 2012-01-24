@@ -3462,7 +3462,9 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			}
 			if (displayRangeValues) {
+				$('.rangeHeader').unbind('mouseenter mouseleave');
 				loadRange(null);
+				enableRangeEvents();
 			}
 			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
 			$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
