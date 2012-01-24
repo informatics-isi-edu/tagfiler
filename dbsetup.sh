@@ -625,6 +625,7 @@ cfgtagdef logo                        text  ""      subject     subject       fa
 cfgtagdef contact                     text  ""      subject     subject       false
 cfgtagdef help                        text  ""      subject     subject       false
 cfgtagdef bugs                        text  ""      subject     subject       false
+cfgtagdef query                       text  ""      subject     subject       false
 cfgtagdef 'client connections'        int8  ""      subject     subject       false
 cfgtagdef 'client upload chunks'      boolean ""      subject     subject       false
 cfgtagdef 'client download chunks'    boolean ""      subject     subject       false
@@ -744,7 +745,6 @@ cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/'"${SVCPR
 cfgtag "contact" text '<p>Your HTML here</p>'
 cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
 cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
-
 
 cmddir=$(dirname "$0")
 #. ./dbsetup-nei-demo.sh

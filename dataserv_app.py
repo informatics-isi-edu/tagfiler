@@ -626,6 +626,7 @@ class Application:
                                     ('log path', '/var/www/%s-logs' % daemonuser),
                                     ('logo', ''),
                                     ('policy remappings', []),
+                                    ('query', None),
                                     ('store path', '/var/www/%s-data' % daemonuser),
                                     ('subtitle', ''),
                                     ('tag list tags', []),
@@ -797,6 +798,7 @@ class Application:
                        ('_cfg_log path', 'text', False, 'subject', False),
                        ('_cfg_logo', 'text', False, 'subject', False),
                        ('_cfg_policy remappings', 'text', True, 'subject', False),
+                       ('_cfg_query', 'text', False, 'subject', False),
                        ('_cfg_store path', 'text', False, 'subject', False),
                        ('_cfg_subtitle', 'text', False, 'subject', False),
                        ('_cfg_tag list tags', 'tagdef', True, 'subject', False),
@@ -967,6 +969,10 @@ class Application:
         self.globals['config'] = self.config
         self.globals['help'] = self.config.help
         self.globals['bugs'] = self.config.bugs
+        if self.config.query:
+            self.globals['query'] = self.config.query
+        else:
+            self.globals['query'] = self.globals['home'] + '/query'
         self.globals['subtitle'] = self.config.subtitle
         self.globals['logo'] = self.config.logo
         self.globals['contact'] = self.config.contact
