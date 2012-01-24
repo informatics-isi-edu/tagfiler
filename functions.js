@@ -1474,7 +1474,6 @@ var editBulkInProgress = false;
 var clickedCancelOK = false;
 var enabledEdit = false;
 var displayRangeValues = false;
-var rangeFilterInProgress = false;
 
 var confirmQueryEditDialog = null;
 var confirmAddTagDialog = null;
@@ -1499,7 +1498,6 @@ var tipBox;
 
 var movePageX;
 
-var SCROLL_BAR_WIDTH;
 var SELECT_LIMIT = 50;
 var WINDOW_TAB = 0;
 var PREVIEW_LIMIT;
@@ -1575,7 +1573,6 @@ function setRangeValues(range, columnRange, tag) {
 
 function initColumnRange(tdRange) {
 	tdRange.html('');
-	var width = tdRange.width() - SCROLL_BAR_WIDTH;
 	var div = $('<div>');
 	tdRange.append(div);
 	div = $('<div>');
@@ -1583,7 +1580,6 @@ function initColumnRange(tdRange) {
 }
 
 function appendDivRange(range, tdRange, div) {
-	var width = tdRange.width() - SCROLL_BAR_WIDTH;
 	var column = tdRange.attr('tag');
 	var table = $('<table>');
 	div.append(table);
@@ -1603,7 +1599,7 @@ function appendDivRange(range, tdRange, div) {
 			}
 		}
 		td.click({	td: td },
-					function(event) {rangeFilter(event.data.td);});
+					function(event) {rangeFilter(event, event.data.td);});
 	});
 }
 
@@ -1619,7 +1615,6 @@ function appendRangeValues(tdRange) {
 
 function appendColumnRangeValues(tdRange) {
 	var column = tdRange.attr('tag');
-	var width = tdRange.width() - SCROLL_BAR_WIDTH;
 	var div1 = getChild(tdRange, 1);
 	var div2 = getChild(tdRange, 2);
 	appendDivRange(columnRangeValues, tdRange, div2);
@@ -1629,7 +1624,6 @@ function appendColumnRangeValues(tdRange) {
 
 function replaceColumnRangeValues(tdRange) {
 	var column = tdRange.attr('tag');
-	var width = tdRange.width() - SCROLL_BAR_WIDTH;
 	var div = getChild(tdRange, 1);
 	div.html('');
 	appendDivRange(headerRangeValues, tdRange, div);
@@ -1764,10 +1758,8 @@ function clearFilter(tag) {
 
 function clearAllFilters() {
 	queryFilter = new Object();
-	if (rangeFilterInProgress) {
-		saveQueryFilter = new Object();
-		rangeQueryFilter = new Object();
-	}
+	saveQueryFilter = new Object();
+	rangeQueryFilter = new Object();
 	$('#GlobalMenu').slideUp('slow');
 	showPreview();
 }
@@ -2148,7 +2140,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
-	SCROLL_BAR_WIDTH = scrollbarWidth();
 	initPreview();
 	setGUIConfig();
 	
@@ -3516,7 +3507,6 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 				}
 			});
 			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
-			$('#applyAllFilters').css('display', rangeFilterInProgress ? '' : 'none');
 			if (enabledEdit) {
 				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 				$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
@@ -4829,7 +4819,7 @@ function contextMenuWork(action, el, pos) {
 	}
 }
 
-function contextRangeWork(action, el, pos) {
+function contextRangeWork(action, el) {
 	var tag = el.attr('tag');
 	el.find('.range').removeClass('range');
 	switch (action) {
@@ -4848,7 +4838,6 @@ function contextRangeWork(action, el, pos) {
 	var tr3 = thead.find('.columnFilter');
 	var td3 = getChild(tr3, iCol+2);
 	td3.find('.rangeConstraint').removeClass('rangeConstraint');
-	el.unbind();
 	delete saveQueryFilter[tag];
 	delete rangeQueryFilter[tag];
 	updateRangeFilterInProgress();
@@ -4879,9 +4868,7 @@ function hideRange() {
 	$('#Query_Preview_range').css('display', 'none');
 	$('#showRange').css('display', '');
 	$('#hideRange').css('display', 'none');
-	if (rangeFilterInProgress) {
-		cleanupRangeFilter();
-	}
+	cleanupRangeFilter();
 }
 
 function deleteMultiValueRow(id) {
@@ -4926,11 +4913,14 @@ function addMultiValueRow(table, tag, value) {
 	td.append(img);
 }
 
-function rangeFilter(td) {
+function rangeFilter(event, td) {
+	var isCtrl = event.ctrlKey;
 	var tag = td.attr('tag');
 	var tdRange = td.parent().parent().parent().parent().parent();
+	if (!isCtrl && rangeQueryFilter[tag] != null) {
+		contextRangeWork('clear', tdRange);
+	}
 	tdRange.attr('rangeClicked', true);
-	rangeFilterInProgress = true;
 	if (columnRangeValues[tag] == null) {
 		columnRangeValues[tag] = headerRangeValues[tag];
 	}
@@ -4970,36 +4960,19 @@ function rangeFilter(td) {
 			}
 			delete saveQueryFilter[tag];
 			delete rangeQueryFilter[tag];
-			tdRange.unbind();
+			tdRange.unbind('mouseenter mouseleave');
 			updateRangeFilterInProgress();
 		}
 	} else {
 		td.addClass('range');
 		var last = queryFilter[tag].length - 1;
 		queryFilter[tag][last]['vals'].push(originalValue);
-		tdRange.contextMenu({ menu: 'rangeColumn' }, function(action, el, pos) { contextRangeWork(action, el, pos); });
 	}
 	showPreview();
 }
 
 function updateRangeFilterInProgress() {
-	rangeFilterInProgress = false;
-	$.each(saveQueryFilter, function(key, value) {
-		rangeFilterInProgress = true;
-		return false;
-	});
 	$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
-	$('#applyAllFilters').css('display', rangeFilterInProgress ? '' : 'none');
-}
-
-function applyAllFilters() {
-	$('.range').removeClass('range');
-	$('.rangeHeader').unbind();
-	rangeFilterInProgress = false;
-	saveQueryFilter = new Object();
-	rangeQueryFilter = new Object();
-	$('#applyAllFilters').css('display', 'none');
-	showPreview();
 }
 
 function cleanupRangeFilter() {
@@ -5010,8 +4983,7 @@ function cleanupRangeFilter() {
 			delete queryFilter[tag];
 		}
 	});
-	$('.rangeHeader').unbind();
-	rangeFilterInProgress = false;
+	$('.rangeHeader').unbind('mouseenter mouseleave');
 	saveQueryFilter = null;
 	rangeQueryFilter = null;
 	showPreview();
@@ -5262,19 +5234,12 @@ function setColumnRange(event, tdRange) {
 function resetColumnRange(event, tdRange) {
 	tdRange.removeClass('rangehover');
 	var tag = tdRange.attr('tag');
-		var div1 = getChild(tdRange, 1);
-		var div2 = getChild(tdRange, 2);
-		div1.css('display', '');
-		div2.css('display', 'none');
+	var div1 = getChild(tdRange, 1);
+	var div2 = getChild(tdRange, 2);
+	div1.css('display', '');
+	div2.css('display', 'none');
+	if (rangeQueryFilter[tag] != null) {
+		contextRangeWork('apply', tdRange);
+	}
 }
 
-function scrollbarWidth() {
-    var div = $('<div style="width:50px;height:50px;overflow:hidden;position:absolute;top:-200px;left:-200px;"><div style="height:100px;"></div>');
-    // Append our div, do our calculation and then remove it
-    $('body').append(div);
-    var w1 = $('div', div).innerWidth();
-    div.css('overflow-y', 'scroll');
-    var w2 = $('div', div).innerWidth();
-    $(div).remove();
-    return Math.ceil((w1 - w2) * 3 / 2);
-}
