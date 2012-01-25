@@ -1126,41 +1126,47 @@ class Application:
         if self.config['policy remappings'].has_key(srcrole):
             raise BadRequest(self, 'Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
-    def doPolicyRule(self, newfile):
+    def getPolicyRule(self):
         srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
         if len(srcroles) == 1:
-            try:
-                t = self.db.transaction()
-                srcrole = srcroles.pop()
-                dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'][srcrole]
-                readusers = [ u for u in readusers ]
-                writeusers = [ u for u in writeusers ]
-                #web.debug(self.remap)
-                #web.debug('remap:', self.remap[srcrole])
+            srcrole = srcroles.pop()
+            dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'][srcrole]
+            readusers = [ u for u in readusers ]
+            writeusers = [ u for u in writeusers ]
+            if readok:
+                readusers.append( self.authn.role )
+            if writeok:
+                writeusers.append( self.authn.role )
+            return dstrole, readusers, writeusers
+        elif len(srcroles) > 1:
+            raise Conflict(self, "Ambiguous remap rules encountered.")
+        else:
+            return ( None, None, None, None, None )
+
+    def doPolicyRule(self, newfile):
+        dstrole, readusers, writeusers = self.getPolicyRule()
+        try:
+            t = self.db.transaction()
+            if readusers != None:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['read users'])
-                if readok:
-                    readusers.append( self.authn.role )
-                if writeok:
-                    writeusers.append( self.authn.role )
                 for readuser in readusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readusers))
+            if writeusers != None:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['write users'])
                 for writeuser in writeusers:
                     self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=','.join(writeusers))
-                if dstrole:
-                    self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
+            if dstrole:
+                self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
-                t.commit()
-            except:
-                et, ev, tb = sys.exc_info()
-                web.debug('got exception "%s" during owner remap attempt' % str(ev),
-                          traceback.format_exception(et, ev, tb))
-                t.rollback()
-                raise
-        elif len(srcroles) > 1:
-            raise Conflict(self, "Ambiguous remap rules encountered.")
+            t.commit()
+        except:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception "%s" during owner remap attempt' % str(ev),
+                      traceback.format_exception(et, ev, tb))
+            t.rollback()
+            raise
 
     def logfmt_old(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
         parts = []
@@ -1291,7 +1297,7 @@ class Application:
     def dbquery(self, query, vars={}):
         return db_dbquery(self.db, query, vars=vars)
 
-    def dbtransact(self, body, postCommit):
+    def dbtransact(self, body, postCommit, limit=8):
         """re-usable transaction pattern
 
            using caller-provided thunks under boilerplate
@@ -1304,7 +1310,6 @@ class Application:
 
         try:
             count = 0
-            limit = 8
             error = None
             while True:
                 count = count + 1
@@ -2173,16 +2178,216 @@ class Application:
         self.set_tag_lastmodified(subject, tagdef)
         
 
-    def bulk_update(self, subject_iter, path=None, on_missing='create', on_existing='', enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=True):
+    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=['True']):
+        """Perform bulk-setting of tags from an input table.
+
+           tagdef:  the tag to update
+           intable: the table name or table expression for the input data with following columns...
+           
+           idcol:   the col name for the subject id of input subject, value triples
+           valcol:  the col name for the value of input subject, value triples
+           flagcol: the col name for tracking updated subjects
+           wokcol:  the col name for checking subject writeok status
+           isowncol: the col name for checking subject is_owner status
+
+           enforce_tag_authz: whether to follow tagdef's write authz policy
+
+           set_mode   = 'merge' combines new triples with existing as appropriate
+                      = 'replace' sets tag-value set to input set (removing all others from graph)
+
+           unnest     = True:  idcol, unnest(valcol) produces set of triples for multivalue tags
+                      = False: idcol, valcol produces set of triples for multivalue tags
+
+           wheres     = list of where clauses limiting which input rows get processed must have 1 element or more
+        """
+        if enforce_tag_authz_mode:
+            if tagdef.writeok == False:
+                raise Forbidden(self, data='write on tag "%s"' % tagdef.tagname)
+            elif tagdef.writeok == None:
+                if tagdef.writepolicy in [ 'subject', 'tagorsubject', 'tagandsubject' ]:
+                    if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
+                                    % dict(intable=intable,
+                                           wheres=' AND '.join([ '%s = False' % wokcol ] + wheres)))[0].count > 0:
+                        raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
+                elif tagdef.writepolicy == 'subjectowner':
+                    if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
+                                    % dict(intable=intable,
+                                           wheres=' AND '.join([ '%s = False' % isowncol ] + wheres)))[0].count > 0:
+                        raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
+                    
+        table = wraptag(td.tagname)
+        count = 0
+
+        if tagdef.multivalue:
+            # multi-valued tags are straightforward set-algebra on triples
+            
+            if unnest:
+                valcol = 'unnest(%s)' % valcol
+            
+            # add input triples not present in graph
+            if flagcol:
+                self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                              + ' WHERE i.%(idcol)s'
+                              + '       IN'
+                              + '       (SELECT DISTINCT subject'
+                              + '        FROM (SELECT %(idcol)s AS subject,'
+                              + '                     %(valcol)s AS value'
+                              + '              FROM %(intable)s WHERE %(wheres)s'
+                              + '              EXCEPT'
+                              + '              SELECT subject, value FROM %(table)s) AS t) AS t')
+                             % dict(table=table, intable=intable, idcol=idcol, valcol=valcol, flagcol=flagcol,
+                                    wheres=' AND '.join(wheres)))
+
+            count += self.dbquery(('INSERT INTO %(table)s (subject, value)'
+                                   + ' SELECT %(idcol)s AS subject,'
+                                   + '        %(valcol)s AS value'
+                                   + ' FROM %(intable)s WHERE %(wheres)s'
+                                   + ' EXCEPT'
+                                   + ' SELECT subject, value FROM %(table)s')
+                                  % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
+                                         wheres=' AND '.join(wheres)))
+
+            if set_mode == 'replace':
+                # clear graph triples not present in input
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' WHERE i.%(idcol)s'
+                                  + '       IN'
+                                  + '       (SELECT DISTINCT subject'
+                                  + '        FROM (SELECT subject, value FROM %(table)s WHERE %(wheres)s'
+                                  + '              EXCEPT'
+                                  + '              SELECT %(idcol)s AS subject,'
+                                  + '                     %(valcol)s AS value'
+                                  + '              FROM %(intable)s) AS t)')
+                                 % dict(table=table, intable=intable, idcol=idcol, valcol=valcol, flagcol=flagcol,
+                                        wheres=' AND '.join(wheres)))
+
+                count += self.dbquery(('DELETE FROM %(table)s AS t'
+                                       + ' WHERE ROW(t.subject, t.value)'
+                                       + '       NOT IN'
+                                       + '       (SELECT %(idcol)s AS subject,'
+                                       + '               %(valcol)s AS value'
+                                       + '        FROM %(intable)s WHERE %(wheres)s)')
+                                      % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
+                                             wheres=' AND '.join(wheres)))
+                
+        else:
+            # single-valued tags require insert-or-update due to cardinality constraint
+            
+            incols = [ '%(idcol)s AS subject' ]
+            excols = [ 'subject' ]
+            addwheres = [ '%(idcol)s NOT IN (SELECT subject FROM %(table)s)' ] + wheres
+
+            if tagdef.dbtype != 'empty':
+                incols.append( '%(valcol)s AS value' )
+                excols.append( 'value' )
+                addwheres.append( '%(valcol)s IS NOT NULL' )
+            else:
+                addwheres.append( '%(valcol)s = True' )
+
+            incols = ', '.join(incols)
+            excols = ', '.join(excols)
+            addwheres = ' AND '.join(addwheres)
+
+            # track add/update of graph for inequal input triples
+            if flagcol:
+                self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                              + ' WHERE i.%(idcol)s'
+                              + '       IN'
+                              + '       (SELECT DISTINCT subject'
+                              + '        FROM (SELECT %(incols)s'
+                              + '              FROM %(intable)s WHERE %(wheres)s'
+                              + '              EXCEPT'
+                              + '              SELECT %(excols)s FROM %(table)s) AS t)')
+                             % dict(table=table, intable=intable,
+                                    idcol=idcol, flagcol=flagcol,
+                                    incols=incols, excols=excols,
+                                    wheres=' AND '.join(wheres)))
+                
+            # add triples where graph lacked them
+            count += self.dbquery(('INSERT INTO %(table)s ( %(excols)s )'
+                                   + ' SELECT %(incols)s'
+                                   + ' FROM %(intable)s AS i'
+                                   + ' WHERE %(addwheres)s')
+                                  % dict(table=table, intable=intable,
+                                         idcol=idcol, incols=incols, excols=excols,
+                                         addwheres=addwheres))
+
+            if tagdef.dbtype != 'empty':
+                # update triples where graph had a different value than non-null input
+                if flagcol:
+                    self.dbquery(('UPDATE %(table)s AS t SET value = i.value'
+                                  + ' USING (SELECT %(idcol)s AS subject,'
+                                  + '               %(valcol)s AS value'
+                                  + '        FROM %(intable)s WHERE %(wheres)s) AS i'
+                                  + ' WHERE t.subject = i.subject'
+                                  + '   AND i.value IS NOT NULL')
+                                 % dict(table=table, intable=intable,
+                                        idcol=idcol, flagcol=valcol,
+                                        wheres=' AND '.join(wheres)))
+
+            if set_mode == 'replace':
+                if tagdef.dbtype != 'empty':
+                    # input null value represents absence of triples w/ values
+                    where = '%s IS NULL' % valcol
+                else:
+                    # input true value represents presence of pair (predicate typed w/ no object)
+                    where = '%s != True' % valcol
+
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' WHERE i.%(idcol)s'
+                                  + '       IN'
+                                  + '       (SELECT subject FROM %(table)s'
+                                  + '        EXCEPT'
+                                  + '        SELECT %(idcol)s AS subject'
+                                  + '        FROM %(intable)s'
+                                  + '        WHERE %(wheres)s)')
+                                 % dict(table=table, intable=intable,
+                                        idcol=idcol, valcol=valcol, flagcol=flagcol,
+                                        wheres=' AND '.join(wheres + [ where ])))
+
+                count += self.dbquery(('DELETE FROM %(table)s AS t'
+                                       + ' WHERE t.subject'
+                                       + '       NOT IN'
+                                       + '       (SELECT %(idcol)s AS subject'
+                                       + '        FROM %(intable)s'
+                                       + '        WHERE %(wheres)s)')
+                                      % dict(table=table, intable=intable,
+                                             idcol=idcol, valcol=valcol,
+                                             wheres=' AND '.join(wheres + [ where ])))
+        
+        if count > 0:
+            # update tagdef's last modified metadata
+            if tagdef.tagname not in [ 'tag last modified', 'tag last modified txid', 'subject last tagged', 'subject last tagged txid' ]:
+                self.set_tag_lastmodified(None, tagdef)
+
+            # update subjecttags mappings
+            self.dbquery('DELETE FROM subjecttags AS s WHERE tagname = %(tagname)s AND s.subject NOT IN (SELECT subject FROM %(table)s)'
+                         % dict(table=table, tagname=tagname))
+            self.dbquery('INSERT INTO subjecttags (subject, tagname)'
+                         + 'SELECT t.subject, %(tagname)s FROM %(table)s AS t LEFT OUTER JOIN subjecttags AS s USING (subject) WHERE s.subject IS NULL'
+                         % dict(table=table, tagname=tagname))
+        
+
+    def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False):
         """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
+
+           *NOTE*: This function performs its own top-level transaction control. DO NOT run it inside another transaction body.
 
            'subject_iter'    is the set of input table rows describing subjects
            
            'path'            query path (default from request context) defines shape of update
+                             -- only support 1-length path to start with
                              -- tags in subjpreds are used as primary keys to find existing subjects
-                             -- tags in subjpreds and listpreds are set using values from input table row
-                             -- input rows must match any constraints in subjpreds and listpreds?
-                             -- updated or created subjects must match any constraints in subjpreds?
+                                -- updated or created subjects must match any constraints in subjpreds
+                                -- only exact '=' constraints supported to begin with
+                             -- tag valss in subjpreds and listpreds are set using values from input table row
+                                -- subjpreds tag vals set only during creation
+                                -- listpreds tag vals set during creation or update
+                             -- input rows must match any constraints in subjpreds and listpreds
+                                -- behavior undefined for invalid input
+                                -- enforce eventually
 
            'on_missing'      what to do for input rows without corresponding graph subjects
                              -- 'create' a new subject
@@ -2191,70 +2396,304 @@ class Application:
            
            'on_existing'     what to do for input rows with corresponding graph subjects
                              -- 'merge' input row tag-values on top of existing subject tags
-                             -- 'reset' subject tags to match input row
-                             -- 'unbind' identifying tags from existing subject and then treat as if missing
+                             -- 'replace' subject tags to match input row's list preds
+                             -- 'unbind' unique subject tags from existing subject and then treat by on_missing condition
                              -- 'ignore' input row
                              -- 'abort' bulk_update process
 
+           'copy_on_write'   what to do when updating existing graph subjects
+                             -- False: directly modify subject
+                             -- True: clone a new versioned subject and apply updates to it
+                                -- only applies to name+version?
+
         """
-        # TODO: implement this logic...
-        # (S)-marked steps must consider subjpreds constraints when enforcing path constraints
-        # (L)-marked steps must consider listpreds constraints
-        # (SZ)-marked steps must consider subject authz constraints
-        # (LZ)-marked steps must consider tuple authz constraints
+        if path == None:
+            path = self.path
         
-        # pre-evaluate static authz checks where possible and abort on conflicts (LZ)
-        # -- for tags with subject-independent policies
+        spreds, lpreds, otags = path[0]
+        if not path or len(path) != 1:
+            raise BadRequest(self, 'Bulk update requires a simple path with subject and list predicates.')
+            
+        if not spreds:
+            raise BadRequest(self, 'Bulk update requires at least one tag to be referenced as a subject predicate.')
 
-        # create a transaction-local temporary table of the right shape for input data
-        # -- unique table name in case multiple calls are happening
-        # -- row_id, tag1, tag2, ... for all subjpred and listpred tags
+        if not lpreds:
+            raise BadRequest(self, 'Bulk update requires at least one tag to be referenced as a list predicate.')
 
-        # load all input rows into the temporary input table
-        # -- one INSERT per iterated dictionary, and use dictionary as query values mapping?
+        def body1():
+            """Validate query path and create unique input table to hold input tuples.
 
-        # test input data against input constraints, aborting on conflict (L)
-        # -- test in python during preceding insert loop?  or compile one SQL test?
+               This body func can be repeated under normal dbtransact() control.
+            """
 
-        # create a transaction-local temporary table for subject-row map including authz columns and updated flag
-        # -- or manage as extra columns on input table?
+            self.spreds = mergepreds(spreds)
+            self.lpreds = mergepreds(lpreds)
 
-        # find existing subjects as result into subject-row map (S) (SZ)
-        # -- join graph to input table using complex composition of all subjpreds
+            # pre-evaluate static authz checks where possible and abort on conflicts
+            # -- for tags with subject-independent policies
+            got_unique_spred = False
+            for tag in self.spreds.keys():
+                td = self.globals['tagdefsdict'].get(tag)
+                if td.readok == False:
+                    raise Conflict(self, 'Tag "%s" cannot be used to identify subjects due to lack of read authorization.' % tag)
+                if tag not in [ 'name', 'version' ] and td.writeok == False and on_existing == 'unbind':
+                    raise Conflict(self, 'Existing tag "%s" values cannot be unbound due to lack of write authorization.' % tag)
+                if td.unique:
+                    got_unique_spred = True
+                elif tag == 'name' and got_unique_spred == False:
+                    got_unique_spred = None
 
-        # prune graph tags based on 'unbind' conditions, tracking set of modified tags (S) (SZ) (LZ) (L)
-        # -- delete subjpred tags on subjects mapped to rows?
-        # -- what about partial matches, e.g. unique pred collisions not satisfying full subjpreds set?
+            if got_unique_spred == False:
+                raise Conflict(self, 'Bulk update requires "name" or at least one unique-identifer tag as a subject predicate.')
 
-        # find existing subjects as result into subject-row map (S) (SZ)
-        # -- join graph to input table using complex composition of all subjpreds
-        # -- repeat operation after graph was pruned above
+            for tag in self.lpreds.keys():
+                td = self.globals['tagdefsdict'].get(tag)
+                if td.readok == False or tag not in [ 'name', 'version' ] and td.writeok == False and on_existing == 'ignore':
+                    raise Conflict(self, 'Tag "%s" values cannot be updated due to lack of authorization.' % tag)
+            
+            # create a transaction-local temporary table of the right shape for input data
+            # -- unique table name in case multiple calls are happening
+            self.input_tablename = "input_%s" % self.request_guid
 
-        # test for 'abort' conditions
-        # -- on_missing=abort and some rows not mapped
-        # -- on_existing=abort and some rows mapped
+            self.input_column_tds = [ self.globals['tagdefsdict'].get(t)
+                                      for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() + ['owner', 'read users', 'write users', 'name', 'version'] ]) ]
 
-        # prune input table based on 'ignore' conditions
-        # -- delete mapped rows
+            # remap empty type to boolean type
+            # remap multivalue tags to value array
+            # two columns per tag: new_tag and old_tag
+            input_column_defs += [ '%s %s%s' % (wraptag(td.tagname, 'in_'),
+                                               (lambda dbtype: {'empty': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
+                                               (lambda multival: {True: '[]'}.get(multival, ''))(td.multivalue))
+                                  for td in input_column_tds ]
 
-        # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
-        # -- bulk allocate new IDs?  or loop doing INSERT DEFAULTS?
+            input_column_defs += [ 'id int8',
+                                   'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True', # True applies to rows not matching subjects
+                                   'updated boolean DEFAULT False', 'created boolean DEFAULT False' ]
 
-        # update graph tags based on input data, tracking set of modified tags (SZ) (LZ)
-        # -- loop over tag columns
-        # -- ignore tags with existing and equal values
-        # -- update single-value tags with new values and old values
-        # -- insert single-value tags with new values only
-        # -- insert multivalue tags with new values
-        # -- delete tags with only old values, for 'clear' case only
+            self.dbquery('CREATE TABLE %s ( %s )' % (wraptag(input_tablename, ''), input_column_defs))
 
-        # update subject metadata based on updated flag
+        def body1compensation():
+            """Destroy input table created by body1."""
+            input_tablename = "input_%s" % self.request_guid
+            self.dbquery('DROP TABLE %s' % wraptag(input_tablename, ''))
 
-        # update tagdef metadata based on set of modified tags
+        def body2():
+            """Load input stream into input table and validate content.
 
-        # destroy temporary table(s)
+               This body func can run at-most once since it consumes input stream.
+            """
+            table = wraptag(self.input_tablename, '')
+            columns = ', '.join([ wraptag(td.tagname, 'in_') for td in self.input_column_tds ])
 
-        return
+            # build up prepared statement to execute once per input row
+            param_types = []
+            for i in range(0, len(self.input_column_tds)):
+                td = self.input_column_tds[i]
+                if td.dbtype == 'empty':
+                    dbtype = 'boolean'
+                else:
+                    dbtype = td.dbtype
+
+                if td.multivalue:
+                    param_types.append( '%s[]' % dbtype )
+                else:
+                    param_types.append( '%s' % dbtype )
+
+            paramdecls = ', '.join([ '%s' % pt for pt in param_types ])
+            params = ', '.join([ '$%d' % i+1 for i in range(0, len(param_types)) ])
+
+            self.dbquery(('PREPARE load_%(table)s ( %(paramdecls)s ) AS'
+                          + ' INSERT INTO %(table)s ( %(columns)s ) VALUES ( %(params)s )')
+                         % dict(table=table, paramdecls=paramdecls, params=params))
+            
+            for subject in subject_iter:
+                values = []
+
+                # build up execute statement w/ subject values
+                for i in range(0, len(self.input_column_tds)):
+                    td = self.input_column_tds[i]
+                    if td.dbtype == 'empty':
+                        dbtype = 'boolean'
+                    else:
+                        dbtype = td.dbtype
+
+                    v = subject.get(td.tagname, None)
+                    if v != None:
+                        if td.multivalue:
+                            values.append( 'ARRAY[ %s ]::%s' % (','.join([ wrapval(v, dbtype) for v in v ]), param_types[i]) )
+                        else:
+                            values.append( '%s::%s' % (wrapval(v, dbtype), param_types[i]) )
+                    else:
+                        values.append( 'NULL' )
+
+                values = ', '.join(values)
+
+                self.dbquery('EXECUTE load_%(table)s ( %(values)s )'
+                             % dict(table=table, values=values))
+
+            # TODO: test input data against input constraints, aborting on conflict (L)
+            # -- test in python during preceding insert loop?  or compile one SQL test?
+
+            return None
+
+        def body3():
+            """Perform graph update using input table.
+
+               1. Use a normal query by predlist-path to find existing subjects to outer-join w/ input table
+                  a. Using subjpred keys for subject search and join conditions
+                  b. Rely on read-authz from normal predlist-path query
+               2. (Not implemented) Perform pruning based on optional update modes
+               3. Create implied subjects for subset of input rows
+                  a. Rows not joined to existing subjects
+                  b. Need to enforce write-authz in this code
+               4. Update subject tags based on input table, one column at a time
+                  a. Update user-supplied columns
+                  b. Update input table 'updated' flag for subjects updated by user-supplied data
+                  c. Update provenance columns
+                     -- owner, read users, write users w/ subject-remapping rules for new subjects
+                     -- modified, created, created by for new subjects
+                     -- subject last tagged for created or updated subjects
+               5. Update tagdef metadata summarizing column updates
+            """
+            # get policy-remapping info if a rule exists
+            dstrole, readusers, writeusers = self.getPolicyRule()
+            
+            # 1. query result will be table of all readable subjects matching spreds
+            # and containing all spred and lpred columns, with array cells for multivalue
+            squery, svalues = self.build_files_by_predlist_path([ (spreds,
+                                                                   [web.Storage(tag=td.tagname, op=None, vals=[]) for td in self.input_column_tds],
+                                                                   []) ],
+                                                                enforce_read_authz=enforce_read_authz)
+
+            # we will update the input table
+            table = wraptag(self.input_tablename, '')
+            
+            # copy subject id and writeok into special columns, and compute is_owner from owner tag
+            assigns = [ 't.writeok = s.writeok',
+                        't.id = s.id',
+                        't.is_owner = CASE WHEN s.owner IN ARRAY[ %s ]::text[] THEN True ELSE False END' % ','.join(wrapval(self.authn.roles)) ]
+
+            # join the subjects table to the input table on all spred tags which are unique or are name/version
+            wheres = [ 't.%s = s.%s' % (wraptag(td.tagname, "in_"), wraptag(td.tagname, ''))
+                       for td in self.spreds.itervalues()
+                       if td.unique or td.tagname in [ 'name', 'version' ] ]
+            wheres = ' AND '.join(wheres)
+
+            squery = 'UPDATE %(table)s AS t SET %(assigns)s FROM ( %(squery)s ) AS s WHERE %(wheres)s'
+            squery = squery % dict(table=table, assigns=assigns, squery=squery, wheres=wheres)
+            
+            self.dbquery(squery, svalues)
+
+            if False:
+                # 2. prune graph based on 'unbind' conditions, tracking set of modified tags (S) (SZ) (LZ) (L)
+                # -- delete subjpred tags on subjects mapped to rows?
+                # -- what about partial matches, e.g. unique pred collisions not satisfying full subjpreds set?
+
+                # find existing subjects as result into subject-row map (S) (SZ)
+                # -- join graph to input table using complex composition of all subjpreds
+                # -- repeat operation after graph was pruned above
+                
+                # test for 'abort' conditions
+                # -- on_missing=abort and some rows not mapped
+                # -- on_existing=abort and some rows mapped
+
+                # prune input table based on 'ignore' conditions
+                # -- delete mapped rows
+                pass
+
+            # 3. create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
+            if on_missing == 'create':
+                # TODO: authz user for subject creation
+                
+                skeys = [ 't.%s AS %s' % (wraptag(tag, 'new_'), wraptag(tag, 'new_'))
+                          for tag in self.spreds.keys()
+                          if td.unique or td.tagname in [ 'name', 'version' ] ]
+                
+                skeycmps = ' AND '.join([ 't.%s = n.%s' % (wraptag(tag, 'new_'), wraptag(tag, 'new_'))
+                                          for tag in self.spreds.keys()
+                                          if td.unique or td.tagname in [ 'name', 'version' ] ])
+
+                inits = ['id = n.id', 'created = True']
+                
+                if dstrole:
+                    inits.append('new_owner = %s' % wrapval(dstrole, 'text'))
+                elif self.authn.role:
+                    inits.append('new_owner = CASE WHEN t.new_owner IS NULL THEN %s ELSE t.new_owner END' %  wrapval(self.authn.role, 'text'))
+                    
+                if readusers != None:
+                    inits.append('"new_read users" = ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in readusers ]))
+                    
+                if writeusers != None:
+                    inits.append('"new_write users" = ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in writeusers ]))
+                    
+                inits = ', '.join(inits)
+                
+                # allocate unique subject IDs for all rows missing a subject and initialize special columns
+                self.dbquery(('UPDATE %(table)s AS t SET %(inits)s'
+                              + ' FROM (SELECT NEXTVAL(\'resources_subject_seq\') AS id, %(skeys)s'
+                              + '       FROM %(table)s AS t'
+                              + '       WHERE t.id IS NULL) AS n'
+                              + ' WHERE %(skeycmps)s')
+                             % dict(table=table, skeys=skeys, skeycmps=skeycmps, inits=inits))
+
+                # insert newly allocated subject IDs into subject table
+                self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(table)s WHERE created = True' % dict(table=table))
+
+                # set unique subject IDs for newly created rows
+                for td in self.input_column_tds:
+                    if self.spreds.has_key(td.tagname) and td.tagname not in [ 'name', 'version' ]:
+                        self.set_tag_intable(td, self.input_tablename,
+                                             idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
+                                             wokcol='writeok', isowncol='is_owner', set_mode='merge')
+
+                # TODO: if 'name' is in spreds, set name/version/vname/version created
+                # use set_tag_intable() with authz disabled, but test for authz and extra constraints first
+
+                # set subject metadata for newly created subjects
+                for tag, val in [ ('owner', wrapval(dstrole)),
+                                  ('created', wrapval('now')),
+                                  ('modified', wrapval('now')),
+                                  ('modified by', wrapval(self.authn.role)),
+                                  ('read users', 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in readusers ])),
+                                  ('write users', 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in writeusers ])) ]:
+                    self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                                         idcol='id', valcol=val, flagcol='updated',
+                                         wokcol='writeok', isowncol='is_owner',
+                                         enforce_tag_authz=False, set_mode='merge',
+                                         wheres=[ 'created = True' ])
+                
+            elif on_missing == 'ignore':
+                self.dbquery('DELETE FROM %(table)s WHERE id IS NULL' % dict(table=table))
+            elif self.dbquery('SELECT count(*) AS count FROM %s WHERE id IS NULL' % table)[0].count > 0:
+                raise Conflict(self, 'Bulk update aborted due to input rows not matching existing catalog subjects.')
+
+            # 4. update graph tags based on input data, tracking set of modified tags
+            for td in self.input_column_tds:
+                if self.lpreds.has_key(td.tagname) and td.tagname not in [ 'name', 'version' ]:
+                    self.set_tag_intable(td, self.input_tablename,
+                                         idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
+                                         wokcol='writeok', isowncol='is_owner',
+                                         set_mode=on_existing)
+
+            # TODO: update subject metadata based on updated flag in each input row
+            for tag, val in [ ('subject last tagged', wrapval('now')),
+                              ('subject last tagged txid', 'txid_current()') ]:
+                self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                                     idcol='id', valcol=val, flagcol=None,
+                                     wokcol='writeok', isowncol='is_owner',
+                                     enforce_tag_authz=False, set_mode='merge',
+                                     wheres=[ 'updated = True' ])
+
+
+        # allow retry as per usual
+        self.dbtransact(body1, lambda x: x)
+        try:
+            self.dbtransact(body2, lambda x: x, limit=0) # prevent retry with limit=0
+            return self.dbtransact(body3, postCommit)
+
+        finally:
+            # always clean up input table if we created one successfully in body1
+            self.dbtransact(body1compensation, lambda x: x)
 
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"
