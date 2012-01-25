@@ -1487,6 +1487,8 @@ var deleteTagValuesTemplate = null;
 var queryFilter = new Object();
 var saveQueryFilter = null;
 var rangeQueryFilter = null;
+var lastSaveQueryFilter = null;
+var lastRangeQueryFilter = null;
 var predicateTable = null;
 var savePredicateFilter = null;
 
@@ -4854,18 +4856,29 @@ function showRange() {
 		var tdBody = getChild(trBody, i+2);
 		tdRange.attr('width', tdBody.width() + 'px');
 	});
-	loadRange(null);
 	$('#showRange').css('display', 'none');
 	$('#hideRange').css('display', '');
-	saveQueryFilter = new Object();
-	rangeQueryFilter = new Object();
-	enableRangeEvents();
+	if (lastSaveQueryFilter == null) {
+		loadRange(null);
+		saveQueryFilter = new Object();
+		rangeQueryFilter = new Object();
+		enableRangeEvents();
+	} else {
+		saveQueryFilter = lastSaveQueryFilter;
+		rangeQueryFilter = lastRangeQueryFilter;
+		// force refresh
+		editBulkInProgress = true;
+		showPreview();
+		editBulkInProgress = false;
+	}
 }
 
 function hideRange() {
 	$('.range').removeClass('range');
 	$('.rangeHeader').unbind('mouseenter mouseleave');
 	displayRangeValues = false;
+	lastSaveQueryFilter = saveQueryFilter;
+	lastRangeQueryFilter = rangeQueryFilter;
 	saveQueryFilter = null;
 	rangeQueryFilter = null;
 	$('#Query_Preview_range').css('display', 'none');
