@@ -1137,14 +1137,16 @@ class Application:
                 readusers.append( self.authn.role )
             if writeok:
                 writeusers.append( self.authn.role )
-            return dstrole, readusers, writeusers
+            return True, dstrole, readusers, writeusers
         elif len(srcroles) > 1:
             raise Conflict(self, "Ambiguous remap rules encountered.")
         else:
-            return ( None, None, None, None, None )
+            return ( False, None, None, None )
 
     def doPolicyRule(self, newfile):
-        dstrole, readusers, writeusers = self.getPolicyRule()
+        remap, dstrole, readusers, writeusers = self.getPolicyRule()
+        if not remap:
+            return
         try:
             t = self.db.transaction()
             if readusers != None:
@@ -1750,7 +1752,27 @@ class Application:
 
     def update_latestfile_version(self, name, next_latest_id):
         vars=dict(name=name, id=next_latest_id)
-        self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
+
+        results = self.dbquery('SELECT subject FROM %s WHERE value = %s'
+                               % (wraptag('latest with name'), wrapval(name)))
+        if len(results) > 0:
+            previd = results[0].subject
+        
+            self.dbquery('DELETE FROM subjecttags AS st WHERE st.subject = (SELECT subject FROM %s WHERE value = %s) AND tagname = %s'
+                         % (wraptag('latest with name'), wrapval(name), wrapval('latest with name')))
+        
+            self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
+
+            self.set_tag_lastmodified(web.Storage(id=previd), self.globals['tagdefsdict']['latest with name'])
+        else:
+            self.dbquery('INSERT INTO %s (subject, tagname) VALUES (%s, %s)'
+                         % (wraptag('latest with name'), wrapval(next_latest_id, 'int8'), wrapval(name)))
+
+        self.dbquery('INSERT INTO subjecttags (subject, tagname) VALUES ( %s, %s )'
+                     % (wrapval(next_latest_id), wrapval('latest with name')))
+
+        self.set_tag_lastmodified(web.Storage(id=next_latest_id), self.globals['tagdefsdict']['latest with name'])
+        
 
     def delete_file(self, subject, allow_tagdef=False):
         wheres = []
@@ -2178,19 +2200,21 @@ class Application:
         self.set_tag_lastmodified(subject, tagdef)
         
 
-    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=['True']):
+    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[]):
         """Perform bulk-setting of tags from an input table.
 
            tagdef:  the tag to update
            intable: the table name or table expression for the input data with following columns...
+               -- requires idcol to already be populated by the caller
            
            idcol:   the col name for the subject id of input subject, value triples
-           valcol:  the col name for the value of input subject, value triples
+           valcol:  the col name or value expression for the value of input subject, value triples
            flagcol: the col name for tracking updated subjects
            wokcol:  the col name for checking subject writeok status
            isowncol: the col name for checking subject is_owner status
 
            enforce_tag_authz: whether to follow tagdef's write authz policy
+               -- requires wokcol and isowncol to already be populated by caller
 
            set_mode   = 'merge' combines new triples with existing as appropriate
                       = 'replace' sets tag-value set to input set (removing all others from graph)
@@ -2198,23 +2222,36 @@ class Application:
            unnest     = True:  idcol, unnest(valcol) produces set of triples for multivalue tags
                       = False: idcol, valcol produces set of triples for multivalue tags
 
-           wheres     = list of where clauses limiting which input rows get processed must have 1 element or more
+           wheres     = list of where clauses limiting which input rows get processed
+               -- will be combined in conjunction (AND)
         """
+        if len(wheres) == 0:
+            # we require a non-empty list for SQL constructs below...
+            wheres = [ 'True' ]
+        
         if enforce_tag_authz_mode:
+            # do the write-authz tests for the active set of intable rows
             if tagdef.writeok == False:
+                # tagdef write policy fails statically for this user and tag
                 raise Forbidden(self, data='write on tag "%s"' % tagdef.tagname)
             elif tagdef.writeok == None:
+                # tagdef write policy depends on per-row information
                 if tagdef.writepolicy in [ 'subject', 'tagorsubject', 'tagandsubject' ]:
+                    # None means we need subject writeok for this user
                     if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
                                     % dict(intable=intable,
                                            wheres=' AND '.join([ '%s = False' % wokcol ] + wheres)))[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
                 elif tagdef.writepolicy == 'subjectowner':
+                    # None means we need subject is_owner for this user
                     if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
                                     % dict(intable=intable,
                                            wheres=' AND '.join([ '%s = False' % isowncol ] + wheres)))[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
-                    
+            else:
+                # tagdef write policy accepts statically for this user and tag
+                pass
+            
         table = wraptag(td.tagname)
         count = 0
 
@@ -2429,46 +2466,57 @@ class Application:
             self.spreds = mergepreds(spreds)
             self.lpreds = mergepreds(lpreds)
 
-            # pre-evaluate static authz checks where possible and abort on conflicts
-            # -- for tags with subject-independent policies
+            # pre-evaluate update "shape" requirements
+            # tag read authz will be handled by regular path-query in body3
+            # tag write authz will be handled by set_tag_intable calls in body3
             got_unique_spred = False
             for tag in self.spreds.keys():
                 td = self.globals['tagdefsdict'].get(tag)
-                if td.readok == False:
-                    raise Conflict(self, 'Tag "%s" cannot be used to identify subjects due to lack of read authorization.' % tag)
-                if tag not in [ 'name', 'version' ] and td.writeok == False and on_existing == 'unbind':
-                    raise Conflict(self, 'Existing tag "%s" values cannot be unbound due to lack of write authorization.' % tag)
                 if td.unique:
                     got_unique_spred = True
                 elif tag == 'name' and got_unique_spred == False:
                     got_unique_spred = None
 
+            if on_missing == 'create':
+                if self.spreds.has_key('version'):
+                    raise BadRequest(self, 'Bulk update cannot create subjects including "version" as a subject key.')
+                if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                    raise Forbidden(self, 'creation of subjects')
+
             if got_unique_spred == False:
                 raise Conflict(self, 'Bulk update requires "name" or at least one unique-identifer tag as a subject predicate.')
 
-            for tag in self.lpreds.keys():
-                td = self.globals['tagdefsdict'].get(tag)
-                if td.readok == False or tag not in [ 'name', 'version' ] and td.writeok == False and on_existing == 'ignore':
-                    raise Conflict(self, 'Tag "%s" values cannot be updated due to lack of authorization.' % tag)
-            
+            if self.spreds.has_key('name'):
+                if self.spreds.has_key('version'):
+                    self.versions = 'any'
+                else:
+                    self.versions = 'latest'
+            else:
+                self.versions = 'any'
+
             # create a transaction-local temporary table of the right shape for input data
             # -- unique table name in case multiple calls are happening
             self.input_tablename = "input_%s" % self.request_guid
 
             self.input_column_tds = [ self.globals['tagdefsdict'].get(t)
-                                      for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() + ['owner', 'read users', 'write users', 'name', 'version'] ]) ]
+                                      for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() + ['owner', 'name', 'version'] ]) ]
 
             # remap empty type to boolean type
             # remap multivalue tags to value array
-            # two columns per tag: new_tag and old_tag
+            # 1 column per tag: in_tag
             input_column_defs += [ '%s %s%s' % (wraptag(td.tagname, 'in_'),
                                                (lambda dbtype: {'empty': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
                                                (lambda multival: {True: '[]'}.get(multival, ''))(td.multivalue))
                                   for td in input_column_tds ]
 
+            # special columns initialized during JOIN with query result
+            # rows resulting in creation of new subjects will get default writeok and is_owner True values
             input_column_defs += [ 'id int8',
-                                   'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True', # True applies to rows not matching subjects
+                                   'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True',
                                    'updated boolean DEFAULT False', 'created boolean DEFAULT False' ]
+
+            if on_missing == 'create' and self.spreds.has_key('name'):
+                input_column_defs.append( 'version int8' )
 
             self.dbquery('CREATE TABLE %s ( %s )' % (wraptag(input_tablename, ''), input_column_defs))
 
@@ -2533,6 +2581,7 @@ class Application:
 
             # TODO: test input data against input constraints, aborting on conflict (L)
             # -- test in python during preceding insert loop?  or compile one SQL test?
+            # -- until implemented, values out of range may have unexpected, but harmless, results
 
             return None
 
@@ -2545,44 +2594,48 @@ class Application:
                2. (Not implemented) Perform pruning based on optional update modes
                3. Create implied subjects for subset of input rows
                   a. Rows not joined to existing subjects
-                  b. Need to enforce write-authz in this code
-               4. Update subject tags based on input table, one column at a time
-                  a. Update user-supplied columns
+                  b. Allocate new subject IDs, enforcing create-authz
+                  c. Update user-supplied spred columns, enforcing write-authz
+                  d. Update provenance columns for created rows
+                     -- owner, read users, write users w/ subject-remapping rules
+                     -- modified, created, created by, etc.
+                  e. Update input table 'created' and 'updated' flag for these rows
+               4. Update subject tags based on input table
+                  a. Update user-supplied lpred columns, enforcing write-authz
                   b. Update input table 'updated' flag for subjects updated by user-supplied data
-                  c. Update provenance columns
-                     -- owner, read users, write users w/ subject-remapping rules for new subjects
-                     -- modified, created, created by for new subjects
-                     -- subject last tagged for created or updated subjects
-               5. Update tagdef metadata summarizing column updates
+                  c. Update provenance columns for 'updated' rows
+                     -- subject last tagged, etc.
+               5. Update tagdef metadata summarizing column updates (for each column update)
             """
             # get policy-remapping info if a rule exists
-            dstrole, readusers, writeusers = self.getPolicyRule()
+            remap, dstrole, readusers, writeusers = self.getPolicyRule()
             
-            # 1. query result will be table of all readable subjects matching spreds
+            # query result will be table of all readable subjects matching spreds
             # and containing all spred and lpred columns, with array cells for multivalue
-            squery, svalues = self.build_files_by_predlist_path([ (spreds,
+            equery, evalues = self.build_files_by_predlist_path([ (spreds,
                                                                    [web.Storage(tag=td.tagname, op=None, vals=[]) for td in self.input_column_tds],
                                                                    []) ],
+                                                                versions=self.versions,
                                                                 enforce_read_authz=enforce_read_authz)
 
-            # we will update the input table
-            table = wraptag(self.input_tablename, '')
+            # we will update the input table from the existing subjects result
+            intable = wraptag(self.input_tablename, '')
             
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
-            assigns = [ 't.writeok = s.writeok',
-                        't.id = s.id',
-                        't.is_owner = CASE WHEN s.owner IN ARRAY[ %s ]::text[] THEN True ELSE False END' % ','.join(wrapval(self.authn.roles)) ]
+            assigns = [ 'i.writeok = e.writeok',
+                        'i.id = e.id',
+                        'i.is_owner = CASE WHEN e.owner IN ARRAY[ %s ]::text[] THEN True ELSE False END' % ','.join(wrapval(self.authn.roles)) ]
 
             # join the subjects table to the input table on all spred tags which are unique or are name/version
-            wheres = [ 't.%s = s.%s' % (wraptag(td.tagname, "in_"), wraptag(td.tagname, ''))
+            wheres = [ 'i.%s = e.%s' % (wraptag(td.tagname, "in_"), wraptag(td.tagname, ''))
                        for td in self.spreds.itervalues()
                        if td.unique or td.tagname in [ 'name', 'version' ] ]
             wheres = ' AND '.join(wheres)
 
-            squery = 'UPDATE %(table)s AS t SET %(assigns)s FROM ( %(squery)s ) AS s WHERE %(wheres)s'
-            squery = squery % dict(table=table, assigns=assigns, squery=squery, wheres=wheres)
+            equery = 'UPDATE %(intable)s AS i SET %(assigns)s FROM ( %(equery)s ) AS e WHERE %(wheres)s'
+            equery = squery % dict(intable=intable, assigns=assigns, squery=squery, wheres=wheres)
             
-            self.dbquery(squery, svalues)
+            self.dbquery(equery, evalues)
 
             if False:
                 # 2. prune graph based on 'unbind' conditions, tracking set of modified tags (S) (SZ) (LZ) (L)
@@ -2601,61 +2654,145 @@ class Application:
                 # -- delete mapped rows
                 pass
 
-            # 3. create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
+            # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
             if on_missing == 'create':
-                # TODO: authz user for subject creation
-                
-                skeys = [ 't.%s AS %s' % (wraptag(tag, 'new_'), wraptag(tag, 'new_'))
-                          for tag in self.spreds.keys()
-                          if td.unique or td.tagname in [ 'name', 'version' ] ]
-                
-                skeycmps = ' AND '.join([ 't.%s = n.%s' % (wraptag(tag, 'new_'), wraptag(tag, 'new_'))
-                                          for tag in self.spreds.keys()
-                                          if td.unique or td.tagname in [ 'name', 'version' ] ])
 
-                inits = ['id = n.id', 'created = True']
+                if self.spreds.has_key('name'):
+                    # it is possible a full key set including 'name' matches no subject
+                    # but the name matches a previous version, which means creating new subject is creating new version
+
+                    # find latest (previous) version for input rows not matched to subjects
+                    pvquery, pvvalues = self.build_files_by_predlist_path([ ([web.Storage(tag='latest with name', op=None, vals=[])],
+                                                                             [web.Storage(tag=tag, op=None, vals=[])
+                                                                              for tag in ['latest with name', 'version']],
+                                                                             []) ],
+                                                                          versions='latest',
+                                                                          enforce_read_authz=False)
+
+                    inits = ', '.join([ 'version = pv.version + 1',
+                                        'writeok = pv.writeok' ])
+                    
+                    wheres = ' AND '.join([ 'i.name = pv.%s' % wraptag('latest with name', ''),
+                                            'i.id IS NULL' ])
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(inits)s FROM ( %(pvquery)s ) AS pv WHERE %(wheres)s'
+                                  % dict(intable=intable, inits=inits, pvquery=pvquery, wheres=wheres)),
+                                 values=pvvalues)
+
+                    if self.dbquery('SELECT count(*) AS count'
+                                    + ' FROM %(intable)s'
+                                    + ' WHERE id IS NULL AND version IS NOT NULL and writeok IS FALSE')[0].count > 0:
+                        raise Forbidden(self, 'creation of new version of existing named subject')
+
+                    # set version=1 for all new rows not matching a previous version
+                    self.dbquery('UPDATE %(intable)s AS i SET version = 1 WHERE id IS NULL AND version IS NULL'
+                                 % dict(intable=intable))
+
+                skeys = [ 'i.%s AS %s' % (wraptag(tag, 'in_'), wraptag(tag, 'in_'))
+                          for tag in self.spreds.keys() ]
                 
-                if dstrole:
-                    inits.append('new_owner = %s' % wrapval(dstrole, 'text'))
-                elif self.authn.role:
-                    inits.append('new_owner = CASE WHEN t.new_owner IS NULL THEN %s ELSE t.new_owner END' %  wrapval(self.authn.role, 'text'))
-                    
-                if readusers != None:
-                    inits.append('"new_read users" = ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in readusers ]))
-                    
-                if writeusers != None:
-                    inits.append('"new_write users" = ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in writeusers ]))
-                    
-                inits = ', '.join(inits)
-                
+                skeycmps = ' AND '.join([ 'i.%s = n.%s' % (wraptag(tag, 'in_'), wraptag(tag, 'in_'))
+                                          for tag in self.spreds.keys() ])
+
+                inits = ', '.join(['id = n.id', 'created = True'])
+
                 # allocate unique subject IDs for all rows missing a subject and initialize special columns
-                self.dbquery(('UPDATE %(table)s AS t SET %(inits)s'
+                self.dbquery(('UPDATE %(intable)s AS i SET %(inits)s'
                               + ' FROM (SELECT NEXTVAL(\'resources_subject_seq\') AS id, %(skeys)s'
-                              + '       FROM %(table)s AS t'
-                              + '       WHERE t.id IS NULL) AS n'
+                              + '       FROM %(intable)s AS i'
+                              + '       WHERE i.id IS NULL) AS n'
                               + ' WHERE %(skeycmps)s')
-                             % dict(table=table, skeys=skeys, skeycmps=skeycmps, inits=inits))
+                             % dict(intable=intable, skeys=skeys, skeycmps=skeycmps, inits=inits))
 
                 # insert newly allocated subject IDs into subject table
                 self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(table)s WHERE created = True' % dict(table=table))
 
-                # set unique subject IDs for newly created rows
+                # set regular subject ID tags for newly created rows, enforcing write authz
                 for td in self.input_column_tds:
                     if self.spreds.has_key(td.tagname) and td.tagname not in [ 'name', 'version' ]:
                         self.set_tag_intable(td, self.input_tablename,
                                              idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
                                              wokcol='writeok', isowncol='is_owner', set_mode='merge')
 
-                # TODO: if 'name' is in spreds, set name/version/vname/version created
-                # use set_tag_intable() with authz disabled, but test for authz and extra constraints first
+                if self.spreds.has_key('name'):
+                    # set name/version/vname/version created
+                    for tag, val in [ ('name', wraptag('name', 'in_')),
+                                      ('version', 'version'),
+                                      ('vname', 'name || %s || CAST(version AS text)' % wrapval('@')),
+                                      ('version created', wrapval('now')) ]:
+                        self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                                             idcol='id', valcol=val, flagcol='updated',
+                                             wokcol='writeok', isowncol='is_owner',
+                                             enforce_tag_authz=False, set_mode='merge',
+                                             wheres=[ 'created = True' ])
 
+                        # carefully update 'latest with name' for new version= N+1 subjects
+
+                        # drop subjecttags entry for previous version
+                        self.dbquery(('DELETE FROM subjecttags AS st'
+                                      + ' USING %(intable)s AS i,'
+                                      + '       %(lname)s AS ln,'
+                                      + ' WHERE i.version > 1'
+                                      + '   AND i.name = ln.value'
+                                      + '   AND ln.subject = st.subject'
+                                      + '   AND st.tagname = %(tagname)s')
+                                     % dict(intable=intable, lname=wraptag('latest with name'), tagname=wrapval('latest with name')))
+
+                        # avoid breaking foreign key refs to value column
+                        self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
+                                      + ' FROM %(intable)s AS i'
+                                      + ' WHERE ln.value = i.name'
+                                      + '   AND i.version > 1')
+                                     % dict(intable=intable, lname=wraptag('latest with name')))
+
+                        # add subjecttags entry for new version
+                        self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
+                                      + ' SELECT i.id AS subject, %(tagname)s AS tagname'
+                                      + ' FROM %(intable)s AS i'
+                                      + ' WHERE i.version > 1')
+                                     % dict(intable=intable, tagname=wrapval('latest with name')))
+
+                        # bump tag's timestamp in case following update hits zero rows...
+                        self.set_tag_lastmodified(None, self.globals['tagdefsdict']['latest with name'])
+
+                        # use regular update for new independent subjects
+                        self.set_tag_intable(self.globals['tagdefsdict']['latest with name'], self.input_tablename,
+                                             idcol='id', valcol=wraptag('latest with name', 'in_'), flagcol='updated',
+                                             wokcol='writeok', isowncol='is_owner',
+                                             enforce_tag_authz=False, set_mode='merge',
+                                             wheres=[ 'created = True', 'version = 1' ])
+
+                if remap and dstrole:
+                    # use remapped owner
+                    owner_val = wrapval(dstrole)
+                elif self.authn.role and self.lpreds.has_key('owner'):
+                    # use table-supplied in_owner or default self.authn.role
+                    owner_val = 'CASE WHEN in_owner IS NULL THEN %s ELSE in_owner END' % wrapval(self.authn.role)
+                else:
+                    owner_val = 'owner_val'
+
+                if remap:
+                    # use remapped users lists
+                    readusers_val = 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in readusers ])
+                    writeusers_val = 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in writeusers ])
+                else:
+                    # use user-supplied lists if they were included in lpreds, but be safe regarding NULL values
+                    if self.lpreds.has_key('read users'):
+                        readusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('read users', 'in_'))
+                    else:
+                        readusers_val = 'ARRAY[]::text[]'
+                    if self.lpreds.has_key('write users'):
+                        writeusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('write users', 'in_'))
+                    else:
+                        writeusers_val = 'ARRAY[]::text[]'
+                                                                   
                 # set subject metadata for newly created subjects
-                for tag, val in [ ('owner', wrapval(dstrole)),
+                for tag, val in [ ('owner', owner_val),
                                   ('created', wrapval('now')),
                                   ('modified', wrapval('now')),
                                   ('modified by', wrapval(self.authn.role)),
-                                  ('read users', 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in readusers ])),
-                                  ('write users', 'ARRAY[%s]::text[]' % ','.join([ wrapval(r) for r in writeusers ])) ]:
+                                  ('read users', readusers_val),
+                                  ('write users', writeusers_val) ]:
                     self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
                                          idcol='id', valcol=val, flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
@@ -2667,15 +2804,21 @@ class Application:
             elif self.dbquery('SELECT count(*) AS count FROM %s WHERE id IS NULL' % table)[0].count > 0:
                 raise Conflict(self, 'Bulk update aborted due to input rows not matching existing catalog subjects.')
 
-            # 4. update graph tags based on input data, tracking set of modified tags
+            # update graph tags based on input data, tracking set of modified tags
             for td in self.input_column_tds:
-                if self.lpreds.has_key(td.tagname) and td.tagname not in [ 'name', 'version' ]:
+                if self.lpreds.has_key(td.tagname):
+                    if td.tagname in [ 'owner', 'read users', 'write users' ]:
+                        # these were set during create pass, so exclude them here
+                        wheres = [ 'created = False' ]
+                    else:
+                        wheres = []
                     self.set_tag_intable(td, self.input_tablename,
                                          idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
-                                         set_mode=on_existing)
+                                         set_mode=on_existing,
+                                         wheres=wheres)
 
-            # TODO: update subject metadata based on updated flag in each input row
+            # update subject metadata based on updated flag in each input row
             for tag, val in [ ('subject last tagged', wrapval('now')),
                               ('subject last tagged txid', 'txid_current()') ]:
                 self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
