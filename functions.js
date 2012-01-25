@@ -4864,11 +4864,14 @@ function showRange() {
 
 function hideRange() {
 	$('.range').removeClass('range');
+	$('.rangeHeader').unbind('mouseenter mouseleave');
 	displayRangeValues = false;
+	saveQueryFilter = null;
+	rangeQueryFilter = null;
 	$('#Query_Preview_range').css('display', 'none');
 	$('#showRange').css('display', '');
 	$('#hideRange').css('display', 'none');
-	cleanupRangeFilter();
+	$('.rangeConstraint').removeClass('rangeConstraint');
 }
 
 function deleteMultiValueRow(id) {
@@ -5238,8 +5241,5 @@ function resetColumnRange(event, tdRange) {
 	var div2 = getChild(tdRange, 2);
 	div1.css('display', '');
 	div2.css('display', 'none');
-	if (rangeQueryFilter[tag] != null) {
-		contextRangeWork('apply', tdRange);
-	}
 }
 
