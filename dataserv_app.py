@@ -35,7 +35,6 @@ import time
 import math
 import string
 from logging.handlers import SysLogHandler
-import json
 try:
     import webauthn
 except:
@@ -336,14 +335,21 @@ logger.addHandler(sysloghandler)
 
 logger.setLevel(logging.INFO)
 
-if hasattr(json, 'write'):
-    jsonWriter = json.write
-    jsonReader = json.read
-elif hasattr(json, 'dumps'):
-    jsonWriter = json.dumps
-    jsonReader = json.loads
-else:
-    raise RuntimeError(ast=None, data='Could not configure JSON library.')
+try:
+    import simplejson
+    
+    jsonWriter = simplejson.dumps
+    jsonReader = simplejson.loads
+    jsonFileReader = simplejson.load
+except:
+    import json
+
+    if hasattr(json, 'dumps'):
+        jsonWriter = json.dumps
+        jsonReader = json.loads
+        jsonFileReader = json.load
+    else:
+        raise RuntimeError(ast=None, data='Could not configure JSON library.')
 
 
 
@@ -2229,7 +2235,7 @@ class Application:
             # we require a non-empty list for SQL constructs below...
             wheres = [ 'True' ]
         
-        if enforce_tag_authz_mode:
+        if enforce_tag_authz:
             # do the write-authz tests for the active set of intable rows
             if tagdef.writeok == False:
                 # tagdef write policy fails statically for this user and tag
@@ -2244,15 +2250,16 @@ class Application:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
                 elif tagdef.writepolicy == 'subjectowner':
                     # None means we need subject is_owner for this user
-                    if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
-                                    % dict(intable=intable,
-                                           wheres=' AND '.join([ '%s = False' % isowncol ] + wheres)))[0].count > 0:
+                    query = 'SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s' % dict(intable=intable,
+                                                                                                wheres=' AND '.join([ '%s = False' % isowncol ] + wheres))
+                    #web.debug(query)
+                    if self.dbquery(query)[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
             else:
                 # tagdef write policy accepts statically for this user and tag
                 pass
             
-        table = wraptag(td.tagname)
+        table = wraptag(tagdef.tagname)
         count = 0
 
         if tagdef.multivalue:
@@ -2263,26 +2270,35 @@ class Application:
             
             # add input triples not present in graph
             if flagcol:
-                self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                              + ' WHERE i.%(idcol)s'
-                              + '       IN'
-                              + '       (SELECT DISTINCT subject'
-                              + '        FROM (SELECT %(idcol)s AS subject,'
-                              + '                     %(valcol)s AS value'
-                              + '              FROM %(intable)s WHERE %(wheres)s'
-                              + '              EXCEPT'
-                              + '              SELECT subject, value FROM %(table)s) AS t) AS t')
-                             % dict(table=table, intable=intable, idcol=idcol, valcol=valcol, flagcol=flagcol,
-                                    wheres=' AND '.join(wheres)))
+                parts = dict(table=table,
+                             intable=intable,
+                             idcol=idcol,
+                             valcol=valcol,
+                             flagcol=flagcol,
+                             wheres=' AND '.join(wheres))
 
-            count += self.dbquery(('INSERT INTO %(table)s (subject, value)'
-                                   + ' SELECT %(idcol)s AS subject,'
-                                   + '        %(valcol)s AS value'
-                                   + ' FROM %(intable)s WHERE %(wheres)s'
-                                   + ' EXCEPT'
-                                   + ' SELECT subject, value FROM %(table)s')
-                                  % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
-                                         wheres=' AND '.join(wheres)))
+                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                         + ' WHERE i.%(idcol)s'
+                         + '       IN'
+                         + '       (SELECT DISTINCT subject'
+                         + '        FROM (SELECT %(idcol)s AS subject,'
+                         + '                     %(valcol)s AS value'
+                         + '              FROM %(intable)s WHERE %(wheres)s'
+                         + '              EXCEPT'
+                         + '              SELECT subject, value FROM %(table)s) AS t)') % parts
+                #web.debug(query)
+                self.dbquery(query)
+
+            query = ('INSERT INTO %(table)s (subject, value)'
+                     + ' SELECT %(idcol)s AS subject,'
+                     + '        %(valcol)s AS value'
+                     + ' FROM %(intable)s AS i WHERE %(wheres)s'
+                     + ' EXCEPT'
+                     + ' SELECT subject, value FROM %(table)s'
+                     ) % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
+                              wheres=' AND '.join(wheres))
+            #web.debug(query)
+            count += self.dbquery(query)
 
             if set_mode == 'replace':
                 # clear graph triples not present in input
@@ -2311,16 +2327,16 @@ class Application:
         else:
             # single-valued tags require insert-or-update due to cardinality constraint
             
-            incols = [ '%(idcol)s AS subject' ]
+            incols = [ '%(idcol)s AS subject' % dict(idcol=idcol) ]
             excols = [ 'subject' ]
-            addwheres = [ '%(idcol)s NOT IN (SELECT subject FROM %(table)s)' ] + wheres
+            addwheres = [ '%(idcol)s NOT IN (SELECT subject FROM %(table)s)' % dict(idcol=idcol, table=table) ] + wheres
 
             if tagdef.dbtype != 'empty':
-                incols.append( '%(valcol)s AS value' )
+                incols.append( '%(valcol)s AS value' % dict(valcol=valcol) )
                 excols.append( 'value' )
-                addwheres.append( '%(valcol)s IS NOT NULL' )
+                addwheres.append( '((%(valcol)s) IS NOT NULL)' % dict(valcol=valcol) )
             else:
-                addwheres.append( '%(valcol)s = True' )
+                addwheres.append( '((%(valcol)s) = True)' % dict(valcol=valcol) )
 
             incols = ', '.join(incols)
             excols = ', '.join(excols)
@@ -2328,40 +2344,44 @@ class Application:
 
             # track add/update of graph for inequal input triples
             if flagcol:
-                self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                              + ' WHERE i.%(idcol)s'
-                              + '       IN'
-                              + '       (SELECT DISTINCT subject'
-                              + '        FROM (SELECT %(incols)s'
-                              + '              FROM %(intable)s WHERE %(wheres)s'
-                              + '              EXCEPT'
-                              + '              SELECT %(excols)s FROM %(table)s) AS t)')
-                             % dict(table=table, intable=intable,
-                                    idcol=idcol, flagcol=flagcol,
-                                    incols=incols, excols=excols,
-                                    wheres=' AND '.join(wheres)))
+                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                         + ' WHERE i.%(idcol)s'
+                         + '       IN'
+                         + '       (SELECT DISTINCT subject'
+                         + '        FROM (SELECT %(incols)s'
+                         + '              FROM %(intable)s WHERE %(wheres)s'
+                         + '              EXCEPT'
+                         + '              SELECT %(excols)s FROM %(table)s) AS t)') % dict(table=table, intable=intable,
+                                                                                           idcol=idcol, flagcol=flagcol,
+                                                                                           incols=incols, excols=excols,
+                                                                                           wheres=' AND '.join(wheres))
+                #web.debug(query)
+                self.dbquery(query)
                 
             # add triples where graph lacked them
-            count += self.dbquery(('INSERT INTO %(table)s ( %(excols)s )'
-                                   + ' SELECT %(incols)s'
-                                   + ' FROM %(intable)s AS i'
-                                   + ' WHERE %(addwheres)s')
-                                  % dict(table=table, intable=intable,
-                                         idcol=idcol, incols=incols, excols=excols,
-                                         addwheres=addwheres))
+            query = ('INSERT INTO %(table)s ( %(excols)s )'
+                     + ' SELECT %(incols)s'
+                     + ' FROM %(intable)s AS i'
+                     + ' WHERE %(addwheres)s') % dict(table=table, intable=intable,
+                                                      idcol=idcol, incols=incols, excols=excols,
+                                                      addwheres=addwheres)
+            #web.debug(query)
+            count += self.dbquery(query)
 
             if tagdef.dbtype != 'empty':
                 # update triples where graph had a different value than non-null input
                 if flagcol:
-                    self.dbquery(('UPDATE %(table)s AS t SET value = i.value'
-                                  + ' USING (SELECT %(idcol)s AS subject,'
-                                  + '               %(valcol)s AS value'
-                                  + '        FROM %(intable)s WHERE %(wheres)s) AS i'
-                                  + ' WHERE t.subject = i.subject'
-                                  + '   AND i.value IS NOT NULL')
-                                 % dict(table=table, intable=intable,
-                                        idcol=idcol, flagcol=valcol,
-                                        wheres=' AND '.join(wheres)))
+                    query = ('UPDATE %(table)s AS t SET value = i.value'
+                             + ' FROM (SELECT %(idcol)s AS subject,'
+                             + '              %(valcol)s AS value'
+                             + '       FROM %(intable)s WHERE %(wheres)s) AS i'
+                             + ' WHERE t.subject = i.subject'
+                             + '   AND i.value IS NOT NULL') % dict(table=table, intable=intable,
+                                                                    idcol=idcol, flagcol=valcol,
+                                                                    valcol=valcol,
+                                                                    wheres=' AND '.join(wheres))
+                    #web.debug(query)
+                    self.dbquery(query)
 
             if set_mode == 'replace':
                 if tagdef.dbtype != 'empty':
@@ -2401,11 +2421,45 @@ class Application:
 
             # update subjecttags mappings
             self.dbquery('DELETE FROM subjecttags AS s WHERE tagname = %(tagname)s AND s.subject NOT IN (SELECT subject FROM %(table)s)'
-                         % dict(table=table, tagname=tagname))
+                         % dict(table=table, tagname=wrapval(tagdef.tagname)))
             self.dbquery('INSERT INTO subjecttags (subject, tagname)'
                          + 'SELECT t.subject, %(tagname)s FROM %(table)s AS t LEFT OUTER JOIN subjecttags AS s USING (subject) WHERE s.subject IS NULL'
-                         % dict(table=table, tagname=tagname))
+                         % dict(table=table, tagname=wrapval(tagdef.tagname)))
         
+
+    def mergepreds(self, predlist, tagdefs=None):
+        """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
+
+           Resulting map has a key for each tag referenced in a
+           predicate. The keyed list of predicates should then be
+           compiled into a conjunction of value constraints on
+           that tag.
+        """
+        if tagdefs == None:
+            tagdefs = self.globals['tagdefsdict']
+
+        pd = dict()
+        for pred in predlist:
+            vals = pred.vals
+            if type(vals) == list:
+                vals = [ v for v in pred.vals ]
+                vals.sort()
+
+            pred = web.Storage(tag=pred.tag, op=pred.op, vals=vals)
+
+            tagdef = tagdefs.get(pred.tag, None)
+            if tagdef == None:
+                #raise KeyError()
+                raise Conflict(self, 'Tagdef "%s" not defined on this server.' % pred.tag)
+
+            pl = pd.get(pred.tag, [])
+            pd[pred.tag] = pl
+            pl.append(pred)
+
+        for tag, preds in pd.items():
+            preds.sort(key=lambda p: (p.op, p.vals))
+
+        return pd
 
     def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False):
         """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
@@ -2463,8 +2517,8 @@ class Application:
                This body func can be repeated under normal dbtransact() control.
             """
 
-            self.spreds = mergepreds(spreds)
-            self.lpreds = mergepreds(lpreds)
+            self.spreds = self.mergepreds(spreds)
+            self.lpreds = self.mergepreds(lpreds)
 
             # pre-evaluate update "shape" requirements
             # tag read authz will be handled by regular path-query in body3
@@ -2499,15 +2553,15 @@ class Application:
             self.input_tablename = "input_%s" % self.request_guid
 
             self.input_column_tds = [ self.globals['tagdefsdict'].get(t)
-                                      for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() + ['owner', 'name', 'version'] ]) ]
+                                      for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() ]) ]
 
             # remap empty type to boolean type
             # remap multivalue tags to value array
             # 1 column per tag: in_tag
-            input_column_defs += [ '%s %s%s' % (wraptag(td.tagname, 'in_'),
+            input_column_defs = [ '%s %s%s' % (wraptag(td.tagname, '', 'in_'),
                                                (lambda dbtype: {'empty': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
                                                (lambda multival: {True: '[]'}.get(multival, ''))(td.multivalue))
-                                  for td in input_column_tds ]
+                                  for td in self.input_column_tds ]
 
             # special columns initialized during JOIN with query result
             # rows resulting in creation of new subjects will get default writeok and is_owner True values
@@ -2518,20 +2572,19 @@ class Application:
             if on_missing == 'create' and self.spreds.has_key('name'):
                 input_column_defs.append( 'version int8' )
 
-            self.dbquery('CREATE TABLE %s ( %s )' % (wraptag(input_tablename, ''), input_column_defs))
+            self.dbquery('CREATE TABLE %s ( %s )' % (wraptag(self.input_tablename, '', ''), ','.join(input_column_defs)))
 
         def body1compensation():
             """Destroy input table created by body1."""
-            input_tablename = "input_%s" % self.request_guid
-            self.dbquery('DROP TABLE %s' % wraptag(input_tablename, ''))
+            self.dbquery('DROP TABLE %s' % wraptag(self.input_tablename, '', ''))
 
         def body2():
             """Load input stream into input table and validate content.
 
                This body func can run at-most once since it consumes input stream.
             """
-            table = wraptag(self.input_tablename, '')
-            columns = ', '.join([ wraptag(td.tagname, 'in_') for td in self.input_column_tds ])
+            table = wraptag(self.input_tablename, '', '')
+            columns = ', '.join([ wraptag(td.tagname, '', 'in_') for td in self.input_column_tds ])
 
             # build up prepared statement to execute once per input row
             param_types = []
@@ -2548,11 +2601,11 @@ class Application:
                     param_types.append( '%s' % dbtype )
 
             paramdecls = ', '.join([ '%s' % pt for pt in param_types ])
-            params = ', '.join([ '$%d' % i+1 for i in range(0, len(param_types)) ])
+            params = ', '.join([ '$$%d' % (i+1) for i in range(0, len(param_types)) ])
 
-            self.dbquery(('PREPARE load_%(table)s ( %(paramdecls)s ) AS'
-                          + ' INSERT INTO %(table)s ( %(columns)s ) VALUES ( %(params)s )')
-                         % dict(table=table, paramdecls=paramdecls, params=params))
+            query = 'PREPARE %(func)s ( %(paramdecls)s ) AS INSERT INTO %(table)s ( %(columns)s ) VALUES ( %(params)s )' % dict(table=table, func=wraptag(self.input_tablename, '', 'load_'), paramdecls=paramdecls, params=params, columns=columns)
+            #web.debug(query)
+            self.dbquery(query)
             
             for subject in subject_iter:
                 values = []
@@ -2576,8 +2629,9 @@ class Application:
 
                 values = ', '.join(values)
 
-                self.dbquery('EXECUTE load_%(table)s ( %(values)s )'
-                             % dict(table=table, values=values))
+                query = 'EXECUTE %(func)s ( %(values)s )' % dict(func=wraptag(self.input_tablename, '', 'load_'), values=values)
+                #web.debug(subject, query)
+                self.dbquery(query)
 
             # TODO: test input data against input constraints, aborting on conflict (L)
             # -- test in python during preceding insert loop?  or compile one SQL test?
@@ -2607,6 +2661,7 @@ class Application:
                      -- subject last tagged, etc.
                5. Update tagdef metadata summarizing column updates (for each column update)
             """
+            
             # get policy-remapping info if a rule exists
             remap, dstrole, readusers, writeusers = self.getPolicyRule()
             
@@ -2619,22 +2674,21 @@ class Application:
                                                                 enforce_read_authz=enforce_read_authz)
 
             # we will update the input table from the existing subjects result
-            intable = wraptag(self.input_tablename, '')
+            intable = wraptag(self.input_tablename, '', '')
             
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
-            assigns = [ 'i.writeok = e.writeok',
-                        'i.id = e.id',
-                        'i.is_owner = CASE WHEN e.owner IN ARRAY[ %s ]::text[] THEN True ELSE False END' % ','.join(wrapval(self.authn.roles)) ]
+            assigns = ', '.join([ 'writeok = e.writeok',
+                                  'id = e.id',
+                                  'is_owner = CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.authn.roles ]) ])
 
             # join the subjects table to the input table on all spred tags which are unique or are name/version
-            wheres = [ 'i.%s = e.%s' % (wraptag(td.tagname, "in_"), wraptag(td.tagname, ''))
-                       for td in self.spreds.itervalues()
+            wheres = [ '%s = e.%s' % (wraptag(td.tagname, '', "in_"), wraptag(td.tagname, '', ''))
+                       for td in [ self.globals['tagdefsdict'][tag] for tag in self.spreds.keys() ]
                        if td.unique or td.tagname in [ 'name', 'version' ] ]
             wheres = ' AND '.join(wheres)
 
-            equery = 'UPDATE %(intable)s AS i SET %(assigns)s FROM ( %(equery)s ) AS e WHERE %(wheres)s'
-            equery = squery % dict(intable=intable, assigns=assigns, squery=squery, wheres=wheres)
-            
+            equery = 'UPDATE %(intable)s AS i SET %(assigns)s FROM ( %(equery)s ) AS e WHERE %(wheres)s' % dict(intable=intable, assigns=assigns, equery=equery, wheres=wheres)
+
             self.dbquery(equery, evalues)
 
             if False:
@@ -2672,15 +2726,15 @@ class Application:
                     inits = ', '.join([ 'version = pv.version + 1',
                                         'writeok = pv.writeok' ])
                     
-                    wheres = ' AND '.join([ 'i.name = pv.%s' % wraptag('latest with name', ''),
+                    wheres = ' AND '.join([ 'i.name = pv.%s' % wraptag('latest with name', '', ''),
                                             'i.id IS NULL' ])
 
                     self.dbquery(('UPDATE %(intable)s AS i SET %(inits)s FROM ( %(pvquery)s ) AS pv WHERE %(wheres)s'
                                   % dict(intable=intable, inits=inits, pvquery=pvquery, wheres=wheres)),
-                                 values=pvvalues)
+                                 vars=pvvalues)
 
                     if self.dbquery('SELECT count(*) AS count'
-                                    + ' FROM %(intable)s'
+                                    + ' FROM %(intable)s' % dict(intable=intable)
                                     + ' WHERE id IS NULL AND version IS NOT NULL and writeok IS FALSE')[0].count > 0:
                         raise Forbidden(self, 'creation of new version of existing named subject')
 
@@ -2688,39 +2742,40 @@ class Application:
                     self.dbquery('UPDATE %(intable)s AS i SET version = 1 WHERE id IS NULL AND version IS NULL'
                                  % dict(intable=intable))
 
-                skeys = [ 'i.%s AS %s' % (wraptag(tag, 'in_'), wraptag(tag, 'in_'))
-                          for tag in self.spreds.keys() ]
+                skeys = ', '.join([ 'i.%s AS %s' % (wraptag(tag, '', 'in_'), wraptag(tag, '', 'in_'))
+                                    for tag in self.spreds.keys() ])
                 
-                skeycmps = ' AND '.join([ 'i.%s = n.%s' % (wraptag(tag, 'in_'), wraptag(tag, 'in_'))
+                skeycmps = ' AND '.join([ 'i.%s = n.%s' % (wraptag(tag, '', 'in_'), wraptag(tag, '', 'in_'))
                                           for tag in self.spreds.keys() ])
 
                 inits = ', '.join(['id = n.id', 'created = True'])
 
                 # allocate unique subject IDs for all rows missing a subject and initialize special columns
-                self.dbquery(('UPDATE %(intable)s AS i SET %(inits)s'
-                              + ' FROM (SELECT NEXTVAL(\'resources_subject_seq\') AS id, %(skeys)s'
-                              + '       FROM %(intable)s AS i'
-                              + '       WHERE i.id IS NULL) AS n'
-                              + ' WHERE %(skeycmps)s')
-                             % dict(intable=intable, skeys=skeys, skeycmps=skeycmps, inits=inits))
+                query = ('UPDATE %(intable)s AS i SET %(inits)s'
+                         + ' FROM (SELECT NEXTVAL(\'resources_subject_seq\') AS id, %(skeys)s'
+                         + '       FROM %(intable)s AS i'
+                         + '       WHERE i.id IS NULL) AS n'
+                         + ' WHERE %(skeycmps)s') % dict(intable=intable, skeys=skeys, skeycmps=skeycmps, inits=inits)
+                #web.debug(query)
+                self.dbquery(query)
 
                 # insert newly allocated subject IDs into subject table
-                self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(table)s WHERE created = True' % dict(table=table))
+                self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(intable)s WHERE created = True' % dict(intable=intable))
 
                 # set regular subject ID tags for newly created rows, enforcing write authz
                 for td in self.input_column_tds:
                     if self.spreds.has_key(td.tagname) and td.tagname not in [ 'name', 'version' ]:
-                        self.set_tag_intable(td, self.input_tablename,
-                                             idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
+                        self.set_tag_intable(td, intable,
+                                             idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
                                              wokcol='writeok', isowncol='is_owner', set_mode='merge')
 
                 if self.spreds.has_key('name'):
                     # set name/version/vname/version created
-                    for tag, val in [ ('name', wraptag('name', 'in_')),
+                    for tag, val in [ ('name', wraptag('name', '', 'in_')),
                                       ('version', 'version'),
-                                      ('vname', 'name || %s || CAST(version AS text)' % wrapval('@')),
-                                      ('version created', wrapval('now')) ]:
-                        self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                                      ('vname', 'in_name || %s || CAST(version AS text)' % wrapval('@')),
+                                      ('version created', '%s::timestamptz' % wrapval('now')) ]:
+                        self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
                                              idcol='id', valcol=val, flagcol='updated',
                                              wokcol='writeok', isowncol='is_owner',
                                              enforce_tag_authz=False, set_mode='merge',
@@ -2729,14 +2784,16 @@ class Application:
                         # carefully update 'latest with name' for new version= N+1 subjects
 
                         # drop subjecttags entry for previous version
-                        self.dbquery(('DELETE FROM subjecttags AS st'
-                                      + ' USING %(intable)s AS i,'
-                                      + '       %(lname)s AS ln,'
-                                      + ' WHERE i.version > 1'
-                                      + '   AND i.name = ln.value'
-                                      + '   AND ln.subject = st.subject'
-                                      + '   AND st.tagname = %(tagname)s')
-                                     % dict(intable=intable, lname=wraptag('latest with name'), tagname=wrapval('latest with name')))
+                        query = ('DELETE FROM subjecttags AS st'
+                                 + ' USING %(intable)s AS i,'
+                                 + '       %(lname)s AS ln'
+                                 + ' WHERE i.version > 1'
+                                 + '   AND i.name = ln.value'
+                                 + '   AND ln.subject = st.subject'
+                                 + '   AND st.tagname = %(tagname)s') % dict(intable=intable,
+                                                                             lname=wraptag('latest with name'),
+                                                                             tagname=wrapval('latest with name'))
+                        self.dbquery(query)
 
                         # avoid breaking foreign key refs to value column
                         self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
@@ -2756,8 +2813,8 @@ class Application:
                         self.set_tag_lastmodified(None, self.globals['tagdefsdict']['latest with name'])
 
                         # use regular update for new independent subjects
-                        self.set_tag_intable(self.globals['tagdefsdict']['latest with name'], self.input_tablename,
-                                             idcol='id', valcol=wraptag('latest with name', 'in_'), flagcol='updated',
+                        self.set_tag_intable(self.globals['tagdefsdict']['latest with name'], intable,
+                                             idcol='id', valcol=wraptag('name', '', 'in_'), flagcol='updated',
                                              wokcol='writeok', isowncol='is_owner',
                                              enforce_tag_authz=False, set_mode='merge',
                                              wheres=[ 'created = True', 'version = 1' ])
@@ -2778,31 +2835,31 @@ class Application:
                 else:
                     # use user-supplied lists if they were included in lpreds, but be safe regarding NULL values
                     if self.lpreds.has_key('read users'):
-                        readusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('read users', 'in_'))
+                        readusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('read users', '', 'in_'))
                     else:
                         readusers_val = 'ARRAY[]::text[]'
                     if self.lpreds.has_key('write users'):
-                        writeusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('write users', 'in_'))
+                        writeusers_val = 'CASE WHEN %(acl)s IS NULL THEN ARRAY[]::text[] ELSE %(acl)s END' % dict(acl=wraptag('write users', '', 'in_'))
                     else:
                         writeusers_val = 'ARRAY[]::text[]'
                                                                    
                 # set subject metadata for newly created subjects
                 for tag, val in [ ('owner', owner_val),
-                                  ('created', wrapval('now')),
-                                  ('modified', wrapval('now')),
+                                  ('created', '%s::timestamptz' % wrapval('now')),
+                                  ('modified', '%s::timestamptz' % wrapval('now')),
                                   ('modified by', wrapval(self.authn.role)),
                                   ('read users', readusers_val),
                                   ('write users', writeusers_val) ]:
-                    self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                    self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
                                          idcol='id', valcol=val, flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          enforce_tag_authz=False, set_mode='merge',
                                          wheres=[ 'created = True' ])
                 
             elif on_missing == 'ignore':
-                self.dbquery('DELETE FROM %(table)s WHERE id IS NULL' % dict(table=table))
-            elif self.dbquery('SELECT count(*) AS count FROM %s WHERE id IS NULL' % table)[0].count > 0:
-                raise Conflict(self, 'Bulk update aborted due to input rows not matching existing catalog subjects.')
+                self.dbquery('DELETE FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))
+            elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
+                raise NotFound(self, 'bulk-update subject(s)')
 
             # update graph tags based on input data, tracking set of modified tags
             for td in self.input_column_tds:
@@ -2812,27 +2869,26 @@ class Application:
                         wheres = [ 'created = False' ]
                     else:
                         wheres = []
-                    self.set_tag_intable(td, self.input_tablename,
-                                         idcol='id', valcol=wraptag(td.tagname, 'in_'), flagcol='updated',
+                    self.set_tag_intable(td, intable,
+                                         idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          set_mode=on_existing,
                                          wheres=wheres)
 
             # update subject metadata based on updated flag in each input row
-            for tag, val in [ ('subject last tagged', wrapval('now')),
+            for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                               ('subject last tagged txid', 'txid_current()') ]:
-                self.set_tag_intable(self.globals['tagdefsdict'][tag], self.input_tablename,
+                self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
                                      idcol='id', valcol=val, flagcol=None,
                                      wokcol='writeok', isowncol='is_owner',
                                      enforce_tag_authz=False, set_mode='merge',
                                      wheres=[ 'updated = True' ])
 
-
         # allow retry as per usual
         self.dbtransact(body1, lambda x: x)
         try:
             self.dbtransact(body2, lambda x: x, limit=0) # prevent retry with limit=0
-            return self.dbtransact(body3, postCommit)
+            return self.dbtransact(body3, lambda x: x)
 
         finally:
             # always clean up input table if we created one successfully in body1
@@ -2915,37 +2971,6 @@ class Application:
         if rangemode not in [ 'values', 'count', 'values<', 'values>' ]:
             rangemode = None
 
-        def mergepreds(predlist):
-            """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
-
-               Resulting map has a key for each tag referenced in a
-               predicate. The keyed list of predicates should then be
-               compiled into a conjunction of value constraints on
-               that tag.
-            """
-            pd = dict()
-            for pred in predlist:
-                vals = pred.vals
-                if type(vals) == list:
-                    vals = [ v for v in pred.vals ]
-                    vals.sort()
-
-                pred = web.Storage(tag=pred.tag, op=pred.op, vals=vals)
-
-                tagdef = tagdefs.get(pred.tag, None)
-                if tagdef == None:
-                    #raise KeyError()
-                    raise Conflict(self, 'Tagdef "%s" not defined on this server.' % pred.tag)
-
-                pl = pd.get(pred.tag, [])
-                pd[pred.tag] = pl
-                pl.append(pred)
-
-            for tag, preds in pd.items():
-                preds.sort(key=lambda p: (p.op, p.vals))
-
-            return pd
-        
         def tag_query(tagdef, preds, values, final=True, tprefix='_', spred=False):
             """Compile preds for one tag into a query fetching all satisfactory triples.
 
@@ -3096,8 +3121,8 @@ class Application:
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            spreds = mergepreds(spreds)
-            lpreds = mergepreds(lpreds)
+            spreds = self.mergepreds(spreds, tagdefs)
+            lpreds = self.mergepreds(lpreds, tagdefs)
 
             subject_wheres = []
 

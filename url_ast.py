@@ -21,7 +21,7 @@ import web
 import re
 import os
 import webauthn
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader
 from rest_fileio import FileIO, LogFileIO
 import subjects
 import json
@@ -1019,11 +1019,28 @@ class FileTags (Node):
             content_type = web.ctx.env['CONTENT_TYPE'].lower()
         except:
             content_type = 'text/plain'
+        
+        if content_type in [ 'application/json' ]:
+            if content_type == 'application/json':
+                try:
+                    input = jsonFileReader(web.ctx.env['wsgi.input'])
+                except:
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception "%s" parsing JSON input from client' % str(ev),
+                              traceback.format_exception(et, ev, tb))
+                    raise BadRequest(self, 'Invalid JSON input to bulk PUT of tags.')
+                if type(input) != list:
+                    raise BadRequest(self, 'JSON input must be a flat list of objects for bulk PUT of tags.')
+                
+            self.bulk_update_transact(input, on_missing='abort', on_existing='merge')
+                
+            web.ctx.status = '204 No Content'
+            return ''
 
-        content = web.ctx.env['wsgi.input'].read()
-        if content_type == 'application/x-www-form-urlencoded':
+        elif content_type == 'application/x-www-form-urlencoded':
             # handle same entity body format we output in GETtag()
             #  tag=val&tag=val...
+            content = web.ctx.env['wsgi.input'].read()
             tagvals = dict()
             for tagval in content.strip().split('&'):
                 tag, val = tagval.split('=')
