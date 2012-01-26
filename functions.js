@@ -4930,11 +4930,15 @@ function addMultiValueRow(table, tag, value) {
 }
 
 function rangeFilter(event, td) {
+	var selected = td.hasClass('range');
 	var isCtrl = event.ctrlKey;
 	var tag = td.attr('tag');
 	var tdRange = td.parent().parent().parent().parent().parent();
 	if (!isCtrl && rangeQueryFilter[tag] != null) {
 		contextRangeWork('clear', tdRange);
+	}
+	if (selected && !isCtrl) {
+		return;
 	}
 	tdRange.attr('rangeClicked', true);
 	if (columnRangeValues[tag] == null) {
