@@ -266,7 +266,7 @@ then
     ifempty
     sharedscripts
     postrotate
-	/sbin/service $SYSLOGSVC restart 2> /dev/null\` 2> /dev/null || true
+	/sbin/service $SYSLOGSVC restart 2> /dev/null 2> /dev/null || true
 	/usr/bin/rsync --delete-after -a -e /usr/local/sbin/runuser-rsh /var/log/${SVCPREFIX}-* ${SVCUSER}@localhost:/var/www/${SVCPREFIX}-logs/ 2>/dev/null || true
     endscript
 }
