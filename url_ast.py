@@ -566,8 +566,8 @@ class Tagdef (Node):
         self.typestr = typestr
         self.writepolicy = None
         self.readpolicy = None
-        self.multivalue = False
-        self.is_unique = False
+        self.multivalue = None
+        self.is_unique = None
         self.action = None
         self.tagdefs = {}
 
