@@ -2306,7 +2306,7 @@ class Application:
                                       % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
                                              wheres=' AND '.join(wheres)))
 
-            if False and tagdef.unique:
+            if tagdef.unique:
                 # test for uniqueness violations
                 if self.dbquery(('SELECT max(count) AS max'
                                  + ' FROM (SELECT count(subject) AS count'
@@ -2372,15 +2372,15 @@ class Application:
             addwheres = ' AND '.join(addwheres)
             updwheres = ' AND '.join(updwheres)
 
+            if tagdef.dbtype != 'empty':
+                # input null value represents absence of triples w/ values
+                where = '(%s) IS NULL' % valcol
+            else:
+                # input true value represents presence of pair (predicate typed w/ no object)
+                where = '(%s) != True' % valcol
+                
             if set_mode == 'replace':
                 # remove triples where input lacks them
-                if tagdef.dbtype != 'empty':
-                    # input null value represents absence of triples w/ values
-                    where = '%s IS NULL' % valcol
-                else:
-                    # input true value represents presence of pair (predicate typed w/ no object)
-                    where = '%s != True' % valcol
-
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' WHERE i.%(idcol)s'
@@ -2403,14 +2403,19 @@ class Application:
                                       % dict(table=table, intable=intable,
                                              idcol=idcol, valcol=valcol,
                                              wheres=' AND '.join(wheres + [ where ])))
-            if False and tagdef.unique:
+            if tagdef.unique and tagdef.dbtype != 'empty':
                 # test for uniqueness violations
-                if self.dbquery(('SELECT max(count) AS max'
-                                 + ' FROM (SELECT count(subject) AS count'
-                                 + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                                 + '             UNION'
-                                 + '             SELECT subject, value FROM %(table)s) AS t'
-                                 + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
+                web.debug('bulk set unique single-valued tag "%s"' % tagdef.tagname)
+                query = ('SELECT max(count) AS max'
+                         + ' FROM (SELECT count(subject) AS count'
+                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
+                         + '             UNION'
+                         + '             SELECT subject, value FROM %(table)s) AS t'
+                         + '       GROUP BY value) AS t') % dict(intable=intable, table=table,
+                                                                 idcol=idcol, valcol=valcol,
+                                                                 wheres='NOT (%s)' % where)
+                web.debug(query)
+                if self.dbquery(query)[0].max > 1:
                     raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
         
             # track add/update of graph for inequal input triples
@@ -2674,7 +2679,7 @@ class Application:
 
             if True:
                 cols = [ 'id' ]
-                if False and self.spreds.has_key('name'):
+                if self.spreds.has_key('name'):
                     cols.append( 'in_name' )
                 self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( %(cols)s )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
                                                                                          intable=wraptag(self.input_tablename, '', ''),
@@ -2766,12 +2771,12 @@ class Application:
                 # -- delete mapped rows
                 pass
 
-            if False:
+            if True:
                 # test for uniqueness violations
                 if self.dbquery(('SELECT max(count) AS max'
-                                 + ' FROM (SELECT count(%(idcol)s) AS count'
-                                 + '       FROM %(intable)s WHERE %(wheres)s) AS t'
-                                 + '       GROUP BY %(idcol)s) AS t') % dict(intable=intable, idcol=idcol))[0].max > 1:
+                                 + ' FROM (SELECT count(*) AS count'
+                                 + '       FROM %(intable)s WHERE id IS NOT NULL'
+                                 + '       GROUP BY id) AS t') % dict(intable=intable))[0].max > 1:
                     raise Conflict(self, 'Duplicate subject keys used in input.')
 
             if False:
@@ -2786,13 +2791,13 @@ class Application:
                     # it is possible a full key set including 'name' matches no subject
                     # but the name matches a previous version, which means creating new subject is creating new version
 
-                    if False and tagdef.unique:
+                    if True:
                         # test for uniqueness violations
                         if self.dbquery(('SELECT max(count) AS max'
                                          + ' FROM (SELECT count(subject) AS count'
-                                         + '       FROM (SELECT %(idcol)s AS subject, in_name AS value FROM %(intable)s WHERE %(wheres)s) AS t'
-                                         + '       GROUP BY value) AS t') % dict(intable=intable, idcol=idcol, valcol=valcol))[0].max > 1:
-                            raise Conflict(self, 'Duplicate name used for new subjects.')
+                                         + '       FROM (SELECT id AS subject, in_name AS value FROM %(intable)s) AS t'
+                                         + '       GROUP BY value) AS t') % dict(intable=intable))[0].max > 1:
+                            raise Conflict(self, 'Duplicate name used for subjects.')
 
                     # find latest (previous) version for input rows not matched to subjects
                     pvquery, pvvalues = self.build_files_by_predlist_path([ ([web.Storage(tag='latest with name', op=None, vals=[])],
