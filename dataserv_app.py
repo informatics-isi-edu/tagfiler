@@ -2405,7 +2405,6 @@ class Application:
                                              wheres=' AND '.join(wheres + [ where ])))
             if tagdef.unique and tagdef.dbtype != 'empty':
                 # test for uniqueness violations
-                web.debug('bulk set unique single-valued tag "%s"' % tagdef.tagname)
                 query = ('SELECT max(count) AS max'
                          + ' FROM (SELECT count(subject) AS count'
                          + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
@@ -2414,7 +2413,8 @@ class Application:
                          + '       GROUP BY value) AS t') % dict(intable=intable, table=table,
                                                                  idcol=idcol, valcol=valcol,
                                                                  wheres='NOT (%s)' % where)
-                web.debug(query)
+                #web.debug('bulk set unique single-valued tag "%s"' % tagdef.tagname)
+                #web.debug(query)
                 if self.dbquery(query)[0].max > 1:
                     raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
         
