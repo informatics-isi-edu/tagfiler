@@ -2220,7 +2220,7 @@ class Application:
         self.set_tag_lastmodified(subject, tagdef)
         
 
-    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[]):
+    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[], test=True):
         """Perform bulk-setting of tags from an input table.
 
            tagdef:  the tag to update
@@ -2244,6 +2244,8 @@ class Application:
 
            wheres     = list of where clauses limiting which input rows get processed
                -- will be combined in conjunction (AND)
+
+           test       = True: perform uniqueness tests; False: skip tests
         """
         if len(wheres) == 0:
             # we require a non-empty list for SQL constructs below...
@@ -2306,7 +2308,7 @@ class Application:
                                       % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
                                              wheres=' AND '.join(wheres)))
 
-            if tagdef.unique:
+            if test and tagdef.unique:
                 # test for uniqueness violations
                 if self.dbquery(('SELECT max(count) AS max'
                                  + ' FROM (SELECT count(subject) AS count'
@@ -2315,6 +2317,7 @@ class Application:
                                  + '             SELECT subject, value FROM %(table)s) AS t'
                                  + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
                     raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
+                #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
                 
             # add input triples not present in graph
             if flagcol:
@@ -2403,7 +2406,8 @@ class Application:
                                       % dict(table=table, intable=intable,
                                              idcol=idcol, valcol=valcol,
                                              wheres=' AND '.join(wheres + [ where ])))
-            if tagdef.unique and tagdef.dbtype != 'empty':
+                
+            if test and tagdef.unique and tagdef.dbtype != 'empty':
                 # test for uniqueness violations
                 query = ('SELECT max(count) AS max'
                          + ' FROM (SELECT count(subject) AS count'
@@ -2417,6 +2421,7 @@ class Application:
                 #web.debug(query)
                 if self.dbquery(query)[0].max > 1:
                     raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
+                #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
         
             # track add/update of graph for inequal input triples
             if flagcol:
@@ -2470,8 +2475,9 @@ class Application:
             self.dbquery('INSERT INTO subjecttags (subject, tagname)'
                          + 'SELECT t.subject, %(tagname)s FROM %(table)s AS t LEFT OUTER JOIN subjecttags AS s USING (subject) WHERE s.subject IS NULL'
                          % dict(table=table, tagname=wrapval(tagdef.tagname)))
+            self.dbquery('ANALYZE subjecttags')
         
-       # self.log('TRACE', 'Application.set_tag_intable("%s", "%s", "%s", "%s") complete' % (tagdef.tagname, intable, idcol, valcol))
+        #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) complete' % (tagdef.tagname, idcol, valcol, wheres))
 
     def mergepreds(self, predlist, tagdefs=None):
         """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
@@ -2678,12 +2684,8 @@ class Application:
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() input stored' % (self.input_tablename))
 
             if True:
-                cols = [ 'id' ]
-                if self.spreds.has_key('name'):
-                    cols.append( 'in_name' )
-                self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( %(cols)s )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
-                                                                                         intable=wraptag(self.input_tablename, '', ''),
-                                                                                         cols=','.join(cols)))
+                self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( id )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
+                                                                                   intable=wraptag(self.input_tablename, '', '')))
                 self.dbquery('ANALYZE %s' % wraptag(self.input_tablename, '', ''))
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() ID index created' % (self.input_tablename))
 
@@ -2771,17 +2773,6 @@ class Application:
                 # -- delete mapped rows
                 pass
 
-            if True:
-                # test for uniqueness violations
-                if self.dbquery(('SELECT max(count) AS max'
-                                 + ' FROM (SELECT count(*) AS count'
-                                 + '       FROM %(intable)s WHERE id IS NOT NULL'
-                                 + '       GROUP BY id) AS t') % dict(intable=intable))[0].max > 1:
-                    raise Conflict(self, 'Duplicate subject keys used in input.')
-
-            if False:
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable,
-                                                                          index=wraptag(self.input_tablename, '_id_idx', '')))
             self.dbquery('ANALYZE %s' % intable)
 
             # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
@@ -2790,14 +2781,6 @@ class Application:
                 if self.spreds.has_key('name'):
                     # it is possible a full key set including 'name' matches no subject
                     # but the name matches a previous version, which means creating new subject is creating new version
-
-                    if True:
-                        # test for uniqueness violations
-                        if self.dbquery(('SELECT max(count) AS max'
-                                         + ' FROM (SELECT count(subject) AS count'
-                                         + '       FROM (SELECT id AS subject, in_name AS value FROM %(intable)s) AS t'
-                                         + '       GROUP BY value) AS t') % dict(intable=intable))[0].max > 1:
-                            raise Conflict(self, 'Duplicate name used for subjects.')
 
                     # find latest (previous) version for input rows not matched to subjects
                     pvquery, pvvalues = self.build_files_by_predlist_path([ ([web.Storage(tag='latest with name', op=None, vals=[])],
@@ -2850,10 +2833,16 @@ class Application:
 
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
+                # do this test after cluster/analyze so it is faster
+                if self.dbquery('SELECT max(count) AS max FROM (SELECT count(*) AS count FROM %s GROUP BY id) AS t' % intable)[0].max > 1:
+                    raise Conflict(self, 'Duplicate input rows violate unique subject key constraint.')
+
+                #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() input uniqueness tested' % (self.input_tablename))
+
                 # insert newly allocated subject IDs into subject table
                 self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(intable)s WHERE created = True' % dict(intable=intable))
 
-                #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subjects allocated' % (self.input_tablename))
+                #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subjects created' % (self.input_tablename))
 
                 # set regular subject ID tags for newly created rows, enforcing write authz
                 for td in self.input_column_tds:
@@ -2866,6 +2855,7 @@ class Application:
 
                 if self.spreds.has_key('name'):
                     # set name/version/vname/version created
+                    # setting of vname will perform uniqueness test for name as side-effect
                     for tag, val in [ ('name', wraptag('name', '', 'in_')),
                                       ('version', 'version'),
                                       ('vname', 'in_name || %s || CAST(version AS text)' % wrapval('@')),
@@ -2907,14 +2897,15 @@ class Application:
                     # bump tag's timestamp in case following update hits zero rows...
                     self.set_tag_lastmodified(None, self.globals['tagdefsdict']['latest with name'])
 
-                    # use regular update for new independent subjects
+                    # use regular update for new independent subjects, skip expensive test we have verified indirectly above
                     self.set_tag_intable(self.globals['tagdefsdict']['latest with name'], intable,
                                          idcol='id', valcol=wraptag('name', '', 'in_'), flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          enforce_tag_authz=False, set_mode='merge',
-                                         wheres=[ 'created = True', 'version = 1' ])
+                                         wheres=[ 'created = True', 'version = 1' ],
+                                         test=False)
 
-                    #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject naming configured' % (self.input_tablename))
+                    #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() latest-with-name configured' % (self.input_tablename))
 
                 if remap and dstrole:
                     # use remapped owner
