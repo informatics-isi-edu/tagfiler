@@ -3273,7 +3273,6 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 			td3.css('display', '');
 			td3.attr('iCol', '' + (i+1));
 			var divConstraint = getChild(td3, 1);
-			divConstraint.css('white-space', 'nowrap');
 			divConstraint.attr('id', makeId('constraint', column.split(' ').join('_'), PREVIEW_COUNTER));
 			divConstraint.html('');
 			if (queryFilter[column] != null) {
@@ -3966,7 +3965,7 @@ function getTagSearchDisplay(tag) {
 				break;
 			default:
 				val += item['opUser'] == 'Between' ? '(' : '{';
-				val += item['vals'].join(',');
+				val += item['vals'].join(', ');
 				val += item['opUser'] == 'Between' ? ')' : '}';
 				break;
 				
