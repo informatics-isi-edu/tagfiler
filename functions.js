@@ -1552,6 +1552,7 @@ function setRangeValues(range, columnRange, tag) {
 		});
 		iCol += 2;
 		var tdRange = getChild(trRange, iCol);
+		tdRange.css('white-space', 'nowrap');
 		if (tdRange.attr('rangeClicked')) {
 			tdRange.removeAttr('rangeClicked');
 			replaceColumnRangeValues(tdRange);
@@ -1559,6 +1560,7 @@ function setRangeValues(range, columnRange, tag) {
 			if (range[tag] != null) {
 				if (range[tag].length == 1 && range[tag][0] == 'too many values to display') {
 					tdRange.html(range[tag][0]);
+					tdRange.css('white-space', '');
 				} else {
 					appendRangeValues(tdRange);
 				}
