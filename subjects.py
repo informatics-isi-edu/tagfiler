@@ -227,6 +227,7 @@ class Subject (Application):
 
     def delete_body(self):
         self.populate_subject(allow_blank=True, allow_multiple=True)
+        
         for subject in self.subjects:
             if not subject.writeok:
                 raise Forbidden(self, 'delete of dataset "%s"' % self.subject2identifiers(subject)[2])

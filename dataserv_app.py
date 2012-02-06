@@ -1431,6 +1431,9 @@ class Application:
                         error = str(te)
                         if count > limit:
                             # retry on version key violation, can happen under concurrent uploads
+                            et, ev, tb = sys.exc_info()
+                            web.debug('got exception "%s" during dbtransact' % str(ev),
+                                      traceback.format_exception(et, ev, tb))
                             raise IntegrityError(self, data=error)
                     except (IOError), te:
                         t.rollback()
@@ -2513,6 +2516,34 @@ class Application:
 
         return pd
 
+    def bulk_delete_subjects(self, path=None, versions='latest'):
+
+        if path == None:
+            path = self.path
+
+        if not path:
+            path = [ ( [], [], [] ) ]
+
+        spreds, lpreds, otags = path[-1]
+        lpreds = [ web.Storage(tag=tag, vals=[], op=None) for tag in [ 'latest with name', 'file' ] ]
+
+        equery, evalues = self.build_files_by_predlist_path(path, latest=latest)
+            
+        if self.dbquery('SELECT count(*) AS count FROM ( %(equery)s ) AS e WHERE e.writeok = False' % dict(equery=equery),
+                        evalues)[0].count > 0:
+            raise Forbidden(self, 'delete of one or more matching subjects')
+
+        # TODO:
+        # WITH QUERY A:
+        #    1. perform latest-with-name updates for any names affected by deletion
+        #    2. perform subjecttags updates for latest-with-name updates
+        # QUERY B drives loop:
+        #    3. perform tagdef timestamp updates for all tags used by all deleted subjects
+        # WITH QUERY C:
+        #    4. perform deletion of all subjects which cascades to all tags
+        #    5. returning... id, file pairs
+        
+
     def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False):
         """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
 
@@ -2667,9 +2698,18 @@ class Application:
                     v = subject.get(td.tagname, None)
                     if v != None:
                         if td.multivalue:
-                            values.append( 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, dbtype) for v in v ]), param_types[i]) )
+                            if type(v) == list:
+                                values.append( 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, dbtype) for v in v ]), param_types[i]) )
+                            else:
+                                values.append( 'ARRAY[ %s ]::%s[]' % (wrapval(v, dbtype), param_types[i]) )
                         else:
-                            values.append( '%s::%s' % (wrapval(v, dbtype), param_types[i]) )
+                            if type(v) == list:
+                                if v:
+                                    values.append( '%s::%s' % (wrapval(v[0], dbtype), param_types[i]) )
+                                else:
+                                    values.append( 'NULL' )
+                            else:
+                                values.append( '%s::%s' % (wrapval(v, dbtype), param_types[i]) )
                     else:
                         values.append( 'NULL' )
 
