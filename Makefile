@@ -122,7 +122,7 @@ IMAGEFILES=$(IMAGEBASES:%=images/%)
 
 $(HOME)/.tagfiler.predeploy:
 	yum -y --skip-broken install postgresql{,-devel,-server} policycoreutils-python || true
-	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil,-json} || true
+	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil,-json,-simplejson} || true
 	postgresql-setup initdb || true
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
