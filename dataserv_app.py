@@ -356,9 +356,7 @@ except:
         jsonReader = json.loads
         jsonFileReader = json.load
     else:
-        raise RuntimeError(ast=None, data='Could not configure JSON library.')
-
-
+        raise RuntimeError('Could not configure JSON library.')
 
 def urlquote(url, safe=""):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -2356,7 +2354,7 @@ class Application:
 
         else:
             # single-valued tags require insert-or-update due to cardinality constraint
-            
+
             incols = [ '%(idcol)s AS subject' % dict(idcol=idcol) ]
             excols = [ 'subject' ]
             
@@ -2376,7 +2374,6 @@ class Application:
             incols = ', '.join(incols)
             excols = ', '.join(excols)
             addwheres = ' AND '.join(addwheres)
-            updwheres = ' AND '.join(updwheres)
 
             if tagdef.dbtype != 'empty':
                 # input null value represents absence of triples w/ values
@@ -2454,21 +2451,19 @@ class Application:
 
             if tagdef.dbtype != 'empty':
                 # update triples where graph had a different value than non-null input
-                if flagcol:
-                    query = ('UPDATE %(table)s AS t SET value = i.value'
-                             + ' FROM (SELECT %(idcol)s AS subject,'
-                             + '              %(valcol)s AS value'
-                             + '       FROM %(intable)s WHERE %(wheres)s) AS i'
-                             + ' WHERE %(updwheres)s') % dict(table=table, intable=intable,
-                                                              idcol=idcol, flagcol=valcol,
-                                                              valcol=valcol,
-                                                              wheres=' AND '.join(wheres),
-                                                              updwheres=updwheres)
-                    #web.debug(query)
-                    self.dbquery(query)
+                query = ('UPDATE %(table)s AS t SET value = i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject,'
+                         + '              %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s) AS i'
+                         + ' WHERE %(updwheres)s') % dict(table=table, intable=intable,
+                                                          idcol=idcol, valcol=valcol,
+                                                          wheres=' AND '.join(wheres),
+                                                          updwheres=' AND '.join(updwheres))
+                #web.debug(query)
+                count += self.dbquery(query)
 
         if count > 0:
-            # update tagdef's last modified metadata
+            #web.debug('updating "%s" metadata after %d modified rows' % (tagdef.tagname, count))
             if tagdef.tagname not in [ 'tag last modified', 'tag last modified txid', 'subject last tagged', 'subject last tagged txid' ]:
                 self.set_tag_lastmodified(None, tagdef)
 
@@ -2476,7 +2471,7 @@ class Application:
             self.dbquery('DELETE FROM subjecttags AS s WHERE tagname = %(tagname)s AND s.subject NOT IN (SELECT subject FROM %(table)s)'
                          % dict(table=table, tagname=wrapval(tagdef.tagname)))
             self.dbquery('INSERT INTO subjecttags (subject, tagname)'
-                         + 'SELECT t.subject, %(tagname)s FROM %(table)s AS t LEFT OUTER JOIN subjecttags AS s USING (subject) WHERE s.subject IS NULL'
+                         + 'SELECT subject, %(tagname)s FROM %(table)s EXCEPT SELECT subject, tagname FROM subjecttags'
                          % dict(table=table, tagname=wrapval(tagdef.tagname)))
             self.dbquery('ANALYZE subjecttags')
         
@@ -2898,7 +2893,7 @@ class Application:
                     # setting of vname will perform uniqueness test for name as side-effect
                     for tag, val in [ ('name', wraptag('name', '', 'in_')),
                                       ('version', 'version'),
-                                      ('vname', 'in_name || %s || CAST(version AS text)' % wrapval('@')),
+                                      ('vname', '%s || %s || CAST(version AS text)' % (wraptag('name', '', 'in_'), wrapval('@'))),
                                       ('version created', '%s::timestamptz' % wrapval('now')) ]:
                         self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
                                              idcol='id', valcol=val, flagcol='updated',
