@@ -1595,6 +1595,7 @@ function appendDivRange(range, tdRange, div) {
 		td.css('padding', '0px 0px 0px 0px');
 		td.attr('tag', column);
 		td.attr('originalValue', value);
+		td.attr('iRow', j);
 		td.html(value);
 		if (saveQueryFilter[column] != null) {
 			var last = queryFilter[column].length - 1;
@@ -1635,7 +1636,7 @@ function replaceColumnRangeValues(tdRange) {
 	var div2 = getChild(tdRange, 2);
 	var trs = div2.find('tr');
 	$.each(trs, function(j, tr) {
-		var td = getChild($(tr), 1);;
+		var td = getChild($(tr), 1);
 		var value = td.attr('originalValue');
 		td.html(value);
 	});
@@ -4876,6 +4877,7 @@ function showRange() {
 
 function hideRange() {
 	$('.range').removeClass('range');
+	$('.rangeHeader').removeAttr('firstClicked');
 	$('.rangeHeader').unbind('mouseenter mouseleave');
 	displayRangeValues = false;
 	lastSaveQueryFilter = saveQueryFilter;
@@ -4933,12 +4935,14 @@ function addMultiValueRow(table, tag, value) {
 function rangeFilter(event, td) {
 	var selected = td.hasClass('range');
 	var isCtrl = event.ctrlKey;
+	var isShift = event.shiftKey;
 	var tag = td.attr('tag');
 	var tdRange = td.parent().parent().parent().parent().parent();
-	if (!isCtrl && rangeQueryFilter[tag] != null) {
+	if ((isShift || !isCtrl)  && rangeQueryFilter[tag] != null) {
 		contextRangeWork('clear', tdRange);
 	}
-	if (selected && !isCtrl) {
+	if (selected && !isCtrl && !isShift) {
+		tdRange.removeAttr('firstClicked');
 		return;
 	}
 	tdRange.attr('rangeClicked', true);
@@ -4959,35 +4963,57 @@ function rangeFilter(event, td) {
 		pred['vals'] = [];
 		pred['opUser'] = 'Equal';
 		queryFilter[tag].push(pred);
+		if (tdRange.attr('firstClicked') == null) {
+			tdRange.attr('firstClicked', td.attr('iRow'));
+		}
 	}
-	var originalValue = td.attr('originalValue');
-	if (td.hasClass('range')) {
-		td.removeClass('range');
-		// remove the value from the filter
-		var last = queryFilter[tag].length - 1;
-		var values = queryFilter[tag][last]['vals'];
-		var index = -1;
-		$.each(values, function(i, value) {
-			if (value == originalValue) {
-				index = i;
-				return false;
-			}
-		});
-		values.splice(index, 1);
-		if (values.length == 0) {
-			queryFilter[tag].splice(last, 1);
-			if (queryFilter[tag].length == 0) {
-				delete queryFilter[tag];
-			}
-			delete saveQueryFilter[tag];
-			delete rangeQueryFilter[tag];
-			tdRange.unbind('mouseenter mouseleave');
-			updateRangeFilterInProgress();
+	if (isShift && tdRange.attr('firstClicked') != null) {
+		var first = parseInt(tdRange.attr('firstClicked'));
+		var row = parseInt(td.attr('iRow'));
+		if (first > row) {
+			var temp = row;
+			row = first;
+			first = temp;
+		}
+		var tbody = td.parent().parent();
+		for (var i=first; i <= row; i++) {
+			var tr = getChild(tbody, i+1);
+			var crtTd = getChild(tr, 1);
+			var originalValue = crtTd.attr('originalValue');
+			crtTd.addClass('range');
+			var last = queryFilter[tag].length - 1;
+			queryFilter[tag][last]['vals'].push(originalValue);
 		}
 	} else {
-		td.addClass('range');
-		var last = queryFilter[tag].length - 1;
-		queryFilter[tag][last]['vals'].push(originalValue);
+		var originalValue = td.attr('originalValue');
+		if (td.hasClass('range')) {
+			td.removeClass('range');
+			// remove the value from the filter
+			var last = queryFilter[tag].length - 1;
+			var values = queryFilter[tag][last]['vals'];
+			var index = -1;
+			$.each(values, function(i, value) {
+				if (value == originalValue) {
+					index = i;
+					return false;
+				}
+			});
+			values.splice(index, 1);
+			if (values.length == 0) {
+				queryFilter[tag].splice(last, 1);
+				if (queryFilter[tag].length == 0) {
+					delete queryFilter[tag];
+				}
+				delete saveQueryFilter[tag];
+				delete rangeQueryFilter[tag];
+				tdRange.unbind('mouseenter mouseleave');
+				updateRangeFilterInProgress();
+			}
+		} else {
+			td.addClass('range');
+			var last = queryFilter[tag].length - 1;
+			queryFilter[tag][last]['vals'].push(originalValue);
+		}
 	}
 	showPreview();
 }
