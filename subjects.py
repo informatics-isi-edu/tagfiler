@@ -226,23 +226,39 @@ class Subject (Application):
         return self.GET(uri, sendBody=False)
 
     def delete_body(self):
-        self.populate_subject(allow_blank=True, allow_multiple=True)
+        spreds, lpreds, otags = self.path[-1]
         
-        for subject in self.subjects:
-            if not subject.writeok:
-                raise Forbidden(self, 'delete of dataset "%s"' % self.subject2identifiers(subject)[2])
-            self.delete_file(subject)
-            self.txlog('DELETE', dataset=self.subject2identifiers(subject)[2])
-        return (self.subjects)
+        self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=spreds)
+
+        if self.unique == None:
+            # this happens only with allow_blank=True when there is no uniqueness and no name
+            self.versions = 'any'
+        elif self.unique:
+            # this means we have an exact match which may not be the latest version
+            self.versions = 'any'
+        elif self.unique == False:
+            # this happens when we accept a name w/o version in lieu of unique predicate(s)
+            self.versions = 'latest'
+
+        results = [ r for r in self.bulk_delete_subjects(self.path, self.versions) ]
+
+        #self.log('TRACE', value='after deleting subjects')
+
+        for r in results:
+            self.txlog('DELETE', dataset='id=%d' % r.id)
+
+        #self.log('TRACE', value='after txlogging delete of subjects')
+
+        return results
 
     def delete_postCommit(self, results, set_status=True):
-        for result in results:
-            if result.dtype == 'file' and result.file != None:
-                """delete the file"""
+        for r in results:
+            if r.file != None:
                 filename = self.config['store path'] + '/' + result.file
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
-                web.ctx.status = '204 No Content'
+        if set_status:
+            web.ctx.status = '204 No Content'
         return ''
 
     def DELETE(self, uri):

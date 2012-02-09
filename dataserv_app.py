@@ -57,6 +57,8 @@ import struct
 
 render = None
 
+cluster_threshold = 1000
+
 def downcast_value(dbtype, value, range_extensions=False):
     
     if dbtype == 'boolean':
@@ -937,6 +939,8 @@ class Application:
 
         self.hostname = socket.gethostname()
 
+        self.table_changes = {}
+        
         self.logmsgs = []
         self.middispatchtime = None
 
@@ -1020,6 +1024,10 @@ class Application:
             self.storage = web.storage([]) 
         #self.log('TRACE', 'Application() constructor exiting')
 
+    def accum_table_changes(self, table, count):
+        x = self.table_changes.get(table, 0)
+        self.table_changes[table] = x + count
+        
     def header(self, name, value):
         web.header(name, value)
         self.emitted_headers[name.lower()] = value
@@ -1338,6 +1346,7 @@ class Application:
                     
                     try:
                         self.logmsgs = []
+                        self.table_changes = {}
                         self.subject = None
                         self.datapred = None
                         self.dataname = None
@@ -1396,6 +1405,13 @@ class Application:
                         #self.log('TRACE', 'dbtransact() all globals loaded')
                         bodyval = body()
                         t.commit()
+                        try:
+                            for table, count in self.table_changes.items():
+                                if count > cluster_threshold:
+                                    self.dbquery('CLUSTER %s' % table)
+                                    self.dbquery('ANALYZE %s' % table)
+                        except:
+                            pass
                         break
                         # syntax "Type as var" not supported by Python 2.4
                     except (psycopg2.InterfaceError), te:
@@ -2467,15 +2483,41 @@ class Application:
             if tagdef.tagname not in [ 'tag last modified', 'tag last modified txid', 'subject last tagged', 'subject last tagged txid' ]:
                 self.set_tag_lastmodified(None, tagdef)
 
+            self.accum_table_changes(table, count)
+
+            count = 0
             # update subjecttags mappings
-            self.dbquery('DELETE FROM subjecttags AS s WHERE tagname = %(tagname)s AND s.subject NOT IN (SELECT subject FROM %(table)s)'
-                         % dict(table=table, tagname=wrapval(tagdef.tagname)))
-            self.dbquery('INSERT INTO subjecttags (subject, tagname)'
-                         + 'SELECT subject, %(tagname)s FROM %(table)s EXCEPT SELECT subject, tagname FROM subjecttags'
-                         % dict(table=table, tagname=wrapval(tagdef.tagname)))
-            self.dbquery('ANALYZE subjecttags')
-        
+            count += self.dbquery(('DELETE FROM subjecttags AS s'
+                                   + ' WHERE tagname = %(tagname)s'
+                                   + '   AND s.subject NOT IN (SELECT subject FROM %(table)s)')
+                                  % dict(table=table, tagname=wrapval(tagdef.tagname)))
+            count += self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
+                                   + ' SELECT subject, %(tagname)s FROM %(table)s'
+                                   + ' EXCEPT SELECT subject, tagname FROM subjecttags')
+                                  % dict(table=table, tagname=wrapval(tagdef.tagname)))
+
+            self.accum_table_changes('"subjecttags"', count)
+
         #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) complete' % (tagdef.tagname, idcol, valcol, wheres))
+
+    def delete_tag_intable(self, tagdef, intable, idcol, valcol, unnest=True):
+        table = wraptag(tagdef.tagname)
+        dwheres = [ 'd.subject = i.subject' ]
+        iselects = [ '%s AS subject' % idcol ]
+        if valcol:
+            if tagdef.multivalue and unnest:
+                valcol = 'unnest(%s)' % valcol
+            dwheres.append( 'd.value = i.value' )
+            iselects.append( '%s AS value' % valcol )
+
+        count = self.dbquery(('DELETE FROM %(table)s AS d'
+                              + ' USING (SELECT %(iselects)s FROM %(intable)s) AS i'
+                              + ' WHERE %(dwheres)s')
+                             % dict(table=table, intable=intable,
+                                    iselects=','.join(iselects),
+                                    dwheres=' AND '.join(dwheres)))
+
+        self.accum_table_changes(table, count)
 
     def mergepreds(self, predlist, tagdefs=None):
         """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
@@ -2521,23 +2563,136 @@ class Application:
 
         spreds, lpreds, otags = path[-1]
         lpreds = [ web.Storage(tag=tag, vals=[], op=None) for tag in [ 'latest with name', 'file' ] ]
+        path[-1] = spreds, lpreds, otags
 
-        equery, evalues = self.build_files_by_predlist_path(path, latest=latest)
-            
-        if self.dbquery('SELECT count(*) AS count FROM ( %(equery)s ) AS e WHERE e.writeok = False' % dict(equery=equery),
-                        evalues)[0].count > 0:
+        equery, evalues = self.build_files_by_predlist_path(path, versions=versions)
+
+        etable = wraptag('tmp_e_%s' % self.request_guid, '', '')
+
+        # save subject-selection results, i.e. subjects we are deleting
+        self.dbquery('CREATE TEMPORARY TABLE %(etable)s ( id int8, file text, lwn text, writeok boolean, nlwn int8 )'
+                     % dict(etable=etable))
+        
+        self.dbquery(('INSERT INTO %(etable)s (id, lwn, writeok)'
+                      + ' SELECT e.id, e."latest with name", e.writeok'
+                      + ' FROM ( %(equery)s ) AS e') % dict(equery=equery, etable=etable),
+                     vars=evalues)
+        
+        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (id)'
+                     % dict(etable=etable, index=wraptag('tmp_e_%s_id_idx' % self.request_guid, '', '')))
+        
+        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (lwn)'
+                     % dict(etable=etable, index=wraptag('tmp_e_%s_ln_idx' % self.request_guid, '', '')))
+
+        self.dbquery('ANALYZE %s' % etable)
+
+        #self.log('TRACE', value='after deletion subject discovery')
+
+        if self.dbquery('SELECT count(id) AS count FROM %(etable)s AS e WHERE e.writeok = False' % dict(etable=etable),
+                        vars=evalues)[0].count > 0:
             raise Forbidden(self, 'delete of one or more matching subjects')
 
-        # TODO:
-        # WITH QUERY A:
-        #    1. perform latest-with-name updates for any names affected by deletion
-        #    2. perform subjecttags updates for latest-with-name updates
-        # QUERY B drives loop:
-        #    3. perform tagdef timestamp updates for all tags used by all deleted subjects
-        # WITH QUERY C:
-        #    4. perform deletion of all subjects which cascades to all tags
-        #    5. returning... id, file pairs
+        # for deleting subjects tagged with "latest with name", find next latest with name subject
+        # based on max (name, version) pairs excluding earlier versions also in the deletion set
+        # nlwn remains NULL for any deletion subjects not tagged "latest with name"
+        # and ALSO for deletion subjects tagged "latest with name" where there is no next-latest version remaining
+
+        q = (('UPDATE %(etable)s AS u SET nlwn = snv.subject '
+              # from-table "nlv" computes next-latest-version number for each name
+              + 'FROM (SELECT n.value AS name, max(v.value) AS version'
+              + '      FROM %(etable)s AS e'
+              #     "n" finds all subjects named same as latest-with-name deletions
+              + '      JOIN "_name" AS n ON (e.lwn IS NOT NULL AND e.lwn = n.name)'
+              #     "nx" excludes subjects in deletion set from consideration
+              + '      JOIN (SELECT subject FROM "_name"'
+              + '            EXCEPT SELECT id AS subject FROM %(etable)s) AS nx ON (n.subject = nx.subject)'
+              + '      JOIN "_version" AS v ON (n.subject = v.subject)'
+              + '      GROUP BY n.value) AS nlv,'
+              # from-table "snv" provides mapping from (name, version) back to subject IDs
+              + '     (SELECT n.subject AS subject, n.value AS name, v.value AS version'
+              + '      FROM "_name" AS n'
+              + '      JOIN "_version" AS v USING (subject)) AS snv '
+              # only update deletion subjects tagged with latest name
+              # using computed next-latest version for that name
+              # and snv mapping to get subject ID
+              + 'WHERE u.lwn IS NOT NULL'
+              + '  AND u.lwn = nlv.name'
+              + '  AND snv.name = nlv.name'
+              + '  AND snv.version = nlv.version') % dict(etable=etable))
+        #web.debug(q)
+        self.dbquery(q)
+
+        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (nlwn)'
+                     % dict(etable=etable, index=wraptag('tmp_e_%s_nln_idx' % self.request_guid, '', '')))
+
+        self.dbquery('ANALYZE %s' % etable)
+
+        #self.log('TRACE', value='after nlwn calculation and indexing')
+
+        # update latest-with-name tuples to next-latest subjects in place to protect foreign key references
+        count = self.dbquery(('UPDATE "_latest with name" AS u SET subject = e.nlwn '
+                              + ' FROM %(etable)s AS e'
+                              + ' WHERE u.subject = e.id AND e.nlwn IS NOT NULL') % dict(etable=etable))
+        self.accum_table_changes('"_latest with name"', count)
+
+        # update metadata reflecting changed latest with name tuples
+        count = self.dbquery('INSERT INTO subjecttags (subject, tagname)'
+                              + ' SELECT nlwn AS subject, \'latest with name\' AS tagname'
+                              + ' FROM %s' % etable
+                              + ' WHERE nlwn IS NOT NULL')
+        self.accum_table_changes('"subjecttags"', count)
         
+        #self.log('TRACE', value='after UPDATE latest with name')
+
+        for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                          ('subject last tagged txid', 'txid_current()') ]:
+            self.set_tag_intable(self.globals['tagdefsdict'][tag], etable,
+                                 idcol='nlwn', valcol=val, flagcol=None,
+                                 wokcol=None, isowncol=None,
+                                 enforce_tag_authz=False, set_mode='merge',
+                                 wheres=[ 'nlwn IS NOT NULL' ])
+
+        #self.log('TRACE', value='after updating next-latest with name metadata')
+        
+        # TODO: deletion of tuples MAY expand effect into other tables and subjects due to cascading delete...
+        #       need to update metadata on tagdefs and/or subjects in those cases too?
+
+        # delete latest-with-name tuples where there is no next-latest to register
+        count = self.dbquery(('DELETE FROM "_latest with name" AS d'
+                              + ' USING %(etable)s AS e'
+                              + ' WHERE d.subject = e.id'
+                              + '   AND e.nlwn IS NULL'
+                              # this last condition will always hold if previous two hold, unless db is corrupt?
+                              + '   AND e.lwn IS NOT NULL') % dict(etable=etable))
+        self.accum_table_changes('"_latest with name"', count)
+
+        #self.log('TRACE', value='after DELETE FROM latest with name')
+        
+        # update tagdef metadata for all tags which will lose tuples due to subject deletion
+        # this will automatically include "latest with name" if that tag is present on any subjects...
+        subjecttags = [ r for r in self.dbquery(('SELECT DISTINCT st.tagname AS tagname'
+                                                 + ' FROM subjecttags AS st'
+                                                 + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
+        for r in subjecttags:
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][r.tagname])
+            self.delete_tag_intable(self.globals['tagdefsdict'][r.tagname],
+                                    etable,
+                                    idcol='id', valcol=None,
+                                    unnest=True)
+
+        #self.log('TRACE', value='after set_tag_lastmodified loop')
+        
+        # delete all deletion subjects, cascading delete purges all other tables
+        # caller must delete returned files after transaction is committed
+        results = self.dbquery(('DELETE FROM resources AS d'
+                                + ' USING (SELECT e.id, f.value AS file'
+                                + '        FROM %(etable)s AS e'
+                                + '        LEFT OUTER JOIN "_file" AS f ON (e.id = f.subject)) AS e'
+                                + ' WHERE d.subject = e.id'
+                                + ' RETURNING e.id AS id, e.file AS file') % dict(etable=etable))
+        self.accum_table_changes('"resources"', len(results))
+
+        return results
 
     def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False):
         """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
@@ -2875,7 +3030,8 @@ class Application:
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() input uniqueness tested' % (self.input_tablename))
 
                 # insert newly allocated subject IDs into subject table
-                self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(intable)s WHERE created = True' % dict(intable=intable))
+                count = self.dbquery('INSERT INTO resources (subject) SELECT id FROM %(intable)s WHERE created = True'
+                                     % dict(intable=intable))
 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subjects created' % (self.input_tablename))
 
@@ -2913,21 +3069,24 @@ class Application:
                              + '   AND st.tagname = %(tagname)s') % dict(intable=intable,
                                                                          lname=wraptag('latest with name'),
                                                                          tagname=wrapval('latest with name'))
-                    self.dbquery(query)
+                    count = self.dbquery(query)
+                    self.accum_table_changes('"subjecttags"', count)
 
                     # avoid breaking foreign key refs to value column
-                    self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
-                                  + ' FROM %(intable)s AS i'
-                                  + ' WHERE ln.value = i.name'
-                                  + '   AND i.version > 1')
-                                 % dict(intable=intable, lname=wraptag('latest with name')))
+                    count = self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
+                                          + ' FROM %(intable)s AS i'
+                                          + ' WHERE ln.value = i.name'
+                                          + '   AND i.version > 1')
+                                         % dict(intable=intable, lname=wraptag('latest with name')))
+                    self.accum_table_changes(wraptag('latest with name'), count)
 
                     # add subjecttags entry for new version
-                    self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
-                                  + ' SELECT i.id AS subject, %(tagname)s AS tagname'
-                                  + ' FROM %(intable)s AS i'
-                                  + ' WHERE i.version > 1' )
-                                 % dict(intable=intable, tagname=wrapval('latest with name')))
+                    count = self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
+                                          + ' SELECT i.id AS subject, %(tagname)s AS tagname'
+                                          + ' FROM %(intable)s AS i'
+                                          + ' WHERE i.version > 1' )
+                                         % dict(intable=intable, tagname=wrapval('latest with name')))
+                    self.accum_table_changes('"subjecttags"', count)
 
                     # bump tag's timestamp in case following update hits zero rows...
                     self.set_tag_lastmodified(None, self.globals['tagdefsdict']['latest with name'])
