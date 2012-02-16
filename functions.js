@@ -166,10 +166,10 @@ function runSessionRequest() {
 }
 
 function getCookie(name) {
-    cookies = document.cookie.split("; ");
+    cookies = document.cookie.split(";");
     cookie = null;
     for (c=0; c<cookies.length; c++) {
-	kv = cookies[c].split("=");
+	kv = cookies[c].replace(/^\s*/, "").replace(/\s*$/, "").split("=");
 	if (kv[0] == name) {
 	    //log ('getCookie: found ' + kv[1]);
 	    cookie = decodeURIComponent(kv[1]);
