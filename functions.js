@@ -166,7 +166,7 @@ function runSessionRequest() {
 }
 
 function getCookie(name) {
-    cookies = document.cookie.split(";");
+    cookies = document.cookie.split("; ");
     cookie = null;
     for (c=0; c<cookies.length; c++) {
 	kv = cookies[c].split("=");
