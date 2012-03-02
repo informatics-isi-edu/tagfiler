@@ -748,9 +748,17 @@ class Application:
                        ('tagdef', 'text', 'Tag definition', 'tagdef', []),
                        ('name', 'text', 'Subject name', 'latest with name', []),
                        ('vname', 'text', 'Subject name@version', 'vname', []),
+                       ('config', 'text', 'Study Type', 'config', []),
                        ('view', 'text', 'View name', 'view', []),
                        ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
-                                                                                   'page Standalone document']) ]:
+                                                                                   'page Standalone document']),
+                       ('GUI features', 'text', 'GUI configuration mode', None, ['bulk_value_edit bulk value editing',
+                                                                                 'bulk_subject_delete bulk subject delete',
+                                                                                 'cell_value_edit cell-based value editing',
+                                                                                 'file_download per-row file download',
+                                                                                 'subject_delete per-row subject delete',
+                                                                                 'view_tags per-row tag page',
+                                                                                 'view_URL per-row view URL']) ]:
         typedef, dbtype, desc, tagref, enum = prototype
         static_typedefs.append(web.Storage({'typedef' : typedef,
                                             'typedef description' : desc,
