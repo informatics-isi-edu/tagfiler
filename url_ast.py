@@ -681,7 +681,7 @@ class Tagdef (Node):
 
         if self.is_unique == None:
             try:
-                self.unique = downcase_value('boolean', self.queryopts['unique'])
+                self.is_unique = downcast_value('boolean', self.queryopts['unique'])
             except:
                 self.is_unique = False
 
