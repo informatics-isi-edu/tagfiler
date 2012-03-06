@@ -72,6 +72,30 @@ def mystr(val):
     else:
         return val
 
+def yield_json(files, tags):
+    yield '['
+    if len(files) > 0:
+        yield jsonWriter(jsonMunger(files[0], tags)) + '\n'
+    if len(files) > 1:
+        for i in range(1,len(files)):
+            yield ',' + jsonWriter(jsonMunger(files[i], tags)) + '\n'
+    yield ']\n'
+
+def yield_csv(files, tags):
+    def wrapval(val):
+        if val == None:
+            return ''
+        if type(val) in [ list, set ]:
+            return ' '.join([wrapval(v) for v in val])
+        if type(val) not in [ str, unicode ]:
+            val = '%s' % val
+        return '"' + val.replace('"','""') + '"'
+
+    yield  ','.join([ wrapval(tag) for tag in tags ]) + '\n'
+    for file in files:
+        yield ','.join([ wrapval(file[tag]) for tag in tags ]) + '\n'
+    return
+
 def dictmerge(base, custom):
     custom.update(base)
     return custom
@@ -896,9 +920,12 @@ class FileTags (Node):
                         else:
                             body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 return '&'.join(body)
+            elif acceptType == 'text/csv':
+                self.header('Content-Type', 'text/csv')
+                return ''.join([ res for res in yield_csv(files, [td.tagname for td in all]) ])
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                return '[' + ",\n".join([ jsonWriter(jsonMunger(file, [ td.tagname for td in all])) for file in files ]) + ']\n'
+                return ''.join([ res for res in yield_json(files, [td.tagname for td in all]) ])
             elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
                 self.header('Content-Type', 'text/plain')
                 val = files[0][self.listtags[0]]
@@ -1243,7 +1270,7 @@ class Query (Node):
         contentType = 'text/html'
 
         for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType in [ 'text/uri-list', 'text/html', 'application/json' ]:
+            if acceptType in [ 'text/uri-list', 'text/html', 'application/json', 'text/csv' ]:
                 contentType = acceptType
                 break
 
@@ -1313,15 +1340,15 @@ class Query (Node):
                 self.header('Content-Type', 'text/uri-list')
                 yield self.render.FileUriList(files)
                 return
+            elif contentType == 'text/csv':
+                self.header('Content-Type', 'text/csv')
+                for res in yield_csv(files, self.globals['filelisttags']):
+                    yield res
+                return
             elif contentType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                yield '['
-                if len(files) > 0:
-                    yield jsonWriter(jsonMunger(files[0], self.listtags)) + '\n'
-                if len(files) > 1:
-                    for i in range(1,len(files)):
-                        yield ',' + jsonWriter(jsonMunger(files[i], self.listtags)) + '\n'
-                yield ']\n'
+                for res in yield_json(files, self.globals['filelisttags']):
+                    yield res
                 return
             else:
                 if self.query_range:
@@ -1335,4 +1362,5 @@ class Query (Node):
             yield res
 
         #self.log('TRACE', value='Query::GET exiting')
+
 
