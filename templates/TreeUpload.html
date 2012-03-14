@@ -20,9 +20,10 @@ $if None:
 	<table>
 		<tr>
 			<td class="applet">
-				<APPLET NAME="TagFileUploader" CODE="edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
+				<OBJECT codetype="application/java" NAME="TagFileUploader" classid="java:edu.isi.misd.tagfiler.TagFilerUploadApplet" CODEBASE="/tagfiler/static"
 				 ARCHIVE="isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar,json-org.jar"
-				  width=25 height=25 MAYSCRIPT >
+				  width=25 height=25 >
+				<PARAM name="MAYSCRIPT" VALUE="true">
 				<PARAM name="tagfiler.server.url" value="${home}"/>
 				<PARAM name="classloader_cache" value="false" />
 				<PARAM name="separate_jvm" value="true" />
@@ -47,7 +48,7 @@ $if None:
 				<hr><b>You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet.
 				  Download JRE 1.5 for your system from the following link:</b><br/>
 				<a href="http://www.java.com/en/download/manual.jsp">http://www.java.com/en/download/manual.jsp</a><br/><hr>
-				</APPLET>
+				</OBJECT>
 			</td>
 			<td>
 				<table>
