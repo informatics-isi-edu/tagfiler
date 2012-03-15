@@ -743,8 +743,8 @@ cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${
 cfgtag "subtitle" text "Tagfiler (trunk) on ${HOME_HOST}"
 cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/'"${SVCPREFIX}"'/static/logo.png" width="245" height="167" />'
 cfgtag "contact" text '<p>Your HTML here</p>'
-cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/DEIIMGUP/Home'
-cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/DEIIMGUP'
+cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/~karlcz/Tagfiler'
+cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/PSOC'
 
 cmddir=$(dirname "$0")
 #. ./dbsetup-nei-demo.sh
