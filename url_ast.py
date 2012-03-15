@@ -1342,12 +1342,12 @@ class Query (Node):
                 return
             elif contentType == 'text/csv':
                 self.header('Content-Type', 'text/csv')
-                for res in yield_csv(files, self.globals['filelisttags']):
+                for res in yield_csv(files, self.listtags):
                     yield res
                 return
             elif contentType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                for res in yield_json(files, self.globals['filelisttags']):
+                for res in yield_json(files, self.listtags):
                     yield res
                 return
             else:
