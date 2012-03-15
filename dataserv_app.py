@@ -743,6 +743,8 @@ class Application:
                                                                         'tag Tag authorization is observed',
                                                                         'tagorsubject Tag or subject authorization is sufficient',
                                                                         'tagandsubject Tag and subject authorization are required',
+                                                                        'tagorowner Tag authorization or subject ownership is sufficient',
+                                                                        'tagandowner Tag authorization and subject ownership is required',
                                                                         'system No client can access']),
                        ('type', 'text', 'Scalar value type', 'typedef', []),
                        ('tagdef', 'text', 'Tag definition', 'tagdef', []),
@@ -787,7 +789,7 @@ class Application:
                        ('typedef tagref', 'text', False, 'subject', False),
                        ('read users', 'rolepat', True, 'subjectowner', False),
                        ('write users', 'rolepat', True, 'subjectowner', False),
-                       ('owner', 'role', False, 'subjectowner', False),
+                       ('owner', 'role', False, 'tagorowner', False),
                        ('modified', 'timestamptz', False, 'system', False),
                        ('subject last tagged', 'timestamptz', False, 'system', False),
                        ('subject last tagged txid', 'int8', False, 'system', False),
@@ -978,6 +980,7 @@ class Application:
         # 'globals' are local to this Application instance and also used by its templates
         self.globals['smartTagValues'] = True
         self.globals['render'] = self.render # HACK: make render available to templates too
+        self.globals['test_tag_authz'] = self.test_tag_authz
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote
         self.globals['webdebug'] = web.debug
@@ -1629,6 +1632,10 @@ class Application:
             return tag_ok and subject_ok
         elif policy == 'tagorsubject':
             return tag_ok or subject_ok
+        elif policy == 'tagorowner':
+            return tag_ok or subject_owner
+        elif policy == 'tagandowner':
+            return tag_ok and subject_owner
         elif policy == 'tag':
             return tag_ok
         else:
@@ -2289,7 +2296,7 @@ class Application:
                                     % dict(intable=intable,
                                            wheres=' AND '.join([ '%s = False' % wokcol ] + wheres)))[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
-                elif tagdef.writepolicy == 'subjectowner':
+                elif tagdef.writepolicy in [ 'subjectowner', 'tagorowner', 'tagandowner' ]:
                     # None means we need subject is_owner for this user
                     query = 'SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s' % dict(intable=intable,
                                                                                                 wheres=' AND '.join([ '%s = False' % isowncol ] + wheres))

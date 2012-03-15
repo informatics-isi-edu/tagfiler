@@ -268,6 +268,8 @@ tagdef_phase2()
    #   tag -- tag access rule is observed for tag access
    #   tagorsubject -- tag or subject access rules are sufficient
    #   tagandsubject -- tag and subject access rules are required
+   #   tagorowner -- tag or ownership is sufficient
+   #   tagandowner -- tag and ownership are required
    #   system  -- no client can access
 
    echo "populate tagdef '$2'..." >&2
@@ -467,7 +469,7 @@ tagdef 'config'              text        ""         anonymous   subject      fal
 tagdef 'view'                text        ""         anonymous   subject      false      ""         true
 tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
 tagdef 'tag write users'     text        ""         anonymous   subjectowner true       rolepat
-tagdef owner                 text        ""         anonymous   tag          false      role
+tagdef owner                 text        ""         anonymous   tagorowner   false      role
 tagdef created               timestamptz ""         anonymous   system       false
 tagdef "version created"     timestamptz ""         anonymous   system       false
 tagdef "read users"          text        ""         anonymous   subjectowner true       rolepat

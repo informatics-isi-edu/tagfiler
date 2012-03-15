@@ -35,14 +35,9 @@ $else:
 		$ itervals = vals
 	$else:
 		$ itervals = [ vals ]
-$ writeok = tagdef.writeok
 $if file['write users'] == None:
 	$ file['write users'] = []
-$if writeok == None:
-	$if tagdef.writepolicy == 'subjectowner':
-		$ writeok = file.owner in authn.roles
-	$elif tagdef.writepolicy == 'subject':
-		$ writeok = file.owner in authn.roles or len( set(authn.roles).intersection(set(file['write users'])) ) > 0
+$ writeok = test_tag_authz('write', file, tagdef)
 $ options = tagOptions(tagdef.tagname, itervals)
 $ params = dict( filerecord=file,
 $				 tagname=tagdef.tagname, 

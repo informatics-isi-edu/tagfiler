@@ -943,10 +943,14 @@ function renderTagdefs(home, table) {
 	    }
 	    var policy = { "anonymous" : "anyone", 
 			   "users" : "authenticated users", 
-			   "subject" : "users who can access the subject", 
-			   "subjectowner" : "user who owns the subject",
-			   "tag" : (ownerand + "users in ACL"),
-			   "system" : "internal service" };
+			   "subject" : "subject owner or subject ACL members", 
+			   "subjectowner" : "subject owner",
+			   "tag" : (ownerand + "tag ACL members"),
+			   "system" : "no access",
+			   "tagorsubject" : (ownerand + "tag ACL members, subject owner, or subject ACL members"),
+			   "tagandsubject" : (ownerand + "tag ACL members who are also either subject owner or subject ACL members"),
+			   "tagorowner" : (ownerand + "tag ACL members or subject owner"),
+			   "tagandowner" : (ownerand + "tag ACL members who are also subject owner") };
 	    var readpolcell = cells[columnmap["readpolicy"]];
 	    readpolcell.innerHTML = policy[readpolcell.innerHTML];
 	    var writepolcell = cells[columnmap["writepolicy"]];
