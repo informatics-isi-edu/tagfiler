@@ -1495,6 +1495,7 @@ var lastSaveQueryFilter = null;
 var lastRangeQueryFilter = null;
 var predicateTable = null;
 var savePredicateFilter = null;
+var queryBasePath = null;
 
 var columnRangeValues = new Object;
 var headerRangeValues = new Object();
@@ -1660,7 +1661,7 @@ function loadRange(tdRange) {
 function loadTagRange(tdRange, tag, exclude) {
 	document.body.style.cursor = 'wait';
 	var range = new Object();
-	var predUrl = HOME + '/query/' + getQueryPredUrl(exclude ? tag : '');
+	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl(exclude ? tag : '');
 	var columnArray = new Array();
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
@@ -2006,7 +2007,7 @@ function dropColumn(e, tag, append) {
 }
 
 function updatePreviewURL(force) {
-	var predUrl = HOME + '/query/' + getQueryPredUrl('');
+	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl('');
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	$('#Query_URL').attr('href', queryUrl);
@@ -2149,6 +2150,10 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
 	
+	queryBasePath = basepath;
+	if (queryBasePath != '/') {
+		queryBasePath += '/';
+	}
 	initPreview();
 	setGUIConfig();
 	
@@ -2182,11 +2187,15 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	loadTags();
 	if (querypath != null) {
 		var querypathJSON = $.parseJSON( querypath );
-		var lpreds = querypathJSON[0]['lpreds'];
+		var last = querypathJSON.length - 1;
+		if (last < 0) {
+			last = 0;
+		}
+		var lpreds = querypathJSON[last]['lpreds'];
 		$.each(lpreds, function(i, pred) {
 			resultColumns.push(pred['tag']);
 		});
-		var spreds = querypathJSON[0]['spreds'];
+		var spreds = querypathJSON[last]['spreds'];
 		$.each(spreds, function(i, item) {
 			var tag = item['tag'];
 			if (queryFilter[tag] == null) {
@@ -2223,7 +2232,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 			}
 			queryFilter[item['tag']].push(pred);
 		});
-		var otags = querypathJSON[0]['otags'];
+		var otags = querypathJSON[last]['otags'];
 		$.each(otags, function(i, item) {
 			var sortObject = new Object();
 			sortObject['name'] = item[0];
@@ -2907,7 +2916,7 @@ function showQueryResults(limit) {
 	if (!editInProgress) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
-	var predUrl = HOME + '/query/' + getQueryPredUrl('');
+	var predUrl = HOME + '/query' +queryBasePath + getQueryPredUrl('');
 	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	if (!editBulkInProgress && lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
@@ -2942,7 +2951,7 @@ function showQueryResultsPreview(predUrl, limit, offset) {
 }
 
 function initDropDownList(tag) {
-	var predUrl = HOME + '/query/' + getQueryPredUrl('');
+	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl('');
 	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push(tag);
@@ -3538,7 +3547,7 @@ function fillIdContextMenu(ul) {
 	}
 	var id = ul.attr('idVal')
 	var subject = null;
-	var idUrl = HOME + '/query/id=' + id + '(' + probe_tags + ')';
+	var idUrl = HOME + '/query' + queryBasePath + 'id=' + id + '(' + probe_tags + ')';
 	$.ajax({
 		url: idUrl,
 		accepts: {text: 'application/json'},
