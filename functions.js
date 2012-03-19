@@ -4598,6 +4598,15 @@ function editCell(td, column, id) {
 	}
 	var button = $('<input>');
 	button.attr('type', 'button');
+	button.val('Delete');
+	td.append(button);
+	button.click({	origValue: origValue,
+					td: td,
+					id: id,
+					column: column },
+					function(event) {deleteCell(event.data.td, event.data.origValue, event.data.column, event.data.id);});
+	button = $('<input>');
+	button.attr('type', 'button');
 	button.val('Cancel');
 	td.append(button);
 	button.click({	origValue: origValue,
@@ -4740,6 +4749,28 @@ function modifyCell(td, origValue, column, id, newValue, values) {
 		td.addClass('tablecelledit');
 		td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 	}
+}
+
+function deleteCell(td, origValue, column, id) {
+	// delete value(s)
+	var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
+	$.ajax({
+		url: url,
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		success: function(data, textStatus, jqXHR) {
+			clickedCancelOK = true;
+			editCellInProgress = false;
+			td.html('');
+			td.css('white-space', 'normal');
+			td.addClass('tablecelledit');
+			td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+		}
+	});
 }
 
 function enableEdit() {
