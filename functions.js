@@ -4715,6 +4715,7 @@ function modifyCell(td, origValue, column, id, newValue, values) {
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
 				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+				td.html(origValue);
 			}
 		});
 	} else {
