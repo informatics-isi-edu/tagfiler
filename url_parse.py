@@ -297,14 +297,17 @@ def p_stringset_grow(p):
     p[1].add(p[3])
 
 def p_queryopts(p):
-    """queryopts_start : '?'"""
-    p[0] = web.storage()
+    """queryopts : '?' string '=' string"""
+    p[0] = web.storage([(p[2], p[4])])
 
-def p_queryopts_base(p):
-    """queryopts : queryopts_start string '=' string
-                 : queryopts_start string '=' stringset"""
-    p[0] = p[1]
-    p[0][p[2]] = p[4]
+def p_queryopts_set(p):
+    """queryopts : '?' string '=' stringset"""
+    p[0] = web.storage([(p[2], p[4])])
+
+def p_queryopts_short(p):
+    """queryopts : '?' string
+                 | '?' string '='"""
+    p[0] = web.storage([(p[2], None)])
 
 def p_queryopts_grow(p):
     """queryopts : queryopts '&' string '=' string
