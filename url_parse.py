@@ -302,7 +302,7 @@ def p_queryopts_empty(p):
 
 def p_queryopts_nonempty(p):
     """queryopts : '?' queryopts_base"""
-    p[0] = p[1]
+    p[0] = p[2]
 
 def p_queryopts(p):
     """queryopts_base : string '=' string
