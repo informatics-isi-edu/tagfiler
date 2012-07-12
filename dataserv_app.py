@@ -957,6 +957,7 @@ class Application:
         self.db = get_db()
 
         # BEGIN: get runtime parameters from database
+        self.globals['adminrole'] = getParamEnv('admin', 'root')
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
         # set default anonymous authn info
         self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
@@ -1158,9 +1159,18 @@ class Application:
 
     def getPolicyRule(self):
         srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
-        if len(srcroles) == 1:
-            srcrole = srcroles.pop()
-            dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'][srcrole]
+
+        if len(srcroles) == 1 or self.authn.role == None:
+            if self.authn.role == None:
+                # anonymous user, who we represent with empty string key in policy mappings
+                # and use a safe default mapping if there is none 
+                dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'].get('', 
+                                                                                                       (self.globals['adminrole'], [], [], False, False))
+            else:
+                # authenticated user who we can map unambiguously
+                srcrole = srcroles.pop()
+                dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'][srcrole]
+
             readusers = [ u for u in readusers ]
             writeusers = [ u for u in writeusers ]
             if readok:
@@ -1169,7 +1179,7 @@ class Application:
                 writeusers.append( self.authn.role )
             return True, dstrole, readusers, writeusers
         elif len(srcroles) > 1:
-            raise Conflict(self, "Ambiguous remap rules encountered.")
+            raise Conflict(self, "Ambiguous remap rules encountered for client roles %s. Please contact service administrator." % list(srcroles))
         else:
             return ( False, None, None, None )
 

@@ -7,15 +7,18 @@
    },
 
    "_per-parameter instructions" : {
-     "db" : "The name of the database (default 'tagfiler')",
+     "db" : "The name of the database (default 'svcuser')",
      "dbnstr" : "The type of RDBMS (default 'postgres')",
-     "dbmaxconnections" : "Limit the number of SQL connections when pooling"
+     "dbmaxconnections" : "Limit the number of SQL connections when pooling",
+     "admin" : "The administrative user role as known by the identity provider"
    },
 
-   "_db" : "tagfiler",
+   "db" : "svcuser",
 
    "_dbnstr" : "postgres",
 
-   "_dbmaxconnections" : "8"
+   "_dbmaxconnections" : "8",
+
+   "admin" : "adminrole"
 
 }
