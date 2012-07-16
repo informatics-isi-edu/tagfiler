@@ -1070,9 +1070,12 @@ class FileTags (Node):
             content = web.ctx.env['wsgi.input'].read()
             tagvals = dict()
             for tagval in content.strip().split('&'):
-                tag, val = tagval.split('=')
-                tag = urlunquote(tag)
-                val = urlunquote(val)
+                try:
+                    tag, val = tagval.split('=')
+                    tag = urlunquote(tag)
+                    val = urlunquote(val)
+                except:
+                    raise BadRequest(self, 'Invalid x-www-form-urlencoded content.')
 
                 if tag == '':
                     raise BadRequest(self, data="A non-empty tag name is required.")
