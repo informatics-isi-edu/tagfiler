@@ -54,7 +54,8 @@ keywords = {
     'log' : 'LOG',
     'contact' : 'CONTACT',
     'asc' : 'ASC',
-    'desc' : 'DESC'
+    'desc' : 'DESC',
+    'ui' : 'UI'
 }
 
 tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())

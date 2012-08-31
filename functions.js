@@ -5332,3 +5332,10 @@ function resetColumnRange(event, tdRange) {
 	div2.css('display', 'none');
 }
 
+function initUI(home, user, webauthnhome, uiopts) {
+	HOME = home;
+	USER = user;
+	WEBAUTHNHOME = webauthnhome;
+	alert('home: '+home+'\nuser: '+user+'\nwebauthnhome: '+webauthnhome+'\nuiopts: '+uiopts);
+}
+

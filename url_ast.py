@@ -1366,4 +1366,17 @@ class Query (Node):
 
         #self.log('TRACE', value='Query::GET exiting')
 
+class UI (Node):
+    """Represents a generic template for the user interface"""
+
+    def __init__(self, parser, appname, uiopts, queryopts={}):
+        Node.__init__(self, parser, appname, queryopts)
+        #self.globals['uiopts'] = jsonWriter(uiopts)
+        self.globals['uiopts'] = uiopts
+
+    def GET(self, uri):
+        self.header('Content-Type', 'text/html')
+        return self.renderlist(None,
+                               [self.render.UI()])
+
 
