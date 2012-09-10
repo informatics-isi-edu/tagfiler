@@ -626,7 +626,8 @@ class Tagdef (Node):
         if len(self.queryopts) > 0:
             raise BadRequest(self, data="Query options are not supported on this interface.")
 
-        return self.dbtransact(body, postCommit)
+        return self.renderui(['tagdef'], self.queryopts)
+        #return self.dbtransact(body, postCommit)
 
     def GETone(self,uri):
 
@@ -1371,12 +1372,20 @@ class UI (Node):
 
     def __init__(self, parser, appname, uiopts, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
-        #self.globals['uiopts'] = jsonWriter(uiopts)
-        self.globals['uiopts'] = uiopts
+        self.uiopts = uiopts
 
     def GET(self, uri):
-        self.header('Content-Type', 'text/html')
-        return self.renderlist(None,
+
+        def body():
+            return None
+
+        def postCommit(results):
+            self.header('Content-Type', 'text/html')
+            self.globals['uiopts'] = {}
+            self.globals['uiopts']['pathes'] = self.uiopts
+            self.globals['uiopts']['roles'] = list(self.globals['authn'].roles)
+            return self.renderlist(None,
                                [self.render.UI()])
 
+        return self.dbtransact(body, postCommit)
 

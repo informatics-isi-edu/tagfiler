@@ -5332,10 +5332,533 @@ function resetColumnRange(event, tdRange) {
 	div2.css('display', 'none');
 }
 
+var policies = {'anonymous': 'anyone', 
+		'subject': 'only clients who can access subject', 
+		'subjectowner': 'only owner of subject', 
+		'tag': 'only clients in tagdef ACL', 
+		'tagorsubject': 'only clients who can access subject or who are in tagdef ACL', 
+		'tagandsubject': 'only clients who can access subject who is also in tagdef ACL', 
+		'tagorowner': 'only owner of subjects or who is in tagdef ACL', 
+		'tagandowner': 'only owner of subject who is also in tagdef ACL',
+		"system" : "no access"
+};
+
+var tagPolicies = ['anonymous', 'subject', 'subjectowner', 'tag', 'tagorsubject', 'tagandsubject'];
+var tagdefsColumns = ['tagdef', 
+                      'tagdef type', 
+                      'tagdef multivalue', 
+                      'tagdef unique', 
+                      'owner',
+                      'tagdef readpolicy',
+                      'tagdef writepolicy'];
+
 function initUI(home, user, webauthnhome, uiopts) {
 	HOME = home;
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
-	alert('home: '+home+'\nuser: '+user+'\nwebauthnhome: '+webauthnhome+'\nuiopts: '+uiopts);
+	// convert to JSON
+	uiopts = $.parseJSON(uiopts);
+	var api = uiopts.api;
+	if (api.length > 0) {
+		if (api[0] == 'tagdef') {
+			var url = WEBAUTHNHOME + '/status'
+			$.ajax({
+				url: url,
+				accepts: {text: 'application/json'},
+				dataType: 'json',
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				async: true,
+		  		timeout: AJAX_TIMEOUT,
+				success: function(data, textStatus, jqXHR) {
+					manageTagDefinitions(data.roles);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+					if (retry && count <= MAX_RETRIES) {
+						var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+						setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+					}
+				}
+			});
+		}
+	}
+}
+
+function manageTagDefinitions(roles) {
+	var uiDiv = $('#ui');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Tag definitions');
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('User');
+	
+	// build the table for the user tags
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('tagdefs');
+	table.attr('id', 'User_tagdefs');
+	
+	// build the header
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('heading');
+	tr.attr('id', 'tr_0');
+	var th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'tagname');
+	th.html('Tag name');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'typestr');
+	th.html('Tag type');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'multivalue');
+	th.html('# Values');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'owner');
+	th.html('Owner');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'readpolicy');
+	th.html('Tag readers');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'writepolicy');
+	th.html('Tag writers');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'unique');
+	th.html('Tag unique');
+	
+	tr = $('<tr>');
+	tr.attr('id', 'tr_1');
+	table.append(tr);
+	tr.addClass('tagdefcreate');
+	var td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'type': 'text',
+		'name': 'tag-1',
+		'id': 'tag-1'});
+	td.append(input);
+	td = $('<td>');
+	tr.append(td);
+	var select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'type-1',
+		'id': 'type-1',
+		'onclick': "chooseTypedefs('"+HOME+"', 'type-1')"});
+	var option = $('<option>');
+	option.text('No content');
+	option.attr('value', 'empty');
+	select.append(option);
+	td = $('<td>');
+	tr.append(td);
+	select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'multivalue-1',
+		'id': 'multivalue-1'});
+	option = $('<option>');
+	option.text('0 or 1');
+	option.attr('value', 'false');
+	select.append(option);
+	option = $('<option>');
+	option.text('0 or more');
+	option.attr('value', 'true');
+	select.append(option);
+	td = $('<td>');
+	tr.append(td);
+	td.html('N/A');
+	td = $('<td>');
+	tr.append(td);
+	select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'readpolicy-1',
+		'id': 'readpolicy-1'});
+	$.each(tagPolicies, function(i, key) {
+		option = $('<option>');
+		option.text(policies[key]);
+		option.attr('value', key);
+		select.append(option);
+	});
+	td = $('<td>');
+	tr.append(td);
+	select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'writepolicy-1',
+		'id': 'writepolicy-1'});
+	$.each(tagPolicies, function(i, key) {
+		option = $('<option>');
+		option.text(policies[key]);
+		option.attr('value', key);
+		select.append(option);
+	});
+	td = $('<td>');
+	tr.append(td);
+	select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'unique-1',
+		'id': 'unique-1'});
+	option.text('False');
+	option.attr('value', 'false');
+	select.append(option);
+	option = $('<option>');
+	option.text('True');
+	option.attr('value', 'true');
+	select.append(option);
+	
+	tr = $('<tr>');
+	tr.attr('id', 'tr_2');
+	table.append(tr);
+	tr.addClass('tagdefcreate');
+	td = $('<td>');
+	tr.append(td);
+	var button = $('<input>');
+	button.attr('type', 'button');
+	button.val('Define tag');
+	button.click(function(event) {defineTag();});
+	td.append(button);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	var count = 0;
+	var url = getTagdefsURL('user');
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postGetUserTagdefs(data, textStatus, jqXHR, roles);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+	
+}
+
+function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
+	var table = $('#User_tagdefs');
+	var count = 0;
+	$.each(data, function(i, object) {
+		var tr = $('<tr>');
+		table.append(tr);
+		tr.attr('id', 'tr_' + (i+3));
+		tr.addClass('tagdef');
+		tr.addClass(roles.contains(object['owner']) ? 'writeok' : 'readonly');
+		tr.addClass((++count % 2 == 1) ? 'odd' : 'even');
+		var td = $('<td>');
+		tr.append(td);
+		if (roles.contains(object['owner'])) {
+			var input = $('<input>');
+			input.attr({'type': 'button',
+				'name': 'tag',
+				'value': object['tagdef']
+			});
+			input.val('[X]');
+			td.append(input);
+			input.click({	'tag': object['tagdef'],
+							'id': 'tr_' + (i+1)},
+							function(event) {deleteTagdef(event.data.tag, event.data.id);});
+		}
+		var a = $('<a>');
+		td.append(a);
+		a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(object['tagdef']));
+		a.html(object['tagdef']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef type']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef multivalue'] ? '0 or more' : '0 or 1');
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['owner']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(policies[object['tagdef readpolicy']]);
+		td = $('<td>');
+		tr.append(td);
+		td.html(policies[object['tagdef writepolicy']]);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef unique'] ? 'True' : 'False');
+	});
+	var uiDiv = $('#ui');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('System');
+	
+	// build the table for the system tags
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('tagdefs');
+	table.attr('id', 'System_tagdefs');
+	
+	// build the header
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('heading');
+	var th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'tagname');
+	th.html('Tag name');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'typestr');
+	th.html('Tag type');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'multivalue');
+	th.html('# Values');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'owner');
+	th.html('Owner');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'readpolicy');
+	th.html('Tag readers');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'writepolicy');
+	th.html('Tag writers');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'unique');
+	th.html('Tag unique');
+	
+	var count = 0;
+	var url = getTagdefsURL('system');
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postGetSystemTagdefs(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function postGetSystemTagdefs(data, textStatus, jqXHR) {
+	var table = $('#System_tagdefs');
+	var count = 0;
+	$.each(data, function(i, object) {
+		var tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('tagdef');
+		tr.addClass('readonly');
+		tr.addClass((++count % 2 == 1) ? 'odd' : 'even');
+		var td = $('<td>');
+		tr.append(td);
+		var a = $('<a>');
+		td.append(a);
+		a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(object['tagdef']));
+		a.html(object['tagdef']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef type']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef multivalue'] ? '0 or more' : '0 or 1');
+		td = $('<td>');
+		tr.append(td);
+		td.html('');
+		td = $('<td>');
+		tr.append(td);
+		td.html(policies[object['tagdef readpolicy']]);
+		td = $('<td>');
+		tr.append(td);
+		td.html(policies[object['tagdef writepolicy']]);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef unique'] ? 'True' : 'False');
+	});
+}
+
+function defineTag() {
+	var count = 0;
+	var url = HOME + '/tagdef';
+	var obj = new Object();
+	obj.action = 'add';
+	obj['tag-1'] = $('#tag-1').val();
+	obj['type-1'] = $('#type-1').val();
+	obj['multivalue-1'] = $('#multivalue-1').val();
+	obj['readpolicy-1'] = $('#readpolicy-1').val();
+	obj['writepolicy-1'] = $('#writepolicy-1').val();
+	obj['unique-1'] = $('#unique-1').val();
+	$.ajax({
+		url: url,
+		type: 'POST',
+		data: obj,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postDefineTagdefs(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function getTagdefsURL(title) {
+	var url = HOME + '/query/tagdef;owner' + ((title == 'system') ? ':absent:' : '');
+	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
+	url += 'tagdef:asc:?limit=none';
+	return url;
+}
+
+function deleteTagdef(tag, id) {
+	var answer = confirm ('Do you want to delete the tag definition "' + tag + '"?');
+	if (!answer) {
+		return;
+	}
+	var count = 0;
+	var url = HOME + '/tagdef/' + tag;
+	$.ajax({
+		url: url,
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postDeleteTagdefs(data, textStatus, jqXHR, id);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function postDefineTagdefs(data, textStatus, jqXHR) {
+	var value = $('#tag-1').val();
+	var position = 0;
+	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
+		if (i<3) {
+			return true;
+		}
+		var a = $($('a', $(tr))[0]);
+		if (value > a.html()) {
+			position = i;
+		} else {
+			return false;
+		}
+	});
+	var tr = $('<tr>');
+	tr.attr('id', 'tr_' + (position+1));
+	tr.addClass('tagdef');
+	tr.addClass('writeok');
+	tr.addClass(((position+1) % 2 == 1) ? 'odd' : 'even');
+	var td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'type': 'button',
+		'name': 'tag',
+		'value': value
+	});
+	input.val('[X]');
+	td.append(input);
+	input.click({	'tag': value,
+					'id': 'tr_' + (position+1)},
+					function(event) {deleteTagdef(event.data.tag, event.data.id);});
+	var a = $('<a>');
+	td.append(a);
+	a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(value));
+	a.html(value);
+	td = $('<td>');
+	tr.append(td);
+	td.html($('#type-1').val());
+	td = $('<td>');
+	tr.append(td);
+	td.html($('#multivalue-1').val() == 'true' ? '0 or more' : '0 or 1');
+	td = $('<td>');
+	tr.append(td);
+	td.html(USER);
+	td = $('<td>');
+	tr.append(td);
+	td.html(policies[$('#readpolicy-1').val()]);
+	td = $('<td>');
+	tr.append(td);
+	td.html(policies[$('#writepolicy-1').val()]);
+	td = $('<td>');
+	tr.append(td);
+	td.html($('#unique-1').val() == 'true' ? 'True' : 'False');
+		
+	$('#tag-1').val('');
+	$('#type-1').val('empty');
+	$('#multivalue-1').val('false');
+	$('#readpolicy-1').val('anonymous');
+	$('#writepolicy-1').val('anonymous');
+	$('#unique-1').val('false');
+	
+	tr.insertAfter($('#tr_'+position));
+	
+	$.each($('tr', $('#User_tagdefs')), function(i, row) {
+		if (i <= position) {
+			return true;
+		}
+		$(row).attr('id', 'tr_' + i);
+		if (i%2 == 1) {
+			$(row).removeClass('even');
+			$(row).addClass('odd');
+		} else {
+			$(row).removeClass('odd');
+			$(row).addClass('even');
+		}
+	});
+}
+
+function postDeleteTagdefs(data, textStatus, jqXHR, id) {
+	$('#'+id).remove();
+	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
+		if (i<3) {
+			return true;
+		}
+		$(tr).attr('id', 'tr_' + i);
+		if (i%2 == 1) {
+			$(tr).removeClass('even');
+			$(tr).addClass('odd');
+		} else {
+			$(tr).removeClass('odd');
+			$(tr).addClass('even');
+		}
+	});
 }
 

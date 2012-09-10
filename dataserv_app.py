@@ -1273,6 +1273,15 @@ class Application:
 
         yield self.render.Bottom()
  
+    def renderui(self, api, queryopts, path=[]):
+        self.header('Content-Type', 'text/html')
+        self.globals['uiopts'] = {}
+        self.globals['uiopts']['api'] = api
+        self.globals['uiopts']['queryopts'] = queryopts
+        #web.debug(self.globals['uiopts'])
+        return self.renderlist(None,
+                           [self.render.UI()])
+
     def preDispatchFake(self, uri, app):
         self.db = app.db
         self.set_authn(app.authn)
