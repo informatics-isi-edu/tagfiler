@@ -1278,6 +1278,7 @@ class Application:
         self.globals['uiopts'] = {}
         self.globals['uiopts']['api'] = api
         self.globals['uiopts']['queryopts'] = queryopts
+        self.globals['uiopts']['path'] = path
         #web.debug(self.globals['uiopts'])
         return self.renderlist(None,
                            [self.render.UI()])

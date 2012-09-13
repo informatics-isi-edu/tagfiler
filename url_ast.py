@@ -835,7 +835,7 @@ class FileTags (Node):
         opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() if k != 'view' ])
         url += '?view=default'
         if opts:
-            url += opts
+            url += '&' + opts
         return url
 
     def qtarget(self):
@@ -1370,22 +1370,13 @@ class Query (Node):
 class UI (Node):
     """Represents a generic template for the user interface"""
 
-    def __init__(self, parser, appname, uiopts, queryopts={}):
+    def __init__(self, parser, appname, uiopts, path=[], queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
         self.uiopts = uiopts
+        self.path = path
+        self.queryopts = queryopts
 
     def GET(self, uri):
-
-        def body():
-            return None
-
-        def postCommit(results):
-            self.header('Content-Type', 'text/html')
-            self.globals['uiopts'] = {}
-            self.globals['uiopts']['pathes'] = self.uiopts
-            self.globals['uiopts']['roles'] = list(self.globals['authn'].roles)
-            return self.renderlist(None,
-                               [self.render.UI()])
-
-        return self.dbtransact(body, postCommit)
+        #web.debug((uri, ' self.uiopts: ', self.uiopts, ' self.queryopts: ', self.queryopts, ' self.path: ', self.path))
+        return self.renderui(self.uiopts, self.queryopts, self.path)
 

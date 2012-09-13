@@ -5343,6 +5343,17 @@ var policies = {'anonymous': 'anyone',
 		"system" : "no access"
 };
 
+var tagdefPolicies = {'anonymous': 'Any client may access', 
+		'subject': 'Subject authorization is observed', 
+		'subjectowner': 'Subject owner may access', 
+		'tag': 'Tag authorization is observed', 
+		'tagorsubject': 'Tag or subject authorization is sufficient', 
+		'tagandsubject': 'Tag and subject authorization are required', 
+		'tagorowner': 'Tag authorization or subject ownership is sufficient', 
+		'tagandowner': 'Tag authorization and subject ownership is required',
+		"system" : "No client can access"
+};
+
 var tagPolicies = ['anonymous', 'subject', 'subjectowner', 'tag', 'tagorsubject', 'tagandsubject'];
 var tagdefsColumns = ['tagdef', 
                       'tagdef type', 
@@ -5352,6 +5363,9 @@ var tagdefsColumns = ['tagdef',
                       'tagdef readpolicy',
                       'tagdef writepolicy'];
 
+var browsersImmutableTags = [ 'check point offset', 'key', 'sha256sum' ];
+
+
 function initUI(home, user, webauthnhome, uiopts) {
 	HOME = home;
 	USER = user;
@@ -5360,7 +5374,7 @@ function initUI(home, user, webauthnhome, uiopts) {
 	uiopts = $.parseJSON(uiopts);
 	var api = uiopts.api;
 	if (api.length > 0) {
-		if (api[0] == 'tagdef') {
+		if (api[0] == 'tagdef' || api[0] == 'tags') {
 			var url = WEBAUTHNHOME + '/status'
 			$.ajax({
 				url: url,
@@ -5370,7 +5384,11 @@ function initUI(home, user, webauthnhome, uiopts) {
 				async: true,
 		  		timeout: AJAX_TIMEOUT,
 				success: function(data, textStatus, jqXHR) {
-					manageTagDefinitions(data.roles);
+					if (api[0] == 'tagdef') {
+						manageTagDefinitions(data.roles);
+					} else if (api[0] == 'tags') {
+						tagsUI(uiopts, data.roles);
+					}
 				},
 				error: function(jqXHR, textStatus, errorThrown) {
 					var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
@@ -5574,13 +5592,12 @@ function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
 			});
 			input.val('[X]');
 			td.append(input);
-			input.click({	'tag': object['tagdef'],
-							'id': 'tr_' + (i+1)},
-							function(event) {deleteTagdef(event.data.tag, event.data.id);});
+			input.click({	'tag': object['tagdef']},
+							function(event) {deleteTagdef(event.data.tag, $(this).parent().parent());});
 		}
 		var a = $('<a>');
 		td.append(a);
-		a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(object['tagdef']));
+		a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
@@ -5680,7 +5697,7 @@ function postGetSystemTagdefs(data, textStatus, jqXHR) {
 		tr.append(td);
 		var a = $('<a>');
 		td.append(a);
-		a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(object['tagdef']));
+		a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
@@ -5741,7 +5758,7 @@ function getTagdefsURL(title) {
 	return url;
 }
 
-function deleteTagdef(tag, id) {
+function deleteTagdef(tag, row) {
 	var answer = confirm ('Do you want to delete the tag definition "' + tag + '"?');
 	if (!answer) {
 		return;
@@ -5755,7 +5772,7 @@ function deleteTagdef(tag, id) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postDeleteTagdefs(data, textStatus, jqXHR, id);
+			postDeleteTagdefs(data, textStatus, jqXHR, row);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
@@ -5795,12 +5812,11 @@ function postDefineTagdefs(data, textStatus, jqXHR) {
 	});
 	input.val('[X]');
 	td.append(input);
-	input.click({	'tag': value,
-					'id': 'tr_' + (position+1)},
-					function(event) {deleteTagdef(event.data.tag, event.data.id);});
+	input.click({	'tag': value},
+					function(event) {deleteTagdef(event.data.tag, $(this).parent().parent());});
 	var a = $('<a>');
 	td.append(a);
-	a.attr('href', HOME + '/file/tagdef=' + encodeSafeURIComponent(value));
+	a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(value) + '?view=tagdef&limit=none');
 	a.html(value);
 	td = $('<td>');
 	tr.append(td);
@@ -5845,8 +5861,8 @@ function postDefineTagdefs(data, textStatus, jqXHR) {
 	});
 }
 
-function postDeleteTagdefs(data, textStatus, jqXHR, id) {
-	$('#'+id).remove();
+function postDeleteTagdefs(data, textStatus, jqXHR, row) {
+	row.remove();
 	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
 		if (i<3) {
 			return true;
@@ -5860,5 +5876,514 @@ function postDeleteTagdefs(data, textStatus, jqXHR, id) {
 			$(tr).addClass('even');
 		}
 	});
+}
+
+function tagsUI(uiopts, roles) {
+	// get the predicate
+	var obj = uiopts.path[0][0][0];
+	var predicate = obj.tag + '=' + encodeSafeURIComponent(obj.vals[0]);
+	var arr = new Array();
+	$.each(uiopts.queryopts, function(key, value) {
+		arr.push(key+'='+value);
+	});
+	var queryopts = '?' + arr.join('&');
+	var count = 0;
+	var url = HOME + '/query/' + predicate + queryopts;
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			if (obj.tag == 'tagdef') {
+				postGetTagdefs(data, textStatus, jqXHR, uiopts, roles);
+			} else if (obj.tag == 'typedef') {
+				postGetTagdefs(data, textStatus, jqXHR, uiopts, roles);
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function postGetTagdefs(data, textStatus, jqXHR, uiopts, roles) {
+	var tags = data[0];
+	var temp = '';
+	$.each(tags, function(key, value) {
+		temp += key+'='+value+'\n';
+	});
+	// get all tags defitions
+	var url = HOME + '/query/tagdef';
+	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
+	url += 'tagdef:asc:?limit=none';
+	var count = 0;
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
+	var viewColumns = new Array();
+	$.each(tags, function(key, value) {
+		viewColumns.push(key);
+	});
+	viewColumns.sort(compareIgnoreCase);
+	var allTags = new Object();
+	$.each(data, function(i,vals) {
+		allTags[vals.tagdef] = vals;
+	});
+	var obj = uiopts.path[0][0][0];
+	var predicate = obj.tag + '=' + obj.vals[0];
+	var arr = new Array();
+	$.each(uiopts.queryopts, function(key, value) {
+		arr.push(key+'='+value);
+	});
+	var queryopts = '?' + arr.join('&');
+	var uiDiv = $('#ui');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Tag(s) for subject matching "/' + predicate + '"');
+	var div = $('<div>');
+	uiDiv.append(div);
+	div.addClass('content');
+	var view = uiopts.queryopts.view;
+	if (view == 'tagdef' || view == 'typedef') {
+		var p = $('<p>');
+		div.append(p);
+		p.html('This is a limited tag view. ');
+		var a = $('<a>');
+		p.append(a);
+		a.attr('href', HOME+'/ui/tags/'+predicate+'?view=alltags&limit=none');
+		a.html('View all tags.');
+	}
+	var table = $('<table>');
+	div.append(table);
+	table.addClass('file-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('file-heading');
+	var th = $('<th>');
+	tr.append(th);
+	th.addClass('tag-name');
+	th.html('Tag');
+	th = $('<th>');
+	tr.append(th);
+	th.addClass('file-name');
+	a = $('<a>');
+	th.append(a);
+	a.attr('href', HOME+'/ui/tags/'+predicate + queryopts);
+	a.html(predicate);
+	$.each(viewColumns, function(i, tag) {
+		tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('file');
+		tr.addClass(((i+1)%2) == 1 ? 'odd' : 'even');
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('tag');
+		td.addClass('name');
+		td.html(tag);
+		td = $('<td>');
+		tr.append(td);
+		td.addClass('file-tag');
+		td.addClass(idquote(tag));
+		var writeOK = writeAllowed(tag, allTags, roles, obj.tag == 'tagdef' ? obj.vals[0] : null);
+		var valuesTable = null;
+		if (writeOK) {
+			valuesTable = $('<table>');
+			td.append(valuesTable);
+			valuesTable.addClass('file-tag-list');
+		}
+		if (tag == 'tagdef') {
+			a = $('<a>');
+			td.append(a);
+			a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent( obj.vals[0]) + '?view=tagdef&limit=none');
+			a.html(obj.vals[0]);
+		} else if (tag == 'id') {
+			a = $('<a>');
+			td.append(a);
+			a.attr('href', HOME + '/ui/tags/' + predicate  + '?view=' + obj.tag + '&limit=none');
+			a.html(predicate + ' (tags)');
+		} else if (tag == 'tagdef type') {
+			a = $('<a>');
+			td.append(a);
+			a.attr('href', HOME + '/ui/tags/typedef=' + encodeSafeURIComponent(tags[tag]) + '?view=typedef&limit=none');
+			a.html('typedef=' + tags[tag]);
+		} else if (tags[tag] != null) {
+			if ($.isArray(tags[tag])) {
+				$.each(tags[tag], function(j, value) {
+					var valueTr = $('<tr>');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					if (allTags[tag]['tagdef multivalue']) {
+						valueTd.addClass('multivalue');
+					}
+					valueTd.html(value);
+					if (writeOK) {
+						valueTd = $('<td>');
+						valueTr.append(valueTd);
+						valueTd.addClass('file-tag');
+						valueTd.addClass(tag);
+						if (allTags[tag]['tagdef multivalue']) {
+							valueTd.addClass('multivalue');
+						}
+						valueTd.addClass('delete');
+						var input = $('<input>');
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': value
+						});
+						input.val('Remove Value');
+						valueTd.append(input);
+						input.click({	'tag': tag,
+										'value': value},
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+					}
+				});
+			} else if (allTags[tag]['tagdef type'] == 'boolean') {
+				td.html(tags[tag] ? 'True' : 'False');
+			} else if (allTags[tag]['tagdef type'] == 'tagpolicy') {
+				td.html('' + tags[tag] + ' (' + tagdefPolicies[tags[tag]] + ')');
+			} else {
+				if (!writeOK) {
+					td.html('' + tags[tag]);
+				} else {
+					var valueTr = $('<tr>');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					valueTd.addClass('multivalue');
+					if (allTags[tag]['tagdef type'] == 'empty') {
+						valueTd.html(tags[tag] ? 'is set' : 'not set');
+					} else {
+						valueTd.html(tags[tag]);
+					}
+					valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					valueTd.addClass('multivalue');
+					valueTd.addClass('delete');
+					var input = $('<input>');
+					if (allTags[tag]['tagdef type'] == 'empty') {
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': tags[tag]
+						});
+						input.val(tags[tag] ? 'Remove Tag' : 'Set Tag');
+						input.click({	'tag': tag,
+										'value': tags[tag]},
+										function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+					} else {
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': tags[tag]
+						});
+						input.val('Remove Value');
+						input.click({	'tag': tag,
+										'value': tags[tag]},
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+					}
+					valueTd.append(input);
+				}
+			}
+		} else {
+			if (!writeOK) {
+				td.html('');
+			}
+		}
+		if (writeOK && allTags[tag]['tagdef type'] != 'empty') {
+			var valueTr = $('<tr>');
+			valuesTable.append(valueTr);
+			var valueTd = $('<td>');
+			valueTr.append(valueTd);
+			valueTd.addClass('file-tag');
+			valueTd.addClass(tag);
+			valueTd.addClass('multivalue');
+			var tagType = allTags[tag]['tagdef type'];
+			if (tagType == 'text' || tagType == 'int8' || tagType == 'date' || 
+					tagType == 'timestamptz' || tagType == 'id' || tagType == 'url') {
+				valueTd.addClass('input');
+				var input = $('<input>');
+				input.attr({'type': 'text',
+					'name': 'val_' + tag,
+					'id': idquote(tag)+'_id',
+					'typestr': 'text'
+				});
+				valueTd.append(input);
+				if (tagType == 'date') {
+					var a = $('<a>');
+					valueTd.append(a);
+					a.attr({'href': "javascript:generateCalendar('" + idquote(tag) + "_id')"});
+					var img = $('<img>');
+					a.append(img);
+					img.attr({'src': HOME + '/static/calendar.gif',
+						'width': 16,
+						'height': 16,
+						'border': 0,
+						'alt': 'Pick a date'
+					});
+				}
+			} else if (tagType == 'rolepat' || 
+					tagType == 'role' ||
+					tagType == 'tagdef' ||
+					tagType == 'boolean' ||
+					tagType == 'GUI features' ||
+					tagType == 'name' ||
+					tagType == 'data provider id' ||
+					tagType == 'view' ||
+					tagType == 'config' ||
+					tagType == 'template mode' ||
+					tagType == 'vname') {
+				valueTd.addClass('input');
+				var select = $('<select>');
+				valueTd.append(select);
+				select.attr({'name': 'val-'+encodeSafeURIComponent(tag),
+					'id': idquote(tag)+'_id',
+					'typestr': tagType,
+					'onclick': "chooseOptions('" + HOME + "', '" + WEBAUTHNHOME + "', '" + tagType + "', '" + idquote(tag) + "_id')"
+				});
+				var option = $('<option>');
+				var text = '';
+				if (tagType == 'rolepat') {
+					text = 'Choose a Role pattern';
+				} else if (tagType == 'role') {
+					text = 'Choose a Role';
+				} else if (tagType == 'tagdef') {
+					text = 'Choose a Tag definition';
+				} else if (tagType == 'boolean') {
+					text = 'Choose a Boolean (true or false)';
+				} else if (tagType == 'GUI features') {
+					text = 'Choose a GUI configuration mode';
+				} else if (tagType == 'name') {
+					text = 'Choose a Subject name';
+				} else if (tagType == 'data provider id') {
+					text = 'Choose an Enumerated data provider IDs';
+				} else if (tagType == 'view') {
+					text = 'Choose a View name';
+				} else if (tagType == 'config') {
+					text = 'Choose a Study Type';
+				} else if (tagType == 'template mode') {
+					text = 'Choose a Template rendering mode';
+				} else if (tagType == 'vname') {
+					text = 'Choose a Subject name@version';
+				}
+				option.text(text);
+				option.attr('value', '');
+				select.append(option);
+			}
+			var valueTd = $('<td>');
+			valueTr.append(valueTd);
+			valueTd.addClass('file-tag');
+			valueTd.addClass(tag);
+			valueTd.addClass('multivalue');
+			valueTd.addClass('set');
+			var input = $('<input>');
+			input.attr({'type': 'button',
+				'name': 'tag'
+			});
+			input.val('Set Value');
+			valueTd.append(input);
+			input.click({	'tag': tag},
+							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, obj.vals[0]);});
+		}
+	});
+	
+}
+
+function idquote(value) {
+	var ret = '';
+	$.each(value, function(i, c) {
+		if (c != ' ') {
+			ret += c;
+		}
+	});
+	return ret;
+}
+
+function writeAllowed(tag, allTags, roles, file) {
+	var ret = allTags[tag]['tagdef writepolicy'] == 'anonymous';
+	if (file != null) {
+		var userOK = roles.contains(allTags[tag]['owner']) || allTags[file]['owner'] == USER || allTags[file]['owner'] == null;
+		ret = ret ||
+			userOK && !browsersImmutableTags.contains(tag) &&
+				(allTags[tag]['tagdef writepolicy'] == 'subject' ||
+				allTags[tag]['tagdef writepolicy'] == 'subjectowner' ||
+				allTags[tag]['tagdef writepolicy'] == 'tag');
+	} else {
+		var userOK = roles.contains(allTags[tag]['owner']) || allTags[tag]['owner'] == USER || allTags[tag]['owner'] == null;
+		ret = ret ||
+			userOK && !browsersImmutableTags.contains(tag) &&
+				allTags[tag]['tagdef writepolicy'] == 'tag';
+	}
+	return ret;
+}
+
+function removeTagValue(tag, value, row, file) {
+	var count = 0;
+	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var obj = new Object();
+	obj.action = 'delete';
+	obj['tag'] = tag;
+	obj['value'] = value;
+	$.ajax({
+		url: url,
+		type: 'POST',
+		data: obj,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			row.remove();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function removeAddTag(tag, value, row, file) {
+	var count = 0;
+	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var obj = new Object();
+	obj.action = value ? 'delete' : 'put';
+	obj['tag'] = tag;
+	$.ajax({
+		url: url,
+		type: 'POST',
+		data: obj,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postRemoveAddTag(tag, value, row, file);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+}
+
+function postRemoveAddTag(tag, value, row, file) {
+	var valueTr = $('<tr>');
+	valueTr.insertBefore(row);
+	var valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.html(!value ? 'is set' : 'not set');
+	valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.addClass('delete');
+	var input = $('<input>');
+	input.attr({'type': 'button',
+		'name': 'tag',
+		'value': !value
+	});
+	input.val(!value ? 'Remove Tag' : 'Set Tag');
+	input.click({	'tag': tag,
+					'value': !value},
+					function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent());});
+	valueTd.append(input);
+	row.remove();
+}
+
+function addTagValue(tag, row, allTags, file) {
+	var count = 0;
+	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var obj = new Object();
+	obj.action = 'put';
+	obj['set-'+tag] = true;
+	obj['val-'+tag] = $('#'+idquote(tag)+'_id').val();
+	$.ajax({
+		url: url,
+		type: 'POST',
+		data: obj,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postAddTagValue(tag, row, allTags, file);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+			}
+		}
+	});
+
+}
+
+function postAddTagValue(tag, row, allTags, file) {
+	var value = $('#'+idquote(tag)+'_id').val();
+	var valueTr = $('<tr>');
+	valueTr.insertBefore(row);
+	var valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.html(value);
+	valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.addClass('delete');
+	var input = $('<input>');
+	input.attr({'type': 'button',
+		'name': 'tag',
+		'value': value
+	});
+	input.val('Remove Value');
+	valueTd.append(input);
+	input.click({	'tag': tag,
+					'value': value},
+					function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), file);});
+	$('#'+idquote(tag)+'_id').val('');
+	if (!allTags[tag]['tagdef multivalue']) {
+		valueTr.prev().remove();
+	}
 }
 

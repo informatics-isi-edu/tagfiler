@@ -59,6 +59,18 @@ def p_ui(p):
     """ui : slash string slash UI uiopts"""
     p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5])
     
+def p_ui_queryopts(p):
+    """ui : slash string slash UI uiopts queryopts"""
+    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], queryopts=p[6])
+    
+def p_ui_querypath(p):
+    """ui : slash string slash UI uiopts slash querypath"""
+    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[7])
+    
+def p_ui_queryopts_querypath(p):
+    """ui : slash string slash UI uiopts slash querypath queryopts"""
+    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[7], queryopts=p[8])
+    
 def p_uiopts(p):
     """uiopts : slash string"""
     p[0] = []
