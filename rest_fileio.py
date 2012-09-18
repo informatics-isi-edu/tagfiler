@@ -127,8 +127,8 @@ class FileIO (Subject):
     """
     __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
-    def __init__(self, parser=None):
-        Subject.__init__(self, parser=parser)
+    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
+        Subject.__init__(self, parser, appname, path, queryopts)
         self.api = 'file'
         self.action = None
         self.key = None
@@ -591,7 +591,7 @@ class FileIO (Subject):
         if not self.mustInsert \
                 and self.subject.dtype == 'file' \
                 and self.unique \
-                and self.authn.role == self.subject['modified by'] \
+                and self.context.client == self.subject['modified by'] \
                 and self.subject['modified'] and (now - self.subject['modified']).seconds < 5 \
                 and self.subject['bytes'] == self.bytes \
                 and not self.subject['url'] \
@@ -700,15 +700,15 @@ class FileIO (Subject):
 
 class LogFileIO (FileIO):
 
-    def __init__(self):
-        FileIO.__init__(self)
+    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
+        FileIO.__init__(self, parser, appname, path, queryopts)
         self.skip_preDispatch = False
 
 
     def GET(self, uri, sendBody=True):
 
-        if not self.authn.hasRoles(['admin']):
-            raise Forbidden(self, 'read access to log file "%s"' % self.name)
+        #if not self.authn.hasRoles(['admin']):
+        raise Forbidden(self, 'read access to log file "%s"' % self.name)
 
         if not self.config['log path']:
             raise Conflict(self, 'log_path is not configured on this server.')

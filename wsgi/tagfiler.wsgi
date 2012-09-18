@@ -33,7 +33,11 @@ from tagfiler import url_lex, url_parse, dataserv_app
 # work with REQUEST_URI to get undecoded URI w/ escape sequences.
 #
 
+UserSession = dataserv_app.webauthn2_handler_factory.UserSession
+
 urls = (
+    '/session(/[^/]+)', UserSession,
+    '/session()', UserSession,
     '.*', 'Dispatcher'
 )
 
@@ -111,7 +115,7 @@ class Dispatcher:
             end_time = datetime.datetime.now(pytz.timezone('UTC'))
             ast.lograw('%d.%3.3ds %s%s req=%s (%s) %s %s://%s%s %s %s' % ((end_time - start_time).seconds,
                                                                          (end_time - start_time).microseconds / 1000, 
-                                                                         web.ctx.ip, ast.authn.role and ' user=%s' % urllib.quote(ast.authn.role) or '',
+                                                                         web.ctx.ip, ast.context.client and ' user=%s' % urllib.quote(ast.context.client) or '',
                                                                          ast and ast.request_guid or '',
                                                                          web.ctx.status, web.ctx.method, web.ctx.protocol, web.ctx.host, uri,
                                                                          ast and ast.content_range and ('%s/%s' % ast.content_range) or '',

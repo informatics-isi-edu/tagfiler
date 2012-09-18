@@ -92,15 +92,26 @@ class SubjectCache:
 
 subject_cache = SubjectCache()
 
-class Subject (Application):
+class Node (Application):
+    """Abstract AST node for all URI patterns"""
+
+    __slots__ = [ 'appname' ]
+
+    def __init__(self, parser, appname, queryopts=None):
+        self.appname = appname
+        Application.__init__(self, parser, queryopts)
+
+    def uri2referer(self, uri):
+        return self.config['home'] + uri
+
+class Subject (Node):
     """Basic subject CRUD
 
     Handle subject CRUD operations including awareness of file bodies, excluding actual file I/O.
     """
-    __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
-    def __init__(self, parser=None):
-        Application.__init__(self, parser=parser)
+    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
+        Node.__init__(self, parser, appname, queryopts)
         self.api = 'subject'
         self.action = None
         self.key = None
@@ -126,7 +137,7 @@ class Subject (Application):
         self.unique = self.validate_subjpreds_unique(acceptName=True, subjpreds=subjpreds)
         
         if self.unique != None:
-            self.subjects, self.path_txid = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.authn.role)
+            self.subjects, self.path_txid = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.context.client)
             self.subject = self.subjects[0]
             self.datapred, self.dataid, self.dataname, self.dtype = self.subject2identifiers(self.subject)
         else:
@@ -298,7 +309,7 @@ class Subject (Application):
             self.subject = None
             self.update = False
             # this is a new dataset independent of others
-            if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+            if len( set(self.config['file write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
             self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True, subjpreds=self.path[-1][0])
@@ -345,7 +356,7 @@ class Subject (Application):
             newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
 
         if newfile.id != None:
-            newfile.owner=self.authn.role
+            newfile.owner=self.context.client
             newfile.writeok=True
             newfile.incomplete=False
         
@@ -382,8 +393,8 @@ class Subject (Application):
                         else:
                             self.set_tag(newfile, self.globals['tagdefsdict'][result.tagname])
 
-        if not basefile or self.authn.role != basefile['modified by'] or basefile.id != newfile.id:
-            self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.authn.role)
+        if not basefile or self.context.client != basefile['modified by'] or basefile.id != newfile.id:
+            self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.context.client)
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
         maxage = myrand.uniform(3, 8)
@@ -482,7 +493,7 @@ class Subject (Application):
                 raise
             
             # not found and not unique, treat as new file put
-            if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+            if len( set(self.config['file write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
             self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, restrictSchema=True)

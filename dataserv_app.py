@@ -35,12 +35,10 @@ import time
 import math
 import string
 from logging.handlers import SysLogHandler
-try:
-    import webauthn
-except:
-    pass
 import base64
 import struct
+
+from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -54,6 +52,18 @@ import struct
 #
 # see Application.__init__() and prepareDispatch() for real dispatch
 # see rules = [ ... ] for real matching rules
+
+global_env = merge_config(jsonFileName='tagfiler-config.json', 
+                          built_ins=dict(db="tagfiler", 
+                                        dbn="postgres", 
+                                        dbmaxconnections="8"
+                                        )
+                          )
+
+webauthn2_config = global_env.get('webauthn2', dict(web_cookie_name='tagfiler'))
+webauthn2_config.update(dict(web_cookie_path='/tagfiler/'))
+
+webauthn2_handler_factory = RestHandlerFactory(overrides=webauthn2_config)
 
 render = None
 
@@ -344,21 +354,6 @@ logger.addHandler(sysloghandler)
 
 logger.setLevel(logging.INFO)
 
-try:
-    import simplejson
-    
-    jsonWriter = simplejson.dumps
-    jsonReader = simplejson.loads
-    jsonFileReader = simplejson.load
-except:
-    import json
-
-    if hasattr(json, 'dumps'):
-        jsonWriter = json.dumps
-        jsonReader = json.loads
-        jsonFileReader = json.load
-    else:
-        raise RuntimeError('Could not configure JSON library.')
 
 def urlquote(url, safe=""):
     "define common URL quote mechanism for registry URL value embeddings"
@@ -495,7 +490,7 @@ class WebException (web.HTTPError):
         else:
             elapsed = '-.---'
         logger.info(myutf8(u'%ss %s%s req=%s -- %s' % (elapsed,
-                                                       web.ctx.ip, ast and ast.authn and ast.authn.role and u' user=%s' % urllib.quote(ast.authn.role) or u'',
+                                                       web.ctx.ip, ast and ast.context and ast.context.client and u' user=%s' % urllib.quote(ast.context.client) or u'',
                                                        ast and ast.request_guid or u'', desc % data)))
         data = render.Error(status, desc, data)
         m = re.match('.*MSIE.*',
@@ -553,16 +548,6 @@ class RuntimeError (WebException):
         desc = u'The request execution encountered a runtime error: %s.'
         WebException.__init__(self, ast, status, headers=headers, data=data, desc=desc)
 
-try:
-    # allow a per-daemon account set of configuration parameters to override hard-coded defaults
-    homedir = os.environ.get('HOME', './')
-    f = open('%s/tagfiler-config.json' % homedir)
-    s = f.read()
-    f.close()
-    global_env = jsonReader(s)
-except:
-    global_env = {}
-
 def getParamEnv(suffix, default=None):
     return global_env.get(suffix, default)
 
@@ -573,6 +558,7 @@ try:
 except:
     daemonuser = 'tagfiler'
 
+"""
 # We want to share one global DB instance when pooling is enabled
 shared_db = web.database(dbn=getParamEnv('dbnstr', 'postgres'),
                          db=getParamEnv('db', ''),
@@ -589,23 +575,24 @@ def get_db():
         return shared_db
     else:
         return web.database(dbn=getParamEnv('dbnstr', 'postgres'), db=getParamEnv('db', ''))
+"""
 
-class Application:
+class Application (webauthn2_handler_factory.RestHandler):
     "common parent class of all service handler classes to use db etc."
-    __slots__ = [ 'dbnstr', 'dbstr', 'db', 'home', 'store_path', 'chunkbytes', 'render', 'help', 'jira', 'remap', 'webauthnexpiremins' ]
 
-    def config_filler(self):
+    def config_filler(self, db):
+        self.db = db
         def helper(config):
             config['policy remappings'] = buildPolicyRules(config['policy remappings'])
             return config
         return lambda : [ helper(config) for config in self.select_config(pred=web.Storage(tag='config', op=None, vals=[])) ]
 
-    def select_config_cached(self, configname=None):
+    def select_config_cached(self, db, configname=None):
         if configname == None:
             configname = 'tagfiler'
-        config = config_cache.select(self.db, self.config_filler(), None, configname)
+        config = config_cache.select(self.db, self.config_filler(db), None, configname)
         if config == None:
-            return config_cache.select(self.db, self.config_filler(), None, 'tagfiler')
+            return config_cache.select(self.db, self.config_filler(db), None, 'tagfiler')
         else:
             return config
 
@@ -644,9 +631,7 @@ class Application:
                                     ('subtitle', ''),
                                     ('tag list tags', []),
                                     ('tagdef write users', []),
-                                    ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()),
-                                    ('webauthn home', None),
-                                    ('webauthn require', 'False') ]
+                                    ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()) ]
 
         results = self.select_files_by_predlist(subjpreds=[pred],
                                                 tagdefs=Application.static_tagdefs,
@@ -673,7 +658,7 @@ class Application:
     def select_view_prioritized(self, viewnames=['default']):
         for viewname in viewnames:
             if viewname:
-                view = view_cache.select(self.db, lambda : self.select_view_all(), self.authn.role, viewname)
+                view = view_cache.select(self.db, lambda : self.select_view_all(), self.context.client, viewname)
                 if view != None:
                     return view
         return None
@@ -826,9 +811,7 @@ class Application:
                        ('_cfg_subtitle', 'text', False, 'subject', False),
                        ('_cfg_tag list tags', 'tagdef', True, 'subject', False),
                        ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
-                       ('_cfg_template path', 'text', False, 'subject', False),
-                       ('_cfg_webauthn home', 'text', False, 'subject', False),
-                       ('_cfg_webauthn require', 'boolean', False, 'subject', False) ]:
+                       ('_cfg_template path', 'text', False, 'subject', False) ]:
         deftagname, typestr, multivalue, writepolicy, unique = prototype
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
@@ -853,7 +836,7 @@ class Application:
         """
         etag = []
         if 'Cookie' in self.http_vary:
-            etag.append( '%s' % self.authn.role )
+            etag.append( '%s' % self.context.client )
         else:
             etag.append( '*' )
             
@@ -906,6 +889,10 @@ class Application:
         global render
         global db_cache
 
+        webauthn2_handler_factory.RestHandler.__init__(self)
+
+        self.context = self.manager.get_request_context()
+
         def long2str(x):
             s = ''
 
@@ -929,6 +916,7 @@ class Application:
         self.version = None
         self.subjpreds = []
         self.globals = dict()
+        self.globals['context'] = self.context
 
         if queryopts == None:
             self.queryopts = dict()
@@ -954,17 +942,17 @@ class Application:
         self.logmsgs = []
         self.middispatchtime = None
 
-        self.db = get_db()
-
         # BEGIN: get runtime parameters from database
         self.globals['adminrole'] = getParamEnv('admin', 'root')
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
         # set default anonymous authn info
-        self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
+
+        #self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
+
         #self.log('TRACE', 'Application() constructor after static defaults')
 
         # get full config
-        self.config = config_cache.select(self.db, self.config_filler(), None, 'tagfiler')
+        self.config = self._db_wrapper(lambda db: config_cache.select(db, self.config_filler(db), None, 'tagfiler'))
 
         #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
@@ -1003,8 +991,7 @@ class Application:
         self.globals['subtitle'] = self.config.subtitle
         self.globals['logo'] = self.config.logo
         self.globals['contact'] = self.config.contact
-        self.globals['webauthnhome'] = self.config['webauthn home']
-        self.globals['webauthnrequire'] = self.config['webauthn require']
+        self.globals['webauthnhome'] = 'FIXME'
         self.globals['filelisttags'] = self.config['file list tags']
         self.globals['filelisttagswrite'] = self.config['file list tags write']
         self.globals['appletTestProperties'] = self.config['applet test properties']
@@ -1107,14 +1094,8 @@ class Application:
             raise Conflict(self, 'Supplied tag name "%s" is not defined.' % tag)
 
     def validateRole(self, role, tagdef=None, subject=None):
-        if self.authn:
-            try:
-                valid = self.authn.roleProvider.testRole(self.db, role)
-            except NotImplemented, AttributeError:
-                valid = True
-            if not valid:
-                #web.debug('Supplied tag value "%s" is not a valid role.' % role)
-                raise Conflict(self, 'Supplied tag value "%s" is not a valid role.' % role)
+        # TODO: fixme with webauthn2
+        pass
                 
     def validateRolePattern(self, role, tagdef=None, subject=None):
         if role in [ '*' ]:
@@ -1136,7 +1117,7 @@ class Application:
             if len(results) == 0:
                 raise Conflict(self, 'Set the "typedef" tag before trying to set "typedef values".')
             typename = results[0]
-            type = typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role, typename)
+            type = typedef_cache.select(self.db, lambda: self.get_type(), self.context.client, typename)
             if type == None:
                 raise Conflict(self, 'The type "%s" is not defined!' % typename)
             dbtype = type['typedef dbtype']
@@ -1158,10 +1139,10 @@ class Application:
             raise BadRequest(self, 'Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
     def getPolicyRule(self):
-        srcroles = set(self.config['policy remappings'].keys()).intersection(self.authn.roles)
+        srcroles = set(self.config['policy remappings'].keys()).intersection(self.context.attributes)
 
-        if len(srcroles) == 1 or self.authn.role == None:
-            if self.authn.role == None:
+        if len(srcroles) == 1 or self.context.client == None:
+            if self.context.client == None:
                 # anonymous user, who we represent with empty string key in policy mappings
                 # and use a safe default mapping if there is none 
                 dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'].get('', 
@@ -1174,9 +1155,9 @@ class Application:
             readusers = [ u for u in readusers ]
             writeusers = [ u for u in writeusers ]
             if readok:
-                readusers.append( self.authn.role )
+                readusers.append( self.context.client )
             if writeok:
-                writeusers.append( self.authn.role )
+                writeusers.append( self.context.client )
             return True, dstrole, readusers, writeusers
         elif len(srcroles) > 1:
             raise Conflict(self, "Ambiguous remap rules encountered for client roles %s. Please contact service administrator." % list(srcroles))
@@ -1239,7 +1220,7 @@ class Application:
             msg = action + ' ' + ('%s' % parts)
         else:
             msg = self.logfmt_old(action, dataset, tag, mode, user, value, txid)
-        return u'%ss %s%s req=%s -- %s' % (elapsed, web.ctx.ip, self.authn.role and u' user=%s' % urlquote(self.authn.role) or u'', 
+        return u'%ss %s%s req=%s -- %s' % (elapsed, web.ctx.ip, self.context.client and u' user=%s' % urlquote(self.context.client) or u'', 
                                            self.request_guid, msg)
 
     def log(self, action, dataset=None, tag=None, mode=None, user=None, value=None, txid=None):
@@ -1250,13 +1231,6 @@ class Application:
 
     def txlog2(self, action, parts):
         self.logmsgs.append(self.logfmt(action, parts=parts))
-
-    def set_authn(self, authn):
-        if not hasattr(self, 'authn'):
-            self.authn = None
-        #web.debug(self.authn, authn)
-        self.authn = authn
-        self.globals['authn'] = authn
 
     def renderlist(self, title, renderlist, refresh=True):
         if refresh:
@@ -1285,55 +1259,18 @@ class Application:
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
-        self.set_authn(app.authn)
 
     def preDispatchCore(self, uri, setcookie=True):
         self.request_uri = uri
-        if self.globals['webauthnhome']:
-            if not self.db:
-                self.db = get_db()
-            t = self.db.transaction()
-            try:
-                self.set_authn(webauthn.session.test_and_update_session(self.db,
-                                                                        referer=self.config.home + uri,
-                                                                        setcookie=setcookie))
-                t.commit()
-            except:
-                t.rollback()
-                raise
 
-            self.middispatchtime = datetime.datetime.now()
-            if not self.authn.role and self.globals['webauthnrequire']:
-                raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.config.home + uri))
-        else:
-            try:
-                user = web.ctx.env['REMOTE_USER']
-                roles = set([ user ])
-            except:
-                user = None
-                roles = set()
-            self.set_authn(webauthn.providers.AuthnInfo(user, roles, None, None, False, None))
+        self.middispatchtime = datetime.datetime.now()
+        #raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.config.home + uri))
 
     def preDispatch(self, uri):
         self.preDispatchCore(uri)
 
     def postDispatch(self, uri=None):
-        def body():
-            if self.globals['webauthnhome']:
-                t = self.db.transaction()
-                try:
-                    webauthn.session.test_and_update_session(self.db, self.authn.guid,
-                                                             ignoremustchange=True,
-                                                             setcookie=False)
-                    t.commit()
-                except:
-                    t.rollback()
-                    raise
-
-        def postCommit(results):
-            pass
-
-        self.dbtransact(body, postCommit)
+        pass
 
     def midDispatch(self):
         now = datetime.datetime.now()
@@ -1362,162 +1299,83 @@ class Application:
            using caller-provided thunks under boilerplate
            commit/rollback/retry logic
         """
-        if not self.db:
-            self.db = get_db()
-
         #self.log('TRACE', value='dbtransact() entered')
 
-        try:
-            count = 0
-            error = None
-            while True:
-                count = count + 1
-                try:
-                    t = self.db.transaction()
-                    
-                    try:
-                        self.logmsgs = []
-                        self.table_changes = {}
-                        self.subject = None
-                        self.datapred = None
-                        self.dataname = None
-                        self.dataid = None
+        def tagOptions(tagname, values=[]):
+            tagdef = self.globals['tagdefsdict'][tagname]
+            tagnames = self.globals['tagdefsdict'].keys()
+            type = self.globals['typesdict'][tagdef.typestr]
+            typevals = type['typedef values']
+            tagref = type['typedef tagref']
 
-                        # build up globals useful to almost all classes, to avoid redundant coding
-                        # this is fragile to make things fast and simple
-                        db_globals_dict = dict(roleinfo=lambda : [],
-                                               typeinfo=lambda : [ x for x in typedef_cache.select(self.db, lambda: self.get_type(), self.authn.role)],
-                                               typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
-                                               tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(self.db, lambda: self.select_tagdef(), self.authn.role) ]) )
-                        #self.log('TRACE', value='preparing needed_db_globals')
-                        for key in self.needed_db_globals:
-                            if not self.globals.has_key(key):
-                                self.globals[key] = db_globals_dict[key]()
-                                #self.log('TRACE', value='prepared %s' % key)
+            if typevals:
+                options = True
+            elif tagdef.typestr in [ 'role', 'rolepat' ]:
+                options = True
+            elif tagref:
+                if tagref in tagnames:
+                    options = True
+                else:
+                    options = None
+            elif tagdef.typestr == 'tagname' and tagnames:
+                options = True
+            else:
+                options = None
+            return options
 
-                        #self.log('TRACE', 'needed_db_globals loaded')
-                        
-                        def tagOptions(tagname, values=[]):
-                            tagdef = self.globals['tagdefsdict'][tagname]
-                            tagnames = self.globals['tagdefsdict'].keys()
-                            type = self.globals['typesdict'][tagdef.typestr]
-                            typevals = type['typedef values']
-                            tagref = type['typedef tagref']
+        self.globals['tagOptions'] = tagOptions
 
-                            if typevals:
-                                options = True
-                            elif tagdef.typestr in [ 'role', 'rolepat' ]:
-                                options = True
-                            elif tagref:
-                                if tagref in tagnames:
-                                    options = True
-                                else:
-                                    options = None
-                            elif tagdef.typestr == 'tagname' and tagnames:
-                                options = True
-                            else:
-                                options = None
-                            return options
+        def db_body(db):
+            self.db = db
 
-                        self.globals['tagOptions'] = tagOptions
-                        #self.log('TRACE', 'dbtransact() tagOptions loaded')
+            self.logmsgs = []
+            self.table_changes = {}
+            self.subject = None
+            self.datapred = None
+            self.dataname = None
+            self.dataid = None
 
-                        # and set defaults if they weren't overridden by caller
-                        for globalname, default in [ ('view', None),
-                                                     ('referer', web.ctx.env.get('HTTP_REFERER', None)),
-                                                     ('tagspace', 'tags'),
-                                                     ('datapred', self.datapred),
-                                                     ('dataname', self.dataname),
-                                                     ('dataid', self.dataid) ]:
-                            current = self.globals.get(globalname, None)
-                            if not current:
-                                self.globals[globalname] = default
+            # build up globals useful to almost all classes, to avoid redundant coding
+            # this is fragile to make things fast and simple
+            db_globals_dict = dict(roleinfo=lambda : [],
+                                   typeinfo=lambda : [ x for x in typedef_cache.select(db, lambda: self.get_type(), self.context.client)],
+                                   typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
+                                   tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
+            #self.log('TRACE', value='preparing needed_db_globals')
+            for key in self.needed_db_globals:
+                if not self.globals.has_key(key):
+                    self.globals[key] = db_globals_dict[key]()
+                    #self.log('TRACE', value='prepared %s' % key)
 
-                        #self.log('TRACE', 'dbtransact() all globals loaded')
-                        bodyval = body()
-                        t.commit()
-                        try:
-                            for table, count in self.table_changes.items():
-                                if count > cluster_threshold:
-                                    self.dbquery('CLUSTER %s' % table)
-                                    self.dbquery('ANALYZE %s' % table)
-                        except:
-                            pass
-                        break
-                        # syntax "Type as var" not supported by Python 2.4
-                    except (psycopg2.InterfaceError), te:
-                        # pass this to outer handler
-                        error = str(te)
-                        web.debug('got psycopg2.InterfaceError "%s"' % error)
-                        et, ev, tb = sys.exc_info()
-                        web.debug('got exception "%s" during dbtransact' % str(ev),
-                                  traceback.format_exception(et, ev, tb))
-                        raise te
-                    except (web.SeeOther), te:
-                        t.commit()
-                        raise te
-                    except (NotFound, BadRequest, Unauthorized, Forbidden, Conflict), te:
-                        t.rollback()
-                        raise te
-                    except (psycopg2.DataError, psycopg2.ProgrammingError), te:
-                        t.rollback()
-                        et, ev, tb = sys.exc_info()
-                        web.debug('got exception "%s" during dbtransact' % str(ev),
-                                  traceback.format_exception(et, ev, tb))
-                        raise BadRequest(self, data='Logical error: %s.' % str(te))
-                    except TypeError, te:
-                        t.rollback()
-                        et, ev, tb = sys.exc_info()
-                        web.debug('got exception "%s" during dbtransact' % str(ev),
-                                  traceback.format_exception(et, ev, tb))
-                        raise RuntimeError(self, data=str(te))
-                    except (psycopg2.IntegrityError, psycopg2.extensions.TransactionRollbackError), te:
-                        t.rollback()
-                        error = str(te)
-                        if count > limit:
-                            # retry on version key violation, can happen under concurrent uploads
-                            et, ev, tb = sys.exc_info()
-                            web.debug('got exception "%s" during dbtransact' % str(ev),
-                                      traceback.format_exception(et, ev, tb))
-                            raise IntegrityError(self, data=error)
-                    except (IOError), te:
-                        t.rollback()
-                        error = str(te)
-                        if count > limit:
-                            raise RuntimeError(self, data=error)
-                        # else fall through to retry...
-                    except:
-                        t.rollback()
-                        et, ev, tb = sys.exc_info()
-                        web.debug('got unmatched exception in dbtransact',
-                                  traceback.format_exception(et, ev, tb),
-                                  ev)
-                        raise
+            #self.log('TRACE', 'needed_db_globals loaded')
+            
+            for globalname, default in [ ('view', None),
+                                         ('referer', web.ctx.env.get('HTTP_REFERER', None)),
+                                         ('tagspace', 'tags'),
+                                         ('datapred', self.datapred),
+                                         ('dataname', self.dataname),
+                                         ('dataid', self.dataid) ]:
+                current = self.globals.get(globalname, None)
+                if not current:
+                    self.globals[globalname] = default
 
-                except psycopg2.InterfaceError:
-                    # try reopening the database connection
-                    web.debug('got psycopg2.InterfaceError')
-                    et, ev, tb = sys.exc_info()
-                    web.debug('got exception "%s" during dbtransact' % str(ev),
-                              traceback.format_exception(et, ev, tb))
-                    self.db = get_db()
+            return body()
 
-                # exponential backoff...
-                # count=1 is roughly 0.1 microsecond
-                # count=9 is roughly 10 seconds
-                # randomly jittered from 75-125% of exponential delay
-                if count > limit:
-                    raise RuntimeError(self, data='Exceeded retry limit with error "%s".' % error)
-                delay =  random.uniform(0.75, 1.25) * math.pow(10.0, count) * 0.00000001
-                web.debug('transaction retry: delaying %f on "%s"' % (delay, error))
-                time.sleep(delay)
+        # run under transaction control implemented by our parent class
+        bodyval = self._db_wrapper(db_body)
 
-        finally:
-            pass
-                    
         for msg in self.logmsgs:
             logger.info(myutf8(msg))
         self.logmsgs = []
+
+        try:
+            for table, count in self.table_changes.items():
+                if count > cluster_threshold:
+                    self.dbquery('CLUSTER %s' % table)
+                    self.dbquery('ANALYZE %s' % table)
+        except:
+            pass
+
         return postCommit(bodyval)
 
     def acceptPair(self, s):
@@ -1610,11 +1468,11 @@ class Application:
 
         # read is authorized or subject would not be found
         if mode == 'write':
-            if len(set(self.authn.roles)
+            if len(set(self.context.attributes)
                    .union(set(['*']))
                    .intersection(set(subject['write users'] or []))) > 0:
                 return True
-            elif self.authn.role:
+            elif self.context.client:
                 return False
             else:
                 return None
@@ -1630,14 +1488,14 @@ class Application:
                  or subject is None and subject is needed to make determination"""
         policy = tagdef['%spolicy' % mode]
 
-        tag_ok = tagdef.owner in self.authn.roles \
-                 or len(set([ r for r in self.authn.roles])
+        tag_ok = tagdef.owner in self.context.attributes \
+                 or len(set([ r for r in self.context.attributes])
                         .union(set(['*']))
                         .intersection(set(tagdef['tag' + mode[0:4] + 'ers'] or []))) > 0
 
         if subject:
             subject_ok = dict(read=True, write=subject.writeok)[mode]
-            subject_owner = subject.owner in self.authn.roles
+            subject_owner = subject.owner in self.context.attributes
         else:
             subject_ok = None
             subject_owner = None
@@ -1666,8 +1524,8 @@ class Application:
         """Check whether access is allowed."""
         if mode == 'read':
             return True
-        elif self.authn.role:
-            return tagdef.owner in self.authn.roles
+        elif self.context.client:
+            return tagdef.owner in self.context.attributes
         else:
             return None
 
@@ -1921,7 +1779,7 @@ class Application:
         if len(results) > 0:
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
-        owner = self.authn.role
+        owner = self.context.client
         newid = self.insert_file(None, None, None)
         subject = web.Storage(id=newid)
         tags = [ ('created', 'now'),
@@ -2802,7 +2660,7 @@ class Application:
             if on_missing == 'create':
                 if self.spreds.has_key('version'):
                     raise BadRequest(self, 'Bulk update cannot create subjects including "version" as a subject key.')
-                if len( set(self.config['file write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                if len( set(self.config['file write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                     raise Forbidden(self, 'creation of subjects')
 
             if got_unique_spred == False:
@@ -2967,7 +2825,7 @@ class Application:
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
             assigns = ', '.join([ 'writeok = e.writeok',
                                   'id = e.id',
-                                  'is_owner = CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.authn.roles ]) ])
+                                  'is_owner = CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.context.attributes ]) ])
 
             # join the subjects table to the input table on all spred tags which are unique or are name/version
             wheres = [ '%s = e.%s' % (wraptag(td.tagname, '', "in_"), wraptag(td.tagname, '', ''))
@@ -3139,11 +2997,11 @@ class Application:
                 if remap and dstrole:
                     # use remapped owner
                     owner_val = '%s::text' % wrapval(dstrole)
-                elif self.authn.role and self.lpreds.has_key('owner'):
-                    # use table-supplied in_owner or default self.authn.role
-                    owner_val = 'CASE WHEN in_owner IS NULL THEN %s::text ELSE in_owner END' % wrapval(self.authn.role)
-                elif self.authn.role:
-                    owner_val = '%s::text' % wrapval(self.authn.role)
+                elif self.context.client and self.lpreds.has_key('owner'):
+                    # use table-supplied in_owner or default self.context.client
+                    owner_val = 'CASE WHEN in_owner IS NULL THEN %s::text ELSE in_owner END' % wrapval(self.context.client)
+                elif self.context.client:
+                    owner_val = '%s::text' % wrapval(self.context.client)
                 else:
                     owner_val = 'NULL'
 
@@ -3162,8 +3020,8 @@ class Application:
                     else:
                         writeusers_val = 'ARRAY[]::text[]'
 
-                if self.authn.role:
-                    mod_val = '%s::text' % wrapval(self.authn.role)
+                if self.context.client:
+                    mod_val = '%s::text' % wrapval(self.context.client)
                 else:
                     mod_val = 'NULL'
                                                                    
@@ -3302,7 +3160,7 @@ class Application:
         if not values:
             values = Values()
 
-        roles = [ r for r in self.authn.roles ]
+        roles = [ r for r in self.context.attributes ]
         roles.append('*')
         roles = set(roles)
         #rolekeys = ','.join([ '$%s' % values.add(r) for r in roles ])

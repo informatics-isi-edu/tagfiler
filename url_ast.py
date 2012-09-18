@@ -20,10 +20,10 @@ import sys
 import web
 import re
 import os
-import webauthn
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader
 from rest_fileio import FileIO, LogFileIO
 import subjects
+from subjects import Node
 import json
 import datetime
 
@@ -111,25 +111,11 @@ class Subquery:
     def __repr__(self):
         return "@(%s)" % path_linearize(self.path)
 
-class Node (object, Application):
-    """Abstract AST node for all URI patterns"""
-
-    __slots__ = [ 'appname' ]
-
-    def __init__(self, parser, appname, queryopts=None):
-        self.appname = appname
-        Application.__init__(self, parser, queryopts)
-
-    def uri2referer(self, uri):
-        return self.config['home'] + uri
-
 class TransmitNumber (Node):
     """Represents a transmitnumber URI
 
        POST tagfiler/transmitnumber
     """
-
-    __slots__ = []
 
     def __init__(self, parser, appname):
         Node.__init__(self, parser, appname)
@@ -167,8 +153,6 @@ class Study (Node):
 
        GET tagfiler/study?action=upload
     """
-
-    __slots__ = []
 
     def __init__(self, parser, appname, subjpreds=[], queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
@@ -210,7 +194,7 @@ class Study (Node):
         def body():
             files = []
 
-            config = self.select_config_cached(self.study_type)
+            config = self.select_config_cached(self.db, self.study_type)
             self.globals['appletTagnames'] = config['applet tags']
             self.globals['appletTagnamesRequire'] = config['applet tags require']
             
@@ -333,8 +317,6 @@ class AppletError (Node):
        GET tagfiler/appleterror?status=string
     """
 
-    __slots__ = []
-
     def __init__(self, parser, appname, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
         self.action = None
@@ -361,8 +343,6 @@ class FileList (Node):
        GET  FILE?action=define     -- gives a new NameForm
        POST FILE?name=foo&type=t   -- redirects to GET FILE/name?type=t&action=define
     """
-
-    __slots__ = []
 
     def __init__(self, parser, appname, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
@@ -499,8 +479,8 @@ class LogList (Node):
         Node.__init__(self, parser, appname, queryopts)
 
     def GET(self, uri):
-        if not self.authn.hasRoles(['admin']):
-            raise Forbidden(self, 'listing of log files')
+        #if not self.authn.hasRoles(['admin']):
+        raise Forbidden(self, 'listing of log files')
         
         if self.config['log path']:
             lognames = sorted(os.listdir(self.config['log path']), reverse=True)
@@ -543,46 +523,38 @@ class Contact (Node):
         return self.renderlist("Contact Us",
                                [self.render.Contact()])
 
-class FileId(Node, FileIO):
+class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI
 
        Just creates filename and lets FileIO do the work.
 
     """
-    __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
     def __init__(self, parser, appname, path, queryopts={}, versions='any', storage=None):
-        Node.__init__(self, parser, appname, queryopts)
-        FileIO.__init__(self, parser=parser)
+        FileIO.__init__(self, parser, appname, path, queryopts)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         self.versions = versions
         if storage:
             self.storage = storage
 
-class Subject(Node, subjects.Subject):
-    __slots__ = [ 'storagename', 'dtype', 'queryopts' ]
+class Subject(subjects.Subject):
     def __init__(self, parser, appname, path, queryopts={}, storage=None):
-        Node.__init__(self, parser, appname, queryopts)
-        subjects.Subject.__init__(self)
+        subjects.Subject.__init__(self, parser, appname, path, queryopts)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         if storage:
             self.storage = storage
 
-class LogId(Node, LogFileIO):
+class LogId(LogFileIO):
     """Represents a direct LOG/subjpreds URI
 
        Just creates filename and lets LogFileIO do the work.
 
     """
-    __slots__ = [ ]
     def __init__(self, parser, appname, name, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-        LogFileIO.__init__(self)
+        LogFileIO.__init__(self, parser, appname, [], queryopts)
         self.name = name
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
-
-    __slots__ = [ 'tag_id', 'typestr', 'target', 'action', 'tagdefs', 'writepolicy', 'readpolicy', 'multivalue', 'queryopts' ]
 
     def __init__(self, parser, appname, tag_id=None, typestr=None, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
@@ -711,7 +683,7 @@ class Tagdef (Node):
                 self.is_unique = False
 
         def body():
-            if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+            if len( set(self.config['tagdef write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of tag definitions')
                 
             results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
@@ -770,7 +742,7 @@ class Tagdef (Node):
 
         def body():
             if self.action == 'add':
-                if len( set(self.config['tagdef write users']).intersection(set(self.authn.roles).union(set('*'))) ) == 0:
+                if len( set(self.config['tagdef write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                     raise Forbidden(self, 'creation of tag definitions')
                 
                 for tagname in self.tagdefs.keys():
@@ -814,8 +786,6 @@ class Tagdef (Node):
 
 class FileTags (Node):
     """Represents TAGS/subjpreds and TAGS/subjpreds/tagvals URIs"""
-
-    __slots__ = [ 'tag_id', 'value', 'tagvals' ]
 
     def __init__(self, parser, appname, path=None, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
@@ -1226,7 +1196,6 @@ class FileTags (Node):
             raise BadRequest(self, data="Form field action=%s not understood." % action)
 
 class Query (Node):
-    __slots__ = [ 'subjpreds', 'queryopts', 'action' ]
     def __init__(self, parser, appname, queryopts={}, path=[]):
         Node.__init__(self, parser, appname, queryopts)
         self.path = path

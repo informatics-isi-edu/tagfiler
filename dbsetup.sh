@@ -575,8 +575,8 @@ $(dataset "View type definitions"                url "${homepath}/query/typedef?
 $(dataset "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*")
 $(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}")
 $(dataset "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}")
-$(dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}")
 )
+#$(dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}")
 
 i=0
 while [[ $i -lt "${#homelinks[*]}" ]]
@@ -615,8 +615,6 @@ cfgtagdef 'file list tags write'      text  ""      subject     subject       tr
 cfgtagdef 'tagdef write users'        text  ""      subject     subject       true       rolepat
 cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
 cfgtagdef home                        text  ""      subject     subject       false
-cfgtagdef 'webauthn home'             text  ""      subject     subject       false
-cfgtagdef 'webauthn require'          boolean ""      subject     subject       false
 cfgtagdef 'store path'                text  ""      subject     subject       false
 cfgtagdef 'log path'                  text  ""      subject     subject       false
 cfgtagdef 'template path'             text  ""      subject     subject       false
@@ -653,8 +651,6 @@ cfgtag()
 }
 
 #cfgtag "home" text 'https://${HOME_HOST}'
-cfgtag "webauthn home" text "https://${HOME_HOST}/webauthn"
-cfgtag "webauthn require" boolean true
 
 #cfgtag "store path" text '${DATADIR}'
 #cfgtag "log path" text '${LOGDIR}'

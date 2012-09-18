@@ -70,13 +70,7 @@ PGCONF=/var/lib/pgsql/data/postgresql.conf
 chkconfig httpd on
 chkconfig postgresql on
 
-# clean up old broken rules
-semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}(/.*)?"
-semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}(/.*)?"
-semanage fcontext --delete --ftype -d --type httpd_sys_content_t "${SVCHOME}"
-semanage fcontext --delete --ftype -- --type httpd_sys_content_t "${SVCHOME}/[^/]+tab\.py"
-semanage fcontext --delete ftype "" --type httpd_sys_content_t "${LOGDIR}(/.*)?"
-
+SVCHOME=$(eval "echo ~${SVCUSER}")
 
 # finish initializing system for our service
 semanage fcontext --add --ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?" \
@@ -93,8 +87,6 @@ if ! runuser -c "/bin/true" ${SVCUSER}
 then
     useradd -m -r ${SVCUSER}
 fi
-
-SVCHOME=$(eval "echo ~${SVCUSER}")
 
 # allow httpd/mod_wsgi based daemon process to access its homedir
 
@@ -135,13 +127,13 @@ else
 fi
 
 runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
-runuser -c "createdb ${SVCUSER}" - ${PGADMIN}
+runuser -c "createdb -O ${SVCUSER} ${SVCUSER}" - ${PGADMIN}
 
 
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
 
-sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > ${SVCHOME}/tagfiler-config.json
+#sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > ${SVCHOME}/tagfiler-config.json
 chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
 chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 
