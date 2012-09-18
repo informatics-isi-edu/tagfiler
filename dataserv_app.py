@@ -38,7 +38,7 @@ from logging.handlers import SysLogHandler
 import base64
 import struct
 
-from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory
+from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -890,8 +890,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         global db_cache
 
         webauthn2_handler_factory.RestHandler.__init__(self)
-
-        self.context = self.manager.get_request_context()
+        self.context = Context()
 
         def long2str(x):
             s = ''
@@ -945,9 +944,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         # BEGIN: get runtime parameters from database
         self.globals['adminrole'] = getParamEnv('admin', 'root')
         self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
-        # set default anonymous authn info
-
-        #self.set_authn(webauthn.providers.AuthnInfo(None, set([]), None, None, False, None))
 
         #self.log('TRACE', 'Application() constructor after static defaults')
 
@@ -1259,12 +1255,23 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
+        self.context = app.context
 
     def preDispatchCore(self, uri, setcookie=True):
         self.request_uri = uri
 
+        try:
+            self.context = self.manager.get_request_context()
+        except (ValueError, IndexError):
+            # client is unauthenticated but require_client and/or require_attributes is enabled
+            acceptTypes = self.acceptTypesPreferedOrder()
+            if acceptTypes and acceptTypes[0] == 'text/html':
+                # render a page allowing AJAX login?
+                pass
+            # give a simple error for non-HTML clients
+            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+        
         self.middispatchtime = datetime.datetime.now()
-        #raise web.seeother(self.globals['webauthnhome'] + '/login?referer=%s' % urlquote(self.config.home + uri))
 
     def preDispatch(self, uri):
         self.preDispatchCore(uri)
