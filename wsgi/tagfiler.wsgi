@@ -42,17 +42,17 @@ AttrNest = dataserv_app.webauthn2_handler_factory.AttrNest
 
 urls = (
     '/session(/[^/]+)', UserSession,
-    '/session()', UserSession,
+    '/session/?()', UserSession,
     '/password(/[^/]+)', UserPassword,
-    '/password()', UserPassword,
+    '/password/?()', UserPassword,
     '/user(/[^/]+)', UserManage,
-    '/user()', UserManage,
+    '/user/?()', UserManage,
     '/attribute(/[^/]+)', AttrManage,
-    '/attribute()', AttrManage,
+    '/attribute/?()', AttrManage,
     '/user/([^/]+)/attribute(/[^/]+)', AttrAssign,
-    '/user/([^/]+)/attribute()', AttrAssign,
+    '/user/([^/]+)/attribute/?()', AttrAssign,
     '/attribute/([^/]+)/implies(/[^/]+)', AttrNest,
-    '/attribute/([^/]+)/implies()', AttrNest,
+    '/attribute/([^/]+)/implies/?()', AttrNest,
     
     '.*', 'Dispatcher'
     )
