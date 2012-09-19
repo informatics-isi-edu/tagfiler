@@ -34,12 +34,28 @@ from tagfiler import url_lex, url_parse, dataserv_app
 #
 
 UserSession = dataserv_app.webauthn2_handler_factory.UserSession
+UserPassword = dataserv_app.webauthn2_handler_factory.UserPassword
+UserManage = dataserv_app.webauthn2_handler_factory.UserManage
+AttrManage = dataserv_app.webauthn2_handler_factory.AttrManage
+AttrAssign = dataserv_app.webauthn2_handler_factory.AttrAssign
+AttrNest = dataserv_app.webauthn2_handler_factory.AttrNest
 
 urls = (
     '/session(/[^/]+)', UserSession,
     '/session()', UserSession,
+    '/password(/[^/]+)', UserPassword,
+    '/password()', UserPassword,
+    '/user(/[^/]+)', UserManage,
+    '/user()', UserManage,
+    '/attribute(/[^/]+)', AttrManage,
+    '/attribute()', AttrManage,
+    '/user/([^/]+)/attribute(/[^/]+)', AttrAssign,
+    '/user/([^/]+)/attribute()', AttrAssign,
+    '/attribute/([^/]+)/implies(/[^/]+)', AttrNest,
+    '/attribute/([^/]+)/implies()', AttrNest,
+    
     '.*', 'Dispatcher'
-)
+    )
 
 # instantiate our custom URL parse routine, which returns active
 # AST nodes that implement the web.py HTTP methods
