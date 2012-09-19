@@ -32,6 +32,9 @@ shift 7
 
 # this script will recreate all tables, but only on a clean database
 
+# this is installed to /usr/local/bin
+tagfiler-webauth2-deploy.py
+
 echo "create core tables..."
 
 psql -q -t <<EOF
