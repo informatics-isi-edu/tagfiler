@@ -73,6 +73,9 @@ FILES=dataserv_app.py rest_fileio.py subjects.py \
 
 SBINFILES=runuser-rsh
 
+BINFILES=tagfiler-webauthn2-deploy.py \
+	tagfiler-webauthn2-manage.py
+
 WEBSTATICFILES=logo.png \
 	functions.js \
 	jquery.js \
@@ -145,6 +148,7 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
 	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
+	rsync -av $(BINFILES) /usr/local/bin/.
 	rsync -av $(SBINFILES) /usr/local/sbin/.
 	./register-software-version.sh $(INSTALLSVC)
 

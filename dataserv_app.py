@@ -38,7 +38,7 @@ from logging.handlers import SysLogHandler
 import base64
 import struct
 
-from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context
+from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context, Manager
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
@@ -63,7 +63,8 @@ global_env = merge_config(jsonFileName='tagfiler-config.json',
 webauthn2_config = global_env.get('webauthn2', dict(web_cookie_name='tagfiler'))
 webauthn2_config.update(dict(web_cookie_path='/tagfiler/'))
 
-webauthn2_handler_factory = RestHandlerFactory(overrides=webauthn2_config)
+webauthn2_manager = Manager(overrides=webauthn2_config)
+webauthn2_handler_factory = RestHandlerFactory(manager=webauthn2_manager)
 
 render = None
 
