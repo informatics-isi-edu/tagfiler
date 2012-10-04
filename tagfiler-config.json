@@ -7,12 +7,15 @@
    },
 
    "_per-parameter instructions" : {
+     "user" : "The name of the daemon account (default 'svcuser')",
      "db" : "The name of the database (default 'svcuser')",
      "dbnstr" : "The type of RDBMS (default 'postgres')",
      "dbmaxconnections" : "Limit the number of SQL connections when pooling",
      "admin" : "The administrative user role as known by the attribute provider",
      "webauthn2" : "{... The webauthn2 config stanza ...}"
    },
+
+   "user" : "svcuser",
 
    "db" : "svcuser",
 

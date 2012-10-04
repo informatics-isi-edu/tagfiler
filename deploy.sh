@@ -133,7 +133,16 @@ runuser -c "createdb -O ${SVCUSER} ${SVCUSER}" - ${PGADMIN}
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
 
-#sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > ${SVCHOME}/tagfiler-config.json
+backup()
+{
+    if [[ -f "$1" ]]
+    then
+	mv "$1" "$1".$(date +%Y%m%d_%H%M%S)
+    fi
+}
+
+backup ${SVCHOME}/tagfiler-config.json
+sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > ${SVCHOME}/tagfiler-config.json
 chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
 chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 

@@ -552,12 +552,7 @@ class RuntimeError (WebException):
 def getParamEnv(suffix, default=None):
     return global_env.get(suffix, default)
 
-try:
-    p = subprocess.Popen(['/usr/bin/whoami'], stdout=subprocess.PIPE)
-    line = p.stdout.readline()
-    daemonuser = line.strip()
-except:
-    daemonuser = 'tagfiler'
+daemonuser = getParamEnv('user', 'tagfiler')
 
 """
 # We want to share one global DB instance when pooling is enabled
@@ -642,6 +637,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         def set_defaults(config):
             for key, default in params_and_defaults:
+                web.debug('config "%s" = %s' % (key, config[key]), default)
                 if config[key] == None or config[key] == []:
                     config[key] = default
             return config
