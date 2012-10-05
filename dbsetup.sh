@@ -695,6 +695,8 @@ urltags=${last_subject}
 tag "$urltags" "_cfg_file list tags" tagdef 'id' 'name' 'url'
 tag "$urltags" "_cfg_tag list tags" tagdef 'id' 'name' 'url'
 
+dataset "alltags" view "${admin}" "*"
+
 # remapping rules:
 #  srcrole ; dstrole ; reader, ... ; writer, ...
 # semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
