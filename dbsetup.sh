@@ -33,11 +33,16 @@ shift 7
 # this script will recreate all tables, but only on a clean database
 
 # this is installed to /usr/local/bin
-tagfiler-webauth2-deploy.py
+tagfiler-webauthn2-deploy.py
+
+# start a coprocess so we can coroutine with a single transaction
+coproc { psql -q -t -A  ; } 
 
 echo "create core tables..."
 
-psql -q -t <<EOF
+cat >&${COPROC[1]} <<EOF
+BEGIN;
+
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
@@ -50,11 +55,16 @@ EOF
 # pre-established stored data
 # MUST NOT be called more than once with same name during deploy 
 # e.g. only deploys version 1 properly
+db_resources=( 0 )
+last_subject=
 dataset_core()
 {
-   psql -A -t -q <<EOF
-INSERT INTO resources DEFAULT VALUES RETURNING subject;
+    local i=${#db_resources[@]}
+    db_resources+=( $i )
+    cat >&${COPROC[1]} <<EOF
+INSERT INTO resources (subject) VALUES ($i);
 EOF
+    last_subject="$i"
 }
 
 dataset_complete()
@@ -128,13 +138,37 @@ dataset_complete()
 	 tag "$subject" "$type" text "$file" >&2
 	 ;;
    esac
+
+   insert_or_update $subject "subject last tagged" "'now'"
+   insert_or_update $subject "subject last tagged txid" "txid_current()"
 }
 
 dataset()
 {
-    local subject=$(dataset_core)
+    dataset_core
+    local subject=${last_subject}
     dataset_complete "$subject" "$@"
-    echo "$subject"
+}
+
+insert_or_update()
+{
+    # args: subject tagname 'value' (caller quotes value as necessary)
+    cat >&${COPROC[1]} <<EOF
+SELECT count(*) FROM "_$2" WHERE subject = $1;
+EOF
+    read -u ${COPROC[0]} count
+
+    if [[ $count -eq 0 ]]
+    then
+	cat >&${COPROC[1]} <<EOF
+INSERT INTO "_$2" (subject, value) VALUES ($1, $3);
+EOF
+    else
+	cat >&${COPROC[1]} <<EOF
+UPDATE "_$2" SET value = $3 WHERE subject = $1;
+EOF
+    fi
+
 }
 
 tag()
@@ -153,13 +187,14 @@ tag()
    echo "set /tags/$file/$tagname=" "$@"
    if [[ -z "$typestr" ]] || [[ $# -eq 0 ]]
    then
-       count=$(psql -A -t -q <<EOF
+       cat >&${COPROC[1]}  <<EOF
 SELECT count(*) FROM "_$tagname" WHERE subject = '$file';
 EOF
-       )
+       read -u ${COPROC[0]} count
+
        if [[ $count -eq 0 ]]
-	   then
-	   psql -q -t <<EOF
+       then
+	   cat >&${COPROC[1]} <<EOF
 INSERT INTO "_$tagname" ( subject ) VALUES ( '$file' );
 EOF
        fi
@@ -167,13 +202,14 @@ EOF
    then
        while [[ $# -gt 0 ]]
 	 do
-	 count=$(psql -A -t -q <<EOF
+	 cat >&${COPROC[1]} <<EOF
 SELECT count(*) FROM "_$tagname" WHERE subject = '$file' AND value = '$1';
 EOF
-	 )
+	 read -u ${COPROC[0]} count
+
 	 if [[ $count -eq 0 ]]
-	     then
-	     psql -q -t <<EOF
+	 then
+	     cat >&${COPROC[1]} <<EOF
 INSERT INTO "_$tagname" ( subject, value ) VALUES ( '$file', '$1' );
 EOF
 	 fi
@@ -181,76 +217,16 @@ EOF
       done
    fi
 
-   # add to filetags only if this insert changes status
-   untracked=$(psql -A -t -q <<EOF
-SELECT DISTINCT a.subject
-FROM "_$tagname" AS a 
-LEFT OUTER JOIN subjecttags AS b ON (a.subject = b.subject AND b.tagname = '$tagname')
-WHERE b.subject IS NULL AND a.subject = '$file';
-EOF
-   )
-
-   if [[ -n "$untracked" ]]
-   then
-      psql -q -t <<EOF
-INSERT INTO subjecttags (subject, tagname) VALUES ('$file', '$tagname');
-EOF
-   fi
-
-   updated=$(psql -A -q -t <<EOF
-UPDATE "_subject last tagged" SET value = 'now' WHERE subject = '$file' RETURNING subject;
-EOF
-   )
-   if [[ -z "$updated" ]]
-   then
-       psql -A -q -t <<EOF
-INSERT INTO "_subject last tagged" (subject, value) VALUES ('$file', 'now');
-EOF
-   fi
-
-   updated=$(psql -A -q -t <<EOF
-UPDATE "_tag last modified" SET value = 'now' WHERE subject IN (SELECT subject FROM "_tagdef" WHERE value = '$tagname') RETURNING subject;
-EOF
-   )
-   if [[ -z "$updated" ]]
-   then
-       psql -A -q -t <<EOF
-INSERT INTO "_tag last modified" (subject, value) SELECT subject, 'now' FROM "_tagdef" WHERE value = '$tagname';
-EOF
-   fi
-
-   updated=$(psql -A -q -t <<EOF
-UPDATE "_subject last tagged txid" SET value = txid_current() WHERE subject = '$file' RETURNING subject;
-EOF
-   )
-   if [[ -z "$updated" ]]
-   then
-       psql -A -q -t <<EOF
-INSERT INTO "_subject last tagged txid" (subject, value) VALUES ('$file', txid_current());
-EOF
-   fi
-
-   updated=$(psql -A -q -t <<EOF
-UPDATE "_tag last modified txid" SET value = txid_current() WHERE subject IN (SELECT subject FROM "_tagdef" WHERE value = '$tagname') RETURNING subject;
-EOF
-   )
-   if [[ -z "$updated" ]]
-   then
-       psql -A -q -t <<EOF
-INSERT INTO "_tag last modified txid" (subject, value) SELECT subject, txid_current() FROM "_tagdef" WHERE value = '$tagname';
-EOF
-   fi
-
-   
 }
 
 tagacl()
 {
    # args: tagname {read|write} [value]...
-   local tag=$(psql -A -t -q <<EOF
+   local tag
+   cat >&${COPROC[1]} <<EOF
 SELECT subject FROM "_tagdef" WHERE value = '$1';
 EOF
-   )
+   read -u ${COPROC[0]} tag
    local mode=$2
    shift 2
    while [[ $# -gt 0 ]]
@@ -306,6 +282,9 @@ tagdef_phase2()
    else
       tag "$subject" "tagdef unique" boolean false >&2
    fi
+
+   insert_or_update $subject "tag last modified" "'now'"
+   insert_or_update $subject "tag last modified txid" "txid_current()"
 }
 
 tagdef_phase1()
@@ -354,22 +333,20 @@ tagdef_phase1()
       # UNIQUE(subject, value) implies index _$1_subject_key on (subject, value)
       # UNIQUE(subject) implies index _$1_subject_key on (subject)
 
-      psql -q -t >&2 <<EOF
+      cat >&${COPROC[1]} <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
 CREATE INDEX "_$1_value_idx" ON "_$1" (value) ;
 CLUSTER "_$1" USING "_$1_subject_key" ;
 EOF
    else
-      psql -q -t >&2 <<EOF
+      cat >&${COPROC[1]} <<EOF
 CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (subject) ON DELETE CASCADE );
 CLUSTER "_$1" USING "_$1_subject_key";
 EOF
    fi
 
-   local subject=$(dataset_core "" tagdef "$3" "*")
-   
-   echo "$subject"
+   dataset_core "" tagdef "$3" "*"
 }
 
 tag_subjects=()
@@ -392,7 +369,8 @@ tagdef()
    tag_typestrs[${#tag_typestrs[*]}]="$7"
    tag_uniques[${#tag_uniques[*]}]="$8"
    tag_tagrefs[${#tag_tagrefs[*]}]="$9"
-   tag_subjects[${#tag_subjects[*]}]=$(tagdef_phase1 "$@")
+   tagdef_phase1 "$@"
+   tag_subjects[${#tag_subjects[*]}]=${last_subject}
 }
 
 tagdefs_complete()
@@ -413,7 +391,8 @@ typedef_core()
    tagref="$4"
    shift 3
    shift  # shift 4 can fail to shift when only 3 args were passed!
-   local subject=$(dataset_core "" typedef "" "*")
+   dataset_core "" typedef "" "*"
+   local subject=${last_subject}
    tag "$subject" "typedef" text "${typename}" >&2
    tag "$subject" "typedef dbtype" text "${dbtype}" >&2
    tag "$subject" "typedef description" text "${desc}" >&2
@@ -421,7 +400,6 @@ typedef_core()
    then
       tag "$subject" "typedef values" text "$@" >&2
    fi
-   echo "$subject"
 }
 
 typedef_tagref()
@@ -440,7 +418,8 @@ type_tagrefs=()
 
 typedef()
 {
-    local subject=$(typedef_core "$@")
+    typedef_core "$@"
+    local subject=${last_subject}
     type_subjects[${#type_subjects[*]}]="$subject"
     type_tagrefs[${#type_tagrefs[*]}]="$4"
 }
@@ -534,14 +513,17 @@ typedef 'GUI features' text       'GUI configuration mode'       ""             
 tagdefs_complete
 tagdef()
 {
-   local subject=$(tagdef_phase1 "$@")
-   tagdef_phase2 "$subject" "$@"
+    tagdef_phase1 "$@"
+    local subject=${last_subject}
+    tagdef_phase2 "$subject" "$@"
+    tag_names[${#tag_names[*]}]="$1"
 }
 
 typedefs_complete
 typedef()
 {
-    local subject=$(typedef_core "$@")
+    typedef_core "$@"
+    local subject=${last_subject}
     typedef_tagref "$subject" "$4"
 }
 
@@ -554,7 +536,7 @@ tagdef vcontains             text        ""         subject     subject      tru
 
 # add tagdef foreign key referencing constraint
 # drop storage for psuedo tag 'id' which we can synthesize from any subject column
-psql -e -t <<EOF
+cat >&${COPROC[1]} <<EOF
 ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 DROP TABLE "_id";
 EOF
@@ -570,30 +552,31 @@ tagacl "homepage order" write "${admin}"
 
 homepath="https://${HOME_HOST}/${SVCPREFIX}"
 
-homelinks=(
-$(dataset "Query by tags"                        url "${homepath}/query"                           "${admin}" "${curator}" "${downloader}")
-$(dataset "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}")
-$(dataset "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*")
-$(dataset "View type definitions"                url "${homepath}/query/typedef?view=typedef"      "${admin}" "*")
-$(dataset "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*")
-$(dataset "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}")
-$(dataset "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}")
-)
-#$(dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}")
+homelink_pos=0
+homelink()
+{
+    dataset "$@"
+    tag ${last_subject} "list on homepage"
+    tag ${last_subject} "homepage order" int8 "$(( ${homelink_pos} + 100 ))"
+    homelink_pos=$(( ${homelink_pos} + 1 ))
+}
 
-i=0
-while [[ $i -lt "${#homelinks[*]}" ]]
-do
-   tag "${homelinks[$i]}" "list on homepage"
-   tag "${homelinks[$i]}" "homepage order" int8 "$(( $i + 100 ))"
-   i=$(( $i + 1 ))
-done
+homelink "Query by tags"                        url "${homepath}/query"                           "${admin}" "${curator}" "${downloader}"
+homelink "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}"
+homelink "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*"
+homelink "View type definitions"                url "${homepath}/query/typedef?view=typedef"      "${admin}" "*"
+homelink "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*"
+homelink "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}"
+homelink "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}"
 
-tagfilercfg=$(dataset "tagfiler" config "${admin}" "*")
+#dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}"
+
+dataset "tagfiler" config "${admin}" "*"
+tagfilercfg=${last_subject}
 tag "$tagfilercfg" "view" text "default"  # config="tagfiler" is also view="default"
 
-
-cfgtags=$(dataset "config" view "${admin}" "*")
+dataset "config" view "${admin}" "*"
+cfgtags=${last_subject}
 
 cfgtagdef()
 {
@@ -678,31 +661,37 @@ cfgtag "file list tags" text 'id' 'name' bytes owner 'read users' 'write users'
 #cfgtag "applet tags require" text ...
 #cfgtag "applet properties" text 'tagfiler.properties'
 
-tagdeftags=$(dataset "tagdef" view "${admin}" "*")
+dataset "tagdef" view "${admin}" "*"
+tagdeftags=${last_subject}
 tag "$tagdeftags" "_cfg_file list tags" tagdef 'id' 'tagdef' "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 tag "$tagdeftags" "_cfg_tag list tags" tagdef 'id' 'tagdef' "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 
-typedeftags=$(dataset "typedef" view "${admin}" "*")
+dataset "typedef" view "${admin}" "*"
+typedeftags=${last_subject}
 tag "$typedeftags" "_cfg_file list tags" tagdef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
 tag "$typedeftags" "_cfg_tag list tags" tagdef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
 
-filetags=$(dataset "file" view "${admin}" "*")
+dataset "file" view "${admin}" "*"
+filetags=${last_subject}
 tag "$filetags" "_cfg_file list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users'
 tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
-
-viewtags=$(dataset "view" view "${admin}" "*")
+dataset "view" view "${admin}" "*"
+viewtags=${last_subject}
 tag "$viewtags" "_cfg_file list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
 tag "$viewtags" "_cfg_tag list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
 
-vcontainstags=$(dataset "vcontains" view "${admin}" "*")
+dataset "vcontains" view "${admin}" "*"
+vcontainstags=${last_subject}
 tag "$vcontainstags" "_cfg_file list tags" tagdef 'id' 'name' 'version' 'vcontains'
 tag "$vcontainstags" "_cfg_tag list tags" tagdef 'id' 'name' 'version' 'vcontains'
 
-containstags=$(dataset "contains" view "${admin}" "*")
+dataset "contains" view "${admin}" "*"
+containstags=${last_subject}
 tag "$containstags" "_cfg_file list tags" tagdef 'id' 'name' 'contains'
 tag "$containstags" "_cfg_tag list tags" tagdef 'id' 'name' 'contains'
 
-urltags=$(dataset "url" view "${admin}" "*")
+dataset "url" view "${admin}" "*"
+urltags=${last_subject}
 tag "$urltags" "_cfg_file list tags" tagdef 'id' 'name' 'url'
 tag "$urltags" "_cfg_tag list tags" tagdef 'id' 'name' 'url'
 
@@ -746,6 +735,29 @@ cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/'"${SVCPR
 cfgtag "contact" text '<p>Your HTML here</p>'
 cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/~karlcz/Tagfiler'
 cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/PSOC'
+
+cat >&${COPROC[1]} <<EOF
+INSERT INTO subjecttags (subject, tagname)
+  SELECT 0, '' WHERE False
+  $(for tagname in "${tag_names[@]}"
+    do
+        if [[ "$tagname" != 'id' ]]
+        then
+           cat <<EOF2
+  UNION SELECT DISTINCT subject, '${tagname}' FROM "_${tagname}"
+EOF2
+        fi
+    done)
+;
+
+COMMIT ;
+
+\q
+
+EOF
+
+: {COPROC[1]}>&-
+wait ${COPROC_PID}
 
 cmddir=$(dirname "$0")
 #. ./dbsetup-nei-demo.sh
