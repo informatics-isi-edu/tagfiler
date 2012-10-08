@@ -929,7 +929,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.query_range = None
 
         # this ordered list can be pruned to optimize transactions
-        self.needed_db_globals = [  'typeinfo', 'typesdict', 'tagdefsdict', 'roleinfo' ]
+        self.needed_db_globals = [  'typeinfo', 'typesdict', 'tagdefsdict']
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -1309,30 +1309,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         """
         #self.log('TRACE', value='dbtransact() entered')
 
-        def tagOptions(tagname, values=[]):
-            tagdef = self.globals['tagdefsdict'][tagname]
-            tagnames = self.globals['tagdefsdict'].keys()
-            type = self.globals['typesdict'][tagdef.typestr]
-            typevals = type['typedef values']
-            tagref = type['typedef tagref']
-
-            if typevals:
-                options = True
-            elif tagdef.typestr in [ 'role', 'rolepat' ]:
-                options = True
-            elif tagref:
-                if tagref in tagnames:
-                    options = True
-                else:
-                    options = None
-            elif tagdef.typestr == 'tagname' and tagnames:
-                options = True
-            else:
-                options = None
-            return options
-
-        self.globals['tagOptions'] = tagOptions
-
         def db_body(db):
             self.db = db
 
@@ -1345,8 +1321,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # build up globals useful to almost all classes, to avoid redundant coding
             # this is fragile to make things fast and simple
-            db_globals_dict = dict(roleinfo=lambda : [],
-                                   typeinfo=lambda : [ x for x in typedef_cache.select(db, lambda: self.get_type(), self.context.client)],
+            db_globals_dict = dict(typeinfo=lambda : [ x for x in typedef_cache.select(db, lambda: self.get_type(), self.context.client)],
                                    typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
                                    tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
             #self.log('TRACE', value='preparing needed_db_globals')
