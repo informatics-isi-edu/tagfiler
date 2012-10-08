@@ -637,7 +637,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         def set_defaults(config):
             for key, default in params_and_defaults:
-                web.debug('config "%s" = %s' % (key, config[key]), default)
+                #web.debug('config "%s" = %s' % (key, config[key]), default)
                 if config[key] == None or config[key] == []:
                     config[key] = default
             return config
@@ -755,6 +755,8 @@ class Application (webauthn2_handler_factory.RestHandler):
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
     for prototype in [ ('config', 'text', False, 'subject', True),
                        ('id', 'int8', False, 'system', True),
+                       ('readok', 'boolean', False, 'system', False),
+                       ('writeok', 'boolean', False, 'system', False),
                        ('tagdef', 'text', False, 'system', True),
                        ('tagdef type', 'type', False, 'system', False),
                        ('tagdef multivalue', 'boolean', False, 'system', False),
@@ -3213,12 +3215,29 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             m = dict(value='', where='', group='', table=wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
             wheres = []
+            extra_tag_columns = set()
 
             valcol = '%s.value'  % wraptag(tagdef.tagname)
             if tagdef.tagname == 'id':
                 m['table'] = 'resources'
                 m['value'] = ', subject AS value'
                 valcol = 'subject'
+            elif tagdef.tagname == 'readok':
+                extra_tag_columns.add('owner')
+                extra_tag_columns.add('read users')
+                m['table'] = 'resources'
+                valcol = ('NOT ("_read users".value IS NULL OR "_read users".value NOT IN (%(rolekeys)s))'
+                          + ' OR '
+                          + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
+                m['value'] = ', %s AS value' % valcol
+            elif tagdef.tagname == 'writeok':
+                extra_tag_columns.add('owner')
+                extra_tag_columns.add('write users')
+                m['table'] = 'resources'
+                valcol = ('NOT ("_write users".value IS NULL OR "_write users".value NOT IN (%(rolekeys)s))'
+                          + ' OR '
+                          + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
+                m['value'] = ', %s AS value' % valcol
             elif tagdef.multivalue and final:
                 m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
                 m['group'] = 'GROUP BY subject'
@@ -3257,11 +3276,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    #vkeys = [ values.add(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
-                    #vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
-                    #constants = [ '($%s::%s)' % (v, tagdef.dbtype) for v in vkeys if type(v) != tuple ]
-                    #bounds = [ '($%s::%s, $%s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vkeys if type(v) == tuple ]
-
                     vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
                     constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
@@ -3270,8 +3284,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                     clauses = []
                     if constants:
                         constants = ', '.join(constants)
-                        clauses.append( '(SELECT bool_or(%s %s t.x) FROM (VALUES %s) AS t (x))'
-                                        %  (valcol, Application.opsDB[pred.op], constants) )
+                        clauses.append( '%s %s ANY (ARRAY[%s]::%s[])'
+                                        %  (valcol, Application.opsDB[pred.op], constants, tagdef.dbtype) )
 
                     if bounds:
                         bounds = ', '.join(bounds)
@@ -3298,8 +3312,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if tagdef.readok == False:
                     wheres = [ 'False' ]
                 elif tagdef.readpolicy == 'subjectowner':
-                    m['table'] += ' LEFT OUTER JOIN %s o USING (subject)' % wraptag('owner')
-                    wheres.append( 'o.value IN (%s)' % rolekeys )
+                    extra_tag_columns.add('owner')
+                    wheres.append( '"_owner".value IN (%s)' % rolekeys )
+
+            for tag in extra_tag_columns:
+                m['table'] += ' LEFT OUTER JOIN %s USING (subject)' % wraptag(tag)
 
             w = ' AND '.join([ '(%s)' % w for w in wheres ])
             if w:
@@ -3334,17 +3351,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
+            if enforce_read_authz:
+                spreds = spreds + [ web.storage(tag='readok', op='=', vals=['True']) ]
+
             spreds = self.mergepreds(spreds, tagdefs)
             lpreds = self.mergepreds(lpreds, tagdefs)
 
             subject_wheres = []
 
             for tag, preds in lpreds.items():
-                if tag == 'id':
+                if tag in [ 'id', 'readok', 'writeok', 'owner' ]:
                     if len([ p for p in preds if p.op]) != 0:
-                        raise BadRequest(self, 'Tag "id" cannot be filtered in a list-predicate.')
-                    if not final or rangemode == None:
-                        del lpreds[tag]
+                        raise BadRequest(self, 'Tag "%s" cannot be filtered in a list-predicate.' % tag)
 
             selects = []
             inner = []
@@ -3367,20 +3385,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     inner.append(sq)
 
-            outer += [ '"_subject last tagged txid" txid',
-                       '"_owner" o',
-                       '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys='%s' % rolekeys),
-                       '(SELECT DISTINCT subject FROM "_write users" WHERE value IN (%(rolekeys)s)) AS wu' % dict(rolekeys='%s' % rolekeys) ]
+            outer += [ '"_subject last tagged txid" txid' ]
 
             if final and rangemode == None:
-                selects += [ 'subject AS id',
-                             'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS readok' % dict(rolekeys='%s' % rolekeys),
-                             'wu.subject IS NOT NULL OR o.value IN (%(rolekeys)s) AS writeok' % dict(rolekeys='%s' % rolekeys),
-                             'o.value AS owner',
-                             'txid.value AS txid' ]
-
-            if enforce_read_authz:
-                subject_wheres.append( 'ru.subject IS NOT NULL OR o.value IN (%(rolekeys)s)' % dict(rolekeys='%s' % rolekeys) )
+                selects += [ 'txid.value AS txid' ]
 
             finals = []
             for tag, preds in lpreds.items():
@@ -3388,27 +3396,23 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if rangemode and final:
                     if len([ p for p in preds if p.op]) > 0:
                         raise BadRequest(self, 'Operators not supported in rangemode list predicates.')
-                    if td.typestr != 'empty':
+                    if tag == 'id':
+                        range_column = 'subject'
+                        range_table = 'resources'
+                    elif tag in [ 'readok', 'writeok' ]:
+                        acl = dict(readok='read', writeok='write')[tag]
+                        range_table = 'resources LEFT OUTER JOIN "_%s users" acl USING (subject) LEFT OUTER JOIN "_owner" o USING (subject)' % acl
+                        range_column = 'NOT (acl.value IS NULL OR acl.value NOT IN (%(rolekeys)s)) OR NOT (o.value IS NULL OR o.value NOT IN (%(rolekeys)s))' % dict(rolekeys=rolekeys)
+                    elif td.typestr != 'empty':
                         # find active value range for given tag
-                        if td.tagname == 'id':
-                            range_column = 'resources.subject'
-                            range_table = 'resources'
-                        else:
-                            range_column = wraptag(td.tagname) + '.value'
-                            range_table = wraptag(td.tagname) + ' JOIN resources USING (subject)'
+                        range_column = wraptag(td.tagname) + '.value'
+                        range_table = wraptag(td.tagname) + ' JOIN resources USING (subject)'
                     else:
                         # pretend empty tags have binary range True, False
                         range_column = 't.x'
                         range_table = '(VALUES (True), (False)) AS t (x)'
-
                 else:
-                    if tag == 'owner':
-                        # owner is restricted, since it MUST appear unfiltered in all results
-                        if len(set([p.op for p in preds]).difference(set([None]))) > 0:
-                            raise Conflict(self, 'The tag "owner" cannot be filtered in projection list predicates.')
-                        # skip this iteration since it's already in the base results
-                        continue
-                    elif spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final and rangemode == None:
+                    if spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final and rangemode == None:
                         # this projection does not further filter triples relative to the spred so optimize it away
                         td = tagdefs[tag]
                         lq = None

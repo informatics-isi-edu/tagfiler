@@ -447,6 +447,8 @@ tagdef 'tagdef active'       boolean       ""         anonymous   system       f
 tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false      tagpolicy
 tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false      tagpolicy
 tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
+tagdef 'readok'              boolean     ""         anonymous   system       false      ""
+tagdef 'writeok'             boolean     ""         anonymous   system       false      ""
 tagdef 'config'              text        ""         anonymous   subject      false      ""         true
 tagdef 'view'                text        ""         anonymous   subject      false      ""         true
 tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
@@ -539,6 +541,8 @@ tagdef vcontains             text        ""         subject     subject      tru
 cat >&${COPROC[1]} <<EOF
 ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 DROP TABLE "_id";
+DROP TABLE "_readok";
+DROP TABLE "_writeok";
 EOF
 
 tagacl "list on homepage" read "*"
@@ -743,7 +747,7 @@ INSERT INTO subjecttags (subject, tagname)
   SELECT 0, '' WHERE False
   $(for tagname in "${tag_names[@]}"
     do
-        if [[ "$tagname" != 'id' ]]
+        if [[ "$tagname" != 'id' ]] && [[ "$tagname" != 'readok' ]] && [[ "$tagname" != 'writeok' ]]
         then
            cat <<EOF2
   UNION SELECT DISTINCT subject, '${tagname}' FROM "_${tagname}"
