@@ -633,7 +633,8 @@ class FileIO (Subject):
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             if web.ctx.env.get('HTTP_REFERER', None) != None:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
-                raise web.seeother(url)
+                return self.renderui(['tags'], {'url': url})
+                #raise web.seeother(url)
             else:
                 url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
                 self.header('Location', uri)

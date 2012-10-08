@@ -100,6 +100,7 @@ class Dispatcher:
         prepare_time = datetime.datetime.now(pytz.timezone('UTC'))
         if not hasattr(ast, methodname):
             raise web.NoMethod()
+        ast.login_required = None
         ast.start_time = start_time
         ast.last_log_time = start_time
         ast.preDispatch(uri)
@@ -110,7 +111,10 @@ class Dispatcher:
             try:
                 #web.debug((uri,astmethod))
                 #web.debug(('env',web.ctx.env))
-                result = astmethod(uri)
+                if ast.login_required:
+                	result = ast.renderui(['login'])
+                else:
+                	result = astmethod(uri)
 
                 if hasattr(result, 'next'):
                     try:

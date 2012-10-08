@@ -1,4 +1,4 @@
-$def with ()
+$def with (client)
 $if None:
 	$# 
 	$# Copyright 2010 University of Southern California
@@ -15,12 +15,49 @@ $if None:
 	$# See the License for the specific language governing permissions and
 	$# limitations under the License.
 	$#
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta content="text/html;charset=UTF-8" http-equiv="Content-Type">
+  <title>Tagfiler</title>
+  <link rel="stylesheet" type="text/css" href="${home}/static/main.css">
+  <link rel="stylesheet" type="text/css" href="${home}/static/jquery-ui.css">
+  <link rel="stylesheet" type="text/css" href="${home}/static/StyleSheet.css">
+  <link rel="stylesheet" type="text/css" href="${home}/static/jquery.contextMenu.css">
+  <script type="text/javascript" src="${home}/static/jquery.js"></script>
+  <script type="text/javascript" src="${home}/static/jquery-ui.js"></script>
+  <script type="text/javascript" src="${home}/static/jquery-ui-timepicker-addon.js"></script>
+  <script type="text/javascript" src="${home}/static/jquery.contextMenu.js"></script>
+  <script type="text/javascript" src="${home}/static/functions.js"></script>
+</head>
+<body>
+<div id="Idle_Session_Warning" style="display: none">
+<p>
+Warning, your session will soon expire due to idle timeout...
+</p>
+</div>
+<table class="topmargin">
+<tr>
+<td class="logo">$:{logo}</td>
+<td class="authninfo" id="authninfo"></td>
+</tr>
+</table>
+<div class="page">
+<table class="topmenu">
+<tr id="topmenu"></tr>
+</table>
+<div class="content">
+
 <div id="ui" onmouseup="document.body.style.cursor = 'default';" >
 
 </div>
 <script type="text/javascript">
 \$(document).ready(function() {
-	initUI("${home}", "${authn.role}", "${webauthnhome}", "$:{jsonWriter(uiopts).replace('"','\\"')}");
+	initUI("${home}", "${client}", "${webauthnhome}", "$:{jsonWriter(uiopts).replace('"','\\"')}");
 });
 </script>
 
+</div>
+</div>
+</body>
+</html>

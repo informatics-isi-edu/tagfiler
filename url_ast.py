@@ -404,13 +404,15 @@ class FileList (Node):
                 return ''
             elif self.homepage:
                 self.header('Content-Type', 'text/html')
-                return self.renderlist(None,
-                                       [self.render.Homepage(files)])
+                return self.renderui(['home'])
+                #return self.renderlist(None,
+                                       #[self.render.Homepage(files)])
             else:
                 self.header('Content-Type', 'text/html')
-                return self.renderlist(None,
-                                       [self.render.Commands(),
-                                        self.render.FileList(files)])
+                return self.renderui(['home'])
+                #return self.renderlist(None,
+                                       #[self.render.Commands(),
+                                        #self.render.FileList(files)])
                 
         action = None
         name = None
@@ -1327,8 +1329,9 @@ class Query (Node):
                 if self.query_range:
                     raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
                 self.header('Content-Type', 'text/html')
-                for r in self.renderlist(self.title, [self.render.Query()]):
-                    yield r
+                #for r in self.renderlist(self.title, [self.render.Query()]):
+                    #yield r
+                yield self.renderui(['query'], self.globals['querypath'], self.globals['basepath'])
                 return
 
         for res in self.dbtransact(body, postCommit):
@@ -1344,8 +1347,33 @@ class UI (Node):
         self.uiopts = uiopts
         self.path = path
         self.queryopts = queryopts
-
+        web.debug(('uiopts', self.uiopts))
+        web.debug(('path', self.path))
+        web.debug(('queryopts', self.queryopts))
+        
     def GET(self, uri):
         #web.debug((uri, ' self.uiopts: ', self.uiopts, ' self.queryopts: ', self.queryopts, ' self.path: ', self.path))
-        return self.renderui(self.uiopts, self.queryopts, self.path)
+        #return self.renderui(self.uiopts, self.queryopts, self.path)
+        def body():
+            path, self.listtags, writetags, self.limit, self.offset, self.versions = \
+                  self.prepare_path_query(self.path,
+                                          list_priority=['path', 'list', 'view', 'default'],
+                                          list_prefix='file',
+                                          extra_tags=[ ])
+            self.basepath = path_linearize(path[0:-1])
+            self.querypath = [ dict(spreds=[dict(s) for s in spreds],
+                                               lpreds=[dict(l) for l in lpreds],
+                                               otags=otags)
+                                          for spreds, lpreds, otags in path ]
+            web.debug(('basepath', self.basepath))
+            web.debug(('querypath', self.querypath))
+            return None
 
+        def postCommit(files):
+            self.uiopts = {}
+            self.uiopts['basepath'] = self.basepath
+            self.uiopts['querypath'] = self.querypath
+            return jsonWriter(self.uiopts)
+
+        return self.dbtransact(body, postCommit)
+    

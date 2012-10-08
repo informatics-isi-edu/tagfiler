@@ -673,7 +673,9 @@ function deleteDataset(dataname, url) {
 function processDelete() {
 	if(ajax_client.readyState == 4) {
 		if(ajax_client.status == 200 || ajax_client.status == 404 || ajax_client.status == 204) {
-			window.location.reload(true);
+			//window.location.reload(true);
+			//window.location = HOME;
+			homePage();
 		} else {
 			var err = ajax_client.getResponseHeader('X-Error-Description');
 			var status = 'Status: ' + ajax_client.status + '. ';
@@ -1202,6 +1204,11 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 	case 503:	// Service Unavailable
 	case 504:	// Gateway Timeout
 		retry = (count <= MAX_RETRIES);
+		break;
+	case 401:		// Unauthorized
+	case 403:	// Forbidden
+		window.location = '/tagfiler';
+		return false;
 	}
 	
 	if (!retry) {
@@ -1291,7 +1298,8 @@ function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
 function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 	tagSelectOptions[typestr] = new Array();
 	if (typestr == 'role') {
-		url = webauthnhome + '/role';
+		//url = webauthnhome + '/role';
+		url = home + '/session';
 	} else if (typedefSelectValues.contains(typestr)) {
 		url = home + '/tags/typedef=' + encodeSafeURIComponent(typestr) + '(' + encodeSafeURIComponent('typedef values') + ')?limit=none';
 	} else if (typedefTagrefs[typestr] != null) {
@@ -1308,6 +1316,9 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 		async: (count <= MAX_RETRIES ? true : false),
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
+			if (typestr == 'role') {
+				data = data.attributes;
+			}
 			$.each(data, function(i, object) {
 				if (typestr == 'role') {
 					var option = new Object();
@@ -1461,8 +1472,40 @@ var availableTags = null;
 var availableTagdefs = null;
 var allTagdefs = null;
 var availableViews = null;
-var ops = new Object();
-var opsExcludeTypes = new Object();
+var ops = {
+	    'Tagged': '',
+	    'Tag absent': ':absent:',
+	    'Equal': '=',
+	    'Not equal': '!=',
+	    'Less than': ':lt:',
+	    'Less than or equal': ':leq:',
+	    'Greater than': ':gt:',
+	    'Greater than or equal': ':geq:',
+	    'LIKE (SQL operator)': ':like:',
+	    'SIMILAR TO (SQL operator)': ':simto:',
+	    'Regular expression (case sensitive)': ':regexp:',
+	    'Negated regular expression (case sensitive)': ':!regexp:',
+	    'Regular expression (case insensitive)': ':ciregexp:',
+	    'Negated regular expression (case insensitive)': ':!ciregexp:'
+		
+};
+
+var opsExcludeTypes = {
+	    '': [],
+	    ':regexp:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    ':!ciregexp:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    ':!regexp:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    ':lt:': ['empty', 'boolean'],
+	    '=': ['empty'],
+	    ':simto:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    ':ciregexp:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    ':gt:': ['empty', 'boolean'],
+	    ':absent:': [],
+	    ':leq:': ['empty', 'boolean'],
+	    ':like:': ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean'],
+	    '!=': ['empty'],
+	    ':geq:': ['empty', 'boolean']
+};
 var typedefSubjects = null;
 
 var resultColumns = [];
@@ -1728,20 +1771,29 @@ function setGUIConfig() {
 		async: false,
 		success: function(data, textStatus, jqXHR) {
 			var values = data[0]['_cfg_enabled GUI features'];
-			if (values.contains('bulk_value_edit')) {
+			if (values != null) {
+				if (values.contains('bulk_value_edit')) {
+					bulk_value_edit = true;
+				}
+				if (values.contains('cell_value_edit')) {
+					cell_value_edit = true;
+					$('#enableEdit').css('display', '');
+				}
+				if (values.contains('file_download')) {
+					file_download = true;
+				}
+				if (values.contains('view_tags')) {
+					view_tags = true;
+				}
+				if (values.contains('view_URL')) {
+					view_URL = true;
+				}
+			} else {
 				bulk_value_edit = true;
-			}
-			if (values.contains('cell_value_edit')) {
 				cell_value_edit = true;
 				$('#enableEdit').css('display', '');
-			}
-			if (values.contains('file_download')) {
 				file_download = true;
-			}
-			if (values.contains('view_tags')) {
 				view_tags = true;
-			}
-			if (values.contains('view_URL')) {
 				view_URL = true;
 			}
 		},
@@ -2043,6 +2095,9 @@ function getChild(item, index) {
 function getColumnOver(e) {
 	var ret = new Object();
 	var header = $('#Query_Preview_header');
+	if (header.offset() == null) {
+		return;
+	}
 	var minY = parseInt(header.offset().top);
 	var minX = parseInt(header.offset().left);
 	var maxY = minY + header.height();
@@ -2103,7 +2158,7 @@ function setNextPage() {
 }
 
 function accessNextPage() {
-	PAGE_PREVIEW = parseInt($('#showRange').val());
+	PAGE_PREVIEW = parseInt($('#showResultRange').val());
 	showPreview();
 }
 
@@ -2133,7 +2188,19 @@ function initPreview() {
 	}
 }
 
-function initPSOC(home, user, webauthnhome, basepath, querypath) {
+function initPSOC_old(home, user, webauthnhome, basepath, querypath) {
+	alert(basepath);
+	alert(querypath);
+	var querypathJSON = null;
+	if (querypath != null) {
+		querypathJSON = $.parseJSON( querypath );
+	}
+	initPSOC(home, user, webauthnhome, basepath, querypathJSON);
+}
+
+function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
+	//alert(basepath);
+	//alert(querypath);
 	HOME = home;
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
@@ -2149,6 +2216,15 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	LAST_PAGE_PREVIEW = 0;
 	PREVIEW_LIMIT = parseInt($('#previewLimit').val());
 	LAST_PREVIEW_LIMIT = PREVIEW_LIMIT;
+	resultColumns = [];
+	userOp = new Object();
+	queryFilter = new Object();
+	sortColumnsArray = new Array();
+	availableTags = null;
+	availableTagdefs = null;
+	allTagdefs = null;
+	availableViews = null;
+	lastPreviewURL = null;
 	
 	queryBasePath = basepath;
 	if (queryBasePath != '/') {
@@ -2177,16 +2253,19 @@ function initPSOC(home, user, webauthnhome, basepath, querypath) {
 	});
 	$(document).mouseup(function(e) {
 		var ret = getColumnOver(e);
-		if (ret['tag'] == null) {
-			HideDragAndDropBox();
-			tagToMove = null;
-		} else {
-			dropColumn(e, ret['tag'], ret['append']);
+		if (ret) {
+			if (ret['tag'] == null) {
+				HideDragAndDropBox();
+				tagToMove = null;
+			} else {
+				dropColumn(e, ret['tag'], ret['append']);
+			}
 		}
 	});
 	loadTags();
-	if (querypath != null) {
-		var querypathJSON = $.parseJSON( querypath );
+	if (querypathJSON != null) {
+		//alert('here');
+		//var querypathJSON = $.parseJSON( querypath );
 		var last = querypathJSON.length - 1;
 		if (last < 0) {
 			last = 0;
@@ -3593,8 +3672,9 @@ function fillIdContextMenu(ul) {
 		ul.append(li);
 		var a = $('<a>');
 		li.append(a);
-		a.attr({	target: '_newtab2' + ++WINDOW_TAB,
-					href: HOME + '/tags/' + results['datapred'] });
+		a.attr({	//target: '_newtab2' + ++WINDOW_TAB,
+					//href: HOME + '/tags/' + results['datapred'] });
+					href: 'javascript:getTagDefinition("'+ encodeSafeURIComponent(results['datapred']) + '","alltags")' });
 		a.html('View tags page');
 	}
 	if (ul.children().length == 0) {
@@ -4477,7 +4557,7 @@ function getSelectRange(totalRows) {
 	if (select.get(0) == null) {
 		$('#resultsRange').html('');
 		select = $('<select>');
-		select.attr('id', 'showRange');
+		select.attr('id', 'showResultRange');
 		select.change(function(event) {accessNextPage();});
 		$('#resultsRange').append(select);
 	}
@@ -5365,17 +5445,30 @@ var tagdefsColumns = ['tagdef',
 
 var browsersImmutableTags = [ 'check point offset', 'key', 'sha256sum' ];
 
+var SESSIONID;
+var USER_ROLES;
+var HELP_URL;
+var BUGS_URL;
 
-function initUI(home, user, webauthnhome, uiopts) {
+function initUI(home, user, webauthnhome, uiopts, count) {
+	//alert(uiopts);
+	if (count == null) {
+		count = 0;
+	}
 	HOME = home;
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
 	// convert to JSON
 	uiopts = $.parseJSON(uiopts);
+	HELP_URL = uiopts.help;
+	BUGS_URL = uiopts.bugs;
 	var api = uiopts.api;
+	//alert(api);
+	//alert('initUI');
+	//alert(api[0]);
 	if (api.length > 0) {
-		if (api[0] == 'tagdef' || api[0] == 'tags') {
-			var url = WEBAUTHNHOME + '/status'
+		if (api[0] == 'tagdef') {
+			var url = HOME + '/session'
 			$.ajax({
 				url: url,
 				accepts: {text: 'application/json'},
@@ -5387,22 +5480,381 @@ function initUI(home, user, webauthnhome, uiopts) {
 					if (api[0] == 'tagdef') {
 						manageTagDefinitions(data.roles);
 					} else if (api[0] == 'tags') {
-						tagsUI(uiopts, data.roles);
+						//tagsUI(predicate, view, roles, count);
 					}
 				},
 				error: function(jqXHR, textStatus, errorThrown) {
 					var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 					if (retry && count <= MAX_RETRIES) {
 						var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-						setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+						setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
 					}
 				}
 			});
+		} else if (api[0] == 'login') {
+			renderLogin();
+			//renderLoginForm();
+		} else if (api[0] == 'query') {
+			getTopPage(uiopts, 'query');
+		} else if (api[0] == 'tags') {
+			getTopPage(uiopts, 'tags');
+		} else if (api[0] == 'home') {
+			getRoles();
+			//getTopPage(uiopts, null);
 		}
+	} else {
+		getTopPage(uiopts, null);
 	}
+	//initIdleWarning();
+	//runSessionPolling(uiopts.pollmins, 2*uiopts.pollmins);
 }
 
-function manageTagDefinitions(roles) {
+function renderLoginForm() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Log In');
+	var form = $('<form>');
+	form.attr({'enctype': 'application/x-www-form-urlencoded',
+		'action': HOME + '/session',
+		'method': 'POST'
+	});
+	uiDiv.append(form);
+	var fieldset = $('<fieldset>');
+	form.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('Login');
+	var table = $('<table>');
+	fieldset.append(table);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.html('Username: ');
+	var input = $('<input>');
+	input.attr({'type': 'text',
+		'id': 'username',
+		'name': 'username',
+		'size': 15
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('Password: ');
+	var input = $('<input>');
+	input.attr({'type': 'password',
+		'id': 'password',
+		'name': 'password',
+		'size': 15
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'type': 'submit',
+		'value': 'Login'
+	});
+	//input.val('Login');
+	td.append(input);
+	//input.click(function(event) {submitLogin();});
+	td.append(input);
+	setTimeout("runSessionRequest()", t)
+}
+
+function renderLogin() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Log In');
+	var fieldset = $('<fieldset>');
+	uiDiv.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('Login');
+	var table = $('<table>');
+	fieldset.append(table);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.html('Username: ');
+	var input = $('<input>');
+	input.attr({'type': 'text',
+		'id': 'username',
+		'name': 'username',
+		'size': 15
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('Password: ');
+	var input = $('<input>');
+	input.attr({'type': 'password',
+		'id': 'password',
+		'name': 'password',
+		'size': 15
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Login'
+	});
+	input.val('Login');
+	td.append(input);
+	input.click(function(event) {submitLogin();});
+	td.append(input);
+}
+
+function submitLogin(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var user = $('#username').val();
+	var password = $('#password').val();
+	//alert('user: '+user+', password: '+password);
+	var url = HOME + '/session';
+	var obj = new Object();
+	obj['username'] = user;
+	obj['password'] = password;
+	document.body.style.cursor = "wait";
+	//alert(url);
+	$.ajax({
+		url: url,
+		type: 'POST',
+		data: obj,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			//alert('Login Success');
+			//alert(data);
+			document.body.style.cursor = "default";
+			SESSIONID = data;
+			getRoles();
+			//window.location = window.location;
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			document.body.style.cursor = "default";
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){submitLogin(count)}, delay);
+			}
+		}
+	});
+}
+
+function getRoles(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/session';
+	//alert(url);
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			//alert('Login Success');
+			//alert(data);
+			USER_ROLES = data['attributes'];
+			USER = data['client'];
+			showAuthnInfo(data);
+			showTopMenu();
+			homePage();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){getRoles(count)}, delay);
+			}
+		}
+	});
+}
+
+function getTopPage(uiopts, page, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/session';
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			//alert('Login Success');
+			//alert(data);
+			USER_ROLES = data['attributes'];
+			USER = data['client'];
+			showAuthnInfo(data);
+			showTopMenu();
+			if (page == 'query') {
+				queryPage(uiopts);
+			} else if (page == 'tags') {
+				//alert('url: '+ uiopts['queryopts']['url']);
+				tagsUI(uiopts['queryopts']['url'], null, USER_ROLES);
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){getTopPage(uiopts, count)}, delay);
+			}
+		}
+	});
+}
+
+function queryPage(uiopts) {
+	//alert(uiopts.queryopts);
+	//alert(uiopts.path);
+	renderQueryHTML();
+	initPSOC(HOME, USER, WEBAUTHNHOME, uiopts.path, uiopts.queryopts);
+}
+
+function showAuthnInfo(data) {
+	var since = getLocaleTimestamp(data['since']);
+	since = since.split(" ")[1].split('.')[0];
+	var expires = getLocaleTimestamp(data['expires']);
+	expires = expires.split(" ")[1].split('.')[0];
+	
+	var td = $('#authninfo');
+	td.html('');
+	var table = $('<table>');
+	td.append(table);
+	table.addClass('authninfo');
+	var tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('User:');
+	td = $('<td>');
+	tr.append(td);
+	var a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:userinfo()'});
+	a.html(USER);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:userLogout()'});
+	a.html('log out');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:userChangePassword()'});
+	a.html('change password');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('Since:');
+	td = $('<td>');
+	tr.append(td);
+	var span = $('<span>');
+	td.append(span);
+	span.attr({'id': 'sincetime'});
+	span.html(since);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('Expires:');
+	td = $('<td>');
+	tr.append(td);
+	span = $('<span>');
+	td.append(span);
+	span.attr({'id': 'untiltime'});
+	span.html(expires);
+}
+
+function showTopMenu() {
+	var tr = $('#topmenu');
+	tr.html('');
+	var td = $('<td>');
+	tr.append(td);
+	var a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:homePage()'});
+	a.html('Home');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:manageRoles()'});
+	a.html('Manage roles');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': HOME + '/study?action=upload'});
+	a.html('Upload study');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': HOME + '/study?action=download'});
+	a.html('Download study');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:queryByTags()'});
+	a.html('Query by tags');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': HELP_URL});
+	a.html('Help');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': BUGS_URL});
+	a.html('Bugs');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': HOME + '/log'});
+	a.html('Logs');
+}
+
+function manageTagDefinitions(roles, count) {
+	if (count == null) {
+		count = 0;
+	}
 	var uiDiv = $('#ui');
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
@@ -5549,7 +6001,6 @@ function manageTagDefinitions(roles) {
 	tr.append(td);
 	td = $('<td>');
 	tr.append(td);
-	var count = 0;
 	var url = getTagdefsURL('user');
 	$.ajax({
 		url: url,
@@ -5565,16 +6016,18 @@ function manageTagDefinitions(roles) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){manageTagDefinitions(roles, count)}, delay);
 			}
 		}
 	});
 	
 }
 
-function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
+function postGetUserTagdefs(data, textStatus, jqXHR, roles, count) {
+	if (count == null) {
+		count = 0;
+	}
 	var table = $('#User_tagdefs');
-	var count = 0;
 	$.each(data, function(i, object) {
 		var tr = $('<tr>');
 		table.append(tr);
@@ -5597,7 +6050,9 @@ function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
 		}
 		var a = $('<a>');
 		td.append(a);
-		a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
+		//a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
+		//a.attr('href', 'javascript:getTagDefinition("tagdef", "' + object['tagdef'] + '", "tagdef")');
+		a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(object['tagdef']) + '","tagdef")');
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
@@ -5662,7 +6117,6 @@ function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
 	th.attr('name', 'unique');
 	th.html('Tag unique');
 	
-	var count = 0;
 	var url = getTagdefsURL('system');
 	$.ajax({
 		url: url,
@@ -5678,7 +6132,7 @@ function postGetUserTagdefs(data, textStatus, jqXHR, roles) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){postGetUserTagdefs(data, textStatus, jqXHR, roles, count)}, delay);
 			}
 		}
 	});
@@ -5697,7 +6151,9 @@ function postGetSystemTagdefs(data, textStatus, jqXHR) {
 		tr.append(td);
 		var a = $('<a>');
 		td.append(a);
-		a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
+		//a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(object['tagdef']) + '?view=tagdef&limit=none');
+		//a.attr('href', 'javascript:getTagDefinition("tagdef", "' + object['tagdef'] + '", "tagdef")');
+		a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(object['tagdef']) + '","tagdef")');
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
@@ -5720,8 +6176,10 @@ function postGetSystemTagdefs(data, textStatus, jqXHR) {
 	});
 }
 
-function defineTag() {
-	var count = 0;
+function defineTag(count) {
+	if (count == null) {
+		count = 0;
+	}
 	var url = HOME + '/tagdef';
 	var obj = new Object();
 	obj.action = 'add';
@@ -5745,7 +6203,7 @@ function defineTag() {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){defineTag(count)}, delay);
 			}
 		}
 	});
@@ -5758,12 +6216,14 @@ function getTagdefsURL(title) {
 	return url;
 }
 
-function deleteTagdef(tag, row) {
+function deleteTagdef(tag, row, count) {
+	if (count == null) {
+		count = 0;
+	}
 	var answer = confirm ('Do you want to delete the tag definition "' + tag + '"?');
 	if (!answer) {
 		return;
 	}
-	var count = 0;
 	var url = HOME + '/tagdef/' + tag;
 	$.ajax({
 		url: url,
@@ -5778,7 +6238,7 @@ function deleteTagdef(tag, row) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){deleteTagdef(tag, row, count)}, delay);
 			}
 		}
 	});
@@ -5786,7 +6246,7 @@ function deleteTagdef(tag, row) {
 
 function postDefineTagdefs(data, textStatus, jqXHR) {
 	var value = $('#tag-1').val();
-	var position = 0;
+	var position = 2;
 	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
 		if (i<3) {
 			return true;
@@ -5816,7 +6276,9 @@ function postDefineTagdefs(data, textStatus, jqXHR) {
 					function(event) {deleteTagdef(event.data.tag, $(this).parent().parent());});
 	var a = $('<a>');
 	td.append(a);
-	a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(value) + '?view=tagdef&limit=none');
+	//a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent(value) + '?view=tagdef&limit=none');
+	//a.attr('href', 'javascript:getTagDefinition("tagdef", "' + value + '", "tagdef")');
+	a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(value) + '","tagdef")');
 	a.html(value);
 	td = $('<td>');
 	tr.append(td);
@@ -5878,17 +6340,29 @@ function postDeleteTagdefs(data, textStatus, jqXHR, row) {
 	});
 }
 
-function tagsUI(uiopts, roles) {
+function tagsUI_old(uiopts, roles) {
+	
+}
+function tagsUI(predicate, view, roles, count) {
+	//window.location.replace(HOME);
+	if (count == null) {
+		count = 0;
+	}
 	// get the predicate
-	var obj = uiopts.path[0][0][0];
-	var predicate = obj.tag + '=' + encodeSafeURIComponent(obj.vals[0]);
-	var arr = new Array();
-	$.each(uiopts.queryopts, function(key, value) {
-		arr.push(key+'='+value);
-	});
-	var queryopts = '?' + arr.join('&');
-	var count = 0;
-	var url = HOME + '/query/' + predicate + queryopts;
+	//var obj = uiopts.path[0][0][0];
+	// predicate = obj.tag + '=' + encodeSafeURIComponent(obj.vals[0]);
+	//var arr = new Array();
+	//$.each(uiopts.queryopts, function(key, value) {
+		//arr.push(key+'='+value);
+	//});
+	//var queryopts = '?' + arr.join('&');
+	//var url = HOME + '/query/' + predicate + queryopts;
+	//var url = HOME + '/query/' + predicate + queryopts;
+	var url = HOME + predicate;
+	if (view != null) {
+		url = HOME + '/query/' + predicate + '?limit=none&view=' + encodeSafeURIComponent(view);
+	}
+	//alert('tagsUI: '+url);
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -5897,24 +6371,34 @@ function tagsUI(uiopts, roles) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
+			/*
 			if (obj.tag == 'tagdef') {
 				postGetTagdefs(data, textStatus, jqXHR, uiopts, roles);
 			} else if (obj.tag == 'typedef') {
 				postGetTagdefs(data, textStatus, jqXHR, uiopts, roles);
 			}
+			*/
+			postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){tagsUI(predicate, view, roles, count)}, delay);
 			}
 		}
 	});
 }
 
-function postGetTagdefs(data, textStatus, jqXHR, uiopts, roles) {
+function postGetTagdefs_old(data, textStatus, jqXHR, uiopts, roles) {
+	
+}
+function postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles, count) {
+	if (count == null) {
+		count = 0;
+	}
 	var tags = data[0];
+	//alert('url: '+tags['url']);
 	var temp = '';
 	$.each(tags, function(key, value) {
 		temp += key+'='+value+'\n';
@@ -5923,7 +6407,7 @@ function postGetTagdefs(data, textStatus, jqXHR, uiopts, roles) {
 	var url = HOME + '/query/tagdef';
 	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
 	url += 'tagdef:asc:?limit=none';
-	var count = 0;
+	//alert(url);
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -5932,50 +6416,94 @@ function postGetTagdefs(data, textStatus, jqXHR, uiopts, roles) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles);
+			//postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles);
+			postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles, count)}, delay);
 			}
 		}
 	});
 }
 
-function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
+function postGetAllTagdefs_old(data, textStatus, jqXHR, tags, uiopts, roles) {
+	
+}
+
+function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles) {
+	if (predicate.indexOf('/tags/') == 0) {
+		predicate = predicate.substr('/tags/'.length);
+	}
 	var viewColumns = new Array();
+	var isId = (predicate.indexOf('id=') == 0);
+	var isFile = false;
+	var isURL = false;
+	var displayPredicate = predicate;
+	var arrPredicate = predicate.split('?');
+	//alert(predicate);
+	//alert(arrPredicate.length);
+	if (arrPredicate.length == 2) {
+		displayPredicate = arrPredicate[0];
+		arrPredicate = arrPredicate[1].split('=');
+		if (arrPredicate.length == 2 && arrPredicate[0] == 'view') {
+			view = arrPredicate[1];
+			predicate = displayPredicate;
+		}
+	}
+	
 	$.each(tags, function(key, value) {
 		viewColumns.push(key);
 	});
+	var defaultView = 'default';
+	if (tags['config'] != null) {
+		defaultView = 'config';
+	} else if (tags['tagdef'] != null) {
+		defaultView = 'tagdef';
+	} else if (tags['typedef'] != null) {
+		defaultView = 'typedef';
+	} else if (tags['vcontains'] != null) {
+		defaultView = 'vcontains';
+	} else if (tags['contains'] != null) {
+		defaultView = 'contains';
+	} else if (tags['bytes'] != null) {
+		isFile = true;
+		defaultView = 'file';
+	} else if (tags['url'] != null) {
+		isURL = true;
+		defaultView = 'url';
+	}
 	viewColumns.sort(compareIgnoreCase);
 	var allTags = new Object();
 	$.each(data, function(i,vals) {
 		allTags[vals.tagdef] = vals;
 	});
-	var obj = uiopts.path[0][0][0];
-	var predicate = obj.tag + '=' + obj.vals[0];
-	var arr = new Array();
-	$.each(uiopts.queryopts, function(key, value) {
-		arr.push(key+'='+value);
-	});
-	var queryopts = '?' + arr.join('&');
+	//var obj = uiopts.path[0][0][0];
+	//var predicate = obj.tag + '=' + obj.vals[0];
+	//var arr = new Array();
+	//$.each(uiopts.queryopts, function(key, value) {
+		//arr.push(key+'='+value);
+	//});
+	//var queryopts = '?' + arr.join('&');
 	var uiDiv = $('#ui');
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
-	h2.html('Tag(s) for subject matching "/' + predicate + '"');
+	h2.html('Tag(s) for subject matching "/' + decodeURIComponent(displayPredicate) + '"');
 	var div = $('<div>');
 	uiDiv.append(div);
 	div.addClass('content');
-	var view = uiopts.queryopts.view;
-	if (view == 'tagdef' || view == 'typedef') {
+	//var view = uiopts.queryopts.view;
+	if (view == 'tagdef' || view == 'typedef' || view == 'file' || view == 'url') {
 		var p = $('<p>');
 		div.append(p);
 		p.html('This is a limited tag view. ');
 		var a = $('<a>');
 		p.append(a);
-		a.attr('href', HOME+'/ui/tags/'+predicate+'?view=alltags&limit=none');
+		//a.attr('href', HOME+'/ui/tags/'+predicate+'?view=alltags&limit=none');
+		//a.attr('href', 'javascript:getTagDefinition("' + obj.tag + '", "' + obj.vals[0] + '", "alltags")');
+		a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","alltags")');
 		a.html('View all tags.');
 	}
 	var table = $('<table>');
@@ -5993,9 +6521,13 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 	th.addClass('file-name');
 	a = $('<a>');
 	th.append(a);
-	a.attr('href', HOME+'/ui/tags/'+predicate + queryopts);
-	a.html(predicate);
+	//a.attr('href', HOME+'/ui/tags/'+predicate + queryopts);
+	//a.attr('href', 'javascript:getTagDefinition("' + obj.tag + '", "' + obj.vals[0] + '", "' + obj.tag + '")');
+	//a.attr('href', 'javascript:getTagDefinition("' + predicate + '", "' + obj.tag + '")');
+	a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+	a.html(decodeURIComponent(displayPredicate));
 	$.each(viewColumns, function(i, tag) {
+		//alert(tag);
 		tr = $('<tr>');
 		table.append(tr);
 		tr.addClass('file');
@@ -6009,30 +6541,190 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 		tr.append(td);
 		td.addClass('file-tag');
 		td.addClass(idquote(tag));
-		var writeOK = writeAllowed(tag, allTags, roles, obj.tag == 'tagdef' ? obj.vals[0] : null);
+		//alert(tags[tag]);
+		//var writeOK = writeAllowed(tag, allTags, roles, obj.tag == 'tagdef' ? obj.vals[0] : null);
+		var writeOK = writeAllowed(tag, allTags, roles, tag == 'tagdef' ? tags[tag] : null);
+		//alert('writeOK: ' + writeOK);
 		var valuesTable = null;
-		if (writeOK) {
+		//if (writeOK) {
 			valuesTable = $('<table>');
 			td.append(valuesTable);
 			valuesTable.addClass('file-tag-list');
-		}
+		//}
 		if (tag == 'tagdef') {
-			a = $('<a>');
-			td.append(a);
-			a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent( obj.vals[0]) + '?view=tagdef&limit=none');
-			a.html(obj.vals[0]);
+			if (tags[tag] != null) {
+				a = $('<a>');
+				td.append(a);
+				//a.attr('href', HOME + '/ui/tags/tagdef=' + encodeSafeURIComponent( obj.vals[0]) + '?view=tagdef&limit=none');
+				//a.attr('href', 'javascript:getTagDefinition("tagdef", "' + obj.vals[0] + '", "tagdef")');
+				//a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(obj.vals[0]) + '", "tagdef")');
+				a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(tags[tag]) + '","tagdef")');
+				a.html(tags[tag]);
+			} else {
+				td.html('');
+			}
 		} else if (tag == 'id') {
-			a = $('<a>');
-			td.append(a);
-			a.attr('href', HOME + '/ui/tags/' + predicate  + '?view=' + obj.tag + '&limit=none');
-			a.html(predicate + ' (tags)');
+			if (isFile || isURL) {
+				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
+				//alert('id: '+tags['id']+', userOK: '+userOK);
+				if (userOK) {
+					var idTable = $('<table>');
+					td.append(idTable);
+					idTable.addClass('file-tag-list');
+					var idTr = $('<tr>');
+					idTable.append(idTr);
+					var idTd = $('<td>');
+					idTr.append(idTd);
+					idTd.addClass('file-tag id multivalue');
+					var multivalueTable = $('<table>');
+					idTd.append(multivalueTable);
+					var multivalueTr = $('<tr>');
+					multivalueTable.append(multivalueTr);
+					var multivalueTd = $('<td>');
+					multivalueTr.append(multivalueTd);
+					var a = $('<a>');
+					multivalueTd.append(a);
+					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
+					a.html(tags['name']);
+					var space = $('<label>');
+					multivalueTd.append(space);
+					space.html(' ');
+					a = $('<a>');
+					multivalueTd.append(a);
+					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
+					a.html('(tags)');
+					multivalueTd = $('<td>');
+					multivalueTr.append(multivalueTd);
+					var input = $('<input>');
+					input.attr({'type': 'button',
+						'value': 'Delete',
+						'name': 'Delete',
+						'id': 'Delete',
+						'onclick': "deleteDataset('" + tags['name'] + "', '" + HOME + '/file/name=' + encodeSafeURIComponent(tags['name']) + "')"
+						
+					});
+					multivalueTd.append(input);
+					multivalueTable = $('<table>');
+					idTd.append(multivalueTable);
+					var formTr = $('<tr>');
+					multivalueTable.append(formTr);
+					var formTd = $('<td>');
+					formTd.attr({'colspan': '2'})
+					formTr.append(formTd);
+					var form = $('<form>');
+					formTd.append(form);
+					form.attr({'id': 'NameForm'+tags['id'],
+						'name': 'NameForm',
+						'enctype': 'application/x-www-form-urlencoded',
+						'action': HOME + '/file/name=' + encodeSafeURIComponent(tags['name']),
+						'method': 'post',
+						'onsubmit': "return validateNameForm('replace', '" + tags['id'] +"')"
+					});
+					var div = $('<div>');
+					form.append(div);
+					div.attr({'id': 'NameForm_div'+tags['id']});
+					var input = $('<input>');
+					input.attr({'type': 'hidden',
+						'name': 'action',
+						'value': 'put'
+					});
+					div.append(input);
+					var label = $('<label>');
+					div.append(label);
+					label.html('Replace with:');
+					
+					var select = $('<select>');
+					div.append(select);
+					select.attr({'name': 'type',
+						'id': 'type'+tags['id'],
+						'onchange': "changeNameFormType('replace', '" + tags['id'] + "');"
+					});
+					var option = $('<option>');
+					select.append(option);
+					option.text('blank (Dataset node for metadata-only)');
+					option.attr('value', 'blank');
+					option = $('<option>');
+					select.append(option);
+					option.text('file (Named dataset for locally stored file)');
+					option.attr({'value': 'file',
+						'selected': 'selected'});
+					option = $('<option>');
+					select.append(option);
+					option.text('url (Named dataset for URL redirecting)');
+					option.attr({'value': 'url'});
+					input = $('<input>');
+					input.attr({'name': 'myfile'+tags['id'],
+						'type': 'file',
+						'id': 'fileName'+tags['id']
+					});
+					input.css({'display': 'inline'});
+					div.append(input);
+					input = $('<input>');
+					input.attr({'type': 'submit',
+						'id': 'submit'+tags['id'],
+						'value': 'Replace'
+					});
+					div.append(input);
+					div = $('<div>');
+					formTd.append(div);
+					div.attr({'id': 'Copy'+tags['id']});
+
+					//var delTd = $('<td>');
+					//idTr.append(delTd);
+					//delTd.addClass('file-tag id delete');
+				}
+			} else if (isId) { 
+				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
+				if (userOK) {
+					var valueTr = $('<tr>');
+					valuesTable.removeClass('file-tag-list');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					var a = $('<a>');
+					valueTd.append(a);
+					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+					a.html(predicate + ' (tags)');
+					valueTd = $('<td>');
+					valueTr.append(valueTd);
+					var input = $('<input>');
+					input.attr({'type': 'button',
+						'value': 'Delete',
+						'name': 'Delete',
+						'id': 'Delete',
+						'onclick': "deleteDataset('" + predicate + "', '" + HOME + '/file/' + predicate + "')"
+					});
+					valueTd.append(input);
+				} else {
+					a = $('<a>');
+					td.append(a);
+					//a.attr('href', HOME + '/ui/tags/' + predicate  + '?view=' + obj.tag + '&limit=none');
+					//a.attr('href', 'javascript:getTagDefinition("' + obj.tag + '", "' + obj.vals[0] + '", "' + obj.tag + '")');
+					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+					a.html(predicate + ' (tags)');
+				}
+			} else {
+				a = $('<a>');
+				td.append(a);
+				//a.attr('href', HOME + '/ui/tags/' + predicate  + '?view=' + obj.tag + '&limit=none');
+				//a.attr('href', 'javascript:getTagDefinition("' + obj.tag + '", "' + obj.vals[0] + '", "' + obj.tag + '")');
+				a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+				a.html(predicate + ' (tags)');
+			}
 		} else if (tag == 'tagdef type') {
-			a = $('<a>');
-			td.append(a);
-			a.attr('href', HOME + '/ui/tags/typedef=' + encodeSafeURIComponent(tags[tag]) + '?view=typedef&limit=none');
-			a.html('typedef=' + tags[tag]);
+			if (tags[tag] != null) {
+				a = $('<a>');
+				td.append(a);
+				//a.attr('href', HOME + '/ui/tags/typedef=' + encodeSafeURIComponent(tags[tag]) + '?view=typedef&limit=none');
+				//a.attr('href', 'javascript:getTagDefinition("typedef", "' + tags[tag] + '", "typedef")');
+				a.attr('href', 'javascript:getTagDefinition("typedef=' + encodeSafeURIComponent(tags[tag]) + '","typedef")');
+				a.html('typedef=' + tags[tag]);
+			} else {
+				td.html('');
+			}
 		} else if (tags[tag] != null) {
 			if ($.isArray(tags[tag])) {
+				//alert('isArray: ' + tag);
 				$.each(tags[tag], function(j, value) {
 					var valueTr = $('<tr>');
 					valuesTable.append(valueTr);
@@ -6045,6 +6737,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 					}
 					valueTd.html(value);
 					if (writeOK) {
+						//alert('writeok: ' + tag);
 						valueTd = $('<td>');
 						valueTr.append(valueTd);
 						valueTd.addClass('file-tag');
@@ -6060,9 +6753,12 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 						});
 						input.val('Remove Value');
 						valueTd.append(input);
+						//alert(tag);
 						input.click({	'tag': tag,
 										'value': value},
-										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										//function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
+						//alert(tag);
 					}
 				});
 			} else if (allTags[tag]['tagdef type'] == 'boolean') {
@@ -6083,7 +6779,14 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 					if (allTags[tag]['tagdef type'] == 'empty') {
 						valueTd.html(tags[tag] ? 'is set' : 'not set');
 					} else {
-						valueTd.html(tags[tag]);
+						if (tag == 'url') {
+							var a = $('<a>');
+							valueTd.append(a);
+							a.attr({'href': tags[tag]});
+							a.html(tags[tag]);
+						} else {
+							valueTd.html(tags[tag]);
+						}
 					}
 					valueTd = $('<td>');
 					valueTr.append(valueTd);
@@ -6100,7 +6803,8 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 						input.val(tags[tag] ? 'Remove Tag' : 'Set Tag');
 						input.click({	'tag': tag,
 										'value': tags[tag]},
-										function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										//function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
 					} else {
 						input.attr({'type': 'button',
 							'name': 'tag',
@@ -6109,7 +6813,8 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 						input.val('Remove Value');
 						input.click({	'tag': tag,
 										'value': tags[tag]},
-										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										//function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), obj.vals[0]);});
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
 					}
 					valueTd.append(input);
 				}
@@ -6212,7 +6917,8 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, uiopts, roles) {
 			input.val('Set Value');
 			valueTd.append(input);
 			input.click({	'tag': tag},
-							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, obj.vals[0]);});
+							//function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, obj.vals[0]);});
+							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, predicate);});
 		}
 	});
 	
@@ -6236,19 +6942,30 @@ function writeAllowed(tag, allTags, roles, file) {
 			userOK && !browsersImmutableTags.contains(tag) &&
 				(allTags[tag]['tagdef writepolicy'] == 'subject' ||
 				allTags[tag]['tagdef writepolicy'] == 'subjectowner' ||
-				allTags[tag]['tagdef writepolicy'] == 'tag');
+				allTags[tag]['tagdef writepolicy'] == 'tag' ||
+				allTags[tag]['tagdef writepolicy'] == 'tagorowner');
 	} else {
-		var userOK = roles.contains(allTags[tag]['owner']) || allTags[tag]['owner'] == USER || allTags[tag]['owner'] == null;
+		var userOK = roles.contains(allTags[tag]['owner']) || allTags[tag]['owner'] == USER  || allTags[tag]['owner'] == 'admin' || allTags[tag]['owner'] == null;
+		//if (tag == 'id')alert(tag+ ': '+ allTags[tag]['tagdef writepolicy']);
+		//if (tag == 'id')alert('userOK: '+ userOK);
+		//if (tag == 'id')alert('owner: '+ allTags[tag]['owner']);
 		ret = ret ||
 			userOK && !browsersImmutableTags.contains(tag) &&
-				allTags[tag]['tagdef writepolicy'] == 'tag';
+				(allTags[tag]['tagdef writepolicy'] == 'tag' ||
+						allTags[tag]['tagdef writepolicy'] == 'subjectowner' ||
+						allTags[tag]['tagdef writepolicy'] == 'tagorowner' ||
+						allTags[tag]['tagdef writepolicy'] == 'subject');
 	}
+	//if (tag == 'id')alert(ret);
 	return ret;
 }
 
-function removeTagValue(tag, value, row, file) {
-	var count = 0;
-	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+function removeTagValue(tag, value, row, predicate, count) {
+	if (count == null) {
+		count = 0;
+	}
+	//var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = 'delete';
 	obj['tag'] = tag;
@@ -6267,15 +6984,19 @@ function removeTagValue(tag, value, row, file) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){removeTagValue(tag, value, row, predicate, count)}, delay);
 			}
 		}
 	});
 }
 
-function removeAddTag(tag, value, row, file) {
-	var count = 0;
-	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+function removeAddTag(tag, value, row, predicate, count) {
+	//alert('removeAddTag: '+predicate);
+	if (count == null) {
+		count = 0;
+	}
+	//var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = value ? 'delete' : 'put';
 	obj['tag'] = tag;
@@ -6287,19 +7008,19 @@ function removeAddTag(tag, value, row, file) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postRemoveAddTag(tag, value, row, file);
+			postRemoveAddTag(tag, value, row, predicate);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){removeAddTag(tag, value, row, predicate, count)}, delay);
 			}
 		}
 	});
 }
 
-function postRemoveAddTag(tag, value, row, file) {
+function postRemoveAddTag(tag, value, row, predicate) {
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
 	var valueTd = $('<td>');
@@ -6322,14 +7043,17 @@ function postRemoveAddTag(tag, value, row, file) {
 	input.val(!value ? 'Remove Tag' : 'Set Tag');
 	input.click({	'tag': tag,
 					'value': !value},
-					function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent());});
+					function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
 	valueTd.append(input);
 	row.remove();
 }
 
-function addTagValue(tag, row, allTags, file) {
-	var count = 0;
-	var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+function addTagValue(tag, row, allTags, predicate, count) {
+	if (count == null) {
+		count = 0;
+	}
+	//var url = HOME + '/tags/tagdef=' + encodeSafeURIComponent(file);
+	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = 'put';
 	obj['set-'+tag] = true;
@@ -6342,20 +7066,20 @@ function addTagValue(tag, row, allTags, file) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postAddTagValue(tag, row, allTags, file);
+			postAddTagValue(tag, row, allTags, predicate);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
+				setTimeout(function(){addTagValue(tag, row, allTags, predicate, count)}, delay);
 			}
 		}
 	});
 
 }
 
-function postAddTagValue(tag, row, allTags, file) {
+function postAddTagValue(tag, row, allTags, predicate) {
 	var value = $('#'+idquote(tag)+'_id').val();
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
@@ -6364,7 +7088,15 @@ function postAddTagValue(tag, row, allTags, file) {
 	valueTd.addClass('file-tag');
 	valueTd.addClass(tag);
 	valueTd.addClass('multivalue');
-	valueTd.html(value);
+	if (tag == 'url') {
+		var a = $('<a>');
+		valueTd.append(a);
+		a.attr({'href': value});
+		a.html(value);
+	} else {
+		valueTd.html(tags[tag]);
+	}
+	//valueTd.html(value);
 	valueTd = $('<td>');
 	valueTr.append(valueTd);
 	valueTd.addClass('file-tag');
@@ -6380,10 +7112,1016 @@ function postAddTagValue(tag, row, allTags, file) {
 	valueTd.append(input);
 	input.click({	'tag': tag,
 					'value': value},
-					function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), file);});
+					function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
 	$('#'+idquote(tag)+'_id').val('');
 	if (!allTags[tag]['tagdef multivalue']) {
 		valueTr.prev().remove();
 	}
+}
+
+function userinfo() {
+	alert('Not yet implemented');
+}
+
+function userLogout() {
+	var url = HOME + '/session';
+	$.ajax({
+		url: url,
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		success: function(data, textStatus, jqXHR) {
+			$('#topmenu').html('');
+			$('#authninfo').html('');
+			window.location = HOME;
+			//renderLogin();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+		}
+	});
+}
+
+function userChangePassword() {
+	alert('Not yet implemented');
+}
+
+function homePage(count) {
+	// get the list on homepage files
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '()name:asc:';
+	//alert(url);
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postHomePage(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){homePage(count)}, delay);
+			}
+		}
+	});
+}
+
+function postHomePage(data, textStatus, jqXHR) {
+	//alert('postHomePage');
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var ol = $('<ol>');
+	uiDiv.append(ol);
+	var li = $('<li>');
+	ol.append(li);
+	var a = $('<a>');
+	li.append(a);
+	a.attr({'href': 'javascript:viewAvailableTagDefinitions()'});
+	a.html('View available tag definitions');
+	li = $('<li>');
+	ol.append(li);
+	a = $('<a>');
+	li.append(a);
+	a.attr({'href': 'javascript:manageAvailableTagDefinitions()'});
+	a.html('Manage available tag definitions (expert mode)');
+	li = $('<li>');
+	ol.append(li);
+	a = $('<a>');
+	li.append(a);
+	a.attr({'href': 'javascript:createCustomDataset()'});
+	a.html('Create custom dataset (expert mode)');
+	$.each(data, function(i, entry) {
+		li = $('<li>');
+		ol.append(li);
+		a = $('<a>');
+		li.append(a);
+		a.attr({'href': 'javascript:showFileLink("name=' + encodeSafeURIComponent(entry.name) + '")'});
+		a.html(entry.name);
+	});
+}
+
+function manageRoles(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/user';
+	//alert('Getting all the users: GET ' + url);
+	postManageRoles(null, null, null);
+	return;
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postManageRoles(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageRoles(count)}, delay);
+			}
+		}
+	});
+}
+
+function postManageRoles(data, textStatus, jqXHR) {
+	// var users = data['users'];
+	var users = USER_ROLES;
+	users.sort(compareIgnoreCase);
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Role Management');
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Create a Role');
+	var input = $('<input>');
+	input.attr({'type': 'text',
+		'name': 'role',
+		'id': 'role'
+	});
+	uiDiv.append(input);
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Create',
+		'id': 'createRole',
+		'onclick': 'createUser();'
+	});
+	uiDiv.append(input);
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Existing Roles');
+	var p = $('<p>');
+	uiDiv.append(p);
+	var a = $('<a>');
+	p.append(a);
+	a.attr({'href': 'javascript:manageAllRoles()'});
+	a.html('Manage membership of all roles');
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('role-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	var th = $('<th>');
+	tr.append(th);
+	th.html('Role');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Delete');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Password');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Disable');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Reset');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Membership');
+	$.each(users, function(i, user) {
+		tr = $('<tr>');
+		table.append(tr);
+		var td = $('<td>');
+		tr.append(td);
+		td.html(user);
+		td = $('<td>');
+		tr.append(td);
+		input = $('<input>');
+		input.attr({'type': 'button',
+			'value': 'Delete role',
+			'onclick': 'deleteUser("' + user + '");'
+		});
+		td.append(input);
+		td = $('<td>');
+		tr.append(td);
+		td.html('Password active');
+		td = $('<td>');
+		tr.append(td);
+		input = $('<input>');
+		input.attr({'type': 'button',
+			'value': 'Disable login',
+			'onclick': 'disableLogin("' + user + '");'
+		});
+		td.append(input);
+		td = $('<td>');
+		tr.append(td);
+		td.html('Password active');
+		td = $('<td>');
+		tr.append(td);
+		input = $('<input>');
+		input.attr({'type': 'button',
+			'value': 'Reset password',
+			'onclick': 'resetPassword("' + user + '");'
+		});
+		td.append(input);
+		td = $('<td>');
+		tr.append(td);
+		a = $('<a>');
+		td.append(a);
+		a.attr({'href': 'javascript:manageMembership("' + user + '")'});
+		a.html('Manage membership');
+	});
+}
+
+function manageAllRoles() {
+	alert('Not yet implemented');
+}
+
+function deleteUser(user) {
+	alert('Not yet implemented ' + user);
+}
+
+function manageMembership(user) {
+	alert('Not yet implemented ' + user);
+}
+
+function resetPassword(user) {
+	alert('Not yet implemented ' + user);
+}
+
+function disableLogin(user) {
+	alert('Not yet implemented ' + user);
+}
+
+function createUser(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var role = $('#role').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (role == '') {
+		alert('Please provide a name for the new user.');
+		return;
+	}
+	var url = HOME + '/user/' + encodeSafeURIComponent(role);
+	//alert('PUT '+url);
+	postCreateUser(null, null, null, role);
+	return;
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'PUT',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postCreateUser(data, textStatus, jqXHR, role);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){createUser(count)}, delay);
+			}
+		}
+	});
+}
+
+function postCreateUser(data, textStatus, jqXHR, role) {
+	alert ('postCreateUser: ' + role);
+}
+
+
+function queryByTags() {
+	viewLink(null);
+}
+
+function viewAvailableTagDefinitions() {
+	viewLink('tagdef?view=tagdef');
+}
+
+function viewLink(querypath, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/ui/query/'
+	if (querypath != null) {
+		url += querypath;
+	}
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			renderQuery(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){viewLink(querypath, count)}, delay);
+			}
+		}
+	});
+}
+
+function renderQuery(data) {
+	renderQueryHTML();
+	initPSOC(HOME, USER, WEBAUTHNHOME, data.basepath, data.querypath);
+}
+
+function renderQueryHTML() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	
+	var psoc = $('<div>');
+	uiDiv.append(psoc);
+	psoc.attr({'id': 'psoc',
+		'onmouseup': "document.body.style.cursor = 'default';"});
+	
+	//<!-- Table Cell Right Click Menu -->
+	var ul = $('<ul>');
+	psoc.append(ul);
+	ul.attr({'id': 'tablecellMenu'});
+	ul.addClass('contextMenu');
+	var li = $('<li>');
+	ul.append(li);
+	var a = $('<a>');
+	li.append(a);
+	a.attr({'href': '#delete'});
+	a.html('Delete value');
+	
+	li = $('<li>');
+	ul.append(li);
+	a = $('<a>');
+	li.append(a);
+	a.attr({'href': '#bulkdelete'});
+	a.html('Delete values...');
+	
+	li = $('<li>');
+	ul.append(li);
+	a = $('<a>');
+	li.append(a);
+	a.attr({'href': '#edit'});
+	a.html('Edit value');
+	
+	ul = $('<ul>');
+	psoc.append(ul);
+	ul.attr({'id': 'tablecellEditMenu'});
+	ul.addClass('contextMenu');
+	li = $('<li>');
+	ul.append(li);
+	a = $('<a>');
+	li.append(a);
+	a.attr({'href': '#edit'});
+	a.html('Edit value');
+	
+	var table = $('<table>');
+	psoc.append(table);
+	var thead = $('<thead>');
+	table.append(thead);
+	var tr = $('<tr>');
+	thead.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.addClass('topnav');
+	var b = $('<b>');
+	td.append(b);
+	b.html('Actions');
+	
+	ul = $('<ul>');
+	td.append(ul);
+	ul.attr({'id': 'GlobalMenu'});
+	ul.addClass('subnav');
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'id': 'clearAllFilters',
+		'onmousedown': 'clearAllFilters();'});
+	li.addClass('item');
+	li.html('Clear all filters');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'id': 'disableEdit',
+		'onmousedown': 'disableEdit();'});
+	li.addClass('item');
+	li.html('Disable edit');
+	li.css('display', 'none');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'id': 'enableEdit',
+		'onmousedown': 'enableEdit();'});
+	li.addClass('item');
+	li.html('Enable edit');
+	li.css('display', 'none');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'id': 'hideRange',
+		'onmousedown': 'hideRange();'});
+	li.addClass('item');
+	li.html('Hide range');
+	li.css('display', 'none');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'onmousedown': 'addTagToQuery();'});
+	li.addClass('item');
+	li.html('Show another column...');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'onmousedown': 'addViewTagsToQuery();'});
+	li.addClass('item');
+	li.html('Show a column set...');
+	
+	li = $('<li>');
+	ul.append(li);
+	li.attr({'id': 'showRange',
+		'onmousedown': 'showRange();'});
+	li.addClass('item');
+	li.html('Show range');
+	var span = $('<span>')
+	td.append(span);
+	
+	td = $('<td>');
+	tr.append(td);
+	span = $('<span>')
+	td.append(span);
+	span.attr({'id': 'ViewResults'});
+	var img = $('<img>');
+	td.append(img);
+	img.attr({'id': 'pagePrevious',
+		'src': HOME + '/static/back.jpg',
+		'alt': 'Previous',
+		'onclick': 'setPreviousPage();'});
+	img.addClass('margin');
+	var label = $('<label>');
+	td.append(label);
+	label.attr({'id': 'resultsRange'});
+	var img = $('<img>');
+	td.append(img);
+	img.attr({'id': 'pageNext',
+		'src': HOME + '/static/forward.jpg',
+		'alt': 'Previous',
+		'onclick': 'setNextPage();'});
+	img.addClass('margin');
+	span = $('<span>')
+	td.append(span);
+	span.attr({'id': 'totalResults'});
+	label = $('<label>');
+	td.append(label);
+	label.html(' with');
+	var select = $('<select>');
+	td.append(select);
+	select.attr({'id': 'previewLimit',
+		'name': 'previewLimit',
+		'onchange': 'updatePreviewLimit()'});
+	var option = $('<option>');
+	select.append(option);
+	option.text('10');
+	option.attr('value', '10');
+	option = $('<option>');
+	select.append(option);
+	option.text('25');
+	option.attr('value', '25');
+	option = $('<option>');
+	select.append(option);
+	option.text('50');
+	option.attr('value', '50');
+	option = $('<option>');
+	select.append(option);
+	option.text('100');
+	option.attr('value', '100');
+	label = $('<label>');
+	td.append(label);
+	label.html('per page.');
+
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': '',
+		'id': 'Query_URL'});
+	a.html('Bookmarkable link');
+
+	var div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'customizedViewDiv'});
+	div.css({'display': 'none'});
+	var fieldset = $('<fieldset>');
+	div.append(fieldset);
+	var p = $('<p>');
+	fieldset.append(p);
+	p.html("Select an available tag and click 'Add to query':");
+	p = $('<p>');
+	fieldset.append(p);
+	var input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'showAnotherColumn',
+		'value': 'add'});
+	p.append(input);
+	label = $('<label>');
+	p.append(label);
+	label.html('Add to visible columns');
+	var br = $('<br>');
+	p.append(br);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'showAnotherColumn',
+		'value': 'replace'});
+	p.append(input);
+	label = $('<label>');
+	p.append(label);
+	label.html('Replace previously visible columns');
+	br = $('<br>');
+	p.append(br);
+	select = $('<select>');
+	fieldset.append(select);
+	select.attr({'id': 'customizedViewSelect',
+		'name': 'customizedViewSelect',
+		'onclick': "loadAvailableTags('customizedViewSelect')"});
+	option = $('<option>');
+	select.append(option);
+	option.text('Available tags');
+	option.attr('value', '');
+	
+	div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'selectViewDiv'});
+	div.css({'display': 'none'});
+	fieldset = $('<fieldset>');
+	div.append(fieldset);
+	p = $('<p>');
+	fieldset.append(p);
+	p.html("Select an available view and click 'Add to query':");
+	p = $('<p>');
+	fieldset.append(p);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'showColumnSet',
+		'value': 'add'});
+	p.append(input);
+	label = $('<label>');
+	p.append(label);
+	label.html('Add to visible columns');
+	br = $('<br>');
+	p.append(br);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'showColumnSet',
+		'value': 'replace'});
+	p.append(input);
+	label = $('<label>');
+	p.append(label);
+	label.html('Replace previously visible columns');
+	br = $('<br>');
+	p.append(br);
+	select = $('<select>');
+	fieldset.append(select);
+	select.attr({'id': 'selectViews',
+		'name': 'selectViews',
+		'onclick': "loadAvailableViews('selectViews')"});
+	option = $('<option>');
+	select.append(option);
+	option.text('Available Views');
+	option.attr('value', '');
+	
+	div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'queryDiv'});
+	div.css({'display': 'none',
+		'width': '25%'});
+	
+	var divWrapper = $('<div>');
+	psoc.append(divWrapper);
+	divWrapper.attr({'id': 'editTagValuesWrapperDiv'});
+	divWrapper.css({'display': 'none',
+		'width': '25%'});
+	div = $('<div>');
+	divWrapper.append(div);
+	div.attr({'id': 'editTagValuesDiv'});
+	fieldset = $('<fieldset>');
+	div.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('Scope');
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'valuesScope',
+		'value': 'page'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Edit all subjects showing on this page');
+	br = $('<br>');
+	fieldset.append(br);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'valuesScope',
+		'value': 'filter'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Edit all subjects matching filters');
+	br = $('<br>');
+	fieldset.append(br);
+
+	fieldset = $('<fieldset>');
+	div.append(fieldset);
+	legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('Action');
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'valuesAction',
+		'value': 'PUT'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Add tag value(s)');
+	br = $('<br>');
+	fieldset.append(br);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'valuesAction',
+		'value': 'DELETE'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Delete tag value(s)');
+	br = $('<br>');
+	fieldset.append(br);
+	br = $('<br>');
+	div.append(br);
+	table = $('<table>');
+	div.append(table);
+	table.attr({'id': 'bulk_edit_table'});
+
+
+	divWrapper = $('<div>');
+	psoc.append(divWrapper);
+	divWrapper.attr({'id': 'deleteTagValuesWrapperDiv'});
+	divWrapper.css({'display': 'none',
+		'width': '25%'});
+	div = $('<div>');
+	divWrapper.append(div);
+	div.attr({'id': 'deleteTagValuesDiv'});
+	fieldset = $('<fieldset>');
+	div.append(fieldset);
+	legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('Scope');
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'deleteValuesScope',
+		'value': 'page'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Edit all subjects showing on this page');
+	br = $('<br>');
+	fieldset.append(br);
+	input = $('<input>');
+	input.attr({'type': 'radio',
+		'name': 'deleteValuesScope',
+		'value': 'filter'});
+	fieldset.append(input);
+	label = $('<label>');
+	fieldset.append(label);
+	label.html('Edit all subjects matching filters');
+	br = $('<br>');
+	fieldset.append(br);
+	div.append($('<br>'))
+	label = $('<label>');
+	div.append(label);
+	label.html('Values:');
+	div.append($('<br>'))
+	table = $('<table>');
+	div.append(table);
+	var tbody = $('<tbody>');
+	table.append(tbody);
+	tbody.attr({'id': 'deleteTagValuesTableBody'});
+	
+	div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'Query_Preview'});
+
+	select = $('<select>');
+	psoc.append(select);
+	select.attr({'id': 'versions',
+		'name': 'versions',
+		'onchange': 'showPreview()'});
+	option = $('<option>');
+	select.append(option);
+	option.text('Show latest version if matches');
+	option.attr('value', 'latest');
+	option = $('<option>');
+	select.append(option);
+	option.text('Show any version which matches');
+	option.attr('value', 'any');
+
+	div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'DragAndDropBox'});
+	div.css({'display': 'none',
+	    'position': 'absolute',
+	    'font-size': '12px',
+	    'font-weight': 'bold',
+	    'font-family': 'verdana',
+	    'border': '#72B0E6 solid 1px',
+	    'padding': '15px',
+	    'color': '#1A80DB',
+    	'background-color': '#FFFFFF'});
+
+	div = $('<div>');
+	psoc.append(div);
+	div.attr({'id': 'TipBox'});
+	div.css({'display': 'none',
+	    'position': 'absolute',
+	    'font-size': '12px',
+	    'font-weight': 'bold',
+	    'font-family': 'verdana',
+	    'border': '#72B0E6 solid 1px',
+	    'padding': '15px',
+	    'color': '#1A80DB',
+	    'white-space': 'nowrap',
+    	'background-color': '#FFFFFF'});
+}
+
+function manageAvailableTagDefinitions(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/session'
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			USER_ROLES = data['attributes'];
+			USER = data['client'];
+			manageTagDefinitions(data['attributes']);
+			/*
+			var uiopts = {'path': [[[{'tag': 'tagdef',
+			                         'vals': ['MyTag']}]]],
+					'queryopts': {'limit': 'none',
+						'view': 'tagdef'}
+					
+			};
+			alert(uiopts.path[0][0][0].tag +' = ' + uiopts.path[0][0][0].vals[0]);
+			alert(uiopts.queryopts.view);
+			*/
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageAvailableTagDefinitions(count)}, delay);
+			}
+		}
+	});
+}
+
+function createCustomDataset() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var form = $('<form>');
+	uiDiv.append(form);
+	form.attr({'id': 'NameForm',
+		'name': 'NameForm',
+		'enctype': 'application/x-www-form-urlencoded',
+		'action': HOME + '/file',
+		'method': 'post',
+		'onsubmit': "return validateNameForm('create', '')"
+	});
+	div = $('<div>');
+	form.append(div);
+	div.attr({'id': 'NameForm_div'});
+	var h3 = $('<h3>');
+	div.append(h3);
+	h3.html('Choose Type of Data');
+	var input = $('<input>');
+	input.attr({'type': 'hidden',
+		'name': 'action',
+		'value': 'put'
+	});
+	div.append(input);
+	var namedDataset_div = $('<div>');
+	div.append(namedDataset_div);
+	namedDataset_div.attr({'id': 'namedDataset'});
+	namedDataset_div.css({'display': 'block'});
+	var label = $('<label>');
+	namedDataset_div.append(label);
+	label.html('Enter a name for the dataset:');
+	input = $('<input>');
+	input.attr({'name': 'name',
+		'type': 'text',
+		'id': 'datasetName'
+	});
+	namedDataset_div.append(input);
+	label = $('<label>');
+	div.append(label);
+	label.html('Select a type of dataset definition:');
+	var select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'type',
+		'id': 'type',
+		'onchange': "changeNameFormType('create', '');"
+	});
+	var option = $('<option>');
+	select.append(option);
+	option.text('blank (Dataset node for metadata-only)');
+	option.attr('value', 'blank');
+	option = $('<option>');
+	select.append(option);
+	option.text('file (Named dataset for locally stored file)');
+	option.attr({'value': 'file',
+		'selected': 'selected'});
+	option = $('<option>');
+	select.append(option);
+	option.text('url (Named dataset for URL redirecting)');
+	option.attr({'value': 'url'});
+	input = $('<input>');
+	input.attr({'name': 'myfile',
+		'type': 'file',
+		'id': 'fileName'
+	});
+	input.css({'display': 'inline'});
+	div.append(input);
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Select an initial read permission:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'read users',
+		'id': 'read users'
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Only owner may read');
+	option.attr('value', 'owner');
+	option = $('<option>');
+	select.append(option);
+	option.text('Anybody may read');
+	option.attr({'value': '*'});
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Select an initial write permission:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'write users',
+		'id': 'write users'
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Only owner may write');
+	option.attr('value', 'owner');
+	option = $('<option>');
+	select.append(option);
+	option.text('Anybody may write');
+	option.attr({'value': '*'});
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Default View:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'defaultView',
+		'id': 'defaultView',
+		'typestr': 'view',
+		'onclick': "chooseOptions('" + HOME + "', '" + WEBAUTHNHOME + "', 'view', 'defaultView')"
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Choose a View name');
+	option.attr('value', '');
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Status of the dataset:  ');
+	input = $('<input>');
+	input.attr({'type': 'checkbox',
+		'id': 'incomplete',
+		'name': 'incomplete',
+		'value': 'incomplete',
+		'checked': 'checked'
+	});
+	div.append(input);
+	label = $('<label>');
+	div.append(label);
+	label.html('Incomplete');
+	input = $('<input>');
+	input.attr({'type': 'submit',
+		'id': 'submit',
+		'value': 'Submit'
+	});
+	form.append(input);
+	div = $('<div>');
+	uiDiv.append(div);
+	div.attr({'id': 'Copy'})
+}
+
+function showFileLink(predicate, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/query/' + predicate + '(url;tagdef)';
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postShowFileLink(data[0]);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){showFileLink(predicate, count)}, delay);
+			}
+		}
+	});
+}
+
+function postShowFileLink(data) {
+	var url = data['url'];
+	var tagdef = data['tagdef'];
+	if (url == null) {
+		alert('NULL url');
+	} else {
+		var index = url.indexOf('/query/');
+		if (index == -1) {
+			alert('url "' + url + '" is not a query.');
+		} else {
+			index += '/query/'.length;
+			viewLink(url.substr(index));
+		}
+	}
+}
+
+function getTagDefinition_old(defType, tag, view) {
+	
+}
+
+function getTagDefinition(predicate, view, count) {
+	//alert(predicate == 'vname=mydataset%401');
+	//alert(predicate);
+	//alert(predicate == 'tagdef=Image%20Set');
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/session'
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			var uiDiv = $('#ui');
+			uiDiv.html('');
+			USER_ROLES = data['attributes'];
+			USER = data['client'];
+			/*
+			var uiopts = {'path': [[[{'tag': defType,
+                					  'vals': []}]]],
+                		  'queryopts': {'limit': 'none'}};
+			uiopts.path[0][0][0].vals.push(tag);
+			uiopts.queryopts.view = view;
+			tagsUI(uiopts, data['attributes']);
+			*/
+			//var predicate = defType + '=' + encodeSafeURIComponent(tag);
+			//var queryopts = '?limit=none&view=' + view;
+			//tagsUI(predicate, queryopts, data['attributes']);
+			tagsUI(predicate, view, data['attributes']);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){getTagDefinition(predicate, view, count)}, delay);
+			}
+		}
+	});
+	//alert(defType);
+	//alert(tag);
+	//alert(view);
 }
 

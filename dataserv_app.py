@@ -1240,15 +1240,16 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         yield self.render.Bottom()
  
-    def renderui(self, api, queryopts, path=[]):
+    def renderui(self, api, queryopts={}, path=[]):
         self.header('Content-Type', 'text/html')
         self.globals['uiopts'] = {}
         self.globals['uiopts']['api'] = api
         self.globals['uiopts']['queryopts'] = queryopts
         self.globals['uiopts']['path'] = path
-        #web.debug(self.globals['uiopts'])
-        return self.renderlist(None,
-                           [self.render.UI()])
+        self.globals['uiopts']['help'] = self.globals['help']
+        self.globals['uiopts']['bugs'] = self.globals['bugs']
+        self.globals['uiopts']['pollmins'] = 1
+        return self.render.UI('client')
 
     def preDispatchFake(self, uri, app):
         self.db = app.db
@@ -1264,9 +1265,10 @@ class Application (webauthn2_handler_factory.RestHandler):
             acceptTypes = self.acceptTypesPreferedOrder()
             if acceptTypes and acceptTypes[0] == 'text/html':
                 # render a page allowing AJAX login?
-                pass
-            # give a simple error for non-HTML clients
-            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+                self.login_required = True
+            else:
+                # give a simple error for non-HTML clients
+                raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
         
         self.middispatchtime = datetime.datetime.now()
 

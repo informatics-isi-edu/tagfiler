@@ -37,92 +37,93 @@ $else:
   <script type="text/javascript" src="${home}/static/jquery-ui-timepicker-addon.js"></script>
   <script type="text/javascript" src="${home}/static/jquery.contextMenu.js"></script>
   <script type="text/javascript" src="${home}/static/functions.js"></script>
-  <script type="text/javascript">
-    $if pollmins and authn.role:
-    	runSessionPolling(${pollmins}, ${2 * pollmins});
-    $if webauthnrequire:
-    	redirectToLogin = true;
-	\$(document).ready(function() {
-		initIdleWarning();
-	});
-  </script>
-</head>
-<body>
-<div id="Idle_Session_Warning" style="display: none">
-<p>
-Warning, your session will soon expire due to idle timeout...
-</p>
-</div>
-<table class="topmargin">
-<tr>
-$if logo:
-	<td class="logo">$:{logo}</td>
-$if subtitle:
-	<td class="title"><h1>${subtitle}</h1></td>
-<td class="authninfo">
-<table class="authninfo">
-$if authn.role:
-	$ rfc1123 = "%a, %d %b %Y %H:%M:%S UTC%z"
-	<tr><td>User:</td><td><a href="${webauthnhome}/status">${authn.role}</a></td></tr>
-	$ passwdurl = authn.getPasswdUrl()
-	$ logouturl = authn.getLogoutUrl()
-	$if logouturl:
-		<tr><td></td><td><a href="${logouturl}">log&nbsp;out</a></td></tr>
-	$if passwdurl:
-		<tr><td></td><td><a href="${passwdurl}">change&nbsp;password</a></td></tr>
-	$if authn.since:
-		<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span>
-		<script type="text/javascript">
-		localizeDate("sincetime");
-		</script></td></tr>
-	$if authn.until:
-		<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span>
-		<script type="text/javascript">
-		localizeDate("untiltime");
-		</script></td></tr>
-$else:
-	<tr class="noauthn"><td>Login User:</td><td>not logged in</td></tr>
-	$ loginurl = authn.getLoginUrl()
-	$if loginurl:
-		<tr><td><a href="${loginurl}">Log in now</a></td></tr>
-</table>
-</td>
-</tr>
-</table>
-<div class="page">
-<table class="topmenu">
-  <tr>
-    <td>
-      <a href="${home}/">Home</a>
-    </td>
-    $ roleurl = authn.getRoleMgmtUrl()
-    $if roleurl and authn.hasRoles(['admin']):
-    	<td>
-	<a href="${roleurl}">Manage roles</a>
+$if None:
+	  <script type="text/javascript">
+	    $if pollmins and authn.role:
+	    	runSessionPolling(${pollmins}, ${2 * pollmins});
+	    $if webauthnrequire:
+	    	redirectToLogin = true;
+		\$(document).ready(function() {
+			initIdleWarning();
+		});
+	  </script>
+	</head>
+	<body>
+	<div id="Idle_Session_Warning" style="display: none">
+	<p>
+	Warning, your session will soon expire due to idle timeout...
+	</p>
+	</div>
+	<table class="topmargin">
+	<tr>
+	$if logo:
+		<td class="logo">$:{logo}</td>
+	$if subtitle:
+		<td class="title"><h1>${subtitle}</h1></td>
+	<td class="authninfo">
+	<table class="authninfo">
+	$if authn.role:
+		$ rfc1123 = "%a, %d %b %Y %H:%M:%S UTC%z"
+		<tr><td>User:</td><td><a href="${webauthnhome}/status">${authn.role}</a></td></tr>
+		$ passwdurl = authn.getPasswdUrl()
+		$ logouturl = authn.getLogoutUrl()
+		$if logouturl:
+			<tr><td></td><td><a href="${logouturl}">log&nbsp;out</a></td></tr>
+		$if passwdurl:
+			<tr><td></td><td><a href="${passwdurl}">change&nbsp;password</a></td></tr>
+		$if authn.since:
+			<tr><td>Since:</td><td><span id="sincetime">${authn.since.strftime(rfc1123)}</span>
+			<script type="text/javascript">
+			localizeDate("sincetime");
+			</script></td></tr>
+		$if authn.until:
+			<tr><td>Expires:</td><td><span id="untiltime">${authn.until.strftime(rfc1123)}</span>
+			<script type="text/javascript">
+			localizeDate("untiltime");
+			</script></td></tr>
+	$else:
+		<tr class="noauthn"><td>Login User:</td><td>not logged in</td></tr>
+		$ loginurl = authn.getLoginUrl()
+		$if loginurl:
+			<tr><td><a href="${loginurl}">Log in now</a></td></tr>
+	</table>
 	</td>
-    $if authn.hasRoles(['curator', 'uploader']):
-	<td>
-	<a href="${home}/study?action=upload">Upload study</a>
-	</td>
-    $if authn.hasRoles(['curator', 'downloader']):
-	<td>
-	<a href="${home}/study?action=download">Download study</a>
-	</td>
-    <td>
-      <a href="${query}">Query by tags</a>
-    </td>
-    <td>
-    <a href="${help}">Help</a>
-    </td>
-    <td>
-    <a href="${bugs}">Bugs</a>
-    </td>
-    $if authn.hasRoles(['admin']):
-	<td>
-	<a href="${home}/log">Logs</a>
-	</td>
-  </tr>
-</table>
-$if title:
-	<h2>${title}</h2>
-<div class="content">
+	</tr>
+	</table>
+	<div class="page">
+	<table class="topmenu">
+	  <tr>
+	    <td>
+	      <a href="${home}/">Home</a>
+	    </td>
+	    $ roleurl = authn.getRoleMgmtUrl()
+	    $if roleurl and authn.hasRoles(['admin']):
+	    	<td>
+		<a href="${roleurl}">Manage roles</a>
+		</td>
+	    $if authn.hasRoles(['curator', 'uploader']):
+		<td>
+		<a href="${home}/study?action=upload">Upload study</a>
+		</td>
+	    $if authn.hasRoles(['curator', 'downloader']):
+		<td>
+		<a href="${home}/study?action=download">Download study</a>
+		</td>
+	    <td>
+	      <a href="${query}">Query by tags</a>
+	    </td>
+	    <td>
+	    <a href="${help}">Help</a>
+	    </td>
+	    <td>
+	    <a href="${bugs}">Bugs</a>
+	    </td>
+	    $if authn.hasRoles(['admin']):
+		<td>
+		<a href="${home}/log">Logs</a>
+		</td>
+	  </tr>
+	</table>
+	$if title:
+		<h2>${title}</h2>
+	<div class="content">
