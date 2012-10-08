@@ -35,7 +35,7 @@ myrand = random.Random()
 myrand.seed(os.getpid())
 
 
-class SubjectCache:
+class SubjectCache (object):
 
     purge_interval_seconds = 60
     cache_stale_seconds = 300

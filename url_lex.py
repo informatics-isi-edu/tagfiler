@@ -91,10 +91,11 @@ def t_STRING(t):
     t.type = keywords.get(t.value, 'STRING')
     return t
 
-class LexicalError:
+class LexicalError (RuntimeError):
     """Exception for lexical errors"""
 
     def __init__(self):
+        RuntimeError.__init__(self)
         pass
 
 def t_error(t):

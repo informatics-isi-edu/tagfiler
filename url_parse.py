@@ -440,10 +440,11 @@ def p_string_concat(p):
     """string : string string"""
     p[0] = p[1] + p[2]
 
-class ParseError:
+class ParseError (RuntimeError):
     """Exception for parse errors"""
 
     def __init__(self, t, message='URL parse error at token:'):
+        RuntimeError.__init__(self)
         web.debug(message, t)
         pass
 

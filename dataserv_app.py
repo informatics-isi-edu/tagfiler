@@ -212,7 +212,7 @@ def db_dbquery(db, query, vars={}):
         # assume it is not an iterable result
         return myunicode(results)
     
-class Values:
+class Values (object):
     """Simple helper class to build up a set of values and return keys suitable for web.db.query."""
     def __init__(self):
         self.va = []
@@ -231,7 +231,7 @@ class Values:
     def pack(self):
         return dict([ ('v%d' % i, self.va[i]) for i in range(0, len(self.va)) ])
 
-class DbCache:
+class DbCache (object):
     """A little helper to share state between web requests."""
 
     def __init__(self, idtagname, idalias=None):
@@ -274,7 +274,7 @@ class DbCache:
         else:
             return self.cache.itervalues()
 
-class PerUserDbCache:
+class PerUserDbCache (object):
 
     max_cache_seconds = 500
     purge_interval_seconds = 60
@@ -955,23 +955,13 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.render = web.template.render(self.config['template path'], globals=self.globals)
         render = self.render # HACK: make this available to exception classes too
 
-        def sq_path_linearize(v):
-            if hasattr(v, 'is_subquery'):
-                return path_linearize(v.path)
-            else:
-                return v
-        
         # 'globals' are local to this Application instance and also used by its templates
-        self.globals['smartTagValues'] = True
         self.globals['render'] = self.render # HACK: make render available to templates too
-        self.globals['test_tag_authz'] = self.test_tag_authz
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote
         self.globals['webdebug'] = web.debug
         self.globals['jsonWriter'] = jsonWriter
         self.globals['subject2identifiers'] = lambda subject, showversions=True: self.subject2identifiers(subject, showversions)
-        self.globals['sq_path_linearize'] = sq_path_linearize
-
         self.globals['home'] = self.config.home + web.ctx.homepath
         self.globals['homepath'] = web.ctx.homepath
 
@@ -986,7 +976,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.globals['subtitle'] = self.config.subtitle
         self.globals['logo'] = self.config.logo
         self.globals['contact'] = self.config.contact
-        self.globals['webauthnhome'] = 'FIXME'
         self.globals['filelisttags'] = self.config['file list tags']
         self.globals['filelisttagswrite'] = self.config['file list tags write']
         self.globals['appletTestProperties'] = self.config['applet test properties']

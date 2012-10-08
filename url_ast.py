@@ -100,7 +100,7 @@ def dictmerge(base, custom):
     custom.update(base)
     return custom
 
-class Subquery:
+class Subquery (object):
     """Stub AST node holds a query path that is not wrapped in a full URI.
 
        This class cannot be invoked by the URL dispatcher as it has no web methods."""
@@ -405,14 +405,9 @@ class FileList (Node):
             elif self.homepage:
                 self.header('Content-Type', 'text/html')
                 return self.renderui(['home'])
-                #return self.renderlist(None,
-                                       #[self.render.Homepage(files)])
             else:
                 self.header('Content-Type', 'text/html')
                 return self.renderui(['home'])
-                #return self.renderlist(None,
-                                       #[self.render.Commands(),
-                                        #self.render.FileList(files)])
                 
         action = None
         name = None
@@ -911,8 +906,6 @@ class FileTags (Node):
                 
         # render HTML result
         self.header('Content-Type', 'text/html')
-        if self.queryopts.get('values', None) == 'basic':
-            self.globals['smartTagValues'] = False
 
         simplepath = [ x for x in self.path ]
         simplepath[-1] = simplepath[-1][0], [], []
@@ -1329,8 +1322,6 @@ class Query (Node):
                 if self.query_range:
                     raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
                 self.header('Content-Type', 'text/html')
-                #for r in self.renderlist(self.title, [self.render.Query()]):
-                    #yield r
                 yield self.renderui(['query'], self.globals['querypath'], self.globals['basepath'])
                 return
 
