@@ -3648,17 +3648,38 @@ class Application (webauthn2_handler_factory.RestHandler):
         if versions not in [ 'latest', 'any' ]:
             versions = 'latest'
 
+        if list_priority and list_priority[0] == 'path' and listpreds:
+            livetags = set([ p.tag for p in listpreds ])
+        else:
+            livetags = None
+
+        sql, values = self.build_files_by_predlist_path(path[0:-1] + [(subjpreds, [ web.storage(tag='id', op=None, vals=[]) ], [])], 
+                                                            versions=versions, limit=None, enforce_read_authz=False)
+        sql = 'SELECT array_agg(DISTINCT st.tagname) AS tagnames FROM (%s) s JOIN subjecttags st ON (s.id = st.subject)' % sql
+        
+        if not livetags or len(livetags) > 5:
+            if livetags:
+                sql += ' WHERE st.tagname IN (%s)' % ','.join([ wrapval(t) for t in livetags ])
+
+            results = self.dbquery(sql, vars=values)
+            livetags = set(results[0].tagnames)
+        else:
+            livetags = None
+
         def wrap_results(listtags=None, listpreds=None, writetags=[], ordered=False):
             # build full results tuple from derived listtags or listpreds, reordering a bit if ordered=False
-            if listpreds:
-                have_tags = set([ p.tag for p in listpreds ])
-            else:
+            if not listpreds:
                 if not listtags:
                     listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
                 listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
                 have_tags = set(listtags)
 
+            if livetags != None:
+                # filter listpreds to only the subject of live tags that can possibly return triples
+                listpreds = [ p for p in listpreds if p.tag in livetags ]
+
             listtags = [ p.tag for p in listpreds ]
+            have_tags = set(listtags)
             listpreds += [ web.Storage(tag=tag, op=None, vals=[]) for tag in extra_tags if tag not in have_tags ]
             have_tags.update( set(extra_tags) )
 
