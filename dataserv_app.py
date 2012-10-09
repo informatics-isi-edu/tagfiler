@@ -3318,6 +3318,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             if enforce_read_authz:
                 spreds = spreds + [ web.storage(tag='readok', op='=', vals=['True']) ]
 
+            lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
+                                web.storage(tag='writeok', op=None, vals=[]),
+                                web.storage(tag='id', op=None, vals=[]),
+                                web.storage(tag='owner', op=None, vals=[]) ]
+
             spreds = self.mergepreds(spreds, tagdefs)
             lpreds = self.mergepreds(lpreds, tagdefs)
 
