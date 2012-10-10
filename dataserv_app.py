@@ -3193,7 +3193,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 valcol = ('NOT ("_read users".value IS NULL OR "_read users".value NOT IN (%(rolekeys)s))'
                           + ' OR '
                           + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
-                m['value'] = ', %s AS value' % valcol
+                m['value'] = ', bool_or(%s) AS value' % valcol
+                m['group'] = 'GROUP BY subject'
             elif tagdef.tagname == 'writeok':
                 extra_tag_columns.add('owner')
                 extra_tag_columns.add('write users')
@@ -3201,7 +3202,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 valcol = ('NOT ("_write users".value IS NULL OR "_write users".value NOT IN (%(rolekeys)s))'
                           + ' OR '
                           + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
-                m['value'] = ', %s AS value' % valcol
+                m['value'] = ', bool_or(%s) AS value' % valcol
+                m['group'] = 'GROUP BY subject'
             elif tagdef.multivalue and final:
                 m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
                 m['group'] = 'GROUP BY subject'
