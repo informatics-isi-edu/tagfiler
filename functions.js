@@ -1206,13 +1206,6 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 		retry = (count <= MAX_RETRIES);
 		break;
 	case 401:		// Unauthorized
-	case 403:	// Forbidden
-		//alert('status: '+jqXHR.status+'\n'+jqXHR.responseText);
-		//var response = $(jqXHR.responseText);
-		//alert('OK');
-		//$.each($('p', response), function(i, p) {
-			//alert($(p).html());
-		//});
 		var err = jqXHR.getResponseHeader('X-Error-Description');
 		if (err != null) {
 			err = decodeURIComponent(err);
@@ -1222,6 +1215,14 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 				return false;
 			}
 		}
+		break;
+	case 403:	// Forbidden
+		var err = jqXHR.responseText;
+		if (err == 'unauthenticated session access forbidden') {
+			window.location = '/tagfiler';
+			return false;
+		}
+		break;
 	}
 	
 	if (!retry) {
@@ -7452,6 +7453,8 @@ function renderQuery(data) {
 function renderQueryHTML() {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
+	$('#selectViewDiv').remove();
+	$('#customizedViewDiv').remove();
 	
 	var psoc = $('<div>');
 	uiDiv.append(psoc);

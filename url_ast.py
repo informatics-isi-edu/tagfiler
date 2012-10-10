@@ -1338,9 +1338,6 @@ class UI (Node):
         self.uiopts = uiopts
         self.path = path
         self.queryopts = queryopts
-        web.debug(('uiopts', self.uiopts))
-        web.debug(('path', self.path))
-        web.debug(('queryopts', self.queryopts))
         
     def GET(self, uri):
         #web.debug((uri, ' self.uiopts: ', self.uiopts, ' self.queryopts: ', self.queryopts, ' self.path: ', self.path))
@@ -1356,8 +1353,6 @@ class UI (Node):
                                                lpreds=[dict(l) for l in lpreds],
                                                otags=otags)
                                           for spreds, lpreds, otags in path ]
-            web.debug(('basepath', self.basepath))
-            web.debug(('querypath', self.querypath))
             return None
 
         def postCommit(files):
