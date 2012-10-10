@@ -1207,8 +1207,21 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 		break;
 	case 401:		// Unauthorized
 	case 403:	// Forbidden
-		window.location = '/tagfiler';
-		return false;
+		//alert('status: '+jqXHR.status+'\n'+jqXHR.responseText);
+		//var response = $(jqXHR.responseText);
+		//alert('OK');
+		//$.each($('p', response), function(i, p) {
+			//alert($(p).html());
+		//});
+		var err = jqXHR.getResponseHeader('X-Error-Description');
+		if (err != null) {
+			err = decodeURIComponent(err);
+			//alert(err);
+			if (err == 'The requested tagfiler API usage by unauthorized client requires authorization.') {
+				window.location = '/tagfiler';
+				return false;
+			}
+		}
 	}
 	
 	if (!retry) {

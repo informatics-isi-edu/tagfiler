@@ -103,7 +103,15 @@ class Dispatcher:
         ast.login_required = None
         ast.start_time = start_time
         ast.last_log_time = start_time
-        ast.preDispatch(uri)
+        
+        try:
+            ast.preDispatch(uri)
+        except dataserv_app.WebException, e:
+            if hasattr(e, 'detail'):
+                detail = dataserv_app.myutf8(e.detail)
+                web.header('X-Error-Description', detail)
+            raise e
+        
         astmethod = getattr(ast, methodname)
         #ast.log('TRACE', value='Dispatcher::METHOD() after preDispatch')
         try:
