@@ -3388,7 +3388,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                         range_column = 't.x'
                         range_table = '(VALUES (True), (False)) AS t (x)'
                 else:
-                    if spreds.has_key(tag) and len(preds) == 0 and not tagdefs[tag].multivalue and final and rangemode == None:
+                    if spreds.has_key(tag) and len([ p for p in preds if p.op != None]) == 0 and not tagdefs[tag].multivalue:
                         # this projection does not further filter triples relative to the spred so optimize it away
                         td = tagdefs[tag]
                         lq = None
