@@ -3190,18 +3190,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                 extra_tag_columns.add('owner')
                 extra_tag_columns.add('read users')
                 m['table'] = 'resources'
-                valcol = ('NOT ("_read users".value IS NULL OR "_read users".value NOT IN (%(rolekeys)s))'
-                          + ' OR '
-                          + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
+                valcol = '"_owner".value IN (%(rolekeys)s) OR "_read users".value IN (%(rolekeys)s)' % dict(rolekeys=rolekeys)
                 m['value'] = ', bool_or(%s) AS value' % valcol
                 m['group'] = 'GROUP BY subject'
             elif tagdef.tagname == 'writeok':
                 extra_tag_columns.add('owner')
                 extra_tag_columns.add('write users')
                 m['table'] = 'resources'
-                valcol = ('NOT ("_write users".value IS NULL OR "_write users".value NOT IN (%(rolekeys)s))'
-                          + ' OR '
-                          + 'NOT ("_owner".value IS NULL OR "_owner".value NOT IN (%(rolekeys)s))') % dict(rolekeys=rolekeys)
+                valcol = '"_owner".value IN (%(rolekeys)s) OR "_write users".value IN (%(rolekeys)s)' % dict(rolekeys=rolekeys)
                 m['value'] = ', bool_or(%s) AS value' % valcol
                 m['group'] = 'GROUP BY subject'
             elif tagdef.multivalue and final:
