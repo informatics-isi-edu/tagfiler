@@ -40,8 +40,58 @@ coproc { psql -q -t -A  ; }
 
 echo "create core tables..."
 
+json_native_func()
+{
+    cat <<EOF
+CREATE FUNCTION val2json($1) RETURNS text AS \$\$
+  SELECT CASE WHEN \$1 IS NULL THEN 'null' ELSE CAST(\$1 AS text) END ;
+\$\$ LANGUAGE SQL;
+EOF
+}
+
+json_munge_func()
+{
+    cat <<EOF
+CREATE FUNCTION val2json($1) RETURNS text AS \$\$
+  SELECT CASE WHEN \$1 IS NULL THEN 'null' ELSE val2json( CAST(\$1 AS text) ) END ;
+\$\$ LANGUAGE SQL;
+EOF
+}
+
 cat >&${COPROC[1]} <<EOF
+\\set ON_ERROR_STOP
+
 BEGIN;
+
+CREATE FUNCTION val2json(text) RETURNS text AS \$\$
+  SELECT CASE WHEN \$1 IS NULL THEN 'null' ELSE '"' || regexp_replace(\$1, '"', E'\\\\"', 'g') || '"' END ;
+\$\$ LANGUAGE SQL;
+
+CREATE FUNCTION val2json(boolean) RETURNS text AS \$\$
+  SELECT CASE WHEN \$1 IS NULL THEN 'null' WHEN \$1 THEN 'true' ELSE 'false' END ;
+\$\$ LANGUAGE SQL;
+
+$(json_native_func int)
+$(json_native_func bigint)
+$(json_native_func float8)
+$(json_munge_func date)
+$(json_munge_func timestamptz)
+
+CREATE FUNCTION val2json(anyarray) RETURNS text AS \$\$
+  SELECT 
+    CASE WHEN \$1 IS NULL 
+      THEN 'null' 
+    ELSE '[' || array_to_string( (SELECT array_agg(val2json(v)) FROM (SELECT unnest(\$1) AS v) s), ',' ) || ']' 
+    END ;
+\$\$ LANGUAGE SQL;
+
+CREATE FUNCTION jsonfield(text, text) RETURNS text AS \$\$
+  SELECT val2json(\$1) || ':' || \$2 ;
+\$\$ LANGUAGE SQL;
+
+CREATE FUNCTION jsonobj(text[]) RETURNS text AS \$\$
+  SELECT '{' || array_to_string(\$1, ',') || '}' ;
+\$\$ LANGUAGE SQL;
 
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CLUSTER resources USING resources_pkey;

@@ -841,43 +841,33 @@ class FileTags (Node):
         all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        files = [ file for file in self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit)  ]
+        if self.acceptType == 'application/json':
+            files = self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit, json=True)
+        else:
+            files = list(self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit))
+
         if len(files) == 0:
             raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0], lambda x: x))
-        else:
-            subject = files[0]
-            datapred, dataid, dataname, subject.dtype = self.subject2identifiers(subject)
 
-            if try_default_view and subject.dtype:
-                view = self.select_view(subject.dtype)
-                if view and view['tag list tags']:
-                    self.listtags = view['tag list tags']
-                    self.globals['queryAllTags'] = self.qAllTags()
-
-        length = 0
-        for file in files:
-            for tagname in self.listtags:
-                length = listOrStringMax(file[tagname], length)
-
-        return (files, all, length)
+        return (files, all)
 
     def get_postCommit(self, results):
-        files, all, length = results
+        files, all = results
 
         if files == None:
             web.ctx.status = '304 Not Modified'
-            return ''
-
+            return
+        
         self.emit_headers()
-        for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType == 'text/uri-list':
-                self.header('Content-Type', 'text/uri-list')
-                self.globals['str'] = str 
-                return self.render.FileTagUriList(files, all)
-            elif acceptType == 'application/x-www-form-urlencoded' and len(files) == 1:
-                self.header('Content-Type', 'application/x-www-form-urlencoded')
+        if self.acceptType == 'text/uri-list':
+            self.header('Content-Type', 'text/uri-list')
+            self.globals['str'] = str 
+            for s in self.render.FileTagUriList(files, all):
+                yield s
+        elif self.acceptType == 'application/x-www-form-urlencoded':
+            self.header('Content-Type', 'application/x-www-form-urlencoded')
+            for file in files:
                 body = []
-                file = files[0]
                 for tagdef in all:
                     if file[tagdef.tagname]:
                         if tagdef.typestr == 'empty':
@@ -887,22 +877,24 @@ class FileTags (Node):
                                 body.append(urlquote(tagdef.tagname) + '=' + urlquote(val))
                         else:
                             body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
-                return '&'.join(body)
-            elif acceptType == 'text/csv':
-                self.header('Content-Type', 'text/csv')
-                return ''.join([ res for res in yield_csv(files, [td.tagname for td in all]) ])
-            elif acceptType == 'application/json':
-                self.header('Content-Type', 'application/json')
-                return ''.join([ res for res in yield_json(files, [td.tagname for td in all]) ])
-            elif acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
-                self.header('Content-Type', 'text/plain')
-                val = files[0][self.listtags[0]]
-                if type(val) == list:
-                    return '\n'.join(val) + '\n'
-                else:
-                    return '%s\n' % val
-            elif acceptType == 'text/html':
-                break
+                yield '&'.join(body) + '\n'
+        elif self.acceptType == 'text/csv':
+            self.header('Content-Type', 'text/csv')
+            yield ''.join([ res for res in yield_csv(files, [td.tagname for td in all]) ])
+        elif self.acceptType == 'application/json':
+            self.header('Content-Type', 'application/json')
+            pref='['
+            for f in files:
+                yield pref + f.json + '\n'
+                pref=','
+            yield ']\n'
+        elif self.acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
+            self.header('Content-Type', 'text/plain')
+            val = files[0][self.listtags[0]]
+            if type(val) == list:
+                yield '\n'.join(val) + '\n'
+            else:
+                yield '%s\n' % val
                 
         # render HTML result
         self.header('Content-Type', 'text/html')
@@ -914,11 +906,13 @@ class FileTags (Node):
 
         title = u'Tag(s) for subject matching "' + path_linearize(simplepath, lambda x: x) + u'"'
         if len(files) == 1:
-            return self.renderlist(title,
-                                   [self.render.FileTagExisting('', files[0], tagdefs)])
+            for s in self.renderlist(title,
+                                     [self.render.FileTagExisting('', files[0], tagdefs)]):
+                yield s
         else:
-            return self.renderlist(title,
-                                   [self.render.FileTagValExisting('', files, tagdefs)])
+            for s in self.renderlist(title,
+                                     [self.render.FileTagValExisting('', files, tagdefs)]):
+                yield s
 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
@@ -928,7 +922,22 @@ class FileTags (Node):
         except:
             pass
 
-        return self.dbtransact(self.get_body, self.get_postCommit)
+        self.acceptType = None
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType in ['text/uri-list',
+                              'application/x-www-form-urlencoded',
+                              'text/csv',
+                              'application/json',
+                              'text/plain'
+                              'text/html']:
+                self.acceptType = acceptType
+                break
+
+        if self.acceptType == None:
+            self.acceptType = 'text/html'
+
+        for r in self.dbtransact(self.get_body, self.get_postCommit):
+            yield r
 
     def put_body(self):
         subjpreds, listpreds, ordertags = self.path[-1]
@@ -1260,6 +1269,13 @@ class Query (Node):
             if cached:
                 web.ctx.status = '304 Not Modified'
                 return None
+            elif contentType == 'application/json':
+                self.txlog('QUERY', dataset=path_linearize(self.path))
+                self.queryopts['range'] = self.query_range
+                files = self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset, json=True)
+                self.queryopts['range'] = None
+                #self.txlog('TRACE', value='Query::body query returned')
+                return files                
             elif contentType != 'text/html':
                 self.txlog('QUERY', dataset=path_linearize(self.path))
 
@@ -1315,8 +1331,11 @@ class Query (Node):
                 return
             elif contentType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                for res in yield_json(files, self.listtags):
-                    yield res
+                pref='['
+                for res in files:
+                    yield pref + res.json + '\n'
+                    pref = ','
+                yield ']\n'
                 return
             else:
                 if self.query_range:

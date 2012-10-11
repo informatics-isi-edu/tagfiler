@@ -3097,7 +3097,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if len(res) == 0:
                 return value
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None, json=False):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3308,7 +3308,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             return (q % m, subject_wheres)
 
-        def elem_query(spreds, lpreds, values, final=True):
+        def elem_query(spreds, lpreds, values, final=True, otags=[]):
             """Compile a query finding subjects by spreds and projecting by lpreds.
 
                final=True means projection is one column per ltag.
@@ -3360,9 +3360,13 @@ class Application (webauthn2_handler_factory.RestHandler):
             outer += [ '"_subject last tagged txid" txid' ]
 
             if final and rangemode == None:
-                selects += [ 'txid.value AS txid' ]
+                if json:
+                    selects += [ "jsonfield('txid'::text, val2json(txid.value))"  ]
+                else:
+                    selects += [ 'txid.value AS txid' ]
 
             finals = []
+            otagexprs = dict()
             for tag, preds in lpreds.items():
                 td = tagdefs[tag]
                 if rangemode and final:
@@ -3402,35 +3406,37 @@ class Application (webauthn2_handler_factory.RestHandler):
                         else:
                             tprefix = 's_'
                         if td.typestr != 'empty':
-                            selects.append('%s.value AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                            expr = '%s.value' % wraptag(td.tagname, prefix=tprefix)
                         else:
-                            selects.append('%s.subject IS NOT NULL AS %s' % (wraptag(td.tagname, prefix=tprefix), wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                            expr = '%s.subject IS NOT NULL' % wraptag(td.tagname, prefix=tprefix)
                     elif rangemode == 'values':
                         # returning distinct values across all subjects
-                        selects.append('(SELECT array_agg(DISTINCT %s) FROM %s) AS %s'
-                                       % (range_column, range_table, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        expr = '(SELECT array_agg(DISTINCT %s) FROM %s)' % (range_column, range_table)
                     elif rangemode == 'count':
                         # returning count of distinct values across all subjects
-                        selects.append('(SELECT count(DISTINCT %s) FROM %s) AS %s'
-                                       % (range_column, range_table, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        expr = '(SELECT count(DISTINCT %s) FROM %s)' % (range_column, range_table)
                     else:
                         # returning (in)frequent values
                         if rangemode[-1] == '<':
                             freqorder = 'ASC'
                         else:
                             freqorder = 'DESC'
-                        selects.append('(SELECT array_agg(value) '
-                                        'FROM (SELECT %(column)s AS value, count(%(column)s) AS count '
-                                              'FROM %(table)s '
-                                              'GROUP BY %(column)s '
-                                              'ORDER BY count %(order)s, value '
-                                              '%(limit)s) AS t) '
-                                        'AS %(alias)s'
-                                       % dict(column=range_column,
-                                              table=range_table,
-                                              order=freqorder,
-                                              limit=({ True: 'LIMIT %d' % limit, False: ''}[limit != None]),
-                                              alias=wraptag(listas.get(td.tagname, td.tagname), prefix='')))
+                        expr = ('(SELECT array_agg(value) '
+                                 'FROM (SELECT %(column)s AS value, count(%(column)s) AS count '
+                                       'FROM %(table)s '
+                                       'GROUP BY %(column)s '
+                                       'ORDER BY count %(order)s, value '
+                                       '%(limit)s) AS t) '
+                                % dict(column=range_column,
+                                       table=range_table,
+                                       order=freqorder,
+                                       limit=({ True: 'LIMIT %d' % limit, False: ''}[limit != None]))
+                                )
+                    otagexprs[listas.get(td.tagname, td.tagname)] = expr
+                    if json:
+                        selects.append('jsonfield(%s, val2json(%s))' % (wrapval(listas.get(td.tagname, td.tagname)), expr))
+                    else:
+                        selects.append('%s AS %s' % (expr, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
                         
                 else:
                     finals.append(lq)
@@ -3450,21 +3456,26 @@ class Application (webauthn2_handler_factory.RestHandler):
                 tables = [ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
             tables += [ '%s USING (subject)' % o for o in outer ]
             tables = ' LEFT OUTER JOIN '.join(tables)
-            if rangemode == None or not final:
-                q = ('SELECT %(selects)s FROM %(tables)s %(where)s' 
-                     % dict(selects=', '.join([ s for s in selects ]),
-                            tables=tables,
-                            where=where))
+
+            if otags and final:
+                order = ' ORDER BY %s' % ', '.join([ '%s %s NULLS LAST' % (otagexprs[listas.get(t, t)],
+                                                                           { ':asc:': 'ASC', ':desc:': 'DESC', None: 'ASC'}[dir])
+                                                     for t, dir in otags])
             else:
-                q = ('WITH resources AS ( SELECT subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
-                     % dict(selects=', '.join([ s for s in selects ]),
-                            tables=tables,
-                            where=where))
-            
+                order = ''
+
+            selects = ', '.join([ s for s in selects ])
+            if json:
+                selects = 'jsonobj(ARRAY[%s]) AS json' % selects
+            q = ('SELECT %(selects)s FROM %(tables)s %(where)s %(order)s' 
+                 % dict(selects=selects,
+                        tables=tables,
+                        where=where,
+                        order=order))
             return q
 
         cq = None
-        order = None
+        ordertags=[]
         for i in range(0, len(path)):
             spreds, lpreds, otags = path[i]
             if i > 0:
@@ -3487,14 +3498,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if rangemode == None:
                     lpreds.extend([ web.storage(tag=tag, op=None, vals=[]) for tag, dir in otags ])
                     if otags != None and len(otags):
-                        order = ' ORDER BY %s' % ', '.join([ '%s %s NULLS LAST' % (wraptag(listas.get(t, t), prefix=''),
-                                                                        { ':asc:': 'ASC', ':desc:': 'DESC', None: 'ASC'}[dir])
-                                                             for t, dir in otags])
+                        ordertags = otags
 
-            cq = elem_query(spreds, lpreds, values, i==len(path)-1)
-
-        if order:
-            cq += order
+            cq = elem_query(spreds, lpreds, values, i==len(path)-1, otags=ordertags)
 
         if limit and rangemode == None:
             cq += ' LIMIT %d' % limit
@@ -3547,9 +3553,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         #    web.debug(r)
         return self.dbquery(query, vars=values)
 
-    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, offset=None):
+    def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, offset=None, json=False):
         #self.txlog('TRACE', value='select_files_by_predlist_path entered')
-        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz, offset=offset)
+        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz, offset=offset, json=json)
         #self.txlog('TRACE', value='select_files_by_predlist_path query built')
         result = self.dbquery(query, values)
         #self.txlog('TRACE', value='select_files_by_predlist_path exiting')
