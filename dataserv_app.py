@@ -3320,7 +3320,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if enforce_read_authz:
                 spreds = spreds + [ web.storage(tag='readok', op='=', vals=['True']) ]
 
-            if final:
+            if final and not json:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='id', op=None, vals=[]),
@@ -3356,14 +3356,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                     subject_wheres.extend(swheres)
                 else:
                     inner.append(sq)
-
-            outer += [ '"_subject last tagged txid" txid' ]
-
-            if final and rangemode == None:
-                if json:
-                    selects += [ "jsonfield('txid'::text, val2json(txid.value))"  ]
-                else:
-                    selects += [ 'txid.value AS txid' ]
 
             finals = []
             otagexprs = dict()
@@ -3476,6 +3468,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                             where=where,
                             order=order))
             else:
+                if json:
+                    selects = 'jsonobj(ARRAY[%s]) AS json' % selects
+
                 q = ('WITH resources AS ( SELECT subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
                      % dict(selects=selects,
                             tables=tables,
