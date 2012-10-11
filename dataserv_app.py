@@ -3465,13 +3465,22 @@ class Application (webauthn2_handler_factory.RestHandler):
                 order = ''
 
             selects = ', '.join([ s for s in selects ])
-            if json:
-                selects = 'jsonobj(ARRAY[%s]) AS json' % selects
-            q = ('SELECT %(selects)s FROM %(tables)s %(where)s %(order)s' 
-                 % dict(selects=selects,
-                        tables=tables,
-                        where=where,
-                        order=order))
+
+            if rangemode == None or not final:
+                if final and json:
+                    selects = 'jsonobj(ARRAY[%s]) AS json' % selects
+
+                q = ('SELECT %(selects)s FROM %(tables)s %(where)s %(order)s' 
+                     % dict(selects=selects,
+                            tables=tables,
+                            where=where,
+                            order=order))
+            else:
+                q = ('WITH resources AS ( SELECT subject FROM %(tables)s %(where)s ) SELECT %(selects)s' 
+                     % dict(selects=selects,
+                            tables=tables,
+                            where=where))
+                
             return q
 
         cq = None
