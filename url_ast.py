@@ -883,7 +883,8 @@ class FileTags (Node):
             yield ''.join([ res for res in yield_csv(files, [td.tagname for td in all]) ])
         elif self.acceptType == 'application/json':
             self.header('Content-Type', 'application/json')
-            pref='['
+            yield '['
+            pref=''
             for f in files:
                 yield pref + f.json + '\n'
                 pref=','
@@ -1331,7 +1332,8 @@ class Query (Node):
                 return
             elif contentType == 'application/json':
                 self.header('Content-Type', 'application/json')
-                pref='['
+                yield '['
+                pref=''
                 for res in files:
                     yield pref + res.json + '\n'
                     pref = ','
