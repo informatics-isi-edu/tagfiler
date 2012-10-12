@@ -1951,6 +1951,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             insert_or_update(self.wraptag('subject last tagged'), dict(subject=subject.id, now=now))
             insert_or_update(self.wraptag('subject last tagged txid'), dict(subject=subject.id, now=txid))
 
+        # update virtual tags based on their source tags
+        if tagdef.tagname in ['read users', 'owner']:
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict']['readok'])
+            
+        if tagdef.tagname in ['write users', 'owner']:
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict']['writeok'])
+            
+
     def delete_tag(self, subject, tagdef, value=None):
         wheres = ['tag.subject = $id']
 
