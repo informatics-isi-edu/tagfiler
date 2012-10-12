@@ -3313,20 +3313,17 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            if enforce_read_authz:
-                spreds = spreds + [ web.storage(tag='readok', op='=', vals=['True']) ]
-
             if final and not json:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='id', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
-
+                
             spreds = self.mergepreds(spreds, tagdefs)
             lpreds = self.mergepreds(lpreds, tagdefs)
-
+            
             subject_wheres = []
-
+            
             for tag, preds in lpreds.items():
                 if tag in [ 'id', 'readok', 'writeok', 'owner' ]:
                     if len([ p for p in preds if p.op]) != 0:
@@ -3352,6 +3349,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                     subject_wheres.extend(swheres)
                 else:
                     inner.append(sq)
+
+            if enforce_read_authz:
+                outer.append( '(SELECT subject FROM "_owner" WHERE value IN (%(rolekeys)s)) AS o' % dict(rolekeys=rolekeys) )
+                outer.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys=rolekeys) )
+                subject_wheres.append( 'o.subject IS NOT NULL OR ru.subject IS NOT NULL' )
 
             finals = []
             otagexprs = dict()
