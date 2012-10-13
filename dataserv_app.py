@@ -247,7 +247,7 @@ class DbCache (object):
             #  individual subjects (tracked as "subject last tagged txid" on each identified subject
             results = db_dbquery(db, 'SELECT max(txid) AS txid FROM ('
                               + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
-                              + ' WHERE subject IN (SELECT subject FROM subjecttags WHERE tagname = $idtag)'
+                              + ' WHERE subject IN (SELECT subject FROM "_tags present" WHERE value = $idtag)'
                               + ' UNION '
                               + 'SELECT value AS txid FROM %s' % wraptag('tag last modified txid')
                               + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
@@ -764,6 +764,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
                        ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
                        ('tagdef unique', 'boolean', False, 'system', False),
+                       ('tags present', 'tagdef', True, 'system', False),
                        ('tag read users', 'rolepat', True, 'subjectowner', False),
                        ('tag write users', 'rolepat', True, 'subjectowner', False),
                        ('typedef', 'text', False, 'subject', True),
@@ -1653,26 +1654,23 @@ class Application (webauthn2_handler_factory.RestHandler):
         return newid
 
     def update_latestfile_version(self, name, next_latest_id):
-        vars=dict(name=name, id=next_latest_id)
+        subject=dict(name=name, id=next_latest_id)
 
         results = self.dbquery('SELECT subject FROM %s WHERE value = %s'
                                % (wraptag('latest with name'), wrapval(name)))
         if len(results) > 0:
             previd = results[0].subject
+            prevsubject = web.Storage(id=previd)
         
-            self.dbquery('DELETE FROM subjecttags AS st WHERE st.subject = (SELECT subject FROM %s WHERE value = %s) AND tagname = %s'
-                         % (wraptag('latest with name'), wrapval(name), wrapval('latest with name')))
-        
-            self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=vars)
+            self.dbquery('UPDATE "_latest with name" SET subject = $id WHERE value = $name', vars=subject)
 
+            self.delete_tag(prevsubject, self.globals['tagdefsdict']['tags present'], 'latest with name')
             self.set_tag_lastmodified(web.Storage(id=previd), self.globals['tagdefsdict']['latest with name'])
         else:
             self.dbquery('INSERT INTO %s (subject, tagname) VALUES (%s, %s)'
                          % (wraptag('latest with name'), wrapval(next_latest_id, 'int8'), wrapval(name)))
 
-        self.dbquery('INSERT INTO subjecttags (subject, tagname) VALUES ( %s, %s )'
-                     % (wrapval(next_latest_id), wrapval('latest with name')))
-
+        self.set_tag(subject, self.globals['tagdefsdict']['tags present'], 'latest with name')
         self.set_tag_lastmodified(web.Storage(id=next_latest_id), self.globals['tagdefsdict']['latest with name'])
         
 
@@ -1692,9 +1690,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # we're deleting the latest version and there are previous versions
                 self.update_latestfile_version(subject.name, versions[1].id)
 
-        results = self.dbquery('SELECT * FROM subjecttags WHERE subject = $subject', vars=dict(subject=subject.id))
+        results = self.dbquery('SELECT * FROM "_tags present" WHERE subject = $subject', vars=dict(subject=subject.id))
         for result in results:
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.tagname])
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.value])
         self.set_tag_lastmodified(None, self.globals['tagdefsdict']['id'])
         
         query = 'DELETE FROM resources WHERE subject = $id'
@@ -1905,15 +1903,15 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagname:
             vars['tagname'] = tagname
-            wheres.append("tagname = $tagname")
+            wheres.append("value = $tagname")
         
         wheres = ' AND '.join(wheres)
         if wheres:
             wheres = " WHERE " + wheres
             
-        query = 'SELECT subject AS id, tagname FROM subjecttags' \
+        query = 'SELECT subject AS id, value AS tagname FROM "_tags present"' \
                 + wheres \
-                + " ORDER BY id, tagname"
+                + " ORDER BY subject, value"
         
         #web.debug(query, vars)
         return self.dbquery(query, vars=vars)
@@ -1977,15 +1975,13 @@ class Application (webauthn2_handler_factory.RestHandler):
                 fire_doPolicyRule = True
 
         query = 'DELETE FROM %s AS tag' % self.wraptag(tagdef.tagname) + wheres + ' RETURNING subject'
-        vars=dict(id=subject.id, value=value, tagname=tagdef.tagname)
-        deleted = self.dbquery(query, vars=vars)
+        deleted = self.dbquery(query, vars=dict(id=subject.id, value=value, tagname=tagdef.tagname))
         if len(deleted) > 0:
             self.set_tag_lastmodified(subject, tagdef)
 
             results = self.select_tag_noauthn(subject, tagdef)
-            if len(results) == 0:
-                query = 'DELETE FROM subjecttags AS tag WHERE subject = $id AND tagname = $tagname'
-                self.dbquery(query, vars=vars)
+            if len(results) == 0 and tagdef.tagname != 'tags present':
+                self.delete_tag(subject, self.globals['tagdefsdict']['tags present'], tagdef.tagname)
 
             # update in-memory representation too for caller's sake
             if tagdef.multivalue:
@@ -2100,12 +2096,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             subject[tagdef.tagname] = True
         
-        results = self.select_filetags_noauthn(subject, tagdef.tagname)
-        if len(results) == 0:
-            results = self.dbquery("INSERT INTO subjecttags (subject, tagname) VALUES ($subject, $tagname)", vars=vars)
-        else:
-            # may already be reverse-indexed in multivalue case
-            pass
+        if tagdef.tagname != 'tags present':
+            results = self.select_filetags_noauthn(subject, tagdef.tagname)
+            if len(results) == 0:
+                self.set_tag(subject, self.globals['tagdefsdict']['tags present'], tagdef.tagname)
 
         self.set_tag_lastmodified(subject, tagdef)
         
@@ -2359,17 +2353,17 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.accum_table_changes(table, count)
 
             count = 0
-            # update subjecttags mappings
-            count += self.dbquery(('DELETE FROM subjecttags AS s'
-                                   + ' WHERE tagname = %(tagname)s'
-                                   + '   AND s.subject NOT IN (SELECT subject FROM %(table)s)')
-                                  % dict(table=table, tagname=wrapval(tagdef.tagname)))
-            count += self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
-                                   + ' SELECT subject, %(tagname)s FROM %(table)s'
-                                   + ' EXCEPT SELECT subject, tagname FROM subjecttags')
-                                  % dict(table=table, tagname=wrapval(tagdef.tagname)))
 
-            self.accum_table_changes('"subjecttags"', count)
+            # update subject-tags mappings
+            if tagdef.tagname != 'tags present':
+                self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+                                        '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(tagdef.tagname),)
+                                        + ' EXCEPT SELECT subject FROM %s) s' % table, 
+                                        idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False)
+
+                self.set_tag_intable(self.globals['tagdefsdict']['tags present'], '(SELECT DISTINCT subject FROM %s)' % table,
+                                     idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                     flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False)
 
         #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) complete' % (tagdef.tagname, idcol, valcol, wheres))
 
@@ -2383,12 +2377,15 @@ class Application (webauthn2_handler_factory.RestHandler):
             dwheres.append( 'd.value = i.value' )
             iselects.append( '%s AS value' % valcol )
 
-        count = self.dbquery(('DELETE FROM %(table)s AS d'
-                              + ' USING (SELECT %(iselects)s FROM %(intable)s) AS i'
-                              + ' WHERE %(dwheres)s')
-                             % dict(table=table, intable=intable,
-                                    iselects=','.join(iselects),
-                                    dwheres=' AND '.join(dwheres)))
+        sql = (('DELETE FROM %(table)s AS d'
+                + ' USING (SELECT %(iselects)s FROM %(intable)s) AS i'
+                + ' WHERE %(dwheres)s'
+                + ' RETURNING d.subject')
+               % dict(table=table, intable=intable,
+                      iselects=','.join(iselects),
+                      dwheres=' AND '.join(dwheres)))
+
+        count = len(self.dbquery(sql))
 
         self.accum_table_changes(table, count)
 
@@ -2509,12 +2506,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.accum_table_changes('"_latest with name"', count)
 
         # update metadata reflecting changed latest with name tuples
-        count = self.dbquery('INSERT INTO subjecttags (subject, tagname)'
-                              + ' SELECT nlwn AS subject, \'latest with name\' AS tagname'
-                              + ' FROM %s' % etable
-                              + ' WHERE nlwn IS NOT NULL')
-        self.accum_table_changes('"subjecttags"', count)
-        
+        self.set_tag_intable(self.globals['tagdefsdict']['tags present'], '(SELECT DISTINCT nlwn FROM %s WHERE nlwn IS NOT NULL)' % etable, 
+                             idcol='nlwn', valcol=wrapval('latest with name') + '::text',
+                             flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False)
+
         #self.log('TRACE', value='after UPDATE latest with name')
 
         for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
@@ -2543,10 +2538,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         
         # update tagdef metadata for all tags which will lose tuples due to subject deletion
         # this will automatically include "latest with name" if that tag is present on any subjects...
-        subjecttags = [ r for r in self.dbquery(('SELECT DISTINCT st.tagname AS tagname'
-                                                 + ' FROM subjecttags AS st'
+        subject_tags = [ r for r in self.dbquery(('SELECT DISTINCT st.tagname AS tagname'
+                                                 + ' FROM "_tags present" AS st'
                                                  + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
-        for r in subjecttags:
+        for r in subject_tags:
             self.set_tag_lastmodified(None, self.globals['tagdefsdict'][r.tagname])
             self.delete_tag_intable(self.globals['tagdefsdict'][r.tagname],
                                     etable,
@@ -2932,18 +2927,13 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                     # carefully update 'latest with name' for new version= N+1 subjects
 
-                    # drop subjecttags entry for previous version
-                    query = ('DELETE FROM subjecttags AS st'
-                             + ' USING %(intable)s AS i,'
-                             + '       %(lname)s AS ln'
-                             + ' WHERE i.version > 1'
-                             + '   AND i.name = ln.value'
-                             + '   AND ln.subject = st.subject'
-                             + '   AND st.tagname = %(tagname)s') % dict(intable=intable,
-                                                                         lname=wraptag('latest with name'),
-                                                                         tagname=wrapval('latest with name'))
-                    count = self.dbquery(query)
-                    self.accum_table_changes('"subjecttags"', count)
+                    # drop subject-tags entry for previous version
+                    self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+                                            ('(SELECT DISTINCT ln.subject'
+                                             + ' FROM %(intable)s i'
+                                             + ' JOIN %(lname)s ln ON (i.name = ln.value)'
+                                             + ' WHERE i.version > 1) s') % dict(intable=intable, lname=wraptag('latest with name')),
+                                            idcol='subject', valcol=wrapval('latest with name') + '::text', unnest=False)
 
                     # avoid breaking foreign key refs to value column
                     count = self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
@@ -2953,13 +2943,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          % dict(intable=intable, lname=wraptag('latest with name')))
                     self.accum_table_changes(wraptag('latest with name'), count)
 
-                    # add subjecttags entry for new version
-                    count = self.dbquery(('INSERT INTO subjecttags (subject, tagname)'
-                                          + ' SELECT i.id AS subject, %(tagname)s AS tagname'
-                                          + ' FROM %(intable)s AS i'
-                                          + ' WHERE i.version > 1' )
-                                         % dict(intable=intable, tagname=wrapval('latest with name')))
-                    self.accum_table_changes('"subjecttags"', count)
+                    # add subject-tags entry for new version
+                    self.set_tag_intable(self.globals['tagdefsdict']['tags present'], intable, idcol='id', valcol=wrapval('latest with name') + '::text',
+                                         flagcol=None, wokcol=None, isowncol=False, enforce_tag_authz=False, set_mode='merge', unnest=False, 
+                                         wheres=['i.version > 1'])
 
                     # bump tag's timestamp in case following update hits zero rows...
                     self.set_tag_lastmodified(None, self.globals['tagdefsdict']['latest with name'])
@@ -3428,7 +3415,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                 % dict(column=range_column,
                                        table=range_table,
                                        order=freqorder,
-                                       limit=({ True: 'LIMIT %d' % limit, False: ''}[limit != None]))
+                                       limit=({ True: 'LIMIT %d' % (limit != None and limit or 0), False: ''}[limit != None]))
                                 )
                     otagexprs[listas.get(td.tagname, td.tagname)] = expr
                     if json:

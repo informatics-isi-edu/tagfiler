@@ -97,9 +97,6 @@ CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
-CREATE TABLE subjecttags ( subject bigint REFERENCES resources (subject) ON DELETE CASCADE, tagname text, UNIQUE (subject, tagname) );
-CREATE INDEX subjecttags_tagname_idx ON subjecttags (tagname);
-CLUSTER subjecttags USING subjecttags_subject_key;
 EOF
 
 # pre-established stored data
@@ -499,6 +496,7 @@ tagdef 'tagdef writepolicy'  text        ""         anonymous   system       fal
 tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
 tagdef 'readok'              boolean     ""         anonymous   system       false      ""
 tagdef 'writeok'             boolean     ""         anonymous   system       false      ""
+tagdef 'tags present'        text        ""         anonymous   system       true       tagdef     false     tagdef
 tagdef 'config'              text        ""         anonymous   subject      false      ""         true
 tagdef 'view'                text        ""         anonymous   subject      false      ""         true
 tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
@@ -589,7 +587,6 @@ tagdef vcontains             text        ""         subject     subject      tru
 # add tagdef foreign key referencing constraint
 # drop storage for psuedo tag 'id' which we can synthesize from any subject column
 cat >&${COPROC[1]} <<EOF
-ALTER TABLE subjecttags ADD FOREIGN KEY (tagname) REFERENCES _tagdef (value) ON DELETE CASCADE;
 DROP TABLE "_id";
 DROP TABLE "_readok";
 DROP TABLE "_writeok";
@@ -793,11 +790,11 @@ cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/~karlcz/Tagfile
 cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/PSOC'
 
 cat >&${COPROC[1]} <<EOF
-INSERT INTO subjecttags (subject, tagname)
+INSERT INTO "_tags present" (subject, value)
   SELECT 0, '' WHERE False
   $(for tagname in "${tag_names[@]}"
     do
-        if [[ "$tagname" != 'id' ]] && [[ "$tagname" != 'readok' ]] && [[ "$tagname" != 'writeok' ]]
+        if [[ "$tagname" != 'id' ]] && [[ "$tagname" != 'readok' ]] && [[ "$tagname" != 'writeok' ]] && [[ "$tagname" != 'tags present' ]]
         then
            cat <<EOF2
   UNION SELECT DISTINCT subject, '${tagname}' FROM "_${tagname}"
