@@ -828,7 +828,7 @@ class FileTags (Node):
         self.http_vary.add('Accept')
         self.set_http_etag(self.select_predlist_path_txid(self.path_modified, versions=self.versions))
         if self.http_is_cached():
-            return None, None, None
+            return None, None
         
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
 
