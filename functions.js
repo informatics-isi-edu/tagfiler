@@ -4509,6 +4509,9 @@ function getLocaleTimestamp(s) {
 	var minutes = parseInt(hms[1], 10);
 	var seconds = parseInt(hms[2], 10);
 	var utcValues = utc.split(':');
+	if (utcValues.length == 1) {
+		utcValues.push('00');
+	}
 	var utcDelta = (new Date()).getTimezoneOffset() + parseInt(utcValues[0], 10) * 60 + parseInt(utcValues[1], 10);
 	date += hours * 60 * 60 * 1000 +
 			(minutes + utcDelta) * 60 * 1000 +
