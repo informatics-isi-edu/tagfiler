@@ -137,7 +137,7 @@ dataset_complete()
          shift         
 
          case "$url" in
-            http*:*|/*)
+            http*:*|/*|javascript:*)
                url="$url"
                ;;
             *)
@@ -612,13 +612,21 @@ homelink()
     homelink_pos=$(( ${homelink_pos} + 1 ))
 }
 
-homelink "Query by tags"                        url "${homepath}/query"                           "${admin}" "${curator}" "${downloader}"
-homelink "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}"
-homelink "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*"
-homelink "View type definitions"                url "${homepath}/query/typedef?view=typedef"      "${admin}" "*"
-homelink "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*"
-homelink "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}"
-homelink "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}"
+#homelink "Query by tags"                        url "${homepath}/query"                           "${admin}" "${curator}" "${downloader}"
+#homelink "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}"
+#homelink "View tag definitions"                 url "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*"
+#homelink "View type definitions"                url "${homepath}/query/typedef?view=typedef"      "${admin}" "*"
+#homelink "View view definitions"                url "${homepath}/query/view?view=view"            "${admin}" "*"
+#homelink "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}"
+#homelink "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}"
+
+homelink "Query by tags"                        url "javascript:queryByTags()"                           "${admin}" "${curator}" "${downloader}"
+homelink "Create catalog entries (expert mode)" url "javascript:createCustomDataset()"              "${admin}"
+homelink "View tag definitions"                 url "javascript:viewLink(\"tagdef?view=tagdef\")"        "${admin}" "*"
+homelink "View type definitions"                url "javascript:viewLink(\"typedef?view=typedef\")"      "${admin}" "*"
+homelink "View view definitions"                url "javascript:viewLink(\"view?view=view\")"            "${admin}" "*"
+homelink "Manage tag definitions (expert mode)" url "javascript:manageAvailableTagDefinitions()"                          "${admin}"
+homelink "Manage catalog configuration"         url "javascript:getTagDefinition(\"tags/config=tagfiler\", null)"            "${admin}"
 
 #dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}"
 
