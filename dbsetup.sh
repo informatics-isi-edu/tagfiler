@@ -127,6 +127,7 @@ dataset_complete()
    local file="$2"
    local type="$3"
    local url
+   local onclick
    local owner
 
    shift 3
@@ -137,7 +138,7 @@ dataset_complete()
          shift         
 
          case "$url" in
-            http*:*|/*|javascript:*)
+            http*:*|/*)
                url="$url"
                ;;
             *)
@@ -147,6 +148,10 @@ dataset_complete()
          ;;
       blank|typedef|tagdef|config|view)
          :
+         ;;
+      onclick)
+         onclick="$1"
+         shift   
          ;;
       *)
          echo "Unsupported dataset format: $*" >&2
@@ -169,7 +174,7 @@ dataset_complete()
    done
 
    case "$type" in
-      url|file)
+      url|file|onclick)
 	 tag "$subject" name text "$file" >&2
 	 tag "$subject" 'latest with name' text "$file" >&2
 	 tag "$subject" vname text "$file@1" >&2
@@ -178,6 +183,9 @@ dataset_complete()
 	 case "$type" in
 	     url)
 		 tag "$subject" url text "$url" >&2
+		 ;;
+	     onclick)
+		 tag "$subject" onclick text "$onclick" >&2
 		 ;;
 	 esac
 	 ;;
@@ -520,6 +528,7 @@ tagdef vname                 text        ""         anonymous   system       fal
 tagdef parentof              int8        ""         subject     subject      true       id
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
+tagdef onclick               text        ""         anonymous   system       false
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
 tagdef key                   text        ""         anonymous   subject      false      ""         true
@@ -547,6 +556,7 @@ typedef role         text          'Role'
 typedef rolepat      text          'Role pattern'
 typedef dtype        text          'Dataset type'                  ""                 'blank Dataset node for metadata-only' 'file Named dataset for locally stored file' 'url Named dataset for URL redirecting'
 typedef url          text          'URL'
+typedef onclick      text          'Javascript function'
 typedef id           int8          'Subject ID or subquery'
 typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'system No client can access'
 typedef type         text          'Scalar value type'             typedef
@@ -620,13 +630,13 @@ homelink()
 #homelink "Manage tag definitions (expert mode)" url "${homepath}/tagdef"                          "${admin}"
 #homelink "Manage catalog configuration"         url "${homepath}/tags/config=tagfiler"            "${admin}"
 
-homelink "Query by tags"                        url "javascript:queryByTags()"                           "${admin}" "${curator}" "${downloader}"
-homelink "Create catalog entries (expert mode)" url "javascript:createCustomDataset()"              "${admin}"
-homelink "View tag definitions"                 url "javascript:viewLink(\"tagdef?view=tagdef\")"        "${admin}" "*"
-homelink "View type definitions"                url "javascript:viewLink(\"typedef?view=typedef\")"      "${admin}" "*"
-homelink "View view definitions"                url "javascript:viewLink(\"view?view=view\")"            "${admin}" "*"
-homelink "Manage tag definitions (expert mode)" url "javascript:manageAvailableTagDefinitions()"                          "${admin}"
-homelink "Manage catalog configuration"         url "javascript:getTagDefinition(\"tags/config=tagfiler\", null)"            "${admin}"
+homelink "Query by tags"                        onclick "javascript:queryByTags()"                           "${admin}" "${curator}" "${downloader}"
+homelink "Create catalog entries (expert mode)" onclick "javascript:createCustomDataset()"              "${admin}"
+homelink "View tag definitions"                 onclick "javascript:viewLink(\"tagdef?view=tagdef\")"        "${admin}" "*"
+homelink "View type definitions"                onclick "javascript:viewLink(\"typedef?view=typedef\")"      "${admin}" "*"
+homelink "View view definitions"                onclick "javascript:viewLink(\"view?view=view\")"            "${admin}" "*"
+homelink "Manage tag definitions (expert mode)" onclick "javascript:manageAvailableTagDefinitions()"                          "${admin}"
+homelink "Manage catalog configuration"         onclick "javascript:getTagDefinition(\"tags/config=tagfiler\", null)"            "${admin}"
 
 #dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}"
 

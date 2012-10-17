@@ -6992,7 +6992,7 @@ function homePage(count) {
 	if (count == null) {
 		count = 0;
 	}
-	var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;url)name:asc:';
+	var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -7023,7 +7023,7 @@ function postHomePage(data, textStatus, jqXHR) {
 		ol.append(li);
 		a = $('<a>');
 		li.append(a);
-		a.attr({'href': entry.url});
+		a.attr({'href': entry.onclick});
 		a.html(entry.name);
 	});
 }
