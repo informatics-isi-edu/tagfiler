@@ -64,11 +64,6 @@ function subject2identifiers(subject) {
 }
 
 var expiration_warning = true;
-var extend_time = 0;
-
-function setExtendTime() {
-	extend_time = (new Date()).getTime();
-}
 
 function enableExpirationWarning() {
 	expiration_warning = true;
@@ -102,7 +97,7 @@ function localizeDate(id) {
 function setLocaleDate(id, d) {
     var node = document.getElementById(id);
     if (node) {
-	node.innerHTML = d.toLocaleTimeString();
+	node.innerHTML = d;
     }
 }
 
@@ -113,9 +108,6 @@ function setLocaleDate(id, d) {
 function runSessionPolling(pollmins, warnmins) {
     expiration_poll_mins = pollmins;
     expiration_warn_mins = warnmins;
-    //    startSessionTimer(pollmins * 60 * 1000);
-    //startCookieTimer(pollmins * 60 * 1000 / 6);
-    startCookieTimer(1000);
 }
 
 function clearSessionTimer() {
@@ -144,8 +136,8 @@ function startExtendSessionTimer(t) {
 }
 
 function startCookieTimer(t) {
-    clearSessionTimer();
-    timer = setTimeout("pollCookie()", t);
+	clearSessionTimer();
+    timer = setTimeout("startSessionTimer("+t+")", t);
     timerset = 1;
 }
 
@@ -184,42 +176,8 @@ function setCookie(name, val) {
     document.cookie = name + "=" + val + "; path=/";
 }
 
-function pollCookie() {
-    cookie = getCookie("webauthn");
-    if (cookie) {
-	parts = cookie.split("|");
-	//guid = parts[0];
-	now = new Date();
-	until = new Date(parts[1]);
-	remain = (until.getTime() - now.getTime()) / 1000;
-	//log("pollCookie: " + remain + "s remain until " + until);
-	setLocaleDate("untiltime", until);
-	if (remain < expiration_warn_mins * 60) {
-	    log("pollCookie: cookie suggests session is near warning period");
-	    runSessionRequest();
-	}
-	else {
-	    //startCookieTimer(expiration_poll_mins * 60 * 1000 / 6);
-	    startCookieTimer(1000);
-	}
-    }
-    else {
-	log("pollCookie: no cookie found");
-	runSessionRequest();
-    }
-}
-
 function runLogoutRequest() {
-    if (ajax_request) {
-	if (ajax_request.readystate != 0) {
-	    ajax_request.abort();
-	}
-	ajax_request.open("POST", "/webauthn/logout");
-	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
-	ajax_request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
-	ajax_request.onreadystatechange = processLogoutRequest;
-	ajax_request.send("action=logout");
-    }
+	userLogout();
 }
 
 function runExtendRequest() {
@@ -227,7 +185,7 @@ function runExtendRequest() {
 	if (ajax_request.readystate != 0) {
 	    ajax_request.abort();
 	}
-	ajax_request.open("GET", "/webauthn/session?action=extend");
+    ajax_request.open("PUT", expiration_check_url);
 	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_request.onreadystatechange = processSessionRequest;
 	ajax_request.send(null);
@@ -248,7 +206,7 @@ function redirectNow() {
 	alert("About to redirect at end of session");
     }
     if (redirectToLogin) {
-	window.location='/webauthn/login?referer=' + encodeSafeURIComponent(window.location);
+    	window.location = '/tagfiler';
     }
     else {
 	window.location = window.location;
@@ -259,59 +217,35 @@ function redirectNow() {
  * Processes the response from the Ajax request
  */
 function processSessionRequest() {
-  if(ajax_request && ajax_request.readyState == 4) {
-      log("processSessionRequest: readyState=4 status=" + ajax_request.status);
-      log("window.location=" + window.location);
-    if(ajax_request.status == 200) {
-      response_pairs = ajax_request.responseText.split("&");
-      until = null;
-      secsremain = 0;
-      for(i=0; i < response_pairs.length; i++) {
-	  pair_fields = response_pairs[i].split("=");
-	  if(pair_fields[0] == 'until') {
-	      until = new Date(decodeURIComponent(pair_fields[1]));
-	      log("processSessionRequest: until=" + decodeURIComponent(pair_fields[1]));
-	      setLocaleDate("untiltime", until);
-	  }
-	  if(pair_fields[0] == 'secsremain') {
-	      secsremain = parseInt(decodeURIComponent(pair_fields[1]));
-	      log("processSessionRequest: secsremain=" + secsremain);
-	  }
-      }
-
-      cookie = getCookie("webauthn");
-      parts = cookie.split("|");
-      setCookie("webauthn", encodeSafeURIComponent(parts[0] + "|" + until.toGMTString() + "|" + secsremain));
-
-      if (secsremain < 1) {
-	  secsremain = 1;
-	  log("processSessionRequest: clamping secsremain to 1");
-      }	
-	      
-      if ( secsremain < expiration_warn_mins * 60) {
-	  if (!expiration_warning) {
-	  	startExtendSessionTimer(1000);
-	  	return;
-	  }
-	  if (((new Date()).getTime() - extend_time) > (expiration_warn_mins * 60 * 1000) && !warn_window_is_open) {
-	      log("processSessionRequest: raising warning window");
-	      warn_window_is_open = true;
-	      confirmLogoutDialog.dialog('open');
-	      $('.ui-widget-overlay').css('opacity', 1.0);
-	  }
-	  startSessionTimer(secsremain * 1000);
-      }
-      else {
-	  //startSessionTimer(expiration_poll_mins * 60 * 1000);
-	  startCookieTimer(1000);
-      }
-      return;
-    }
-    else {
-	// usually 404 ends a session
-	redirectNow();
-    }
-  }
+	if(ajax_request && ajax_request.readyState == 4) {
+		if(ajax_request.status == 200) {
+			var session_opts = $.parseJSON(ajax_request.responseText);
+			var until = getLocaleTimestamp(session_opts.expires);
+			until = until.split(" ")[1].split('.')[0];
+			setLocaleDate("untiltime", until);
+			var secsremain = session_opts.seconds_remaining;
+			if (secsremain < 1) {
+				secsremain = 1;
+			}
+			if ( secsremain < expiration_warn_mins * 60) {
+				if (!expiration_warning) {
+					startExtendSessionTimer(1000);
+					return;
+				}
+				if (!warn_window_is_open) {
+					warn_window_is_open = true;
+					confirmLogoutDialog.dialog('open');
+					$('.ui-widget-overlay').css('opacity', 1.0);
+				}
+				startSessionTimer(secsremain * 1000);
+			} else {
+				startSessionTimer((secsremain - (expiration_warn_mins * 60)) * 1000);
+			}
+			return;
+		} else {
+			redirectNow();
+		}
+	}
 }
 
 /**
@@ -872,7 +806,7 @@ var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;
 var expiration_warn_mins = 2;
-var expiration_check_url = "/webauthn/session";
+var expiration_check_url = "/tagfiler/session";
 var ajax_request = null;
 var until = null;
 var width = 0;
@@ -1207,7 +1141,6 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 		var err = jqXHR.getResponseHeader('X-Error-Description');
 		if (err != null) {
 			err = decodeURIComponent(err);
-			//alert(err);
 			if (err == 'The requested tagfiler API usage by unauthorized client requires authorization.') {
 				window.location = '/tagfiler';
 				return false;
@@ -4550,7 +4483,6 @@ function initIdleWarning() {
 				},
 			'Extend session': function() {
 					runExtendRequest();
-					setExtendTime();
 					$(this).dialog('close');
 				}
 		},
@@ -5508,8 +5440,8 @@ function initUI(home, user, webauthnhome, uiopts, count) {
 	} else {
 		getTopPage(uiopts, null);
 	}
-	//initIdleWarning();
-	//runSessionPolling(uiopts.pollmins, 2*uiopts.pollmins);
+	initIdleWarning();
+	runSessionPolling(uiopts.pollmins, 2*uiopts.pollmins);
 }
 
 function renderLogin() {
@@ -5585,6 +5517,7 @@ function submitLogin(count) {
 			document.body.style.cursor = "default";
 			SESSIONID = data;
 			getRoles();
+			startCookieTimer(1000);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			document.body.style.cursor = "default";
