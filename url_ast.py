@@ -231,14 +231,48 @@ class Study (Node):
         def postCommit(files):
             self.emit_headers()
             if self.action == 'upload':
-                self.header('Content-Type', 'text/html')
-                return self.renderlist("Study Upload",
-                                       [self.render.TreeUpload()])
+                #self.header('Content-Type', 'text/html')
+                #return self.renderlist("Study Upload",
+                #                       [self.render.TreeUpload()])
+                self.header('Content-Type', 'application/json')
+                params = {}
+                params['tagfiler.server.url'] = self.globals['home']
+                params['tagfiler.applet.test'] = self.globals['appletTestProperties']
+                params['tagfiler.applet.log'] = self.globals['appletLogfile']
+                params['custom.properties'] = self.globals['appletCustomProperties']
+                params['tagfiler.connections'] = self.globals['clientConnections']
+                params['tagfiler.allow.chunks'] = self.globals['clientUploadChunks']
+                params['tagfiler.socket.buffer.size'] = self.globals['clientSocketBufferSize']
+                params['tagfiler.chunkbytes'] = self.globals['clientChunkbytes']
+                params['tagfiler.client.socket.timeout'] = self.globals['clientSocketTimeout']
+                params['tagfiler.retries'] = self.globals['clientRetryCount']
+                params['tagfiler.cookie.name'] = 'tagfiler'
+                self.uiopts = {}
+                self.uiopts['params'] = params
+                return jsonWriter(self.uiopts)
             elif self.action == 'download':
                 self.globals['version'] = self.version
-                self.header('Content-Type', 'text/html')
-                return self.renderlist("Study Download",
-                                       [self.render.TreeDownload(self.name)])
+                #self.header('Content-Type', 'text/html')
+                #return self.renderlist("Study Download",
+                #                       [self.render.TreeDownload(self.name)])
+                self.header('Content-Type', 'application/json')
+                params = {}
+                params['tagfiler.server.url'] = self.globals['home']
+                params['tagfiler.server.transmissionnum'] = self.name
+                params['tagfiler.server.version'] = self.globals['version']
+                params['tagfiler.applet.test'] = self.globals['appletTestProperties']
+                params['tagfiler.applet.log'] = self.globals['appletLogfile']
+                params['custom.properties'] = self.globals['appletCustomProperties']
+                params['tagfiler.connections'] = self.globals['clientConnections']
+                params['tagfiler.allow.chunks'] = self.globals['clientUploadChunks']
+                params['tagfiler.socket.buffer.size'] = self.globals['clientSocketBufferSize']
+                params['tagfiler.chunkbytes'] = self.globals['clientChunkbytes']
+                params['tagfiler.client.socket.timeout'] = self.globals['clientSocketTimeout']
+                params['tagfiler.retries'] = self.globals['clientRetryCount']
+                params['tagfiler.cookie.name'] = 'tagfiler'
+                self.uiopts = {}
+                self.uiopts['params'] = params
+                return jsonWriter(self.uiopts)
             elif self.action == 'get':
                 success = None
                 error = None
@@ -251,9 +285,21 @@ class Study (Node):
     
                 if self.name:
                     self.globals['version'] = self.version
-                    self.header('Content-Type', 'text/html')
-                    return self.renderlist(None,
-                                           [self.render.TreeStatus(self.name, self.direction, success, error, files)])
+                    #self.header('Content-Type', 'text/html')
+                    #return self.renderlist(None,
+                    #                       [self.render.TreeStatus(self.name, self.direction, success, error, files)])
+                    self.header('Content-Type', 'application/json')
+                    params = {}
+                    params['name'] = self.name
+                    params['direction'] = self.direction
+                    params['success'] = success
+                    params['error'] = error
+                    params['files'] = files
+                    params['appletTagvals'] = self.globals['appletTagvals']
+                    params['version'] = self.globals['version']
+                    self.uiopts = {}
+                    self.uiopts['params'] = params
+                    return jsonWriter(self.uiopts)
                 else:
                     url = '/appleterror'
                     if self.status:

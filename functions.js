@@ -5682,13 +5682,13 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': HOME + '/study?action=upload'});
+	a.attr({'href': 'javascript:uploadStudy()'});
 	a.html('Upload study');
 	td = $('<td>');
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': HOME + '/study?action=download'});
+	a.attr({'href': 'javascript:downloadStudy()'});
 	a.html('Download study');
 	td = $('<td>');
 	tr.append(td);
@@ -7856,4 +7856,901 @@ function getTagDefinition(predicate, view, count) {
 		}
 	});
 }
+
+function uploadStudy(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/study?action=upload'
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postUploadStudy(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){uploadStudy(count)}, delay);
+			}
+		}
+	});
+}
+
+function downloadStudy(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/study?action=download'
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postDownloadStudy(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){downloadStudy(count)}, delay);
+			}
+		}
+	});
+}
+
+function postUploadStudy(data) {
+	var params = data.params;
+	var div1 = $('<div>');
+	var h3 = $('<h3>');
+	div1.append(h3);
+	h3.html('Status');
+	var table = $('<table>');
+	div1.append(table);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.addClass('applet');
+	var applet = $('<applet>');
+	applet.attr({'NAME': 'TagFileUploader',
+		'CODE': 'edu.isi.misd.tagfiler.TagFilerUploadApplet',
+		'CODEBASE': '/tagfiler/static',
+		 'ARCHIVE': 'isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar,json-org.jar',
+		 'width': 25,
+		 'height': 25,
+		 'MAYSCRIPT': 'true'
+	});
+	var param;
+	if (params['tagfiler.cookie.name'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.cookie.name',
+			'value': params['tagfiler.cookie.name']});
+	}
+	if (params['tagfiler.server.url'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.server.url',
+			'value': params['tagfiler.server.url']});
+	}
+	param = $('<param>');
+	applet.append(param);
+	param.attr({'name': 'classloader_cache',
+		'value': 'false'});
+	param = $('<param>');
+	applet.append(param);
+	param.attr({'name': 'separate_jvm',
+		'value': 'true'});
+	if (params['tagfiler.applet.test'] != null && params['tagfiler.applet.test'].length > 0) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.applet.test',
+			'value': '' + params['tagfiler.applet.test']});
+	}
+	if (params['tagfiler.applet.log'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.applet.log',
+			'value': params['tagfiler.applet.log']});
+	}
+	if (params['custom.properties'] != null && params['custom.properties'].length > 0) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'custom.properties',
+			'value': '' + params['custom.properties']});
+	}
+	if (params['tagfiler.connections'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.connections',
+			'value': '' + params['tagfiler.connections']});
+	}
+	if (params['tagfiler.allow.chunks'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.allow.chunks',
+			'value': '' + params['tagfiler.allow.chunks']});
+	}
+	if (params['tagfiler.socket.buffer.size'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.socket.buffer.size',
+			'value': '' + params['tagfiler.socket.buffer.size']});
+	}
+	if (params['tagfiler.chunkbytes'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.chunkbytes',
+			'value': '' + params['tagfiler.chunkbytes']});
+	}
+	if (params['tagfiler.client.socket.timeout'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.client.socket.timeout',
+			'value': '' + params['tagfiler.client.socket.timeout']});
+	}
+	if (params['tagfiler.retries'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.retries',
+			'value': '' + params['tagfiler.retries']});
+	}
+	var hr = $('<hr>');
+	var b = $('<b>');
+	b.html('You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet. Download JRE 1.5 for your system from the following link:');
+	var a = $('<a>');
+	a.attr({'href': 'http://www.java.com/en/download/manual.jsp'});
+	a.html('http://www.java.com/en/download/manual.jsp');
+	hr.append(b);
+	hr.append('<br>');
+	hr.append(a);
+	hr.append('<br>');
+	applet.append(hr);
+	td.append(applet);
+	td = $('<td>');
+	tr.append(td);
+	table = $('<table>');
+	td.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.addClass('status-wrapper');
+	td.attr({'id': 'Status'});
+	b = $('<b>');
+	td.append(b);
+	b.html('Select a directory to upload');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	table = $('<table>');
+	td.append(table);
+	table.addClass('table-border');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.attr({'id': 'ProgressBar'});
+	var tempString = '';
+	for (var i=0; i < 60; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	var div1_2 = $('<div>');
+	h3 = $('<h3>');
+	div1_2.append(h3);
+	h3.html('Dataset Name');
+	table = $('<table>');
+	div1_2.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'id': 'TransmissionNumber',
+		'name': 'TransmissionNumber',
+		'type': 'text',
+		'value': '',
+		'disabled': 'disabled'});
+	td.append(input);
+	td = $('<td>');
+	tr.append(td);
+	input = $('<input>');
+	input.attr({'name': 'DatasetName',
+		'id': 'DatasetName Automatically',
+		'type': 'radio',
+		'value': 'automatically',
+		'checked': 'checked',
+		'onclick': 'resetDatasetName()'});
+	td.append(input);
+	var label = $('<label>');
+	td.append(label);
+	label.html('Generate Automatically');
+	td.append($('<br>'));
+	input = $('<input>');
+	input.attr({'name': 'DatasetName',
+		'id': 'DatasetName Set',
+		'type': 'radio',
+		'value': 'set',
+		'onclick': 'setDatasetName()'});
+	td.append(input);
+	label = $('<label>');
+	td.append(label);
+	label.html('Set');
+	var div2 = $('<div>');
+	h3 = $('<h3>');
+	div2.append(h3);
+	h3.html('Source Directory for Upload');
+	table = $('<table>');
+	div2.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.addClass('directory');
+	td.attr({'id': 'DestinationDirectory'});
+	var tempString = '';
+	for (var i=0; i < 60; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	td = $('<td>');
+	tr.append(td);
+	var button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Browse', 
+		'id': 'Browse',
+		'value': '',
+		'disabled': 'disabled',
+		'onclick': 'uploadBrowse()'});
+	button.html('Browse');
+	td.append(button);
+	var div3 = $('<div>');
+	h3 = $('<h3>');
+	div3.append(h3);
+	h3.html('Checksum');
+	var input = $('<input>');
+	input.attr({'type': 'checkbox',
+		'id': 'cksum',
+		'name': 'cksum',
+		'value': 'on',
+		'checked': 'checked'});
+	div3.append(input);
+	var label = $('<label>');
+	div3.append(label);
+	label.html('Set');
+	var div4 = $('<div>');
+	h3 = $('<h3>');
+	div4.append(h3);
+	h3.html('Submit');
+	button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Upload All',
+		'id': 'Upload All',
+		'disabled': 'disabled',
+		'onclick': "uploadAll('all')"});
+	button.html('Upload All');
+	div4.append(button);
+	button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Resume',
+		'id': 'Resume',
+		'onclick': "uploadAll('resume')"});
+	button.css({'visibility': 'hidden'});
+	button.html('Resume');
+	div4.append(button);
+	var div5 = $('<div>');
+	h3 = $('<h3>');
+	div5.append(h3);
+	h3.html('Study Tags');
+	table = $('<table>');
+	div5.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var div = $('<div>');
+	td.append(div);
+	div.attr({'id': 'custom-tags'});
+	table = $('<table>');
+	div.append(table);
+	table.attr({id: 'Required Tags'});
+	table.addClass('table-wrapper');
+
+	var div6 = $('<div>');
+	h3 = $('<h3>');
+	div6.append(h3);
+	h3.html('File(s) that will be uploaded');
+	table = $('<table>');
+	div6.append(table);
+	table.addClass('file-list');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.attr({'id': 'Files'});
+	td.addClass('text-tree');
+	tempString = '';
+	for (var i=0; i < 60; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Study Upload');
+	uiDiv.append(div1);
+	uiDiv.append(div1_2);
+	uiDiv.append(div2);
+	uiDiv.append(div3);
+	uiDiv.append(div4);
+	uiDiv.append(div5);
+	uiDiv.append(div6);
+}
+
+function postDownloadStudy(data) {
+	var params = data.params;
+	var div1 = $('<div>');
+	var h3 = $('<h3>');
+	div1.append(h3);
+	h3.html('Status');
+	var table = $('<table>');
+	div1.append(table);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.addClass('applet');
+	var applet = $('<applet>');
+	applet.attr({'NAME': 'TagFileDownloader',
+		'CODE': 'edu.isi.misd.tagfiler.TagFilerDownloadApplet',
+		'CODEBASE': '/tagfiler/static',
+		 'ARCHIVE': 'isi-misd-tagfiler-upload.jar,apache-mime4j-0.6.jar,commons-codec-1.4.jar,commons-logging-1.1.1.jar,httpclient-4.0.3.jar,httpcore-4.0.1.jar,httpmime-4.0.3.jar,jakarta-commons-httpclient-3.1.jar,jsse.jar,plugin.jar,json-org.jar',
+		 'width': 25,
+		 'height': 25,
+		 'MAYSCRIPT': 'true'
+	});
+	var param;
+	if (params['tagfiler.cookie.name'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.cookie.name',
+			'value': params['tagfiler.cookie.name']});
+	}
+	if (params['tagfiler.server.url'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.server.url',
+			'value': params['tagfiler.server.url']});
+	}
+	if (params['tagfiler.server.transmissionnum'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.server.transmissionnum',
+			'value': params['tagfiler.server.transmissionnum']});
+	}
+	if (params['tagfiler.server.version'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.server.version',
+			'value': params['tagfiler.server.version']});
+	}
+	param = $('<param>');
+	applet.append(param);
+	param.attr({'name': 'classloader_cache',
+		'value': 'false'});
+	param = $('<param>');
+	applet.append(param);
+	param.attr({'name': 'separate_jvm',
+		'value': 'true'});
+	if (params['tagfiler.applet.test'] != null && params['tagfiler.applet.test'].length > 0) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.applet.test',
+			'value': '' + params['tagfiler.applet.test']});
+	}
+	if (params['tagfiler.applet.log'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.applet.log',
+			'value': params['tagfiler.applet.log']});
+	}
+	if (params['custom.properties'] != null && params['custom.properties'].length > 0) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'custom.properties',
+			'value': '' + params['custom.properties']});
+	}
+	if (params['tagfiler.connections'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.connections',
+			'value': '' + params['tagfiler.connections']});
+	}
+	if (params['tagfiler.allow.chunks'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.allow.chunks',
+			'value': '' + params['tagfiler.allow.chunks']});
+	}
+	if (params['tagfiler.socket.buffer.size'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.socket.buffer.size',
+			'value': '' + params['tagfiler.socket.buffer.size']});
+	}
+	if (params['tagfiler.chunkbytes'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.chunkbytes',
+			'value': '' + params['tagfiler.chunkbytes']});
+	}
+	if (params['tagfiler.client.socket.timeout'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.client.socket.timeout',
+			'value': '' + params['tagfiler.client.socket.timeout']});
+	}
+	if (params['tagfiler.retries'] != null) {
+		param = $('<param>');
+		applet.append(param);
+		param.attr({'name': 'tagfiler.retries',
+			'value': '' + params['tagfiler.retries']});
+	}
+	var hr = $('<hr>');
+	var b = $('<b>');
+	b.html('You must have Java-enabled browser (JRE 1.5+) to run the TagFiler Applet. Download JRE 1.5 for your system from the following link:');
+	var a = $('<a>');
+	a.attr({'href': 'http://www.java.com/en/download/manual.jsp'});
+	a.html('http://www.java.com/en/download/manual.jsp');
+	hr.append(b);
+	hr.append('<br>');
+	hr.append(a);
+	hr.append('<br>');
+	applet.append(hr);
+	td.append(applet);
+	td = $('<td>');
+	tr.append(td);
+	table = $('<table>');
+	td.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.addClass('status-wrapper');
+	td.attr({'id': 'Status'});
+	b = $('<b>');
+	td.append(b);
+	b.html('Click "Update" to fill the form');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	table = $('<table>');
+	td.append(table);
+	table.addClass('table-border');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.attr({'id': 'ProgressBar'});
+	var tempString = '';
+	for (var i=0; i < 60; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	var div1_2 = $('<div>');
+	h3 = $('<h3>');
+	div1_2.append(h3);
+	h3.html('Dataset');
+	table = $('<table>');
+	div1_2.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var table = $('<table>');
+	td.append(table);
+	table.addClass('table-wrapper');
+	table.attr({'rules': 'all'})
+	var tr1 = $('<tr>');
+	table.append(tr1);
+	td = $('<td>');
+	tr1.append(td);
+	td.addClass('tag-name');
+	td.html('Name');
+	td = $('<td>');
+	tr1.append(td);
+	var input = $('<input>');
+	input.attr({'id': 'TransmissionNumber',
+		'name': 'TransmissionNumber',
+		'type': 'text',
+		'value': '',
+		'disabled': 'disabled'});
+	td.append(input);
+	tr1 = $('<tr>');
+	table.append(tr1);
+	td = $('<td>');
+	tr1.append(td);
+	td.addClass('tag-name');
+	td.html('Version');
+	td = $('<td>');
+	tr1.append(td);
+	input = $('<input>');
+	input.attr({'id': 'Version',
+		'type': 'text',
+		'value': '',
+		'disabled': 'disabled'});
+	td.append(input);
+	td = $('<td>');
+	tr.append(td);
+	var button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Update', 
+		'id': 'UpdateButton',
+		'value': '',
+		'disabled': 'disabled',
+		'onclick': 'getDatasetInfo()'});
+	button.html('Update');
+	td.append(button);
+	var div2 = $('<div>');
+	h3 = $('<h3>');
+	div2.append(h3);
+	h3.html('Destination Directory for Download');
+	table = $('<table>');
+	div2.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.addClass('directory');
+	td.attr({'id': 'DestinationDirectory'});
+	var tempString = '';
+	for (var i=0; i < 80; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	td = $('<td>');
+	tr.append(td);
+	var button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Browse', 
+		'id': 'Browse',
+		'value': '',
+		'disabled': 'disabled',
+		'onclick': 'downloadBrowse()'});
+	button.html('Browse');
+	td.append(button);
+	var div3 = $('<div>');
+	h3 = $('<h3>');
+	div3.append(h3);
+	h3.html('Checksum');
+	var input = $('<input>');
+	input.attr({'type': 'checkbox',
+		'id': 'cksum',
+		'name': 'cksum',
+		'value': 'on',
+		'checked': 'checked'});
+	div3.append(input);
+	var label = $('<label>');
+	div3.append(label);
+	label.html('Verify');
+	var div4 = $('<div>');
+	h3 = $('<h3>');
+	div4.append(h3);
+	h3.html('Submit');
+	button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Download Files',
+		'id': 'Download Files',
+		'disabled': 'disabled',
+		'onclick': "downloadFiles('all')"});
+	button.html('Download Files');
+	div4.append(button);
+	button = $('<button>');
+	button.attr({'type': 'button',
+		'name': 'Resume',
+		'id': 'Resume',
+		'onclick': "downloadFiles('resume')"});
+	button.css({'visibility': 'hidden'});
+	button.html('Resume');
+	div4.append(button);
+	var div5 = $('<div>');
+	h3 = $('<h3>');
+	div5.append(h3);
+	h3.html('Study Tags');
+	table = $('<table>');
+	div5.append(table);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	var div = $('<div>');
+	td.append(div);
+	div.attr({'id': 'Required Tags'});
+	table = $('<table>');
+	div.append(table);
+	table.attr({id: 'Dataset Tags',
+		'rules': 'all'});
+	table.addClass('table-wrapper');
+	var div6 = $('<div>');
+	h3 = $('<h3>');
+	div6.append(h3);
+	h3.html('File(s) that will be downloaded');
+	table = $('<table>');
+	div6.append(table);
+	table.addClass('file-list');
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.attr({'id': 'Files'});
+	td.addClass('text-tree');
+	tempString = '';
+	for (var i=0; i < 70; i++) {
+		tempString += '&nbsp;'
+	}
+	td.html(tempString);
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Study Download');
+	uiDiv.append(div1);
+	uiDiv.append(div1_2);
+	uiDiv.append(div2);
+	uiDiv.append(div3);
+	uiDiv.append(div4);
+	uiDiv.append(div5);
+	uiDiv.append(div6);
+}
+
+function redirectApplet(url) {
+	var index = url.indexOf('/appleterror');
+	if (index != -1) {
+		var status = 'An unknown error prevented the applet from functioning.';
+		index = url.indexOf('/appleterror?status=');
+		if (index != -1) {
+			var err = url.substr(index + '/appleterror?status='.length);
+			if (err.length > 0) {
+				status = decodeURIComponent(err.replace(/\+/g, '%20'));
+			}
+		}
+		var uiDiv = $('#ui');
+		uiDiv.html('');
+		var h1 = $('<h1>');
+		uiDiv.append(h1);
+		h1.html('Applet Failed');
+		uiDiv.append($('<p>'));
+		var div = $('<div>');
+		uiDiv.append(div);
+		div.addClass('error');
+		div.html(status);
+		var p = $('<p>');
+		uiDiv.append(p);
+		p.html('If you plan to request help, please note the current time as well as ' +
+				'any other information you can remember about steps that preceded this error.');
+	} else {
+		getAppletTreeStatus(url);
+	}
+}
+
+function getAppletTreeStatus(url, count) {
+	if (count == null) {
+		count = 0;
+	}
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postGetAppletTreeStatus(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){getAppletTreeStatus(url, count)}, delay);
+			}
+		}
+	});
+	
+}
+
+function postGetAppletTreeStatus(data) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var params = data.params;
+	var odd = true;
+	var classname = 'transmissionnum';
+	if (params['success'] != null) {
+		var h2 = $('<h2>');
+		uiDiv.append(h2);
+		h2.html('Completed');
+		uiDiv.append($('<p>'));
+		var b = $('<b>');
+		uiDiv.append(b);
+		b.html(params['success']);
+		uiDiv.append($('<p>'));
+		var label = $('<label>');
+		uiDiv.append(label);
+		label.html('See below for a summary of the study.');
+	} else if (params['error'] != null) {
+		classname = 'error';
+		var h2 = $('<h2>');
+		uiDiv.append(h2);
+		h2.html('Failed');
+		var div = $('<div>');
+		uiDiv.append(div);
+		div.addClass(classname);
+		div.html(params['error']);
+	} else {
+		var h2 = $('<h2>');
+		uiDiv.append(h2);
+		h2.html('Status');
+		var label = $('<label>');
+		uiDiv.append(label);
+		label.html('The status of the transfer is unknown.');
+	}
+	if (params['name'] != null) {
+		uiDiv.append($('<p>'));
+		var div = $('<div>');
+		uiDiv.append(div);
+		div.addClass(classname);
+		div.html('Dataset Name: ' + params['name']);
+		if (params['version'] != null) {
+			uiDiv.append($('<p>'));
+			var div = $('<div>');
+			uiDiv.append(div);
+			div.addClass(classname);
+			div.html('Dataset Version: ' + params['version']);
+		}
+		if (params['direction'] == 'upload' && params['success'] != null) {
+			uiDiv.append($('<p>'));
+			var label = $('<label>');
+			uiDiv.append(label);
+			label.html('Please write this Dataset Name on the visit inventory form.');
+		}
+	}
+	uiDiv.append($('<p>'));
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('file-tag-list');
+	for (var i=0; i < params['appletTagvals'].length; i++) {
+		var tr = $('<tr>');
+		table.append(tr);
+		tr.addClass(odd ? 'file-tag odd' : 'file-tag even');
+		odd = !odd;
+		var arr = params['appletTagvals'][i];
+		var tag = arr[0];
+		var vals = arr[1];
+		var th = $('<th>');
+		tr.append(th);
+		th.addClass('file-tag');
+		th.addClass(idquote(tag));
+		th.html(tag);
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('file-tag');
+		td.addClass(idquote(tag));
+		for (var j=0; j < vals.length; j++) {
+			if (j != 0) {
+				td.append($('<br>'));
+			}
+			var label = $('<label>');
+			td.append(label);
+			label.html(vals[j]);
+		}
+	}
+	if (params['direction'] == 'upload') {
+		uiDiv.append($('<p>'));
+		var label = $('<label>');
+		uiDiv.append(label);
+		label.html('Please compare this study information with that on the visit inventory form.');
+	}
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Study Files');
+	var ul = $('<ul>');
+	uiDiv.append(ul);
+	for (var i=0; i < params['files'].length; i++) {
+		var li = $('<li>');
+		ul.append(li);
+		var index = params['files'][i].indexOf('@');
+		li.html(index == -1 ? params['files'][i] : params['files'][i].substr(0, index))
+	}
+}
+
+
+/**
+ * Converts a value to a JSON string representation
+ * 
+ * @param val
+ * 	the value to converted
+ * @return the JSON string representation
+ */
+function valueToString(val) {
+	if ($.isArray(val)) {
+		return arrayToString(val);
+	} else if ($.isPlainObject(val)) {
+		return objectToString(val);
+	} else if ($.isNumeric(val)) {
+		return val;
+	} else if ($.isEmptyObject(val)) {
+		return '"EmptyObject"';
+	} else if ($.isFunction(val)) {
+		return '"Function"';
+	} else if($.isWindow(val)) {
+		return '"Window"';
+	} else if ($.isXMLDoc(val)) {
+		return '"XMLDoc"';
+	} else {
+		var valType = $.type(val);
+		if (valType == 'string') {
+			//return '"' + escapeDoubleQuotes(val) + '"';
+			return '"' + val + '"';
+		} else if (valType == 'object') {
+			return '"Object"';
+		} else {
+			return '"' + valType + '"';
+		}
+	}
+}
+
+/**
+ * Converts an object to a JSON string representation
+ * 
+ * @param obj
+ * 	the object to converted
+ * @return the JSON string representation
+ */
+function objectToString(obj) {
+	var s = '{';
+	var first = true;
+	$.each(obj, function(key, val) {
+		if (!first) {
+			s += ',';
+		}
+		first = false;
+		s += '"' + key + '":' + valueToString(val);
+	});
+	s += '}';
+	return s;
+}
+
+/**
+ * Converts an array to a JSON string representation
+ * 
+ * @param obj
+ * 	the array to converted
+ * @return the JSON string representation
+ */
+function arrayToString(obj) {
+	var s = '[';
+	var first = true;
+	$.each(obj, function(i, val) {
+		if (!first) {
+			s += ',';
+		}
+		first = false;
+		s += valueToString(val);
+	});
+	s += ']';
+	return s;
+}
+
 
