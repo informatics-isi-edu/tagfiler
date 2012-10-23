@@ -5515,9 +5515,10 @@ function submitLogin(count) {
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			document.body.style.cursor = "default";
-			SESSIONID = data;
-			getRoles();
-			startCookieTimer(1000);
+			window.location = window.location;
+			//SESSIONID = data;
+			//getRoles();
+			//startCookieTimer(1000);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			document.body.style.cursor = "default";
@@ -8701,8 +8702,7 @@ function valueToString(val) {
 	} else {
 		var valType = $.type(val);
 		if (valType == 'string') {
-			//return '"' + escapeDoubleQuotes(val) + '"';
-			return '"' + val + '"';
+			return '"' + escapeDoubleQuotes(val) + '"';
 		} else if (valType == 'object') {
 			return '"Object"';
 		} else {
@@ -8751,6 +8751,18 @@ function arrayToString(obj) {
 	});
 	s += ']';
 	return s;
+}
+
+/**
+ * Method "escape" for a string
+ * escape all the " characters 
+ * 
+ * @param text
+ * 	the string to be escaped
+ * @return the escaped string
+ */
+function escapeDoubleQuotes(text) {
+	return text.replace(/"/g, '\\"');
 }
 
 
