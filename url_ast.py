@@ -249,6 +249,8 @@ class Study (Node):
                 params['tagfiler.cookie.name'] = 'tagfiler'
                 self.uiopts = {}
                 self.uiopts['params'] = params
+                self.uiopts['appletTagnames'] = self.globals['appletTagnames']
+                self.uiopts['appletTagnamesRequire'] = self.globals['appletTagnamesRequire']
                 return jsonWriter(self.uiopts)
             elif self.action == 'download':
                 self.globals['version'] = self.version

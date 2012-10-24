@@ -8195,6 +8195,27 @@ function postUploadStudy(data) {
 	div.append(table);
 	table.attr({id: 'Required Tags'});
 	table.addClass('table-wrapper');
+	var appletTagnames = data['appletTagnames'];
+	var appletTagnamesRequire = data['appletTagnamesRequire'];
+	for (var i=0; i < appletTagnames.length; i++) {
+		var trTag = $('<tr>');
+		table.append(trTag);
+		var tdTag = $('<td>');
+		trTag.append(tdTag);
+		tdTag.addClass('tag-name');
+		tdTag.html(appletTagnames[i]);
+		tdTag = $('<td>');
+		trTag.append(tdTag);
+		var inputTag = $('<input>');
+		inputTag.attr({'type': 'text',
+			'name': appletTagnames[i],
+			'id': appletTagnames[i]+'_id'
+		});
+		if (appletTagnamesRequire.contains(appletTagnames[i])) {
+			inputTag.attr('required', 'required');
+		}
+		tdTag.append(inputTag);
+	}
 
 	var div6 = $('<div>');
 	h3 = $('<h3>');
