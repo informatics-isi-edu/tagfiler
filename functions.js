@@ -50,7 +50,10 @@ function subject2identifiers(subject) {
 		 });
     }
 
-    if (subject['template mode']) {
+    if (subject['Image Set']) {
+		results.dtype = 'Image Set';
+    }
+    else if (subject['template mode']) {
 		results.dtype = 'template';
     }
     else if (subject['url']) {
@@ -328,6 +331,13 @@ function setTags(tags) {
  */
 function setTransmissionNumber(value) {
 	document.getElementById("TransmissionNumber").value = value;
+}
+
+/**
+ * Set the Dataset Version
+ */
+function setVersion(value) {
+	document.getElementById("Version").value = value;
 }
 
 /**
@@ -2356,7 +2366,7 @@ function loadTags() {
 			availableTags = new Object();
 			availableTagdefs = new Array();
 			allTagdefs = new Object();
-			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id'];
+			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id', 'Image%20Set'];
 			$.each(data, function(i, object) {
 				availableTagdefs.push(object['tagdef']);
 				availableTags[object['tagdef']] = object['tagdef type'];
@@ -3584,6 +3594,25 @@ function fillIdContextMenu(ul) {
 	});
 	var results = subject2identifiers(subject);
 	var dtype = results['dtype'];
+	if (dtype == 'Image Set') {
+		var li = $('<li>');
+		ul.append(li);
+		var a = $('<a>');
+		li.append(a);
+		var index = results['dataname'].indexOf('@');
+		var downloadUrl = 'javascript:downloadStudy("study/name=';
+		if (index != -1) {
+			var name = results['dataname'].substr(0, index);
+			var version = results['dataname'].substr(index+1);
+			downloadUrl += encodeSafeURIComponent(name) + ';version=' + encodeSafeURIComponent(version);
+		} else {
+			downloadUrl += encodeSafeURIComponent(results['dataname']);
+		}
+		downloadUrl += '?action=download")';
+		a.attr({	href: downloadUrl });
+		a.html('Download Study ' + results['dataname']);
+		dtype = 'url';
+	}
 	if (dtype == 'template' && view_URL) {
 		var li = $('<li>');
 		ul.append(li);
@@ -5689,7 +5718,7 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:downloadStudy()'});
+	a.attr({'href': 'javascript:downloadStudy("study?action=download")'});
 	a.html('Download study');
 	td = $('<td>');
 	tr.append(td);
@@ -7883,13 +7912,12 @@ function uploadStudy(count) {
 	});
 }
 
-function downloadStudy(count) {
+function downloadStudy(url, count) {
 	if (count == null) {
 		count = 0;
 	}
-	var url = HOME + '/study?action=download'
 	$.ajax({
-		url: url,
+		url: HOME + '/' + url,
 		headers: {'User-agent': 'Tagfiler/1.0'},
 		async: true,
 		accepts: {text: 'application/json'},
@@ -7902,7 +7930,7 @@ function downloadStudy(count) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){downloadStudy(count)}, delay);
+				setTimeout(function(){downloadStudy(url, count)}, delay);
 			}
 		}
 	});
