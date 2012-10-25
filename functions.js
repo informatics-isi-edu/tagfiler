@@ -5706,8 +5706,14 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:manageRoles()'});
-	a.html('Manage roles');
+	a.attr({'href': 'javascript:manageUsers()'});
+	a.html('Manage users');
+	td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:manageAttributes()'});
+	a.html('Manage attributes');
 	td = $('<td>');
 	tr.append(td);
 	a = $('<a>');
@@ -6947,7 +6953,149 @@ function userLogout() {
 }
 
 function userChangePassword() {
-	alert('Not yet implemented');
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Change Password');
+	var fieldset = $('<fieldset>');
+	uiDiv.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('User ' + USER);
+	var table = $('<table>');
+	fieldset.append(table);
+	var tr = $('<tr>');
+	table.append(tr);
+	var td = $('<td>');
+	tr.append(td);
+	td.html('Old Password:');
+	td = $('<td>');
+	tr.append(td);
+	var input = $('<input>');
+	input.attr({'type': 'password',
+		'name': 'oldpassword',
+		'id': 'oldpassword',
+		'size': '15'
+		
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('New Password:');
+	td = $('<td>');
+	tr.append(td);
+	input = $('<input>');
+	input.attr({'type': 'password',
+		'name': 'newpassword1',
+		'id': 'newpassword1',
+		'size': '15'
+		
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	td.html('New Password (confirm):');
+	td = $('<td>');
+	tr.append(td);
+	input = $('<input>');
+	input.attr({'type': 'password',
+		'name': 'newpassword2',
+		'id': 'newpassword2',
+		'size': '15'
+		
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Change Password',
+		'onclick': 'changePassword();'
+	});
+	td.append(input);
+	tr = $('<tr>');
+	table.append(tr);
+	td = $('<td>');
+	tr.append(td);
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Cancel',
+		'onclick': 'homePage();'
+	});
+	td.append(input);
+	uiDiv.append($('<br>'));
+	uiDiv.append($('<br>'));
+	var div = $('<div>');
+	uiDiv.append(div);
+	div.addClass('error');
+	div.attr({'id': 'errorDiv'});
+}
+
+function changePassword(count) {
+	var oldpassword = $('#oldpassword').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (oldpassword == '') {
+		alert('Please provide the old password.');
+		return;
+	}
+	var newpassword1 = $('#newpassword1').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (newpassword1 == '') {
+		alert('Please provide the new password.');
+		return;
+	}
+	var newpassword2 = $('#newpassword2').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (newpassword2 == '') {
+		alert('Please confirm the new password.');
+		return;
+	}
+	if (newpassword1 != newpassword2) {
+		alert('The confirm new password is invalid.');
+		return;
+	}
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/password';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		type: 'PUT',
+		data: {'old_password': oldpassword,
+			'password': newpassword1
+		},
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postChangePassword(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			if (jqXHR.status == 403) {
+				$('#errorDiv').html(jqXHR.responseText);
+			}
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){changePassword(count)}, delay);
+			}
+		}
+	});
+}
+
+function postChangePassword() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var div = $('<div>');
+	uiDiv.append(div);
+	div.addClass('transmissionnum');
+	div.html('The password was successfully changed.');
 }
 
 function homePage(count) {
@@ -6991,12 +7139,16 @@ function postHomePage(data, textStatus, jqXHR) {
 	});
 }
 
-function manageRoles(count) {
+function manageAttributes(count) {
+	alert('Not yet implemented ' + user);
+}
+
+function manageUsers(count) {
 	if (count == null) {
 		count = 0;
 	}
 	var url = HOME + '/user';
-	postManageRoles(null, null, null);
+	postManageUsers(null, null, null);
 	return;
 	$.ajax({
 		url: url,
@@ -7006,19 +7158,19 @@ function manageRoles(count) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postManageRoles(data, textStatus, jqXHR);
+			postManageUsers(data, textStatus, jqXHR);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageRoles(count)}, delay);
+				setTimeout(function(){manageUsers(count)}, delay);
 			}
 		}
 	});
 }
 
-function postManageRoles(data, textStatus, jqXHR) {
+function postManageUsers(data, textStatus, jqXHR) {
 	var users = USER_ROLES;
 	users.sort(compareIgnoreCase);
 	var uiDiv = $('#ui');
@@ -7077,6 +7229,7 @@ function postManageRoles(data, textStatus, jqXHR) {
 	$.each(users, function(i, user) {
 		tr = $('<tr>');
 		table.append(tr);
+		tr.addClass('role');
 		var td = $('<td>');
 		tr.append(td);
 		td.html(user);
@@ -7099,9 +7252,6 @@ function postManageRoles(data, textStatus, jqXHR) {
 			'onclick': 'disableLogin("' + user + '");'
 		});
 		td.append(input);
-		td = $('<td>');
-		tr.append(td);
-		td.html('Password active');
 		td = $('<td>');
 		tr.append(td);
 		input = $('<input>');
