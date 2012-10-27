@@ -5434,6 +5434,7 @@ function initUI(home, user, webauthnhome, uiopts, count) {
 	HELP_URL = uiopts.help;
 	BUGS_URL = uiopts.bugs;
 	var api = uiopts.api;
+	var isLogin = false;
 	if (api.length > 0) {
 		if (api[0] == 'tagdef') {
 			var url = HOME + '/session'
@@ -5459,6 +5460,7 @@ function initUI(home, user, webauthnhome, uiopts, count) {
 			});
 		} else if (api[0] == 'login') {
 			renderLogin();
+			isLogin = true;
 		} else if (api[0] == 'query') {
 			getTopPage(uiopts, 'query');
 		} else if (api[0] == 'tags') {
@@ -5471,6 +5473,9 @@ function initUI(home, user, webauthnhome, uiopts, count) {
 	}
 	initIdleWarning();
 	runSessionPolling(uiopts.pollmins, 2*uiopts.pollmins);
+	if (!isLogin) {
+		startCookieTimer(1000);
+	}
 }
 
 function renderLogin() {
@@ -5647,7 +5652,7 @@ function showAuthnInfo(data) {
 	tr.append(td);
 	var a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:userinfo()'});
+	a.attr({'href': 'javascript:userInfo()'});
 	a.html(USER);
 	tr = $('<tr>');
 	table.append(tr);
@@ -6930,8 +6935,61 @@ function postAddTagValue(tag, row, allTags, predicate) {
 	}
 }
 
-function userinfo() {
-	alert('Not yet implemented');
+function userInfo(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/session'
+	$.ajax({
+		url: url,
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+ 		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postUserInfo(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){userInfo(count)}, delay);
+			}
+		}
+	});
+}
+
+function postUserInfo(data) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Status: Logged In');
+	var p = $('<p>');
+	uiDiv.append(p);
+	var since = getLocaleTimestamp(data['since']);
+	since = since.split(" ")[1].split('.')[0];
+	p.html('You are logged in as "serban" since ' + since + '.');
+	var roles = [];
+	$.each(data.attributes, function (i, val) {
+		if (val != USER) {
+			roles.push(val);
+		}
+	});
+	if (roles.length > 0) {
+		roles.sort(compareIgnoreCase);
+		var p = $('<p>');
+		uiDiv.append(p);
+		p.html('As such, you are assigned to the following attributes:');
+		var ul = $('<ul>');
+		uiDiv.append(ul);
+		$.each(roles, function (i, role) {
+			var li = $('<li>');
+			ul.append(li);
+			li.html(role);
+		});
+	}
 }
 
 function userLogout() {
@@ -7079,6 +7137,7 @@ function changePassword(count) {
 		error: function(jqXHR, textStatus, errorThrown) {
 			if (jqXHR.status == 403) {
 				$('#errorDiv').html(jqXHR.responseText);
+				return;
 			}
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
@@ -7140,7 +7199,28 @@ function postHomePage(data, textStatus, jqXHR) {
 }
 
 function manageAttributes(count) {
-	alert('Not yet implemented ' + user);
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/attribute';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postManageAttributes(data, textStatus, jqXHR);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageAttributes(count)}, delay);
+			}
+		}
+	});
 }
 
 function manageUsers(count) {
@@ -7148,8 +7228,6 @@ function manageUsers(count) {
 		count = 0;
 	}
 	var url = HOME + '/user';
-	postManageUsers(null, null, null);
-	return;
 	$.ajax({
 		url: url,
 		accepts: {text: 'application/json'},
@@ -7171,16 +7249,16 @@ function manageUsers(count) {
 }
 
 function postManageUsers(data, textStatus, jqXHR) {
-	var users = USER_ROLES;
+	var users = data;
 	users.sort(compareIgnoreCase);
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
-	h2.html('Role Management');
+	h2.html('User Management');
 	h2 = $('<h2>');
 	uiDiv.append(h2);
-	h2.html('Create a Role');
+	h2.html('Create an User');
 	var input = $('<input>');
 	input.attr({'type': 'text',
 		'name': 'role',
@@ -7196,13 +7274,13 @@ function postManageUsers(data, textStatus, jqXHR) {
 	uiDiv.append(input);
 	h2 = $('<h2>');
 	uiDiv.append(h2);
-	h2.html('Existing Roles');
+	h2.html('Existing Users');
 	var p = $('<p>');
 	uiDiv.append(p);
 	var a = $('<a>');
 	p.append(a);
 	a.attr({'href': 'javascript:manageAllRoles()'});
-	a.html('Manage membership of all roles');
+	a.html('Manage attributes of all users');
 	var table = $('<table>');
 	uiDiv.append(table);
 	table.addClass('role-list');
@@ -7210,13 +7288,10 @@ function postManageUsers(data, textStatus, jqXHR) {
 	table.append(tr);
 	var th = $('<th>');
 	tr.append(th);
-	th.html('Role');
+	th.html('User');
 	th = $('<th>');
 	tr.append(th);
 	th.html('Delete');
-	th = $('<th>');
-	tr.append(th);
-	th.html('Password');
 	th = $('<th>');
 	tr.append(th);
 	th.html('Disable');
@@ -7225,7 +7300,7 @@ function postManageUsers(data, textStatus, jqXHR) {
 	th.html('Reset');
 	th = $('<th>');
 	tr.append(th);
-	th.html('Membership');
+	th.html('Attributes');
 	$.each(users, function(i, user) {
 		tr = $('<tr>');
 		table.append(tr);
@@ -7237,13 +7312,10 @@ function postManageUsers(data, textStatus, jqXHR) {
 		tr.append(td);
 		input = $('<input>');
 		input.attr({'type': 'button',
-			'value': 'Delete role',
+			'value': 'Delete user',
 			'onclick': 'deleteUser("' + user + '");'
 		});
 		td.append(input);
-		td = $('<td>');
-		tr.append(td);
-		td.html('Password active');
 		td = $('<td>');
 		tr.append(td);
 		input = $('<input>');
@@ -7264,29 +7336,421 @@ function postManageUsers(data, textStatus, jqXHR) {
 		tr.append(td);
 		a = $('<a>');
 		td.append(a);
-		a.attr({'href': 'javascript:manageMembership("' + user + '")'});
-		a.html('Manage membership');
+		a.attr({'href': 'javascript:manageMembership("' + user + '", false)'});
+		a.html('Manage attributes');
 	});
 }
 
-function manageAllRoles() {
-	alert('Not yet implemented');
+function postManageAttributes(data, textStatus, jqXHR) {
+	var attributes = data;
+	attributes.sort(compareIgnoreCase);
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Attribute Management');
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Create an Attribute');
+	var input = $('<input>');
+	input.attr({'type': 'text',
+		'name': 'attribute',
+		'id': 'attribute'
+	});
+	uiDiv.append(input);
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Create',
+		'onclick': 'buildAttribute();'
+	});
+	uiDiv.append(input);
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Existing Attributes');
+	var p = $('<p>');
+	uiDiv.append(p);
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('role-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	var th = $('<th>');
+	tr.append(th);
+	th.html('Attribute');
+	th = $('<th>');
+	tr.append(th);
+	th.html('Delete');
+	$.each(attributes, function(i, attribute) {
+		tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('role');
+		var td = $('<td>');
+		tr.append(td);
+		td.html(attribute);
+		td = $('<td>');
+		tr.append(td);
+		input = $('<input>');
+		input.attr({'type': 'button',
+			'value': 'Delete attribute',
+			'onclick': 'deleteGlobalAttribute("' + attribute + '");'
+		});
+		td.append(input);
+	});
 }
 
-function deleteUser(user) {
-	alert('Not yet implemented ' + user);
+function manageAllRoles(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/user';
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postManageAllRoles(data);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageAllRoles(count)}, delay);
+			}
+		}
+	});
 }
 
-function manageMembership(user) {
-	alert('Not yet implemented ' + user);
+function postManageAllRoles(users) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Attribute Assignment Management');
+	users.sort(compareIgnoreCase);
+	$.each(users, function(i, user) {
+		manageMembership(user, true);
+	});
 }
 
-function resetPassword(user) {
-	alert('Not yet implemented ' + user);
+function deleteUser(user, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/user/' + encodeSafeURIComponent(user);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			manageUsers();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){deleteUser(user, count)}, delay);
+			}
+		}
+	});
 }
 
-function disableLogin(user) {
-	alert('Not yet implemented ' + user);
+function deleteGlobalAttribute(attribute, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			manageAttributes();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){deleteGlobalAttribute(attribute, count)}, delay);
+			}
+		}
+	});
+}
+
+function manageMembership(user, allUsers, count) {
+	if (count == null) {
+		count = 0;
+	}
+	// get user attributes
+	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute';
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			manageUserAttributes(data, user, allUsers);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageMembership(user, allUsers, count)}, delay);
+			}
+		}
+	});
+}
+
+function manageUserAttributes(data, user, allUsers, count) {
+	var userAttributes = data;
+	if (count == null) {
+		count = 0;
+	}
+	// get all the attributes
+	var url = HOME + '/attribute';
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: false,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postManageUserAttributes(userAttributes, data, user, allUsers);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageUserAttributes(data, user, allUsers, count)}, delay);
+			}
+		}
+	});
+}
+
+function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers) {
+	userAttributes.sort(compareIgnoreCase);
+	allAtrributes.sort(compareIgnoreCase);
+	var uiDiv = $('#ui');
+	if (!allUsers) {
+		uiDiv.html('');
+		var h2 = $('<h2>');
+		uiDiv.append(h2);
+		h2.html('Attribute Assignment Management');
+	}
+	var fieldset = $('<fieldset>');
+	uiDiv.append(fieldset);
+	var legend = $('<legend>');
+	fieldset.append(legend);
+	legend.html('User "' + user + '"');
+	if (userAttributes.length > 0 || allAtrributes.length > 0) {
+		var table = $('<table>');
+		fieldset.append(table);
+		var tr = $('<tr>');
+		table.append(tr);
+		if (allAtrributes.length > userAttributes.length) {
+			td = $('<td>');
+			tr.append(td);
+			td.attr({'valign': 'top'});
+			fieldset = $('<fieldset>');
+			td.append(fieldset);
+			legend = $('<legend>');
+			fieldset.append(legend);
+			legend.html('Assign attribute');
+			var select = $('<select>');
+			fieldset.append(select);
+			select.attr({'id': 'attribute_' + idquote(user),
+				'name': 'attributeName'});
+			$.each(allAtrributes, function(i, val) {
+				if (!userAttributes.contains(val)) {
+					var option = $('<option>');
+					select.append(option);
+					option.text(val);
+					option.attr('value', val);
+				}
+			});
+			fieldset.append($('<br>'));
+			var input = $('<input>');
+			input.attr({'type': 'button',
+				'name': 'assignAttribute_' + idquote(user), 
+				'id': 'assignAttribute_' + idquote(user),
+				'value': 'Assign Attribute',
+				'onclick': 'assignAttribute("' + user + '", ' + allUsers + ')'
+			});
+			fieldset.append(input);
+		}
+		if (userAttributes.length > 0) {
+			td = $('<td>');
+			tr.append(td);
+			td.attr({'valign': 'top'});
+			fieldset = $('<fieldset>');
+			td.append(fieldset);
+			legend = $('<legend>');
+			fieldset.append(legend);
+			legend.html('Current attributes');
+			var table = $('<table>');
+			fieldset.append(table);
+			table.attr({'border': '1'});
+			$.each(userAttributes, function(i, val) {
+				var tr = $('<tr>');
+				table.append(tr);
+				var td = $('<td>');
+				tr.append(td);
+				td.html(val);
+				td = $('<td>');
+				tr.append(td);
+				var input = $('<input>');
+				input.attr({'type': 'button',
+					'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
+					'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
+					'value': 'Remove',
+					'onclick': 'removeUserAttribute("' + user + '", "' + val + '", ' + allUsers + ')'
+				});
+				td.append(input);
+			});
+		}
+	}
+}
+
+function assignAttribute(user, allUsers, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var attribute = $('#attribute_' + idquote(user)).val();
+	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'PUT',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			if (allUsers) {
+				manageAllRoles();
+			} else {
+				manageMembership(user, allUsers);
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){assignAttribute(user, allUsers, count)}, delay);
+			}
+		}
+	});
+}
+
+function removeUserAttribute(user, attribute, allUsers, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			if (allUsers) {
+				manageAllRoles();
+			} else {
+				manageMembership(user, allUsers);
+			}
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){removeUserAttribute(user, attribute, allUsers, count)}, delay);
+			}
+		}
+	});
+}
+
+function resetPassword(user, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/password/' + encodeSafeURIComponent(user);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'PUT',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postResetPassword(data, user);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){resetPassword(user, count)}, delay);
+			}
+		}
+	});
+}
+
+function postResetPassword(data, user) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var p = $('<p>');
+	uiDiv.append(p);
+	p.html('The password for "' + user + '" has been reset.')
+	var ul = $('<ul>');
+	uiDiv.append(ul);
+	var li = $('<li>');
+	ul.append(li);
+	li.html('New temporary password: "' + data[user] + '"')
+	li = $('<li>');
+	ul.append(li);
+	li.html('User must change password on next login.')
+}
+
+function disableLogin(user, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = HOME + '/password/' + encodeSafeURIComponent(user);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'DELETE',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			alert('The password for the user "' + user + '" was disabled.');
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			if (jqXHR.status == 404) {
+				// NotFound
+				alert('The password is already disabled for ' + jqXHR.responseText);
+				return;
+			} else if (jqXHR.status == 404) {
+				// Forbidden
+				alert(jqXHR.responseText);
+				return;
+			}
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){disableLogin(user, count)}, delay);
+			}
+		}
+	});
 }
 
 function createUser(count) {
@@ -7299,8 +7763,6 @@ function createUser(count) {
 		return;
 	}
 	var url = HOME + '/user/' + encodeSafeURIComponent(role);
-	postCreateUser(null, null, null, role);
-	return;
 	$.ajax({
 		url: url,
 		dataType: 'json',
@@ -7309,7 +7771,7 @@ function createUser(count) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postCreateUser(data, textStatus, jqXHR, role);
+			manageUsers();
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
@@ -7321,10 +7783,35 @@ function createUser(count) {
 	});
 }
 
-function postCreateUser(data, textStatus, jqXHR, role) {
-	alert ('postCreateUser: ' + role);
+function buildAttribute(count) {
+	if (count == null) {
+		count = 0;
+	}
+	var attribute = $('#attribute').val().replace(/^\s*/, "").replace(/\s*$/, "");
+	if (attribute == '') {
+		alert('Please provide a name for the new attribute.');
+		return;
+	}
+	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
+	$.ajax({
+		url: url,
+		dataType: 'json',
+		type: 'PUT',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			manageAttributes();
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){buildAttribute(count)}, delay);
+			}
+		}
+	});
 }
-
 
 function queryByTags() {
 	viewLink(null);
