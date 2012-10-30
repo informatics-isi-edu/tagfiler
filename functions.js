@@ -5550,9 +5550,6 @@ function submitLogin(count) {
 		success: function(data, textStatus, jqXHR) {
 			document.body.style.cursor = "default";
 			window.location = window.location;
-			//SESSIONID = data;
-			//getRoles();
-			//startCookieTimer(1000);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			document.body.style.cursor = "default";
@@ -7336,7 +7333,7 @@ function postManageUsers(data, textStatus, jqXHR) {
 		tr.append(td);
 		a = $('<a>');
 		td.append(a);
-		a.attr({'href': 'javascript:manageMembership("' + user + '", false)'});
+		a.attr({'href': 'javascript:manageUserRoles("' + user + '")'});
 		a.html('Manage attributes');
 	});
 }
@@ -7410,7 +7407,7 @@ function manageAllRoles(count) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			postManageAllRoles(data);
+			manageAllUsersAttributes(data);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
@@ -7419,18 +7416,6 @@ function manageAllRoles(count) {
 				setTimeout(function(){manageAllRoles(count)}, delay);
 			}
 		}
-	});
-}
-
-function postManageAllRoles(users) {
-	var uiDiv = $('#ui');
-	uiDiv.html('');
-	var h2 = $('<h2>');
-	uiDiv.append(h2);
-	h2.html('Attribute Assignment Management');
-	users.sort(compareIgnoreCase);
-	$.each(users, function(i, user) {
-		manageMembership(user, true);
 	});
 }
 
@@ -7484,7 +7469,7 @@ function deleteGlobalAttribute(attribute, count) {
 	});
 }
 
-function manageMembership(user, allUsers, count) {
+function manageMembership(allAttributes, user, count) {
 	if (count == null) {
 		count = 0;
 	}
@@ -7494,62 +7479,24 @@ function manageMembership(user, allUsers, count) {
 		url: url,
 		dataType: 'json',
 		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
+		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			manageUserAttributes(data, user, allUsers);
+			postManageUserAttributes(data, allAttributes, user);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageMembership(user, allUsers, count)}, delay);
+				setTimeout(function(){manageMembership(user, allAttributes, count)}, delay);
 			}
 		}
 	});
 }
 
-function manageUserAttributes(data, user, allUsers, count) {
-	var userAttributes = data;
-	if (count == null) {
-		count = 0;
-	}
-	// get all the attributes
-	var url = HOME + '/attribute';
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postManageUserAttributes(userAttributes, data, user, allUsers);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageUserAttributes(data, user, allUsers, count)}, delay);
-			}
-		}
-	});
-}
-
-function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers) {
+function postManageUserAttributes(userAttributes, allAtrributes, user) {
 	userAttributes.sort(compareIgnoreCase);
-	allAtrributes.sort(compareIgnoreCase);
-	var uiDiv = $('#ui');
-	if (!allUsers) {
-		uiDiv.html('');
-		var h2 = $('<h2>');
-		uiDiv.append(h2);
-		h2.html('Attribute Assignment Management');
-	}
-	var fieldset = $('<fieldset>');
-	uiDiv.append(fieldset);
-	var legend = $('<legend>');
-	fieldset.append(legend);
-	legend.html('User "' + user + '"');
+	var fieldset = $('#fieldset_' + idquote(user));
 	if (userAttributes.length > 0 || allAtrributes.length > 0) {
 		var table = $('<table>');
 		fieldset.append(table);
@@ -7558,7 +7505,8 @@ function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers)
 		if (allAtrributes.length > userAttributes.length) {
 			td = $('<td>');
 			tr.append(td);
-			td.attr({'valign': 'top'});
+			td.attr({'valign': 'top',
+				'id': 'td_assign_attribute_' + idquote(user)});
 			fieldset = $('<fieldset>');
 			td.append(fieldset);
 			legend = $('<legend>');
@@ -7582,14 +7530,15 @@ function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers)
 				'name': 'assignAttribute_' + idquote(user), 
 				'id': 'assignAttribute_' + idquote(user),
 				'value': 'Assign Attribute',
-				'onclick': 'assignAttribute("' + user + '", ' + allUsers + ')'
+				'onclick': 'assignAttribute("' + user + '")'
 			});
 			fieldset.append(input);
 		}
 		if (userAttributes.length > 0) {
 			td = $('<td>');
 			tr.append(td);
-			td.attr({'valign': 'top'});
+			td.attr({'valign': 'top',
+				'id': 'td_remove_attribute_' + idquote(user)});
 			fieldset = $('<fieldset>');
 			td.append(fieldset);
 			legend = $('<legend>');
@@ -7597,12 +7546,14 @@ function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers)
 			legend.html('Current attributes');
 			var table = $('<table>');
 			fieldset.append(table);
-			table.attr({'border': '1'});
+			table.attr({'border': '1',
+				'id': 'table_attribute_' + idquote(user)});
 			$.each(userAttributes, function(i, val) {
 				var tr = $('<tr>');
 				table.append(tr);
 				var td = $('<td>');
 				tr.append(td);
+				td.addClass('userAttribute');
 				td.html(val);
 				td = $('<td>');
 				tr.append(td);
@@ -7611,7 +7562,7 @@ function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers)
 					'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
 					'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
 					'value': 'Remove',
-					'onclick': 'removeUserAttribute("' + user + '", "' + val + '", ' + allUsers + ')'
+					'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
 				});
 				td.append(input);
 			});
@@ -7619,7 +7570,7 @@ function postManageUserAttributes(userAttributes, allAtrributes, user, allUsers)
 	}
 }
 
-function assignAttribute(user, allUsers, count) {
+function assignAttribute(user, count) {
 	if (count == null) {
 		count = 0;
 	}
@@ -7633,11 +7584,67 @@ function assignAttribute(user, allUsers, count) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			if (allUsers) {
-				manageAllRoles();
-			} else {
-				manageMembership(user, allUsers);
+			// to re-write success
+			if ($('#td_remove_attribute_' + idquote(user)).length == 0) {
+				td = $('<td>');
+				td.insertAfter($('#td_assign_attribute_' + idquote(user)));
+				td.attr({'valign': 'top',
+					'id': 'td_remove_attribute_' + idquote(user)});
+				fieldset = $('<fieldset>');
+				td.append(fieldset);
+				legend = $('<legend>');
+				fieldset.append(legend);
+				legend.html('Current attributes');
+				var table = $('<table>');
+				fieldset.append(table);
+				table.attr({'border': '1',
+					'id': 'table_attribute_' + idquote(user)});
 			}
+			var allAttributes = new Array();
+			var userAttributes = new Array();
+			userAttributes.push(attribute);
+			$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
+				if ($(option).attr('value') != attribute) {
+					allAttributes.push($(option).attr('value'));
+				}
+			});
+			$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
+				userAttributes.push($(td).html());
+			});
+			allAttributes.sort(compareIgnoreCase);
+			userAttributes.sort(compareIgnoreCase);
+			if (allAttributes.length > 0) {
+				var select = $('#attribute_' + idquote(user));
+				select.html('');
+				$.each(allAttributes, function(i, val) {
+					var option = $('<option>');
+					select.append(option);
+					option.text(val);
+					option.attr('value', val);
+				});
+			} else {
+				$('#td_assign_attribute_' + idquote(user)).remove();
+			}
+			var table = $('#table_attribute_' + idquote(user));
+			table.html('');
+			$.each(userAttributes, function(i, val) {
+				var tr = $('<tr>');
+				table.append(tr);
+				var td = $('<td>');
+				tr.append(td);
+				td.addClass('userAttribute');
+				td.html(val);
+				td = $('<td>');
+				tr.append(td);
+				var input = $('<input>');
+				input.attr({'type': 'button',
+					'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
+					'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
+					'value': 'Remove',
+					'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
+				});
+				td.append(input);
+			});
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
@@ -7662,10 +7669,76 @@ function removeUserAttribute(user, attribute, allUsers, count) {
 		async: true,
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
-			if (allUsers) {
-				manageAllRoles();
+			if ($('#td_assign_attribute_' + idquote(user)).length == 0) {
+				td = $('<td>');
+				td.insertBefore($('#td_remove_attribute_' + idquote(user)));
+				td.attr({'valign': 'top',
+					'id': 'td_assign_attribute_' + idquote(user)});
+				fieldset = $('<fieldset>');
+				td.append(fieldset);
+				legend = $('<legend>');
+				fieldset.append(legend);
+				legend.html('Assign attribute');
+				var select = $('<select>');
+				fieldset.append(select);
+				select.attr({'id': 'attribute_' + idquote(user),
+					'name': 'attributeName'});
+				fieldset.append($('<br>'));
+				var input = $('<input>');
+				input.attr({'type': 'button',
+					'name': 'assignAttribute_' + idquote(user), 
+					'id': 'assignAttribute_' + idquote(user),
+					'value': 'Assign Attribute',
+					'onclick': 'assignAttribute("' + user + '")'
+				});
+				fieldset.append(input);
+			}
+			var allAttributes = new Array();
+			var userAttributes = new Array();
+			allAttributes.push(attribute);
+			$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
+				allAttributes.push($(option).attr('value'));
+			});
+			$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
+				if ($(td).html() != attribute) {
+					userAttributes.push($(td).html());
+				}
+			});
+
+			allAttributes.sort(compareIgnoreCase);
+			userAttributes.sort(compareIgnoreCase);
+			var select = $('#attribute_' + idquote(user));
+			select.html('');
+			$.each(allAttributes, function(i, val) {
+				var option = $('<option>');
+				select.append(option);
+				option.text(val);
+				option.attr('value', val);
+			});
+			
+			if (userAttributes.length > 0) {
+				var table = $('#table_attribute_' + idquote(user));
+				table.html('');
+				$.each(userAttributes, function(i, val) {
+					var tr = $('<tr>');
+					table.append(tr);
+					var td = $('<td>');
+					tr.append(td);
+					td.addClass('userAttribute');
+					td.html(val);
+					td = $('<td>');
+					tr.append(td);
+					var input = $('<input>');
+					input.attr({'type': 'button',
+						'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
+						'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
+						'value': 'Remove',
+						'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
+					});
+					td.append(input);
+				});
 			} else {
-				manageMembership(user, allUsers);
+				$('#td_remove_attribute_' + idquote(user)).remove();
 			}
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -9451,4 +9524,56 @@ function escapeDoubleQuotes(text) {
 	return text.replace(/"/g, '\\"');
 }
 
+function manageUserRoles(user) {
+	var users = new Array();
+	users.push(user);
+	manageAllUsersAttributes(users);
+}
+
+function manageAllUsersAttributes(users, count) {
+	if (count == null) {
+		count = 0;
+	}
+	// get all the available attributes
+	var url = HOME + '/attribute';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			postManageAllUsersAttributes(data, users);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+			if (retry && count <= MAX_RETRIES) {
+				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+				setTimeout(function(){manageAllUsersAttributes(users, count)}, delay);
+			}
+		}
+	});
+}
+
+function postManageAllUsersAttributes(allAttributes, users) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Attribute Assignment Management');
+	users.sort(compareIgnoreCase);
+	allAttributes.sort(compareIgnoreCase);
+	$.each(users, function(i, user) {
+		var fieldset = $('<fieldset>');
+		uiDiv.append(fieldset);
+		fieldset.attr({'id': 'fieldset_' + idquote(user)});
+		var legend = $('<legend>');
+		fieldset.append(legend);
+		legend.html('User "' + user + '"');
+	});
+	$.each(users, function(i, user) {
+		manageMembership(allAttributes, user);
+	});
+}
 
