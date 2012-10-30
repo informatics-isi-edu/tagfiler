@@ -2609,7 +2609,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         if not spreds:
             raise BadRequest(self, 'Bulk update requires at least one tag to be referenced as a subject predicate.')
 
-        if not lpreds:
+        if on_missing != 'create' and not lpreds:
             raise BadRequest(self, 'Bulk update requires at least one tag to be referenced as a list predicate.')
 
         def body1():
