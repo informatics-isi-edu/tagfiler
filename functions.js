@@ -6908,7 +6908,7 @@ function postAddTagValue(tag, row, allTags, predicate) {
 		a.attr({'href': value});
 		a.html(value);
 	} else {
-		valueTd.html(tags[tag]);
+		valueTd.html(value);
 	}
 	valueTd = $('<td>');
 	valueTr.append(valueTd);
