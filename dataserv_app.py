@@ -493,11 +493,12 @@ class WebException (web.HTTPError):
         logger.info(myutf8(u'%ss %s%s req=%s -- %s' % (elapsed,
                                                        web.ctx.ip, ast and ast.context and ast.context.client and u' user=%s' % urllib.quote(ast.context.client) or u'',
                                                        ast and ast.request_guid or u'', desc % data)))
-        data = render.Error(status, desc, data)
+        data = ('%s\n%s' % (status, desc)) % data
         m = re.match('.*MSIE.*',
                      web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
         if m and False:
             status = '200 OK'
+        headers['Content-Type'] = 'text/plain'
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
 class NotFound (WebException):
@@ -2538,7 +2539,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         
         # update tagdef metadata for all tags which will lose tuples due to subject deletion
         # this will automatically include "latest with name" if that tag is present on any subjects...
-        subject_tags = [ r for r in self.dbquery(('SELECT DISTINCT st.tagname AS tagname'
+        subject_tags = [ r for r in self.dbquery(('SELECT DISTINCT st.value AS tagname'
                                                  + ' FROM "_tags present" AS st'
                                                  + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
         for r in subject_tags:

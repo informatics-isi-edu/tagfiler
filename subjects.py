@@ -671,16 +671,6 @@ class Subject (Node):
                 
             return ftype
 
-        def preDeletePostCommit(ftype):
-            self.globals['datapred'] = path_linearize(self.path)[1:]
-            names = [ '%s' % self.subject2identifiers(s)[2] for s in self.subjects ]
-            if len(names) > 1:
-                self.globals['dataname'] = '<br/>'.join(names)
-            else:
-                self.globals['dataname'] = names[0]
-            return self.renderlist("Delete Confirmation",
-                                   [self.render.ConfirmForm(ftype)])
-        
         contentType = web.ctx.env.get('CONTENT_TYPE', '').lower()
         if contentType[0:33] == 'application/x-www-form-urlencoded':
             storage = web.input()
@@ -708,9 +698,7 @@ class Subject (Node):
 
             self.referer = get_param('referer', "/file")
 
-            if self.action == 'delete':
-                return self.dbtransact(preDeleteBody, preDeletePostCommit)
-            elif self.action == 'CancelDelete':
+            if self.action == 'CancelDelete':
                 raise web.seeother(self.referer)
             elif self.action == 'ConfirmDelete':
                 return self.dbtransact(deleteBody, deletePostCommit)

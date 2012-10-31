@@ -231,9 +231,6 @@ class Study (Node):
         def postCommit(files):
             self.emit_headers()
             if self.action == 'upload':
-                #self.header('Content-Type', 'text/html')
-                #return self.renderlist("Study Upload",
-                #                       [self.render.TreeUpload()])
                 self.header('Content-Type', 'application/json')
                 params = {}
                 params['tagfiler.server.url'] = self.globals['home']
@@ -254,9 +251,6 @@ class Study (Node):
                 return jsonWriter(self.uiopts)
             elif self.action == 'download':
                 self.globals['version'] = self.version
-                #self.header('Content-Type', 'text/html')
-                #return self.renderlist("Study Download",
-                #                       [self.render.TreeDownload(self.name)])
                 self.header('Content-Type', 'application/json')
                 params = {}
                 params['tagfiler.server.url'] = self.globals['home']
@@ -287,9 +281,6 @@ class Study (Node):
     
                 if self.name:
                     self.globals['version'] = self.version
-                    #self.header('Content-Type', 'text/html')
-                    #return self.renderlist(None,
-                    #                       [self.render.TreeStatus(self.name, self.direction, success, error, files)])
                     self.header('Content-Type', 'application/json')
                     params = {}
                     params['name'] = self.name
@@ -381,8 +372,7 @@ class AppletError (Node):
         target = self.config['home'] + web.ctx.homepath
         self.setNoCache()
         self.emit_headers()
-        return self.renderlist("Study Transfer Applet",
-                               [self.render.AppletError(self.status)])
+        return 'AppletError: %s' % self.status
 
 class FileList (Node):
     """Represents a bare FILE/ URI
@@ -496,8 +486,7 @@ class FileList (Node):
                     return None
                 def postCommit(ignore):
                     self.header('Content-Type', 'text/html')
-                    return self.renderlist("Define a dataset",
-                                           [self.render.NameForm()])
+                    return 'Define a dataset'
                 return self.dbtransact(body, postCommit)
         else:
             try:
@@ -636,15 +625,12 @@ class Tagdef (Node):
             self.header('Content-Type', 'text/html')
             predefined, userdefined, types = defs
             test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
-            return self.renderlist("Tag definitions",
-                                   [self.render.TagdefExisting('User', userdefined),
-                                    self.render.TagdefExisting('System', predefined )])
+            return 'Tag definitions'
 
         if len(self.queryopts) > 0:
             raise BadRequest(self, data="Query options are not supported on this interface.")
 
         return self.renderui(['tagdef'], self.queryopts)
-        #return self.dbtransact(body, postCommit)
 
     def GETone(self,uri):
 
@@ -821,8 +807,7 @@ class Tagdef (Node):
                 self.globals['version'] = None
                 self.emit_headers()
                 self.header('Content-Type', 'text/html')
-                return self.renderlist("Delete Confirmation",
-                                       [self.render.ConfirmForm('tagdef')])
+                return 'Delete Confirmation'
             else:
                 # send client back to get form page again
                 raise web.seeother('/tagdef')
@@ -908,10 +893,23 @@ class FileTags (Node):
         
         self.emit_headers()
         if self.acceptType == 'text/uri-list':
+            def render_file(file):
+              subject = self.subject2identifiers(file)[0]
+              def render_tagvals(tagdef):
+                 home = self.config.home + web.ctx.homepath
+                 if tagdef.typestr == 'empty':
+                    return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + ")\n"
+                 elif tagdef.multivalue and file[tagdef.tagname]:
+                    return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname ) + "=" + ','.join([urlquote(str(val)) for val in file[tagdef.tagname]]) + ")\n"
+                 elif file[tagdef.tagname]:
+                    return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + "=" + urlquote(str(file[tagdef.tagname])) + ")\n"
+                 else:
+                    return ''
+              return ''.join([ render_tagvals(tagdef) for tagdef in all or [] ])
+            
             self.header('Content-Type', 'text/uri-list')
             self.globals['str'] = str 
-            for s in self.render.FileTagUriList(files, all):
-                yield s
+            yield ''.join([ render_file(file) for file in files or [] ])
         elif self.acceptType == 'application/x-www-form-urlencoded':
             self.header('Content-Type', 'application/x-www-form-urlencoded')
             for file in files:
@@ -945,24 +943,6 @@ class FileTags (Node):
             else:
                 yield '%s\n' % val
                 
-        # render HTML result
-        self.header('Content-Type', 'text/html')
-
-        simplepath = [ x for x in self.path ]
-        simplepath[-1] = simplepath[-1][0], [], []
-
-        tagdefs = [ x for x in all if x.tagname in self.listtags ]
-
-        title = u'Tag(s) for subject matching "' + path_linearize(simplepath, lambda x: x) + u'"'
-        if len(files) == 1:
-            for s in self.renderlist(title,
-                                     [self.render.FileTagExisting('', files[0], tagdefs)]):
-                yield s
-        else:
-            for s in self.renderlist(title,
-                                     [self.render.FileTagValExisting('', files, tagdefs)]):
-                yield s
-
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
         self.globals['referer'] = self.config['home'] + uri
@@ -1371,7 +1351,7 @@ class Query (Node):
                 if self.query_range:
                     raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
                 self.header('Content-Type', 'text/uri-list')
-                yield self.render.FileUriList(files)
+                yield "\n".join([ "%s/file/%s" % (self.config.home + web.ctx.homepath, self.subject2identifiers(file)[0]) for file in files])
                 return
             elif contentType == 'text/csv':
                 self.header('Content-Type', 'text/csv')
@@ -1409,8 +1389,6 @@ class UI (Node):
         self.queryopts = queryopts
         
     def GET(self, uri):
-        #web.debug((uri, ' self.uiopts: ', self.uiopts, ' self.queryopts: ', self.queryopts, ' self.path: ', self.path))
-        #return self.renderui(self.uiopts, self.queryopts, self.path)
         def body():
             path, self.listtags, writetags, self.limit, self.offset, self.versions = \
                   self.prepare_path_query(self.path,

@@ -7488,7 +7488,7 @@ function manageMembership(allAttributes, user, count) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageMembership(user, allAttributes, count)}, delay);
+				setTimeout(function(){manageMembership(allAttributes, user, count)}, delay);
 			}
 		}
 	});
@@ -7650,13 +7650,13 @@ function assignAttribute(user, count) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){assignAttribute(user, allUsers, count)}, delay);
+				setTimeout(function(){assignAttribute(user, count)}, delay);
 			}
 		}
 	});
 }
 
-function removeUserAttribute(user, attribute, allUsers, count) {
+function removeUserAttribute(user, attribute, count) {
 	if (count == null) {
 		count = 0;
 	}
@@ -7745,7 +7745,7 @@ function removeUserAttribute(user, attribute, allUsers, count) {
 			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
 			if (retry && count <= MAX_RETRIES) {
 				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){removeUserAttribute(user, attribute, allUsers, count)}, delay);
+				setTimeout(function(){removeUserAttribute(user, attribute, count)}, delay);
 			}
 		}
 	});
@@ -7786,10 +7786,7 @@ function postResetPassword(data, user) {
 	uiDiv.append(ul);
 	var li = $('<li>');
 	ul.append(li);
-	li.html('New temporary password: "' + data[user] + '"')
-	li = $('<li>');
-	ul.append(li);
-	li.html('User must change password on next login.')
+	li.html('New password: "' + data[user] + '"')
 }
 
 function disableLogin(user, count) {

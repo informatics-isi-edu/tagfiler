@@ -102,19 +102,7 @@ WEBSTATICFILES=logo.png \
 	forward_disabled.jpg \
 	arrow_down.gif
 
-TEMPLATEBASES=Top.html Bottom.html Commands.html \
-	FileForm.html NameForm.html UrlForm.html \
-	FileList.html FileUriList.txt ConfirmForm.html \
-	Homepage.html \
-	FileTagValBlock.html \
-	TagdefExisting.html \
-	FileTagExisting.html FileTagUriList.txt FileTagValExisting.html \
-	TagdefNewShortcut.html \
-	QueryAdd.html QueryView.html QueryViewStatic.html Query.html \
-	TreeUpload.html TreeDownload.html TreeStatus.html \
-	Error.html AppletError.html \
-	LogList.html LogUriList.html Contact.html DatasetForm.html \
-	RemoveTagValueForm.html SetTagForm.html SetTagValueForm.html TagValueForm.html UI.html
+TEMPLATEBASES=UI.html
 
 TEMPLATES=$(TEMPLATEBASES:%=templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)
@@ -125,7 +113,7 @@ IMAGEFILES=$(IMAGEBASES:%=images/%)
 
 $(HOME)/.tagfiler.predeploy:
 	yum -y --skip-broken install postgresql{,-devel,-server} policycoreutils-python || true
-	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil,-json,-simplejson} || true
+	yum -y --skip-broken install httpd mod_ssl mod_wsgi python{,-psycopg2,-webpy,-ply,-dateutil,-json,-simplejson,-oauth,-suds} || true
 	postgresql-setup initdb || true
 	service postgresql initdb || true
 	touch $(HOME)/.tagfiler.predeploy
