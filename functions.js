@@ -5420,8 +5420,42 @@ var SESSIONID;
 var USER_ROLES;
 var HELP_URL;
 var BUGS_URL;
+var allowManageUsers = false;
 
 function initUI(home, user, webauthnhome, uiopts, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = home + '/user';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			allowManageUsers = true;
+			postInitUI(home, user, webauthnhome, uiopts);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			switch(jqXHR.status) {
+			case 401:
+			case 403:
+				postInitUI(home, user, webauthnhome, uiopts);
+				break;
+			default:
+				var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+				if (retry && count <= MAX_RETRIES) {
+					var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+					setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
+				}
+			}
+		}
+	});
+}
+
+function postInitUI(home, user, webauthnhome, uiopts, count) {
 	//alert(uiopts);
 	if (count == null) {
 		count = 0;
@@ -5704,18 +5738,20 @@ function showTopMenu() {
 	td.append(a);
 	a.attr({'href': 'javascript:homePage()'});
 	a.html('Home');
-	td = $('<td>');
-	tr.append(td);
-	a = $('<a>');
-	td.append(a);
-	a.attr({'href': 'javascript:manageUsers()'});
-	a.html('Manage users');
-	td = $('<td>');
-	tr.append(td);
-	a = $('<a>');
-	td.append(a);
-	a.attr({'href': 'javascript:manageAttributes()'});
-	a.html('Manage attributes');
+	if (allowManageUsers) {
+		td = $('<td>');
+		tr.append(td);
+		a = $('<a>');
+		td.append(a);
+		a.attr({'href': 'javascript:manageUsers()'});
+		a.html('Manage users');
+		td = $('<td>');
+		tr.append(td);
+		a = $('<a>');
+		td.append(a);
+		a.attr({'href': 'javascript:manageAttributes()'});
+		a.html('Manage attributes');
+	}
 	td = $('<td>');
 	tr.append(td);
 	a = $('<a>');
