@@ -5421,6 +5421,40 @@ var USER_ROLES;
 var HELP_URL;
 var BUGS_URL;
 var allowManageUsers = false;
+var allowManageAttributes = false;
+
+function checkListAttributes(home, user, webauthnhome, uiopts, count) {
+	if (count == null) {
+		count = 0;
+	}
+	var url = home + '/attribute';
+	$.ajax({
+		url: url,
+		accepts: {text: 'application/json'},
+		dataType: 'json',
+		headers: {'User-agent': 'Tagfiler/1.0'},
+		async: true,
+  		timeout: AJAX_TIMEOUT,
+		success: function(data, textStatus, jqXHR) {
+			allowManageAttributes = true;
+			postInitUI(home, user, webauthnhome, uiopts);
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			switch(jqXHR.status) {
+			case 401:
+			case 403:
+				postInitUI(home, user, webauthnhome, uiopts);
+				break;
+			default:
+				var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
+				if (retry && count <= MAX_RETRIES) {
+					var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+					setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
+				}
+			}
+		}
+	});
+}
 
 function initUI(home, user, webauthnhome, uiopts, count) {
 	if (count == null) {
@@ -5436,7 +5470,7 @@ function initUI(home, user, webauthnhome, uiopts, count) {
   		timeout: AJAX_TIMEOUT,
 		success: function(data, textStatus, jqXHR) {
 			allowManageUsers = true;
-			postInitUI(home, user, webauthnhome, uiopts);
+			checkListAttributes(home, user, webauthnhome, uiopts);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
 			switch(jqXHR.status) {
@@ -5745,12 +5779,14 @@ function showTopMenu() {
 		td.append(a);
 		a.attr({'href': 'javascript:manageUsers()'});
 		a.html('Manage users');
-		td = $('<td>');
-		tr.append(td);
-		a = $('<a>');
-		td.append(a);
-		a.attr({'href': 'javascript:manageAttributes()'});
-		a.html('Manage attributes');
+		if (allowManageAttributes) {
+			td = $('<td>');
+			tr.append(td);
+			a = $('<a>');
+			td.append(a);
+			a.attr({'href': 'javascript:manageAttributes()'});
+			a.html('Manage attributes');
+		}
 	}
 	td = $('<td>');
 	tr.append(td);
@@ -7310,10 +7346,12 @@ function postManageUsers(data, textStatus, jqXHR) {
 	h2.html('Existing Users');
 	var p = $('<p>');
 	uiDiv.append(p);
-	var a = $('<a>');
-	p.append(a);
-	a.attr({'href': 'javascript:manageAllRoles()'});
-	a.html('Manage attributes of all users');
+	if (allowManageAttributes) {
+		var a = $('<a>');
+		p.append(a);
+		a.attr({'href': 'javascript:manageAllRoles()'});
+		a.html('Manage attributes of all users');
+	}
 	var table = $('<table>');
 	uiDiv.append(table);
 	table.addClass('role-list');
@@ -7331,9 +7369,11 @@ function postManageUsers(data, textStatus, jqXHR) {
 	th = $('<th>');
 	tr.append(th);
 	th.html('Reset');
-	th = $('<th>');
-	tr.append(th);
-	th.html('Attributes');
+	if (allowManageAttributes) {
+		th = $('<th>');
+		tr.append(th);
+		th.html('Attributes');
+	}
 	$.each(users, function(i, user) {
 		tr = $('<tr>');
 		table.append(tr);
@@ -7365,12 +7405,14 @@ function postManageUsers(data, textStatus, jqXHR) {
 			'onclick': 'resetPassword("' + user + '");'
 		});
 		td.append(input);
-		td = $('<td>');
-		tr.append(td);
-		a = $('<a>');
-		td.append(a);
-		a.attr({'href': 'javascript:manageUserRoles("' + user + '")'});
-		a.html('Manage attributes');
+		if (allowManageAttributes) {
+			td = $('<td>');
+			tr.append(td);
+			var a = $('<a>');
+			td.append(a);
+			a.attr({'href': 'javascript:manageUserRoles("' + user + '")'});
+			a.html('Manage attributes');
+		}
 	});
 }
 
