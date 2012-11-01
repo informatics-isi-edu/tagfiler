@@ -1291,7 +1291,7 @@ class Query (Node):
                                           extra_tags=[ ])
 
             #self.txlog('TRACE', value='Query::body query prepared')
-            self.set_http_etag(txid=self.select_predlist_path_txid(self.path, versions=self.versions, limit=self.limit))
+            self.set_http_etag(txid=self.select_predlist_path_txid(path, versions=self.versions, limit=self.limit))
             #self.txlog('TRACE', value='Query::body txid computed')
             cached = self.http_is_cached()
 
