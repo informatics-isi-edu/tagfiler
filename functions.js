@@ -6412,7 +6412,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles
 	var div = $('<div>');
 	uiDiv.append(div);
 	div.addClass('content');
-	if (view == 'tagdef' || view == 'typedef' || view == 'file' || view == 'url') {
+	if (view != null && view != 'alltags') {
 		var p = $('<p>');
 		div.append(p);
 		p.html('This is a limited tag view. ');
