@@ -2142,16 +2142,6 @@ function initPreview() {
 	}
 }
 
-function initPSOC_old(home, user, webauthnhome, basepath, querypath) {
-	alert(basepath);
-	alert(querypath);
-	var querypathJSON = null;
-	if (querypath != null) {
-		querypathJSON = $.parseJSON( querypath );
-	}
-	initPSOC(home, user, webauthnhome, basepath, querypathJSON);
-}
-
 function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
 	//alert(basepath);
 	//alert(querypath);
@@ -6392,7 +6382,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles
 	$.each(tags, function(key, value) {
 		viewColumns.push(key);
 	});
-	var defaultView = 'default';
+	var defaultView = (view != null ? view : 'default');
 	if (tags['config'] != null) {
 		defaultView = 'config';
 	} else if (tags['tagdef'] != null) {
@@ -6418,7 +6408,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles
 	var uiDiv = $('#ui');
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
-	h2.html('Tag(s) for subject matching "/' + decodeURIComponent(displayPredicate) + '"');
+	h2.html('Tag(s) for subject matching "/' + decodeURIComponent((displayPredicate.indexOf('tags/') == 0 ? displayPredicate.substr('tags/'.length) : displayPredicate)) + '"');
 	var div = $('<div>');
 	uiDiv.append(div);
 	div.addClass('content');
@@ -6428,7 +6418,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles
 		p.html('This is a limited tag view. ');
 		var a = $('<a>');
 		p.append(a);
-		a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","alltags")');
+		a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate.indexOf('tags/') == 0 ? predicate.substr('tags/'.length) : predicate) + '","alltags")');
 		a.html('View all tags.');
 	}
 	var table = $('<table>');
@@ -6446,8 +6436,8 @@ function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles
 	th.addClass('file-name');
 	a = $('<a>');
 	th.append(a);
-	a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
-	a.html(decodeURIComponent(displayPredicate));
+	a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate.indexOf('tags/') == 0 ? predicate.substr('tags/'.length) : predicate) + '","' + defaultView + '")');
+	a.html(decodeURIComponent(displayPredicate.indexOf('tags/') == 0 ? displayPredicate.substr('tags/'.length) : displayPredicate));
 	$.each(viewColumns, function(i, tag) {
 		tr = $('<tr>');
 		table.append(tr);
@@ -7444,33 +7434,35 @@ function postManageAttributes(data, textStatus, jqXHR) {
 	h2.html('Existing Attributes');
 	var p = $('<p>');
 	uiDiv.append(p);
-	var table = $('<table>');
-	uiDiv.append(table);
-	table.addClass('role-list');
-	var tr = $('<tr>');
-	table.append(tr);
-	var th = $('<th>');
-	tr.append(th);
-	th.html('Attribute');
-	th = $('<th>');
-	tr.append(th);
-	th.html('Delete');
-	$.each(attributes, function(i, attribute) {
-		tr = $('<tr>');
+	if (attributes.length > 0) {
+		var table = $('<table>');
+		uiDiv.append(table);
+		table.addClass('role-list');
+		var tr = $('<tr>');
 		table.append(tr);
-		tr.addClass('role');
-		var td = $('<td>');
-		tr.append(td);
-		td.html(attribute);
-		td = $('<td>');
-		tr.append(td);
-		input = $('<input>');
-		input.attr({'type': 'button',
-			'value': 'Delete attribute',
-			'onclick': 'deleteGlobalAttribute("' + attribute + '");'
+		var th = $('<th>');
+		tr.append(th);
+		th.html('Attribute');
+		th = $('<th>');
+		tr.append(th);
+		th.html('Delete');
+		$.each(attributes, function(i, attribute) {
+			tr = $('<tr>');
+			table.append(tr);
+			tr.addClass('role');
+			var td = $('<td>');
+			tr.append(td);
+			td.html(attribute);
+			td = $('<td>');
+			tr.append(td);
+			input = $('<input>');
+			input.attr({'type': 'button',
+				'value': 'Delete attribute',
+				'onclick': 'deleteGlobalAttribute("' + attribute + '");'
+			});
+			td.append(input);
 		});
-		td.append(input);
-	});
+	}
 }
 
 function manageAllRoles(count) {

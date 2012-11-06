@@ -892,7 +892,12 @@ class FileTags (Node):
             return
         
         self.emit_headers()
-        if self.acceptType == 'text/uri-list':
+        if self.acceptType == 'text/html':
+            self.header('Content-Type', 'text/html')
+            self.globals['basepath'] = path_linearize(self.path[0:-1])
+            url = 'tags/' + self.globals['queryTarget'][(self.globals['queryTarget'].find('/tags//')+len('/tags//')):]
+            yield self.renderui(['tags'], {'url': url}, self.globals['basepath'])
+        elif self.acceptType == 'text/uri-list':
             def render_file(file):
               subject = self.subject2identifiers(file)[0]
               def render_tagvals(tagdef):
