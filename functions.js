@@ -5417,6 +5417,7 @@ function checkListAttributes(home, user, webauthnhome, uiopts, count) {
 	if (count == null) {
 		count = 0;
 	}
+	allowManageAttributes = false;
 	var url = home + '/attribute';
 	$.ajax({
 		url: url,
@@ -5450,6 +5451,7 @@ function initUI(home, user, webauthnhome, uiopts, count) {
 	if (count == null) {
 		count = 0;
 	}
+	allowManageUsers = false;
 	var url = home + '/user';
 	$.ajax({
 		url: url,
@@ -5760,7 +5762,7 @@ function showTopMenu() {
 	tr.append(td);
 	var a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:homePage()'});
+	a.attr({'href': 'javascript:window.location="'+HOME+'"'});
 	a.html('Home');
 	if (allowManageUsers) {
 		td = $('<td>');
