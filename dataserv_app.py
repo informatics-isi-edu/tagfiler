@@ -1655,7 +1655,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         return newid
 
     def update_latestfile_version(self, name, next_latest_id):
-        subject=dict(name=name, id=next_latest_id)
+        subject=web.Storage(name=name, id=next_latest_id)
 
         results = self.dbquery('SELECT subject FROM %s WHERE value = %s'
                                % (wraptag('latest with name'), wrapval(name)))
