@@ -1137,6 +1137,33 @@ var tagSelectOptions = new Object();
 var typedefSelectValues = null;
 var typedefTagrefs = null;
 
+
+/**
+ * sanitize the AJAX response
+ * @param data
+ * 	the response
+* @return the AJAX response sanitized
+ */
+function sanitize(data, type) {
+	// enclose references to the cookie in quotes
+	var re = new RegExp('document\.cookie', 'g');
+	var ret = data.replace(re, '<q>document.cookie</q>');
+	return ret;
+}
+
+/**
+ * unsanitize the data before deleting it
+ * @param data
+ * 	the response
+* @return the AJAX response sanitized
+ */
+function unsanitize(data) {
+	// remove the quotes from the references of the cookie
+	var re = new RegExp('<q>document\.cookie</q>', 'g');
+	var ret = data.replace(re, 'document.cookie');
+	return ret;
+}
+
 function isRetry(jqXHR, textStatus, errorThrown, count) {
 	var retry = false;
 	switch(jqXHR.status) {
@@ -1262,6 +1289,9 @@ var tagfiler = {
 				data: obj,
 				timeout: AJAX_TIMEOUT,
 				async: async,
+				dataFilter: function(data, type) {
+					return sanitize(data, type);
+				},
 				success: function(data, textStatus, jqXHR) {
 					successCallback(data, textStatus, jqXHR, param);
 				},
@@ -1285,6 +1315,9 @@ var tagfiler = {
 				async: async,
 				accepts: {text: 'application/json'},
 				dataType: 'json',
+				dataFilter: function(data, type) {
+					return sanitize(data, type);
+				},
 				success: function(data, textStatus, jqXHR) {
 					successCallback(data, textStatus, jqXHR, param);
 				},
@@ -1309,6 +1342,9 @@ var tagfiler = {
 				async: async,
 				accepts: {text: 'application/json'},
 				dataType: 'json',
+				dataFilter: function(data, type) {
+					return sanitize(data, type);
+				},
 				success: function(data, textStatus, jqXHR) {
 					successCallback(data, textStatus, jqXHR, param);
 				},
@@ -1330,6 +1366,9 @@ var tagfiler = {
 				dataType: 'json',
 				timeout: AJAX_TIMEOUT,
 				async: async,
+				dataFilter: function(data, type) {
+					return sanitize(data, type);
+				},
 				success: function(data, textStatus, jqXHR) {
 					successCallback(data, textStatus, jqXHR, param);
 				},
@@ -6115,6 +6154,11 @@ function submitLogin() {
  * 	the parameters to be used by the callback success function
  */
 function postSubmitLogin(data, textStatus, jqXHR, param) {
+	// check if the login page was loaded under an i-frame
+	if (window.top.location != window.location) {
+		alert("An expected frame was detected. For security reasons, you are logged out.")
+		userLogout();
+	}
 	document.body.style.cursor = "default";
 	window.location = window.location;
 }
@@ -7316,7 +7360,7 @@ function removeTagValue(tag, value, row, predicate) {
 	var obj = new Object();
 	obj.action = 'delete';
 	obj['tag'] = tag;
-	obj['value'] = value;
+	obj['value'] = unsanitize(value);
 	var param = {
 		'row': row	
 	};
@@ -7430,6 +7474,7 @@ function postAddTagValue(data, textStatus, jqXHR, param) {
 	var allTags = param.allTags;
 	var predicate = param.predicate;
 	var value = $('#'+idquote(tag)+'_id').val();
+	value = sanitize(value);
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
 	var valueTd = $('<td>');
