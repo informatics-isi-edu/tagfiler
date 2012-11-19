@@ -1137,7 +1137,49 @@ var tagSelectOptions = new Object();
 var typedefSelectValues = null;
 var typedefTagrefs = null;
 
-function handleError(jqXHR, textStatus, errorThrown, count, url) {
+function isRetry(jqXHR, textStatus, errorThrown, count) {
+	var retry = false;
+	switch(jqXHR.status) {
+	case 0:		// client timeout
+	case 408:	// server timeout
+	case 503:	// Service Unavailable
+	case 504:	// Gateway Timeout
+		retry = (count < MAX_RETRIES);
+		break;
+	}
+	return retry;
+}
+
+/**
+ * Handle an error from the AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
 	var retry = false;
 	
 	switch(jqXHR.status) {
@@ -1153,7 +1195,7 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 			err = decodeURIComponent(err);
 			if (err == 'The requested tagfiler API usage by unauthorized client requires authorization.') {
 				window.location = '/tagfiler';
-				return false;
+				return;
 			}
 		}
 		break;
@@ -1161,7 +1203,7 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 		var err = jqXHR.responseText;
 		if (err == 'unauthenticated session access forbidden') {
 			window.location = '/tagfiler';
-			return false;
+			return;
 		}
 		break;
 	}
@@ -1189,69 +1231,190 @@ function handleError(jqXHR, textStatus, errorThrown, count, url) {
 		msg += 'URL: ' + url + '\n';
 		alert(msg);
 		document.body.style.cursor = "default";
+	} else {
+		var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
+		setTimeout(function(){retryCallback(url, obj, async, successCallback, param, errorCallback, count+1);}, delay);
 	}
-	
-	return retry;
 }
 
-function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count) {
+/**
+ * Functions to send AJAX requests
+ * 
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+var tagfiler = {
+		POST: function(url, obj, async, successCallback, param, errorCallback, count) {
+			$.ajax({
+				url: url,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				type: 'POST',
+				data: obj,
+				timeout: AJAX_TIMEOUT,
+				async: async,
+				success: function(data, textStatus, jqXHR) {
+					successCallback(data, textStatus, jqXHR, param);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					if (errorCallback == null) {
+						handleError(jqXHR, textStatus, errorThrown, tagfiler.POST, url, obj, async, successCallback, param, errorCallback, count);
+					} else {
+						errorCallback(jqXHR, textStatus, errorThrown, tagfiler.POST, url, obj, async, successCallback, param, errorCallback, count);
+					}
+				}
+			});
+		},
+		GET: function(url, async, successCallback, param, errorCallback, count) {
+			tagfiler.fetch(url, null, async, successCallback, param, errorCallback, count);
+		},
+		fetch: function(url, obj, async, successCallback, param, errorCallback, count) {
+			$.ajax({
+				url: url,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				timeout: AJAX_TIMEOUT,
+				async: async,
+				accepts: {text: 'application/json'},
+				dataType: 'json',
+				success: function(data, textStatus, jqXHR) {
+					successCallback(data, textStatus, jqXHR, param);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					if (errorCallback == null) {
+						handleError(jqXHR, textStatus, errorThrown, tagfiler.fetch, url, obj, async, successCallback, param, errorCallback, count);
+					} else {
+						errorCallback(jqXHR, textStatus, errorThrown, tagfiler.fetch, url, obj, async, successCallback, param, errorCallback, count);
+					}
+				}
+			});
+		},
+		DELETE: function(url, async, successCallback, param, errorCallback, count) {
+			tagfiler.remove(url, null, async, successCallback, param, errorCallback, count);
+		},
+		remove: function(url, obj, async, successCallback, param, errorCallback, count) {
+			$.ajax({
+				url: url,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				type: 'DELETE',
+				timeout: AJAX_TIMEOUT,
+				async: async,
+				accepts: {text: 'application/json'},
+				dataType: 'json',
+				success: function(data, textStatus, jqXHR) {
+					successCallback(data, textStatus, jqXHR, param);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					if (errorCallback == null) {
+						handleError(jqXHR, textStatus, errorThrown, tagfiler.remove, url, obj, async, successCallback, param, errorCallback, count);
+					} else {
+						errorCallback(jqXHR, textStatus, errorThrown, tagfiler.remove, url, obj, async, successCallback, param, errorCallback, count);
+					}
+				}
+			});
+		},
+		PUT: function(url, obj, async, successCallback, param, errorCallback, count) {
+			$.ajax({
+				url: url,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				type: 'PUT',
+				data: obj,
+				dataType: 'json',
+				timeout: AJAX_TIMEOUT,
+				async: async,
+				success: function(data, textStatus, jqXHR) {
+					successCallback(data, textStatus, jqXHR, param);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					if (errorCallback == null) {
+						handleError(jqXHR, textStatus, errorThrown, tagfiler.PUT, url, obj, async, successCallback, param, errorCallback, count);
+					} else {
+						errorCallback(jqXHR, textStatus, errorThrown, tagfiler.PUT, url, obj, async, successCallback, param, errorCallback, count);
+					}
+				}
+			});
+		},
+};
+
+function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern) {
 	var url = home + '/query/' + encodeSafeURIComponent('typedef values') + '(typedef)?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: (count <= MAX_RETRIES ? true : false),
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			typedefSelectValues = new Array();
-			$.each(data, function(i, object) {
-				typedefSelectValues.push(object['typedef']);
-			});
-			initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count)}, delay);
-			}
-		}
-	});
+	var param = {
+			'home': home,
+			'webauthnhome': webauthnhome,
+			'typestr': typestr,
+			'id': id,
+			'pattern': pattern
+	};
+	tagfiler.GET(url, true, postInitTypedefSelectValues, param, null, 0);
 }
 
-function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count) {
+/**
+ * initialize the typedef select values
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitTypedefSelectValues(data, textStatus, jqXHR, param) {
+	typedefSelectValues = new Array();
+	$.each(data, function(i, object) {
+		typedefSelectValues.push(object['typedef']);
+	});
+	initTypedefTagrefs(param.home, param.webauthnhome, param.typestr, param.id, param.pattern)
+}
+
+function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern) {
 	var url = home + '/query/' + encodeSafeURIComponent('typedef tagref') + '(typedef;' + encodeSafeURIComponent('typedef tagref') + ')?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: (count <= MAX_RETRIES ? true : false),
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			typedefTagrefs = new Object();
-			$.each(data, function(i, object) {
-				typedefTagrefs[object['typedef']] = object['typedef tagref'];
-			});
-			if (tagSelectOptions[typestr] == null) {
-				initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count);
-			} else {
-				appendOptions(typestr, id, pattern);
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefTagrefs(home, webauthnhome, typestr, id, pattern, count)}, delay);
-			}
-		}
-	});
+	var param = {
+			'home': home,
+			'webauthnhome': webauthnhome,
+			'typestr': typestr,
+			'id': id,
+			'pattern': pattern
+	};
+	tagfiler.GET(url, true, postInitTypedefTagrefs, param, null, 0);
 }
 
-function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
+/**
+ * initialize the typedef tagrefs
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitTypedefTagrefs(data, textStatus, jqXHR, param) {
+	typedefTagrefs = new Object();
+	$.each(data, function(i, object) {
+		typedefTagrefs[object['typedef']] = object['typedef tagref'];
+	});
+	if (tagSelectOptions[param.typestr] == null) {
+		initTagSelectOptions(param.home, param.webauthnhome, param.typestr, param.id, param.pattern);
+	} else {
+		appendOptions(param.typestr, param.id, param.pattern);
+	}
+}
+
+function initTagSelectOptions(home, webauthnhome, typestr, id, pattern) {
 	tagSelectOptions[typestr] = new Array();
+	var url = null;
 	if (typestr == 'role') {
 		url = home + '/session';
 	} else if (typedefSelectValues.contains(typestr)) {
@@ -1262,75 +1425,115 @@ function initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count) {
 		alert('Invalid typestr: "' + typestr + '"');
 		return;
 	}
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: (count <= MAX_RETRIES ? true : false),
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			if (typestr == 'role') {
-				data = data.attributes;
-			}
-			$.each(data, function(i, object) {
-				if (typestr == 'role') {
-					var option = new Object();
-					option.value = object;
-					option.text = object;
-					tagSelectOptions[typestr].push(option);
-				} else if (typedefSelectValues.contains(typestr)) {
-					$.each(object['typedef values'], function(j, item) {
-						var option = new Object();
-						var index = item.indexOf(' ');
-						if (index != -1) {
-							option.value = item.substring(0, index++);
-							var description = item.substr(index);
-							if (description != option.value) {
-								option.text = option.value + ' (' + item.substr(index) + ')';
-							} else {
-								option.text = option.value;
-							}
-						} else {
-							option.value = item;
-							option.text = item;
-						}
-						tagSelectOptions[typestr].push(option);
-					});
-				} else {
-					var option = new Object();
-					option.value = object[typedefTagrefs[typestr]];
-					option.text = object[typedefTagrefs[typestr]];
-					tagSelectOptions[typestr].push(option);
-				}
-			});
-			appendOptions(typestr, id, pattern);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count)}, delay);
-			} else {
-				delete tagSelectOptions[typestr];
-			}
-		}
-	});
+	var param = {
+			'home': home,
+			'webauthnhome': webauthnhome,
+			'typestr': typestr,
+			'id': id,
+			'pattern': pattern
+	};
+	tagfiler.GET(url, true, postInitTagSelectOptions, param, errorInitTagSelectOptions, 0);
 }
 
-function chooseOptions(home, webauthnhome, typestr, id, count) {
-	if (count == null) {
-		count = 0;
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorInitTagSelectOptions(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	if (!isRetry(jqXHR, textStatus, errorThrown, count)) {
+		delete tagSelectOptions[param.typestr];
+		document.body.style.cursor = "default";
+	} else {
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
 	}
+}
+
+/**
+ * initialize the typedef tagrefs
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitTagSelectOptions(data, textStatus, jqXHR, param) {
+	var typestr = param.typestr;
+	if (typestr == 'role') {
+		data = data.attributes;
+	}
+	$.each(data, function(i, object) {
+		if (typestr == 'role') {
+			var option = new Object();
+			option.value = object;
+			option.text = object;
+			tagSelectOptions[typestr].push(option);
+		} else if (typedefSelectValues.contains(typestr)) {
+			$.each(object['typedef values'], function(j, item) {
+				var option = new Object();
+				var index = item.indexOf(' ');
+				if (index != -1) {
+					option.value = item.substring(0, index++);
+					var description = item.substr(index);
+					if (description != option.value) {
+						option.text = option.value + ' (' + item.substr(index) + ')';
+					} else {
+						option.text = option.value;
+					}
+				} else {
+					option.value = item;
+					option.text = item;
+				}
+				tagSelectOptions[typestr].push(option);
+			});
+		} else {
+			var option = new Object();
+			option.value = object[typedefTagrefs[typestr]];
+			option.text = object[typedefTagrefs[typestr]];
+			tagSelectOptions[typestr].push(option);
+		}
+	});
+	appendOptions(param.typestr, param.id, param.pattern);
+}
+
+function chooseOptions(home, webauthnhome, typestr, id) {
 	var pattern = '';
 	if (typestr == 'rolepat') {
 		pattern = '*';
 		typestr = 'role'
 	}
 	if (typedefSelectValues == null) {
-		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern, count);
+		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern);
 	} else if (tagSelectOptions[typestr] == null) {
-		initTagSelectOptions(home, webauthnhome, typestr, id, pattern, count);
+		initTagSelectOptions(home, webauthnhome, typestr, id, pattern);
 	} else {
 		appendOptions(typestr, id, pattern);
 	}
@@ -1359,35 +1562,38 @@ function appendOptions(typestr, id, pattern) {
 
 var typedefTags = null;
 
-function initTypedefTags(home, id, count) {
+function initTypedefTags(home, id) {
 	var url = home + '/query/typedef(typedef;' + encodeSafeURIComponent('typedef description') + ')' + encodeSafeURIComponent('typedef description') + '?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			typedefTags = new Array();
-			$.each(data, function(i, object) {
-				typedefTags.push(object);
-			});
-			appendTypedefs(id);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){initTypedefTags(home, id, count)}, delay);
-			}
-		}
+	var param = {
+			'home': home,
+			'id': id
+	};
+	tagfiler.GET(url, true, postInitTypedefTags, param, null, 0);
+}
+
+/**
+ * initialize the typedef tags
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitTypedefTags(data, textStatus, jqXHR, param) {
+	typedefTags = new Array();
+	$.each(data, function(i, object) {
+		typedefTags.push(object);
 	});
+	appendTypedefs(param.id);
 }
 
 function chooseTypedefs(home, id) {
 	if (typedefTags == null) {
-		initTypedefTags(home, id, 0);
+		initTypedefTags(home, id);
 	} else {
 		appendTypedefs(id);
 	}
@@ -1657,105 +1863,157 @@ function loadRange(tdRange) {
 
 function loadTagRange(tdRange, tag, exclude) {
 	document.body.style.cursor = 'wait';
-	var range = new Object();
 	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl(exclude ? tag : '');
 	var columnArray = new Array();
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
-	$.ajax({
-		url: queryUrl,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		success: function(data, textStatus, jqXHR) {
-			var columnArray = new Array();
-			$.each(data[0], function(key, value) {
-				if (value == 0) {
-					range[key] = null;
-				} else if (value <= SELECT_LIMIT) {
-					columnArray.push(key);
-				} else {
-					var rangeArray = new Array();
-					rangeArray.push('too many values to display');
-					range[key] = rangeArray;
-				}
-			});
-			if (columnArray.length == 0) {
-				setRangeValues(range, tdRange, tag);
-			} else {
-				// if we want sorted by frequency ascended use '&range=values' + encodeSafeURIComponent('<') or
-				// descending use '&range=values' + encodeSafeURIComponent('>')
-				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
-				$.ajax({
-					url: queryUrl,
-					headers: {'User-agent': 'Tagfiler/1.0'},
-					async: true,
-					accepts: {text: 'application/json'},
-					dataType: 'json',
-					success: function(data, textStatus, jqXHR) {
-						$.each(data[0], function(key, value) {
-							range[key] = value;
-						});
-						setRangeValues(range, tdRange, tag);
-					},
-					error: function(jqXHR, textStatus, errorThrown) {
-						if (!disableAjaxAlert) {
-							handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
-						}
-					}
-				});
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
-			}
+	var param = {
+			'tdRange': tdRange,
+			'tag': tag,
+			'predUrl': predUrl
+	};
+	tagfiler.GET(queryUrl, true, postLoadTagRangeCount, param, errorInitDropDownList, 0);
+}
+
+/**
+ * initialize the tags range count
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postLoadTagRangeCount(data, textStatus, jqXHR, param) {
+	var range = new Object();
+	var columnArray = new Array();
+	$.each(data[0], function(key, value) {
+		if (value == 0) {
+			range[key] = null;
+		} else if (value <= SELECT_LIMIT) {
+			columnArray.push(key);
+		} else {
+			var rangeArray = new Array();
+			rangeArray.push('too many values to display');
+			range[key] = rangeArray;
 		}
 	});
+	if (columnArray.length == 0) {
+		setRangeValues(range, param.tdRange, param.tag);
+	} else {
+		// if we want sorted by frequency ascended use '&range=values' + encodeSafeURIComponent('<') or
+		// descending use '&range=values' + encodeSafeURIComponent('>')
+		var queryUrl = getQueryUrl(param.predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
+		var param = {
+				'tdRange': param.tdRange,
+				'tag': param.tag,
+				'range': range
+		};
+		tagfiler.GET(queryUrl, true, postLoadTagRangeValues, param, errorInitDropDownList, 0);
+	}
+}
+
+/**
+ * initialize the tags range values
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postLoadTagRangeValues(data, textStatus, jqXHR, param) {
+	var range = param.range;
+	$.each(data[0], function(key, value) {
+		range[key] = value;
+	});
+	setRangeValues(param.range, param.tdRange, param.tag);
 }
 
 function setGUIConfig() {
 	var url = HOME + '/query/config=tagfiler(' + encodeSafeURIComponent('_cfg_enabled GUI features') + ')';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			var values = data[0]['_cfg_enabled GUI features'];
-			if (values != null) {
-				if (values.contains('bulk_value_edit')) {
-					bulk_value_edit = true;
-				}
-				if (values.contains('cell_value_edit')) {
-					cell_value_edit = true;
-					$('#enableEdit').css('display', '');
-				}
-				if (values.contains('file_download')) {
-					file_download = true;
-				}
-				if (values.contains('view_tags')) {
-					view_tags = true;
-				}
-				if (values.contains('view_URL')) {
-					view_URL = true;
-				}
-			} else {
-				bulk_value_edit = true;
-				cell_value_edit = true;
-				$('#enableEdit').css('display', '');
-				file_download = true;
-				view_tags = true;
-				view_URL = true;
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			// ignore for now until the tag will be defined 'enabled GUI features'
-			//handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+	tagfiler.GET(url, false, postSetGUIConfig, null, errorSetGUIConfig, 0);
+}
+
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorSetGUIConfig(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	// ignore for now until the tag will be defined 'enabled GUI features'
+	document.body.style.cursor = "default";
+}
+
+/**
+ * initialize the GUI configuration
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postSetGUIConfig(data, textStatus, jqXHR, param) {
+	var values = data[0]['_cfg_enabled GUI features'];
+	if (values != null) {
+		if (values.contains('bulk_value_edit')) {
+			bulk_value_edit = true;
 		}
-	});
+		if (values.contains('cell_value_edit')) {
+			cell_value_edit = true;
+			$('#enableEdit').css('display', '');
+		}
+		if (values.contains('file_download')) {
+			file_download = true;
+		}
+		if (values.contains('view_tags')) {
+			view_tags = true;
+		}
+		if (values.contains('view_URL')) {
+			view_URL = true;
+		}
+	} else {
+		bulk_value_edit = true;
+		cell_value_edit = true;
+		$('#enableEdit').css('display', '');
+		file_download = true;
+		view_tags = true;
+		view_URL = true;
+	}
 }
 
 function queryHasFilters() {
@@ -2323,21 +2581,25 @@ function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
 
 function loadTypedefs() {
 	var url = HOME + '/query/typedef(typedef;' + encodeSafeURIComponent('typedef values') + ';' +encodeSafeURIComponent('typedef dbtype') + ';' +encodeSafeURIComponent('typedef tagref') + ')?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			typedefSubjects = new Object();
-			$.each(data, function(i, object) {
-				typedefSubjects[object['typedef']] = object;
-			});
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-		}
+	tagfiler.GET(url, false, postLoadTypedefs, null, null, 0);
+}
+
+/**
+ * initialize the typedefs
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postLoadTypedefs(data, textStatus, jqXHR, param) {
+	typedefSubjects = new Object();
+	$.each(data, function(i, object) {
+		typedefSubjects[object['typedef']] = object;
 	});
 }
 
@@ -2346,36 +2608,40 @@ function loadTags() {
 				encodeSafeURIComponent('tagdef type') + ';' + 
 				encodeSafeURIComponent('tagdef multivalue') + ';' +
 				encodeSafeURIComponent('tagdef unique') + ')?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			availableTags = new Object();
-			availableTagdefs = new Array();
-			allTagdefs = new Object();
-			var results = ['bytes', 'vname', 'url', 'template%20mode', 'id', 'Image%20Set'];
-			$.each(data, function(i, object) {
-				availableTagdefs.push(object['tagdef']);
-				availableTags[object['tagdef']] = object['tagdef type'];
-				allTagdefs[object['tagdef']] = object;
-				if (object['tagdef unique']) {
-					var encodeValue = encodeSafeURIComponent(object['tagdef']);
-					if (!results.contains(encodeValue)) {
-						results.push(encodeValue);
-					}
-					unique_tags.push(object['tagdef']);
-				}
-			});
-			availableTagdefs.sort(compareIgnoreCase);
-			probe_tags = results.join(';');
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
+	tagfiler.GET(url, false, postLoadTags, null, null, 0);
+}
+
+/**
+ * initialize the tags
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postLoadTags(data, textStatus, jqXHR, param) {
+	availableTags = new Object();
+	availableTagdefs = new Array();
+	allTagdefs = new Object();
+	var results = ['bytes', 'vname', 'url', 'template%20mode', 'id', 'Image%20Set'];
+	$.each(data, function(i, object) {
+		availableTagdefs.push(object['tagdef']);
+		availableTags[object['tagdef']] = object['tagdef type'];
+		allTagdefs[object['tagdef']] = object;
+		if (object['tagdef unique']) {
+			var encodeValue = encodeSafeURIComponent(object['tagdef']);
+			if (!results.contains(encodeValue)) {
+				results.push(encodeValue);
+			}
+			unique_tags.push(object['tagdef']);
 		}
 	});
+	availableTagdefs.sort(compareIgnoreCase);
+	probe_tags = results.join(';');
 }
 
 function loadAvailableTags(id) {
@@ -2395,21 +2661,25 @@ function loadAvailableTags(id) {
 
 function loadViews() {
 	var url = HOME + '/query/view(view)view?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			availableViews = new Array();
-			$.each(data, function(i, object) {
-				availableViews.push(object.view);
-			});
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-		}
+	tagfiler.GET(url, false, postLoadViews, null, null, 0);
+}
+
+/**
+ * initialize the views
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postLoadViews(data, textStatus, jqXHR, param) {
+	availableViews = new Array();
+	$.each(data, function(i, object) {
+		availableViews.push(object.view);
 	});
 }
 
@@ -2434,24 +2704,32 @@ function setViewTags(tag) {
 		return;
 	}
 	var url = HOME + '/query/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('_cfg_file list tags') + ')' + encodeSafeURIComponent('_cfg_file list tags');
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(data, textStatus, jqXHR) {
-			viewListTags[tag] = new Array();
-			var tags = data[0]['_cfg_file list tags'];
-			$.each(tags, function(i, value) {
-				viewListTags[tag].push(value);
-			});
-			viewListTags[tag].reverse();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-		}
+	var param = {
+		'tag': tag	
+	};
+	tagfiler.GET(url, false, postSetViewTags, param, null, 0);
+}
+
+/**
+ * initialize the views
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postSetViewTags(data, textStatus, jqXHR, param) {
+	var tag = param.tag;
+	viewListTags[tag] = new Array();
+	var tags = data[0]['_cfg_file list tags'];
+	$.each(tags, function(i, value) {
+		viewListTags[tag].push(value);
 	});
+	viewListTags[tag].reverse();
 }
 
 function addToQueryTable(tableId, tag) {
@@ -2676,7 +2954,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 				if (select_tags[tag] != null) {
 					appendTagValuesOptions(tag, selid);
 				} else {
-					chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+					chooseOptions(HOME, WEBAUTHNHOME, type, selid);
 				}
 			}
 			td = $('<td>');
@@ -2710,7 +2988,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 				if (select_tags[tag] != null) {
 					appendTagValuesOptions(tag, selid);
 				} else {
-					chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+					chooseOptions(HOME, WEBAUTHNHOME, type, selid);
 				}
 			}
 		}
@@ -2758,7 +3036,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 			if (select_tags[tag] != null) {
 				appendTagValuesOptions(tag, selid);
 			} else {
-				chooseOptions(HOME, WEBAUTHNHOME, type, selid, MAX_RETRIES + 1);
+				chooseOptions(HOME, WEBAUTHNHOME, type, selid);
 			}
 		}
 	}
@@ -2953,69 +3231,125 @@ function showQueryResultsPreview(predUrl, limit, offset) {
 	var columnArray = new Array();
 	columnArray.push('id');
 	var queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
-	$.ajax({
-		url: queryUrl,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		success: function(data, textStatus, jqXHR) {
-			var totalRows = data[0]['id'];
-			showQueryResultsTable(predUrl, limit, totalRows, offset);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
-			}
-		}
-	});
+	var param = {
+		'predUrl': predUrl,
+		'limit': limit,
+		'offset': offset
+	};
+	tagfiler.GET(queryUrl, true, postShowQueryResultsPreview, param, errorInitDropDownList, 0);
+}
+
+/**
+ * initialize the query preview
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postShowQueryResultsPreview(data, textStatus, jqXHR, param) {
+	var totalRows = data[0]['id'];
+	showQueryResultsTable(param.predUrl, param.limit, totalRows, param.offset);
 }
 
 function initDropDownList(tag) {
 	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl('');
-	var totalRows = 0;
 	var columnArray = new Array();
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
+	var param = {
+			'predUrl': predUrl,
+			'tag': tag,
+			'columnArray': columnArray
+		};
+	tagfiler.GET(queryUrl, false, postInitDropDownListCount, param, errorInitDropDownList, 0);
+}
+
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorInitDropDownList(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	if (!disableAjaxAlert) {
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
+	} else {
+		document.body.style.cursor = "default";
+	}
+}
+
+/**
+ * initialize the drop down list count
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitDropDownListCount(data, textStatus, jqXHR, param) {
+	var tag = param.tag;
+	var totalRows = data[0][tag];
 	select_tags = new Object();
 	select_tags_count = new Object();
-	$.ajax({
-		url: queryUrl,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		success: function(data, textStatus, jqXHR) {
-			totalRows = data[0][tag];
-			if (totalRows == 0) {
-				select_tags[tag] = new Array();
-			} else if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
-				queryUrl = getQueryUrl(predUrl, '&range=values', encodeURIArray(columnArray, ''), new Array(), '');
-				$.ajax({
-					url: queryUrl,
-					headers: {'User-agent': 'Tagfiler/1.0'},
-					async: false,
-					accepts: {text: 'application/json'},
-					dataType: 'json',
-					success: function(data, textStatus, jqXHR) {
-						select_tags[tag] = data[0][tag];
-					},
-					error: function(jqXHR, textStatus, errorThrown) {
-						if (!disableAjaxAlert) {
-							handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
-						}
-					}
-				});
-			} else {
-				select_tags_count[tag] = totalRows;
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
-			}
+	if (totalRows == 0) {
+		select_tags[tag] = new Array();
+	} else if (totalRows > 0 && totalRows <= SELECT_LIMIT) {
+		var queryUrl = getQueryUrl(param.predUrl, '&range=values', encodeURIArray(param.columnArray, ''), new Array(), '');
+		var param = {
+				'tag': tag
 		}
-	});
+		tagfiler.GET(queryUrl, false, postInitDropDownListValues, param, errorInitDropDownList, 0);
+	} else {
+		select_tags_count[tag] = totalRows;
+	}
+}
+
+/**
+ * initialize the drop down list values
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitDropDownListValues(data, textStatus, jqXHR, param) {
+	select_tags[param.tag] = data[0][param.tag];
 }
 
 function updatePreviewLimit() {
@@ -3337,229 +3671,243 @@ function showQueryResultsTable(predUrl, limit, totalRows, offset) {
 		td = getChild(trRange, i+1);
 		td.css('display', 'none');
 	}
-	$.ajax({
-		url: queryUrl,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		success: function(data, textStatus, jqXHR) {
-			var rowLimit = 0;
-			previewRows = data.length;
-			var odd = false;
-			var tbody = getChild(table, 3);
-			$.each(data, function(i, row) {
-				rowLimit = i + 1;
-				var tr = getChild(tbody, i+1);
-				if (tr.get(0) == null) {
-					tr = $('<tr>');
-					tbody.append(tr);
-					tr.addClass(odd ? 'odd' : 'even');
-					tr.addClass('gradeA');
-					tr.addClass('tablerow');
-					if (i == 0) {
-						tr.addClass('headborder');
-					}
-				}
-				tr.css('display', '');
-				tr.attr('recordId', row['id'])
-				odd = !odd;
-				if (getChild(tr, 1).get(0) == null) {
-					// context menu here
-					var td = $('<td>');
-					td.attr('width', '1%');
-					td.addClass('separator');
-					td.attr('valign', 'top');
-					tr.append(td);
-				}
-				var td = getChild(tr, 1);
-				td.html('');
-				getIdContextMenuSlot(td, row['id']);
-				$.each(resultColumns, function(j, column) {
-					var td = getChild(tr, j+2);
-					if (td.get(0) == null) {
-						td = $('<td>');
-						td.addClass('tablecell');
-						td.addClass('separator');
-						td.attr('valign', 'top');
-						tr.append(td);
-					}
-					td.css('display', '');
-					td.unbind();
-					if (enabledEdit) {
-						td.click({	td: td,
-									column: column,
-									id: row['id'] },
-									function(event) {editCell(event.data.td, event.data.column, event.data.id);});
-					}
-					td.removeClass();
-					td.addClass(column.replace(/ /g, ''));
-					td.addClass('tablecell');
-					if (j < (resultColumns.length - 1)) {
-						td.addClass('separator');
-					}
-					td.attr('iCol', '' + (j+1));
-					td.attr('tag', column);
-					td.html('');
-					if (row[column] != null) {
-						if (!allTagdefs[column]['tagdef multivalue']) {
-							if (row[column] === true && availableTags[column] == 'empty') {
-								td.html('is set');
-							} else if (row[column] === false && availableTags[column] == 'empty') {
-								td.html('not set');
-							} else {
-								if (column == 'name') {
-									td.html(htmlEscape(row[column]));
-								} else if (column == 'url') {
-									var a = $('<a>');
-									td.append(a);
-									a.attr('href', row[column]);
-									a.html(row[column]);
-								} else {
-									var cellVal = htmlEscape(row[column]);
-									if (availableTags[column] == 'timestamptz') {
-										cellVal = getLocaleTimestamp(cellVal);
-									}
-									td.html(cellVal);
-								}
-							}
-						} else {
-							td.html(row[column].join('<br>'));
-						}
-					} else {
-						td.addClass('tablecelledit');
-					}
-				});
-				for (var k=columnLimit; k < columnLength; k++) {
-					var td = getChild(tr, k+1);
-					if (td.css('display') == 'none') {
-						break;
-					}
-					td.css('display', 'none');
-				}
-			});
-			var b = $('#ViewResults');
-			b.html('');
-			if (previewRows == 0) {
-				b.html('No matches');
-				$('#pagePrevious').css('display', 'none');
-				$('#resultsRange').html('');
-				$('#pageNext').css('display', 'none');
-				$('#totalResults').html('');
-			} else if (previewRows < totalRows) {
-				var minRow = 1;
-				if (offset != '') {
-					offset = parseInt(offset.split('=')[1]);
-					minRow = offset + 1;
-				}
-				var maxRow = minRow + PREVIEW_LIMIT - 1;
-				if (maxRow > totalRows) {
-					maxRow = totalRows;
-				}
-				b.html('Showing ');
-				getSelectRange(totalRows);
-				if (minRow > PREVIEW_LIMIT) {
-					$('#pagePrevious').css('display', '');
-				} else {
-					$('#pagePrevious').css('display', 'none');
-				}
-				if (maxRow < totalRows) {
-					$('#pageNext').css('display', '');
-				} else {
-					$('#pageNext').css('display', 'none');
-				}
-				$('#totalResults').html('of ' + totalRows + ' matches');
-			} else {
-				$('#pagePrevious').css('display', 'none');
-				$('#pageNext').css('display', 'none');
-				b.html('Showing all ' + previewRows + ' matches');
-				$('#resultsRange').html('');
-				$('#totalResults').html('');
-			}
-			var tableLength = tbody.children().length;
-			for (var i=rowLimit; i < tableLength; i++) {
-				var tr = getChild(tbody, i+1);
-				if (tr.css('display') == 'none') {
-					break;
-				}
-				if (i < PREVIEW_LIMIT) {
-					tr.css('display', 'none');
-				} else {
-					tr.remove();
-					tableLength--;
-					i--;
-				}
-			}
-			if (displayRangeValues) {
-				$('.rangeHeader').unbind('mouseenter mouseleave');
-				loadRange(null);
-				enableRangeEvents();
-			}
-			$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
-			$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
-			$('td.topnav span').click(function() {
-				enabledDrag = false;
-				var ul = $(this).parent().find('ul.subnav');
-				if (ul.children().length == 0) {
-					fillIdContextMenu(ul);
-				}
-				var height = $(this).height();
-				var top = ($(this).position().top + height) + 'px';
-				$('ul.subnav').css('top', top);
-				var left = $(this).position().left + $(this).width() - 180;
-				if (left < 0) {
-					left = 0;
-				}
-				left += 'px';
-				$('ul.subnav').css('left', left);
-				
-				//Following events are applied to the subnav itself (moving subnav up and down)
-				$(this).parent().find('ul.subnav').slideDown('fast').show(); //Drop down the subnav on click
-		
-				$(this).parent().hover(function() {
-				}, function(){	
-					$(this).parent().find('ul.subnav').slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
-					enabledDrag = true;
-				});
-		
-				//Following events are applied to the trigger (Hover events for the trigger)
-				}).hover(function() { 
-					$(this).addClass('subhover'); //On hover over, add class 'subhover'
-				}, function(){	//On Hover Out
-					$(this).removeClass('subhover'); //On hover out, remove class 'subhover'
-			});
-			$('.tablecell').hover( function() {
-				var iCol = parseInt($(this).attr('iCol'));
-				var trs = $('.tablerow');
-				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
-			}, function() {
-				$('td.highlighted').removeClass('highlighted');
-			});
-			$('.tableheadercell').hover( function(e) {
-				var iCol = parseInt($(this).attr('iCol'));
-				var trs = $('.tablerow');
-				$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
-			}, function() {
-				if (tagToMove == null) {
-					$('td.highlighted').removeClass('highlighted');
-				}
-			});
-			$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
-			if (enabledEdit) {
-				$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-				$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-			} else if (cell_value_edit) {
-				$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
-				$('.tablecell').mouseout(function(event) {HideTipBox();});
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (!disableAjaxAlert) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, queryUrl);
+	var param = {
+		'table': table,
+		'columnLimit': columnLimit,
+		'columnLength': columnLength,
+		'totalRows': totalRows,
+		'offset': offset
+	};
+	tagfiler.GET(queryUrl, true, postShowQueryResultsTable, param, errorInitDropDownList, 0);
+	document.body.style.cursor = 'default';
+}
+
+/**
+ * initialize the query results table
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postShowQueryResultsTable(data, textStatus, jqXHR, param) {
+	var table = param.table;
+	var columnLimit = param.columnLimit;
+	var columnLength = param.columnLength;
+	var totalRows = param.totalRows;
+	var offset = param.offset;
+	var rowLimit = 0;
+	var previewRows = data.length;
+	var odd = false;
+	var tbody = getChild(table, 3);
+	$.each(data, function(i, row) {
+		rowLimit = i + 1;
+		var tr = getChild(tbody, i+1);
+		if (tr.get(0) == null) {
+			tr = $('<tr>');
+			tbody.append(tr);
+			tr.addClass(odd ? 'odd' : 'even');
+			tr.addClass('gradeA');
+			tr.addClass('tablerow');
+			if (i == 0) {
+				tr.addClass('headborder');
 			}
 		}
+		tr.css('display', '');
+		tr.attr('recordId', row['id'])
+		odd = !odd;
+		if (getChild(tr, 1).get(0) == null) {
+			// context menu here
+			var td = $('<td>');
+			td.attr('width', '1%');
+			td.addClass('separator');
+			td.attr('valign', 'top');
+			tr.append(td);
+		}
+		var td = getChild(tr, 1);
+		td.html('');
+		getIdContextMenuSlot(td, row['id']);
+		$.each(resultColumns, function(j, column) {
+			var td = getChild(tr, j+2);
+			if (td.get(0) == null) {
+				td = $('<td>');
+				td.addClass('tablecell');
+				td.addClass('separator');
+				td.attr('valign', 'top');
+				tr.append(td);
+			}
+			td.css('display', '');
+			td.unbind();
+			if (enabledEdit) {
+				td.click({	td: td,
+							column: column,
+							id: row['id'] },
+							function(event) {editCell(event.data.td, event.data.column, event.data.id);});
+			}
+			td.removeClass();
+			td.addClass(column.replace(/ /g, ''));
+			td.addClass('tablecell');
+			if (j < (resultColumns.length - 1)) {
+				td.addClass('separator');
+			}
+			td.attr('iCol', '' + (j+1));
+			td.attr('tag', column);
+			td.html('');
+			if (row[column] != null) {
+				if (!allTagdefs[column]['tagdef multivalue']) {
+					if (row[column] === true && availableTags[column] == 'empty') {
+						td.html('is set');
+					} else if (row[column] === false && availableTags[column] == 'empty') {
+						td.html('not set');
+					} else {
+						if (column == 'name') {
+							td.html(htmlEscape(row[column]));
+						} else if (column == 'url') {
+							var a = $('<a>');
+							td.append(a);
+							a.attr('href', row[column]);
+							a.html(row[column]);
+						} else {
+							var cellVal = htmlEscape(row[column]);
+							if (availableTags[column] == 'timestamptz') {
+								cellVal = getLocaleTimestamp(cellVal);
+							}
+							td.html(cellVal);
+						}
+					}
+				} else {
+					td.html(row[column].join('<br>'));
+				}
+			} else {
+				td.addClass('tablecelledit');
+			}
+		});
+		for (var k=columnLimit; k < columnLength; k++) {
+			var td = getChild(tr, k+1);
+			if (td.css('display') == 'none') {
+				break;
+			}
+			td.css('display', 'none');
+		}
 	});
-	document.body.style.cursor = 'default';
+	var b = $('#ViewResults');
+	b.html('');
+	if (previewRows == 0) {
+		b.html('No matches');
+		$('#pagePrevious').css('display', 'none');
+		$('#resultsRange').html('');
+		$('#pageNext').css('display', 'none');
+		$('#totalResults').html('');
+	} else if (previewRows < totalRows) {
+		var minRow = 1;
+		if (offset != '') {
+			offset = parseInt(offset.split('=')[1]);
+			minRow = offset + 1;
+		}
+		var maxRow = minRow + PREVIEW_LIMIT - 1;
+		if (maxRow > totalRows) {
+			maxRow = totalRows;
+		}
+		b.html('Showing ');
+		getSelectRange(totalRows);
+		if (minRow > PREVIEW_LIMIT) {
+			$('#pagePrevious').css('display', '');
+		} else {
+			$('#pagePrevious').css('display', 'none');
+		}
+		if (maxRow < totalRows) {
+			$('#pageNext').css('display', '');
+		} else {
+			$('#pageNext').css('display', 'none');
+		}
+		$('#totalResults').html('of ' + totalRows + ' matches');
+	} else {
+		$('#pagePrevious').css('display', 'none');
+		$('#pageNext').css('display', 'none');
+		b.html('Showing all ' + previewRows + ' matches');
+		$('#resultsRange').html('');
+		$('#totalResults').html('');
+	}
+	var tableLength = tbody.children().length;
+	for (var i=rowLimit; i < tableLength; i++) {
+		var tr = getChild(tbody, i+1);
+		if (tr.css('display') == 'none') {
+			break;
+		}
+		if (i < PREVIEW_LIMIT) {
+			tr.css('display', 'none');
+		} else {
+			tr.remove();
+			tableLength--;
+			i--;
+		}
+	}
+	if (displayRangeValues) {
+		$('.rangeHeader').unbind('mouseenter mouseleave');
+		loadRange(null);
+		enableRangeEvents();
+	}
+	$('td.topnav ul.subnav li.item').click(function(event) {event.preventDefault();});
+	$('td.topnav ul.subnav li.item').mouseup(function(event) {event.preventDefault();});
+	$('td.topnav span').click(function() {
+		enabledDrag = false;
+		var ul = $(this).parent().find('ul.subnav');
+		if (ul.children().length == 0) {
+			fillIdContextMenu(ul);
+		}
+		var height = $(this).height();
+		var top = ($(this).position().top + height) + 'px';
+		$('ul.subnav').css('top', top);
+		var left = $(this).position().left + $(this).width() - 180;
+		if (left < 0) {
+			left = 0;
+		}
+		left += 'px';
+		$('ul.subnav').css('left', left);
+		
+		//Following events are applied to the subnav itself (moving subnav up and down)
+		$(this).parent().find('ul.subnav').slideDown('fast').show(); //Drop down the subnav on click
+
+		$(this).parent().hover(function() {
+		}, function(){	
+			$(this).parent().find('ul.subnav').slideUp('slow'); //When the mouse hovers out of the subnav, move it back up
+			enabledDrag = true;
+		});
+
+		//Following events are applied to the trigger (Hover events for the trigger)
+		}).hover(function() { 
+			$(this).addClass('subhover'); //On hover over, add class 'subhover'
+		}, function(){	//On Hover Out
+			$(this).removeClass('subhover'); //On hover out, remove class 'subhover'
+	});
+	$('.tablecell').hover( function() {
+		var iCol = parseInt($(this).attr('iCol'));
+		var trs = $('.tablerow');
+		$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
+	}, function() {
+		$('td.highlighted').removeClass('highlighted');
+	});
+	$('.tableheadercell').hover( function(e) {
+		var iCol = parseInt($(this).attr('iCol'));
+		var trs = $('.tablerow');
+		$('td:nth-child('+(iCol+1)+')', trs).addClass('highlighted');
+	}, function() {
+		if (tagToMove == null) {
+			$('td.highlighted').removeClass('highlighted');
+		}
+	});
+	$('#clearAllFilters').css('display', queryHasFilters() ? '' : 'none');
+	if (enabledEdit) {
+		$('.tablecell').contextMenu({ menu: 'tablecellMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+		$('.tablecelledit').contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
+	} else if (cell_value_edit) {
+		$('.tablecell').click(function(event) {DisplayTipBox(event, 'You might "Enable edit" via the "Actions" menu.');});
+		$('.tablecell').mouseout(function(event) {HideTipBox();});
+	}
 }
 
 function fillIdContextMenu(ul) {
@@ -3569,19 +3917,27 @@ function fillIdContextMenu(ul) {
 	var id = ul.attr('idVal')
 	var subject = null;
 	var idUrl = HOME + '/query' + queryBasePath + 'id=' + id + '(' + probe_tags + ')';
-	$.ajax({
-		url: idUrl,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: false,
-		success: function(iddata, textStatus, jqXHR) {
-			subject = iddata[0];
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, idUrl);
-		}
-	});
+	var param = {
+		'ul': ul	
+	};
+	tagfiler.GET(idUrl, false, postFillIdContextMenu, param, null, 0);
+}
+
+/**
+ * initialize the context menu
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postFillIdContextMenu(data, textStatus, jqXHR, param) {
+	var ul = param.ul;
+	var subject = data[0];
 	var results = subject2identifiers(subject);
 	var dtype = results['dtype'];
 	if (dtype == 'Image Set') {
@@ -4390,19 +4746,7 @@ function sendBulkRequest(column, scope, action, values) {
 	if (scope == 'filter') {
 		var predUrl = HOME + '/tags/' + getQueryPredUrl('');
 		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
-		$.ajax({
-			url: url,
-			type: action,
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: true,
-			success: function(data, textStatus, jqXHR) {
-				showPreview();
-				editBulkInProgress = false;
-			},
-			error: function(jqXHR, textStatus, errorThrown) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-			}
-		});
+		tagfiler.GET(url, true, postSendBulkRequest, null, null, 0);
 	} else {
 		// update each row from the page
 		var tbody = $('#Query_Preview_tbody');
@@ -4421,20 +4765,25 @@ function sendBulkRequest(column, scope, action, values) {
 		var id = ids.join(',');
 		var predUrl = HOME + '/tags/id=' + id;
 		var url = predUrl + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
-		$.ajax({
-			url: url,
-			type: action,
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: true,
-			success: function(data, textStatus, jqXHR) {
-				showPreview();
-				editBulkInProgress = false;
-			},
-			error: function(jqXHR, textStatus, errorThrown) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-			}
-		});
+		tagfiler.GET(url, true, postSendBulkRequest, null, null, 0);
 	}
+}
+
+/**
+ * initialize the bulk
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postSendBulkRequest(data, textStatus, jqXHR, param) {
+	showPreview();
+	editBulkInProgress = false;
 }
 
 /**
@@ -4728,20 +5077,16 @@ function updateCell(td, origValue, column, id) {
 			if (child.is('TABLE') && origValue != '' || tagAbsent) {
 				// delete all old values
 				var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
-				$.ajax({
-					url: url,
-					type: 'DELETE',
-					headers: {'User-agent': 'Tagfiler/1.0'},
-					async: true,
-					success: function(data, textStatus, jqXHR) {
-						if (!tagAbsent) {
-							modifyCell(td, origValue, column, id, value, values);
-						}
-					},
-					error: function(jqXHR, textStatus, errorThrown) {
-						handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-					}
-				});
+				var param = {
+					'tagAbsent': tagAbsent,
+					'td': td,
+					'origValue': origValue,
+					'column': column,
+					'id': id,
+					'value': value,
+					'values': values
+				};
+				tagfiler.DELETE(url, true, postUpdateCell, param, null, 0);
 			} else {
 				modifyCell(td, origValue, column, id, value, values);
 			}
@@ -4751,37 +5096,38 @@ function updateCell(td, origValue, column, id) {
 	}
 }
 
+/**
+ * initialize the cell update
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postUpdateCell(data, textStatus, jqXHR, param) {
+	if (!param.tagAbsent) {
+		modifyCell(param.td, param.origValue, param.column, param.id, param.value, param.values);
+	}
+}
+
 function modifyCell(td, origValue, column, id, newValue, values) {
 	if (newValue != '') {
 		// update value
 		var value = encodeURIArray(values, '').join(',');
 		var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + '=' + value + ')';
-		$.ajax({
-			url: url,
-			type: 'PUT',
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: true,
-			success: function(data, textStatus, jqXHR) {
-			},
-			error: function(jqXHR, textStatus, errorThrown) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-				td.html(origValue);
-			}
-		});
+		var param = {
+			'td': td,
+			'origValue': origValue
+		};
+		tagfiler.PUT(url, {}, true, postModifyCell, param, errorModifyCell, 0);
 	} else {
 		// delete value(s)
 		var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
-		$.ajax({
-			url: url,
-			type: 'DELETE',
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: true,
-			success: function(data, textStatus, jqXHR) {
-			},
-			error: function(jqXHR, textStatus, errorThrown) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-			}
-		});
+		tagfiler.DELETE(url, true, postModifyCell, null, null, 0);
 	}
 	if (origValue.length == 0) {
 		td.removeClass('tablecelledit');
@@ -4792,26 +5138,87 @@ function modifyCell(td, origValue, column, id, newValue, values) {
 	}
 }
 
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorModifyCell(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	if (!isRetry(jqXHR, textStatus, errorThrown, count)) {
+		param.td.html(param.origValue);
+	} else {
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
+	}
+}
+
+/**
+ * initialize the cell modify
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postModifyCell(data, textStatus, jqXHR, param) {
+}
+
 function deleteCell(td, origValue, column, id) {
 	// delete value(s)
 	var url = HOME + '/tags/id=' + encodeSafeURIComponent(id) + '(' + encodeSafeURIComponent(column) + ')';
-	$.ajax({
-		url: url,
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		success: function(data, textStatus, jqXHR) {
-			clickedCancelOK = true;
-			editCellInProgress = false;
-			td.html('');
-			td.css('white-space', 'normal');
-			td.addClass('tablecelledit');
-			td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-		}
-	});
+	var param = {
+			'td': td
+		};
+	tagfiler.DELETE(url, true, postDeleteCell, param, null, 0);
+}
+
+/**
+ * initialize the cell delete
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postDeleteCell(data, textStatus, jqXHR, param) {
+	var td = param.td
+	clickedCancelOK = true;
+	editCellInProgress = false;
+	td.html('');
+	td.css('white-space', 'normal');
+	td.addClass('tablecelledit');
+	td.contextMenu({ menu: 'tablecellEditMenu' }, function(action, el, pos) { contextMenuWork(action, el, pos); });
 }
 
 function enableEdit() {
@@ -4882,21 +5289,7 @@ function contextMenuWork(action, el, pos) {
 		var column = el.attr('tag');
 		var predUrl = HOME + '/tags/id=' + encodeSafeURIComponent(id);
 		var url = predUrl + '(' + encodeSafeURIComponent(column) + ')';
-		$.ajax({
-			url: url,
-			type: 'DELETE',
-			headers: {'User-agent': 'Tagfiler/1.0'},
-			async: true,
-			success: function(data, textStatus, jqXHR) {
-				// force a preview 'refresh'
-				editBulkInProgress = true;
-				showPreview();
-				editBulkInProgress = false;
-			},
-			error: function(jqXHR, textStatus, errorThrown) {
-				handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-			}
-		});
+		tagfiler.DELETE(url, true, postContextMenuWork, null, null, 0);
 		break;
 	case 'bulkdelete':
 		var tag = el.attr('tag');
@@ -4907,6 +5300,24 @@ function contextMenuWork(action, el, pos) {
 		el.click();
 		break;
 	}
+}
+
+/**
+ * initialize the context menu work
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postContextMenuWork(data, textStatus, jqXHR, param) {
+	editBulkInProgress = true;
+	showPreview();
+	editBulkInProgress = false;
 }
 
 function contextRangeWork(action, el) {
@@ -5123,6 +5534,8 @@ function cleanupRangeFilter() {
 }
 
 function addFilter(tag, predIndex) {
+	var savePreview = PAGE_PREVIEW;
+	PAGE_PREVIEW = 0;
 	$('.editColumnFilter').css('display', 'none');
 	$('.addFilter').css('display', 'none');
 	savePredicateFilter = (predIndex != -1) ? queryFilter[tag][predIndex] : null;
@@ -5228,7 +5641,7 @@ function addFilter(tag, predIndex) {
 	button.attr('type', 'button');
 	button.val('Cancel');
 	td.append(button);
-	button.click(function(event) {cancelPredicate();});
+	button.click(function(event) {cancelPredicate(savePreview);});
 	button = $('<input>');
 	button.attr('type', 'button');
 	button.val('OK');
@@ -5236,7 +5649,8 @@ function addFilter(tag, predIndex) {
 	td.append(button);
 }
 
-function cancelPredicate() {
+function cancelPredicate(savePreview) {
+	PAGE_PREVIEW = savePreview;
 	$('.editColumnFilter').css('display', '');
 	$('.addFilter').css('display', '');
 	var tag = predicateTable.attr('tag');
@@ -5413,84 +5827,170 @@ var BUGS_URL;
 var allowManageUsers = false;
 var allowManageAttributes = false;
 
-function checkListAttributes(home, user, webauthnhome, uiopts, count) {
-	if (count == null) {
-		count = 0;
-	}
+function checkListAttributes(home, user, webauthnhome, uiopts) {
 	allowManageAttributes = false;
 	var url = home + '/attribute';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			allowManageAttributes = true;
-			postInitUI(home, user, webauthnhome, uiopts);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			switch(jqXHR.status) {
-			case 401:
-			case 403:
-				postInitUI(home, user, webauthnhome, uiopts);
-				break;
-			default:
-				var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-				if (retry && count <= MAX_RETRIES) {
-					var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-					setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
-				}
-			}
-		}
-	});
+	var param = {
+		'home'	: home,
+		'user': user,
+		'webauthnhome': webauthnhome,
+		'uiopts': uiopts
+	};
+	tagfiler.GET(url, true, postCheckListAttributes, param, errorCheckListAttributes, 0);
 }
 
-function initUI(home, user, webauthnhome, uiopts, count) {
-	if (count == null) {
-		count = 0;
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorCheckListAttributes(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	switch(jqXHR.status) {
+	case 401:
+	case 403:
+		document.body.style.cursor = "default";
+		postInitUI(null, textStatus, jqXHR, param);
+		break;
+	default:
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
 	}
+}
+
+/**
+ * initialize the check list attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postCheckListAttributes(data, textStatus, jqXHR, param) {
+	allowManageAttributes = true;
+	postInitUI(data, textStatus, jqXHR, param);
+}
+
+function initUI(home, user, webauthnhome, uiopts) {
 	allowManageUsers = false;
 	var url = home + '/user';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			allowManageUsers = true;
-			checkListAttributes(home, user, webauthnhome, uiopts);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			switch(jqXHR.status) {
-			case 401:
-			case 403:
-				postInitUI(home, user, webauthnhome, uiopts);
-				break;
-			default:
-				var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-				if (retry && count <= MAX_RETRIES) {
-					var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-					setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
-				}
-			}
-		}
-	});
+	var param = {
+			'home'	: home,
+			'user': user,
+			'webauthnhome': webauthnhome,
+			'uiopts': uiopts
+		};
+	tagfiler.GET(url, true, postInitUISuccess, param, errorInitUI, 0);
 }
 
-function postInitUI(home, user, webauthnhome, uiopts, count) {
-	//alert(uiopts);
-	if (count == null) {
-		count = 0;
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorInitUI(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	switch(jqXHR.status) {
+	case 401:
+	case 403:
+		document.body.style.cursor = "default";
+		postInitUI(null, textStatus, jqXHR, param);
+		break;
+	default:
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
 	}
+}
+
+/**
+ * initialize the UI success
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitUISuccess(data, textStatus, jqXHR, param) {
+	allowManageUsers = true;
+	checkListAttributes(param.home, param.user, param.webauthnhome, param.uiopts);
+}
+
+/**
+ * initialize the UI
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postInitUI(data, textStatus, jqXHR, param) {
+	//alert(valueToString(param));
+	home = param.home;
+	user = param.user;
+	webauthnhome = param.webauthnhome;
+	uiopts = param.uiopts;
 	HOME = home;
 	USER = user;
 	WEBAUTHNHOME = webauthnhome;
 	// convert to JSON
 	uiopts = $.parseJSON(uiopts);
+	//alert(valueToString(uiopts));
 	HELP_URL = uiopts.help;
 	BUGS_URL = uiopts.bugs;
 	var api = uiopts.api;
@@ -5498,26 +5998,10 @@ function postInitUI(home, user, webauthnhome, uiopts, count) {
 	if (api.length > 0) {
 		if (api[0] == 'tagdef') {
 			var url = HOME + '/session'
-			$.ajax({
-				url: url,
-				accepts: {text: 'application/json'},
-				dataType: 'json',
-				headers: {'User-agent': 'Tagfiler/1.0'},
-				async: true,
-		  		timeout: AJAX_TIMEOUT,
-				success: function(data, textStatus, jqXHR) {
-					if (api[0] == 'tagdef') {
-						manageTagDefinitions(data.roles);
-					}
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-					if (retry && count <= MAX_RETRIES) {
-						var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-						setTimeout(function(){initUI(home, user, webauthnhome, uiopts, count)}, delay);
-					}
-				}
-			});
+			var param = {
+					'api'	: api
+				};
+			tagfiler.GET(url, true, postGetSession, param, null, 0);
 		} else if (api[0] == 'login') {
 			renderLogin();
 			isLogin = true;
@@ -5535,6 +6019,24 @@ function postInitUI(home, user, webauthnhome, uiopts, count) {
 	runSessionPolling(uiopts.pollmins, 2*uiopts.pollmins);
 	if (!isLogin) {
 		startCookieTimer(1000);
+	}
+}
+
+/**
+ * initialize the session
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetSession(data, textStatus, jqXHR, param) {
+	if (param.api[0] == 'tagdef') {
+		manageTagDefinitions(data.roles);
 	}
 }
 
@@ -5589,10 +6091,7 @@ function renderLogin() {
 	td.append(input);
 }
 
-function submitLogin(count) {
-	if (count == null) {
-		count = 0;
-	}
+function submitLogin() {
 	var user = $('#username').val();
 	var password = $('#password').val();
 	var url = HOME + '/session';
@@ -5600,88 +6099,84 @@ function submitLogin(count) {
 	obj['username'] = user;
 	obj['password'] = password;
 	document.body.style.cursor = "wait";
-	$.ajax({
-		url: url,
-		type: 'POST',
-		data: obj,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			document.body.style.cursor = "default";
-			window.location = window.location;
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			document.body.style.cursor = "default";
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){submitLogin(count)}, delay);
-			}
-		}
-	});
+	tagfiler.POST(url, obj, true, postSubmitLogin, null, null, 0);
 }
 
-function getRoles(count) {
-	if (count == null) {
-		count = 0;
-	}
-	var url = HOME + '/session';
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			USER_ROLES = data['attributes'];
-			USER = data['client'];
-			showAuthnInfo(data);
-			showTopMenu();
-			homePage();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){getRoles(count)}, delay);
-			}
-		}
-	});
+/**
+ * initialize the login
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postSubmitLogin(data, textStatus, jqXHR, param) {
+	document.body.style.cursor = "default";
+	window.location = window.location;
 }
 
-function getTopPage(uiopts, page, count) {
-	if (count == null) {
-		count = 0;
-	}
+function getRoles() {
 	var url = HOME + '/session';
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			USER_ROLES = data['attributes'];
-			USER = data['client'];
-			showAuthnInfo(data);
-			showTopMenu();
-			if (page == 'query') {
-				queryPage(uiopts);
-			} else if (page == 'tags') {
-				tagsUI(uiopts['queryopts']['url'], null, USER_ROLES);
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){getTopPage(uiopts, count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postGetRoles, null, null, 0);
+}
+
+/**
+ * initialize the roles
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetRoles(data, textStatus, jqXHR, param) {
+	USER_ROLES = data['attributes'];
+	USER = data['client'];
+	showAuthnInfo(data);
+	showTopMenu();
+	homePage();
+}
+
+function getTopPage(uiopts, page) {
+	var url = HOME + '/session';
+	var param = {
+			'page'	: page,
+			'uiopts': uiopts
+		};
+	tagfiler.GET(url, true, postGetTopPage, param, null, 0);
+}
+
+/**
+ * initialize the top page
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetTopPage(data, textStatus, jqXHR, param) {
+	var page = param.page;
+	var uiopts = param.uiopts;
+	USER_ROLES = data['attributes'];
+	USER = data['client'];
+	showAuthnInfo(data);
+	showTopMenu();
+	if (page == 'query') {
+		queryPage(uiopts);
+	} else if (page == 'tags') {
+		tagsUI(uiopts['queryopts']['url'], null, USER_ROLES);
+	}
 }
 
 function queryPage(uiopts) {
@@ -5818,10 +6313,7 @@ function showTopMenu() {
 	a.html('Logs');
 }
 
-function manageTagDefinitions(roles, count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageTagDefinitions(roles) {
 	var uiDiv = $('#ui');
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
@@ -5969,32 +6461,28 @@ function manageTagDefinitions(roles, count) {
 	td = $('<td>');
 	tr.append(td);
 	var url = getTagdefsURL('user');
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postGetUserTagdefs(data, textStatus, jqXHR, roles);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageTagDefinitions(roles, count)}, delay);
-			}
-		}
-	});
-	
+	var param = {
+			'roles'	: roles
+		};
+	tagfiler.GET(url, true, postManageTagDefinitions, param, null, 0);
 }
 
-function postGetUserTagdefs(data, textStatus, jqXHR, roles, count) {
-	if (count == null) {
-		count = 0;
-	}
+/**
+ * initialize the tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageTagDefinitions(data, textStatus, jqXHR, param) {
+	var roles = param.roles;
 	var table = $('#User_tagdefs');
+	var count = 0;
 	$.each(data, function(i, object) {
 		var tr = $('<tr>');
 		table.append(tr);
@@ -6083,27 +6571,22 @@ function postGetUserTagdefs(data, textStatus, jqXHR, roles, count) {
 	th.html('Tag unique');
 	
 	var url = getTagdefsURL('system');
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postGetSystemTagdefs(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){postGetUserTagdefs(data, textStatus, jqXHR, roles, count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postGetSystemTagdefs, null, null, 0);
 }
 
-function postGetSystemTagdefs(data, textStatus, jqXHR) {
+/**
+ * initialize the system tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetSystemTagdefs(data, textStatus, jqXHR, param) {
 	var table = $('#System_tagdefs');
 	var count = 0;
 	$.each(data, function(i, object) {
@@ -6139,10 +6622,7 @@ function postGetSystemTagdefs(data, textStatus, jqXHR) {
 	});
 }
 
-function defineTag(count) {
-	if (count == null) {
-		count = 0;
-	}
+function defineTag() {
 	var url = HOME + '/tagdef';
 	var obj = new Object();
 	obj.action = 'add';
@@ -6152,24 +6632,7 @@ function defineTag(count) {
 	obj['readpolicy-1'] = $('#readpolicy-1').val();
 	obj['writepolicy-1'] = $('#writepolicy-1').val();
 	obj['unique-1'] = $('#unique-1').val();
-	$.ajax({
-		url: url,
-		type: 'POST',
-		data: obj,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postDefineTagdefs(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){defineTag(count)}, delay);
-			}
-		}
-	});
+	tagfiler.POST(url, obj, true, postDefineTagdefs, null, null, 0);
 }
 
 function getTagdefsURL(title) {
@@ -6179,35 +6642,31 @@ function getTagdefsURL(title) {
 	return url;
 }
 
-function deleteTagdef(tag, row, count) {
-	if (count == null) {
-		count = 0;
-	}
+function deleteTagdef(tag, row) {
 	var answer = confirm ('Do you want to delete the tag definition "' + tag + '"?');
 	if (!answer) {
 		return;
 	}
 	var url = HOME + '/tagdef/' + tag;
-	$.ajax({
-		url: url,
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postDeleteTagdefs(data, textStatus, jqXHR, row);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){deleteTagdef(tag, row, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'row': row
+	}
+	tagfiler.DELETE(url, true, postDeleteTagdefs, param, null, 0);
 }
 
-function postDefineTagdefs(data, textStatus, jqXHR) {
+/**
+ * initialize the tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postDefineTagdefs(data, textStatus, jqXHR, param) {
 	var value = $('#tag-1').val();
 	var position = 2;
 	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
@@ -6284,7 +6743,20 @@ function postDefineTagdefs(data, textStatus, jqXHR) {
 	});
 }
 
-function postDeleteTagdefs(data, textStatus, jqXHR, row) {
+/**
+ * initialize the delete tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postDeleteTagdefs(data, textStatus, jqXHR, param) {
+	var row = param.row;
 	row.remove();
 	$.each($('tr', $('#User_tagdefs')), function(i, tr) {
 		if (i<3) {
@@ -6301,38 +6773,35 @@ function postDeleteTagdefs(data, textStatus, jqXHR, row) {
 	});
 }
 
-function tagsUI(predicate, view, roles, count) {
-	if (count == null) {
-		count = 0;
-	}
+function tagsUI(predicate, view, roles) {
 	var url = HOME + '/' + predicate;
 	if (view != null) {
 		url = HOME + '/query/' + predicate + '?limit=none&view=' + encodeSafeURIComponent(view);
 	}
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){tagsUI(predicate, view, roles, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'predicate': predicate,
+		'view': view,
+		'roles': roles
+	};
+	tagfiler.GET(url, true, postGetTagdefs, param, null, 0);
 }
 
-function postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles, count) {
-	if (count == null) {
-		count = 0;
-	}
+/**
+ * initialize the get tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetTagdefs(data, textStatus, jqXHR, param) {
+	var predicate = param.predicate;
+	var view = param.view;
+	var roles = param.roles;
 	var tags = data[0];
 	var temp = '';
 	$.each(tags, function(key, value) {
@@ -6342,27 +6811,27 @@ function postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles, count) 
 	var url = HOME + '/query/tagdef';
 	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
 	url += 'tagdef:asc:?limit=none';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){postGetTagdefs(data, textStatus, jqXHR, predicate, view, roles, count)}, delay);
-			}
-		}
-	});
+	param.tags = tags;
+	tagfiler.GET(url, true, postGetAllTagdefs, param, null, 0);
 }
 
-function postGetAllTagdefs(data, textStatus, jqXHR, tags, predicate, view, roles) {
+/**
+ * initialize the get all tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetAllTagdefs(data, textStatus, jqXHR, param) {
+	var tags = param.tags;
+	var predicate = param.predicate;
+	var view = param.view;
+	var roles = param.roles;
 	if (predicate.indexOf('/tags/') == 0) {
 		predicate = predicate.substr('/tags/'.length);
 	}
@@ -6842,64 +7311,65 @@ function writeAllowed(tag, allTags, roles, file) {
 	return ret;
 }
 
-function removeTagValue(tag, value, row, predicate, count) {
-	if (count == null) {
-		count = 0;
-	}
+function removeTagValue(tag, value, row, predicate) {
 	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = 'delete';
 	obj['tag'] = tag;
 	obj['value'] = value;
-	$.ajax({
-		url: url,
-		type: 'POST',
-		data: obj,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			row.remove();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){removeTagValue(tag, value, row, predicate, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'row': row	
+	};
+	tagfiler.POST(url, obj, true, postRemoveTagValue, param, null, 0);
 }
 
-function removeAddTag(tag, value, row, predicate, count) {
-	if (count == null) {
-		count = 0;
-	}
+/**
+ * initialize the tag remove
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postRemoveTagValue(data, textStatus, jqXHR, param) {
+	param.row.remove();
+}
+
+function removeAddTag(tag, value, row, predicate) {
 	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = value ? 'delete' : 'put';
 	obj['tag'] = tag;
-	$.ajax({
-		url: url,
-		type: 'POST',
-		data: obj,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postRemoveAddTag(tag, value, row, predicate);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){removeAddTag(tag, value, row, predicate, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'tag': tag,
+		'value': value,
+		'row': row,
+		'predicate': predicate
+	};
+	tagfiler.POST(url, obj, true, postRemoveAddTag, param, null, 0);
 }
 
-function postRemoveAddTag(tag, value, row, predicate) {
+/**
+ * initialize the remove add tag
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postRemoveAddTag(data, textStatus, jqXHR, param) {
+	var tag = param.tag;
+	var value = param.value;
+	var row = param.row;
+	var predicate = param.predicate;
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
 	var valueTd = $('<td>');
@@ -6927,37 +7397,38 @@ function postRemoveAddTag(tag, value, row, predicate) {
 	row.remove();
 }
 
-function addTagValue(tag, row, allTags, predicate, count) {
-	if (count == null) {
-		count = 0;
-	}
+function addTagValue(tag, row, allTags, predicate) {
 	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = 'put';
 	obj['set-'+tag] = true;
 	obj['val-'+tag] = $('#'+idquote(tag)+'_id').val();
-	$.ajax({
-		url: url,
-		type: 'POST',
-		data: obj,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postAddTagValue(tag, row, allTags, predicate);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){addTagValue(tag, row, allTags, predicate, count)}, delay);
-			}
-		}
-	});
-
+	var param = {
+			'tag': tag,
+			'allTags': allTags,
+			'row': row,
+			'predicate': predicate
+		};
+	tagfiler.POST(url, obj, true, postAddTagValue, param, null, 0);
 }
 
-function postAddTagValue(tag, row, allTags, predicate) {
+/**
+ * initialize the add tag value
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postAddTagValue(data, textStatus, jqXHR, param) {
+	var tag = param.tag;
+	var row = param.row;
+	var allTags = param.allTags;
+	var predicate = param.predicate;
 	var value = $('#'+idquote(tag)+'_id').val();
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
@@ -6996,32 +7467,24 @@ function postAddTagValue(tag, row, allTags, predicate) {
 	}
 }
 
-function userInfo(count) {
-	if (count == null) {
-		count = 0;
-	}
+function userInfo() {
 	var url = HOME + '/session'
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postUserInfo(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){userInfo(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postUserInfo, null, null, 0);
 }
 
-function postUserInfo(data) {
+/**
+ * initialize the user info
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postUserInfo(data, textStatus, jqXHR, param) {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var h2 = $('<h2>');
@@ -7055,20 +7518,25 @@ function postUserInfo(data) {
 
 function userLogout() {
 	var url = HOME + '/session';
-	$.ajax({
-		url: url,
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		success: function(data, textStatus, jqXHR) {
-			$('#topmenu').html('');
-			$('#authninfo').html('');
-			window.location = HOME;
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			handleError(jqXHR, textStatus, errorThrown, MAX_RETRIES + 1, url);
-		}
-	});
+	tagfiler.DELETE(url, true, postUserLogout, null, null, 0);
+}
+
+/**
+ * initialize the logout context
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postUserLogout(data, textStatus, jqXHR, param) {
+	$('#topmenu').html('');
+	$('#authninfo').html('');
+	window.location = HOME;
 }
 
 function userChangePassword() {
@@ -7157,7 +7625,7 @@ function userChangePassword() {
 	div.attr({'id': 'errorDiv'});
 }
 
-function changePassword(count) {
+function changePassword() {
 	var oldpassword = $('#oldpassword').val().replace(/^\s*/, "").replace(/\s*$/, "");
 	if (oldpassword == '') {
 		alert('Please provide the old password.');
@@ -7177,39 +7645,64 @@ function changePassword(count) {
 		alert('The confirm new password is invalid.');
 		return;
 	}
-	if (count == null) {
-		count = 0;
-	}
 	var url = HOME + '/password';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		type: 'PUT',
-		data: {'old_password': oldpassword,
+	var obj = {'old_password': oldpassword,
 			'password': newpassword1
-		},
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postChangePassword(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (jqXHR.status == 403) {
-				$('#errorDiv').html(jqXHR.responseText);
-				return;
-			}
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){changePassword(count)}, delay);
-			}
-		}
-	});
+	};
+	tagfiler.PUT(url, obj, true, postChangePassword, null, errorChangePassword, 0);
 }
 
-function postChangePassword() {
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorChangePassword(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	if (jqXHR.status == 403) {
+		$('#errorDiv').html(jqXHR.responseText);
+		document.body.style.cursor = "default";
+		return;
+	}
+	handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
+}
+
+/**
+ * initialize the change password
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postChangePassword(data, textStatus, jqXHR, param) {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var div = $('<div>');
@@ -7218,33 +7711,25 @@ function postChangePassword() {
 	div.html('The password was successfully changed.');
 }
 
-function homePage(count) {
+function homePage() {
 	// get the list on homepage files
-	if (count == null) {
-		count = 0;
-	}
 	var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postHomePage(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){homePage(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postHomePage, null, null, 0);
 }
 
-function postHomePage(data, textStatus, jqXHR) {
+/**
+ * initialize the home page
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postHomePage(data, textStatus, jqXHR, param) {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var ol = $('<ol>');
@@ -7259,57 +7744,29 @@ function postHomePage(data, textStatus, jqXHR) {
 	});
 }
 
-function manageAttributes(count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageAttributes(data, textStatus, jqXHR, param) {
 	var url = HOME + '/attribute';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postManageAttributes(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageAttributes(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postManageAttributes, null, null, 0);
 }
 
-function manageUsers(count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageUsers(data, textStatus, jqXHR, param) {
 	var url = HOME + '/user';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postManageUsers(data, textStatus, jqXHR);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageUsers(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postManageUsers, null, null, 0);
 }
 
-function postManageUsers(data, textStatus, jqXHR) {
+/**
+ * initialize the manage users
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageUsers(data, textStatus, jqXHR, param) {
 	var users = data;
 	users.sort(compareIgnoreCase);
 	var uiDiv = $('#ui');
@@ -7408,7 +7865,19 @@ function postManageUsers(data, textStatus, jqXHR) {
 	});
 }
 
-function postManageAttributes(data, textStatus, jqXHR) {
+/**
+ * initialize the manage attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageAttributes(data, textStatus, jqXHR, param) {
 	var attributes = data;
 	attributes.sort(compareIgnoreCase);
 	var uiDiv = $('#ui');
@@ -7467,114 +7936,55 @@ function postManageAttributes(data, textStatus, jqXHR) {
 	}
 }
 
-function manageAllRoles(count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageAllRoles() {
 	var url = HOME + '/user';
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			manageAllUsersAttributes(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageAllRoles(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, manageAllUsersAttributes, null, null, 0);
 }
 
-function deleteUser(user, count) {
-	if (count == null) {
-		count = 0;
-	}
+function deleteUser(user) {
 	var url = HOME + '/user/' + encodeSafeURIComponent(user);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			manageUsers();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){deleteUser(user, count)}, delay);
-			}
-		}
-	});
+	tagfiler.DELETE(url, true, manageUsers, null, null, 0);
 }
 
-function deleteGlobalAttribute(attribute, count) {
-	if (count == null) {
-		count = 0;
-	}
+function deleteGlobalAttribute(attribute) {
 	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			manageAttributes();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){deleteGlobalAttribute(attribute, count)}, delay);
-			}
-		}
-	});
+	tagfiler.DELETE(url, true, manageAttributes, null, null, 0);
 }
 
-function manageMembership(allAttributes, user, count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageMembership(allAttributes, user) {
 	// get user attributes
 	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute';
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postManageUserAttributes(data, allAttributes, user);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageMembership(allAttributes, user, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'allAttributes': allAttributes,
+		'user': user
+	};
+	tagfiler.GET(url, true, postManageUserAttributes, param, null, 0);
 }
 
-function postManageUserAttributes(userAttributes, allAtrributes, user) {
+/**
+ * initialize the manage user's attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageUserAttributes(data, textStatus, jqXHR, param) {
+	var userAttributes = data;
+	var allAttributes = param.allAttributes;
+	var user = param.user;
 	userAttributes.sort(compareIgnoreCase);
 	var fieldset = $('#fieldset_' + idquote(user));
-	if (userAttributes.length > 0 || allAtrributes.length > 0) {
+	if (userAttributes.length > 0 || allAttributes.length > 0) {
 		var table = $('<table>');
 		fieldset.append(table);
 		var tr = $('<tr>');
 		table.append(tr);
-		if (allAtrributes.length > userAttributes.length) {
+		if (allAttributes.length > userAttributes.length) {
 			td = $('<td>');
 			tr.append(td);
 			td.attr({'valign': 'top',
@@ -7588,7 +7998,7 @@ function postManageUserAttributes(userAttributes, allAtrributes, user) {
 			fieldset.append(select);
 			select.attr({'id': 'attribute_' + idquote(user),
 				'name': 'attributeName'});
-			$.each(allAtrributes, function(i, val) {
+			$.each(allAttributes, function(i, val) {
 				if (!userAttributes.contains(val)) {
 					var option = $('<option>');
 					select.append(option);
@@ -7642,213 +8052,212 @@ function postManageUserAttributes(userAttributes, allAtrributes, user) {
 	}
 }
 
-function assignAttribute(user, count) {
-	if (count == null) {
-		count = 0;
-	}
+function assignAttribute(user) {
 	var attribute = $('#attribute_' + idquote(user)).val();
 	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'PUT',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			// to re-write success
-			if ($('#td_remove_attribute_' + idquote(user)).length == 0) {
-				td = $('<td>');
-				td.insertAfter($('#td_assign_attribute_' + idquote(user)));
-				td.attr({'valign': 'top',
-					'id': 'td_remove_attribute_' + idquote(user)});
-				fieldset = $('<fieldset>');
-				td.append(fieldset);
-				legend = $('<legend>');
-				fieldset.append(legend);
-				legend.html('Current attributes');
-				var table = $('<table>');
-				fieldset.append(table);
-				table.attr({'border': '1',
-					'id': 'table_attribute_' + idquote(user)});
-			}
-			var allAttributes = new Array();
-			var userAttributes = new Array();
-			userAttributes.push(attribute);
-			$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
-				if ($(option).attr('value') != attribute) {
-					allAttributes.push($(option).attr('value'));
-				}
-			});
-			$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
-				userAttributes.push($(td).html());
-			});
-			allAttributes.sort(compareIgnoreCase);
-			userAttributes.sort(compareIgnoreCase);
-			if (allAttributes.length > 0) {
-				var select = $('#attribute_' + idquote(user));
-				select.html('');
-				$.each(allAttributes, function(i, val) {
-					var option = $('<option>');
-					select.append(option);
-					option.text(val);
-					option.attr('value', val);
-				});
-			} else {
-				$('#td_assign_attribute_' + idquote(user)).remove();
-			}
-			var table = $('#table_attribute_' + idquote(user));
-			table.html('');
-			$.each(userAttributes, function(i, val) {
-				var tr = $('<tr>');
-				table.append(tr);
-				var td = $('<td>');
-				tr.append(td);
-				td.addClass('userAttribute');
-				td.html(val);
-				td = $('<td>');
-				tr.append(td);
-				var input = $('<input>');
-				input.attr({'type': 'button',
-					'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
-					'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
-					'value': 'Remove',
-					'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
-				});
-				td.append(input);
-			});
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){assignAttribute(user, count)}, delay);
-			}
+	var param = {
+		'attribute': attribute,
+		'user': user
+	};
+	tagfiler.PUT(url, {}, true, postAssignAttribute, param, null, 0);
+}
+
+/**
+ * initialize the assign attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postAssignAttribute(data, textStatus, jqXHR, param) {
+	var attribute = param.attribute;
+	var user = param.user;
+	if ($('#td_remove_attribute_' + idquote(user)).length == 0) {
+		td = $('<td>');
+		td.insertAfter($('#td_assign_attribute_' + idquote(user)));
+		td.attr({'valign': 'top',
+			'id': 'td_remove_attribute_' + idquote(user)});
+		fieldset = $('<fieldset>');
+		td.append(fieldset);
+		legend = $('<legend>');
+		fieldset.append(legend);
+		legend.html('Current attributes');
+		var table = $('<table>');
+		fieldset.append(table);
+		table.attr({'border': '1',
+			'id': 'table_attribute_' + idquote(user)});
+	}
+	var allAttributes = new Array();
+	var userAttributes = new Array();
+	userAttributes.push(attribute);
+	$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
+		if ($(option).attr('value') != attribute) {
+			allAttributes.push($(option).attr('value'));
 		}
+	});
+	$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
+		userAttributes.push($(td).html());
+	});
+	allAttributes.sort(compareIgnoreCase);
+	userAttributes.sort(compareIgnoreCase);
+	if (allAttributes.length > 0) {
+		var select = $('#attribute_' + idquote(user));
+		select.html('');
+		$.each(allAttributes, function(i, val) {
+			var option = $('<option>');
+			select.append(option);
+			option.text(val);
+			option.attr('value', val);
+		});
+	} else {
+		$('#td_assign_attribute_' + idquote(user)).remove();
+	}
+	var table = $('#table_attribute_' + idquote(user));
+	table.html('');
+	$.each(userAttributes, function(i, val) {
+		var tr = $('<tr>');
+		table.append(tr);
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('userAttribute');
+		td.html(val);
+		td = $('<td>');
+		tr.append(td);
+		var input = $('<input>');
+		input.attr({'type': 'button',
+			'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
+			'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
+			'value': 'Remove',
+			'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
+		});
+		td.append(input);
 	});
 }
 
-function removeUserAttribute(user, attribute, count) {
-	if (count == null) {
-		count = 0;
-	}
+function removeUserAttribute(user, attribute) {
 	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			if ($('#td_assign_attribute_' + idquote(user)).length == 0) {
-				td = $('<td>');
-				td.insertBefore($('#td_remove_attribute_' + idquote(user)));
-				td.attr({'valign': 'top',
-					'id': 'td_assign_attribute_' + idquote(user)});
-				fieldset = $('<fieldset>');
-				td.append(fieldset);
-				legend = $('<legend>');
-				fieldset.append(legend);
-				legend.html('Assign attribute');
-				var select = $('<select>');
-				fieldset.append(select);
-				select.attr({'id': 'attribute_' + idquote(user),
-					'name': 'attributeName'});
-				fieldset.append($('<br>'));
-				var input = $('<input>');
-				input.attr({'type': 'button',
-					'name': 'assignAttribute_' + idquote(user), 
-					'id': 'assignAttribute_' + idquote(user),
-					'value': 'Assign Attribute',
-					'onclick': 'assignAttribute("' + user + '")'
-				});
-				fieldset.append(input);
-			}
-			var allAttributes = new Array();
-			var userAttributes = new Array();
-			allAttributes.push(attribute);
-			$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
-				allAttributes.push($(option).attr('value'));
-			});
-			$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
-				if ($(td).html() != attribute) {
-					userAttributes.push($(td).html());
-				}
-			});
-
-			allAttributes.sort(compareIgnoreCase);
-			userAttributes.sort(compareIgnoreCase);
-			var select = $('#attribute_' + idquote(user));
-			select.html('');
-			$.each(allAttributes, function(i, val) {
-				var option = $('<option>');
-				select.append(option);
-				option.text(val);
-				option.attr('value', val);
-			});
-			
-			if (userAttributes.length > 0) {
-				var table = $('#table_attribute_' + idquote(user));
-				table.html('');
-				$.each(userAttributes, function(i, val) {
-					var tr = $('<tr>');
-					table.append(tr);
-					var td = $('<td>');
-					tr.append(td);
-					td.addClass('userAttribute');
-					td.html(val);
-					td = $('<td>');
-					tr.append(td);
-					var input = $('<input>');
-					input.attr({'type': 'button',
-						'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
-						'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
-						'value': 'Remove',
-						'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
-					});
-					td.append(input);
-				});
-			} else {
-				$('#td_remove_attribute_' + idquote(user)).remove();
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){removeUserAttribute(user, attribute, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'user': user,
+		'attribute': attribute
+	};
+	tagfiler.DELETE(url, true, postRemoveUserAttribute, param, null, 0);
 }
 
-function resetPassword(user, count) {
-	if (count == null) {
-		count = 0;
+/**
+ * initialize the remove user's attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postRemoveUserAttribute(data, textStatus, jqXHR, param) {
+	var user = param.user;
+	var attribute = param.attribute;
+	if ($('#td_assign_attribute_' + idquote(user)).length == 0) {
+		td = $('<td>');
+		td.insertBefore($('#td_remove_attribute_' + idquote(user)));
+		td.attr({'valign': 'top',
+			'id': 'td_assign_attribute_' + idquote(user)});
+		fieldset = $('<fieldset>');
+		td.append(fieldset);
+		legend = $('<legend>');
+		fieldset.append(legend);
+		legend.html('Assign attribute');
+		var select = $('<select>');
+		fieldset.append(select);
+		select.attr({'id': 'attribute_' + idquote(user),
+			'name': 'attributeName'});
+		fieldset.append($('<br>'));
+		var input = $('<input>');
+		input.attr({'type': 'button',
+			'name': 'assignAttribute_' + idquote(user), 
+			'id': 'assignAttribute_' + idquote(user),
+			'value': 'Assign Attribute',
+			'onclick': 'assignAttribute("' + user + '")'
+		});
+		fieldset.append(input);
 	}
-	var url = HOME + '/password/' + encodeSafeURIComponent(user);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'PUT',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postResetPassword(data, user);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){resetPassword(user, count)}, delay);
-			}
+	var allAttributes = new Array();
+	var userAttributes = new Array();
+	allAttributes.push(attribute);
+	$.each($('option', $('#attribute_' + idquote(user))), function (i, option) {
+		allAttributes.push($(option).attr('value'));
+	});
+	$.each($('.userAttribute', $('#table_attribute_' + idquote(user))), function (i, td) {
+		if ($(td).html() != attribute) {
+			userAttributes.push($(td).html());
 		}
 	});
+
+	allAttributes.sort(compareIgnoreCase);
+	userAttributes.sort(compareIgnoreCase);
+	var select = $('#attribute_' + idquote(user));
+	select.html('');
+	$.each(allAttributes, function(i, val) {
+		var option = $('<option>');
+		select.append(option);
+		option.text(val);
+		option.attr('value', val);
+	});
+	
+	if (userAttributes.length > 0) {
+		var table = $('#table_attribute_' + idquote(user));
+		table.html('');
+		$.each(userAttributes, function(i, val) {
+			var tr = $('<tr>');
+			table.append(tr);
+			var td = $('<td>');
+			tr.append(td);
+			td.addClass('userAttribute');
+			td.html(val);
+			td = $('<td>');
+			tr.append(td);
+			var input = $('<input>');
+			input.attr({'type': 'button',
+				'name': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val), 
+				'id': 'removeUserAttribute_' + idquote(user) + '_' + idquote(val),
+				'value': 'Remove',
+				'onclick': 'removeUserAttribute("' + user + '", "' + val + '")'
+			});
+			td.append(input);
+		});
+	} else {
+		$('#td_remove_attribute_' + idquote(user)).remove();
+	}
 }
 
-function postResetPassword(data, user) {
+function resetPassword(user) {
+	var url = HOME + '/password/' + encodeSafeURIComponent(user);
+	var param = {
+		'user': user	
+	};
+	tagfiler.PUT(url, {}, true, postResetPassword, param, null, 0);
+}
+
+/**
+ * initialize the reset password
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postResetPassword(data, textStatus, jqXHR, param) {
+	var user = param.user;
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var p = $('<p>');
@@ -7861,98 +8270,94 @@ function postResetPassword(data, user) {
 	li.html('New password: "' + data[user] + '"')
 }
 
-function disableLogin(user, count) {
-	if (count == null) {
-		count = 0;
-	}
+function disableLogin(user) {
 	var url = HOME + '/password/' + encodeSafeURIComponent(user);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'DELETE',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			alert('The password for the user "' + user + '" was disabled.');
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			if (jqXHR.status == 404) {
-				// NotFound
-				alert('The password is already disabled for ' + jqXHR.responseText);
-				return;
-			} else if (jqXHR.status == 404) {
-				// Forbidden
-				alert(jqXHR.responseText);
-				return;
-			}
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){disableLogin(user, count)}, delay);
-			}
-		}
-	});
+	var param = {
+		'user': user	
+	};
+	tagfiler.DELETE(url, true, postDisableLogin, param, errorDisableLogin, 0);
 }
 
-function createUser(count) {
-	if (count == null) {
-		count = 0;
+/**
+ * Handle an error from a specific AJAX request
+ * retry the request in case of timeout
+ * maximum retries: 10
+ * each retry is performed after an exponential delay
+ * 
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param textStatus
+ * 	the string describing the type of error
+ * @param errorThrown
+ * 	the textual portion of the HTTP status
+ * @param retryCallback
+ * 	the AJAX request to be retried
+ * @param url
+ * 	the request url
+ * @param obj
+ * 	the parameters (in a dictionary form) for the POST request
+ * @param async
+ * 	the operation type (sync or async)
+ * @param successCallback
+ * 	the success callback function
+ * @param param
+ * 	the parameters for the success callback function
+ * @param errorCallback
+ * 	the error callback function
+ * @param count
+ * 	the number of retries already performed
+ */
+function errorDisableLogin(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	if (jqXHR.status == 404) {
+		// NotFound
+		document.body.style.cursor = "default";
+		alert('The password is already disabled for ' + jqXHR.responseText);
+		return;
+	} else if (jqXHR.status == 403) {
+		// Forbidden
+		document.body.style.cursor = "default";
+		alert(jqXHR.responseText);
+		return;
 	}
+	if (isRetry(jqXHR, textStatus, errorThrown, count)) {
+		handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count);
+	}
+}
+
+/**
+ * initialize the disable login
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postDisableLogin(data, textStatus, jqXHR, param) {
+	alert('The password for the user "' + param.user + '" was disabled.');
+}
+
+function createUser() {
 	var role = $('#role').val().replace(/^\s*/, "").replace(/\s*$/, "");
 	if (role == '') {
 		alert('Please provide a name for the new user.');
 		return;
 	}
 	var url = HOME + '/user/' + encodeSafeURIComponent(role);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'PUT',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			manageUsers();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){createUser(count)}, delay);
-			}
-		}
-	});
+	tagfiler.PUT(url, {}, true, manageUsers, null, null, 0);
 }
 
-function buildAttribute(count) {
-	if (count == null) {
-		count = 0;
-	}
+function buildAttribute() {
 	var attribute = $('#attribute').val().replace(/^\s*/, "").replace(/\s*$/, "");
 	if (attribute == '') {
 		alert('Please provide a name for the new attribute.');
 		return;
 	}
 	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
-	$.ajax({
-		url: url,
-		dataType: 'json',
-		type: 'PUT',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			manageAttributes();
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){buildAttribute(count)}, delay);
-			}
-		}
-	});
+	tagfiler.PUT(url, {}, true, manageAttributes, null, null, 0);
 }
 
 function queryByTags() {
@@ -7963,35 +8368,15 @@ function viewAvailableTagDefinitions() {
 	viewLink('tagdef?view=tagdef');
 }
 
-function viewLink(querypath, count) {
-	if (count == null) {
-		count = 0;
-	}
+function viewLink(querypath) {
 	var url = HOME + '/ui/query/'
 	if (querypath != null) {
 		url += querypath;
 	}
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			renderQuery(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){viewLink(querypath, count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, renderQuery, null, null, 0);
 }
 
-function renderQuery(data) {
+function renderQuery(data, textStatus, jqXHR, param) {
 	renderQueryHTML();
 	initPSOC(HOME, USER, WEBAUTHNHOME, data.basepath, data.querypath);
 }
@@ -8418,41 +8803,27 @@ function renderQueryHTML() {
     	'background-color': '#FFFFFF'});
 }
 
-function manageAvailableTagDefinitions(count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageAvailableTagDefinitions() {
 	var url = HOME + '/session'
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			USER_ROLES = data['attributes'];
-			USER = data['client'];
-			manageTagDefinitions(data['attributes']);
-			/*
-			var uiopts = {'path': [[[{'tag': 'tagdef',
-			                         'vals': ['MyTag']}]]],
-					'queryopts': {'limit': 'none',
-						'view': 'tagdef'}
-					
-			};
-			alert(uiopts.path[0][0][0].tag +' = ' + uiopts.path[0][0][0].vals[0]);
-			alert(uiopts.queryopts.view);
-			*/
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageAvailableTagDefinitions(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postManageAvailableTagDefinitions, null, null, 0);
+}
+
+/**
+ * initialize the manage available tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageAvailableTagDefinitions(data, textStatus, jqXHR, param) {
+	USER_ROLES = data['attributes'];
+	USER = data['client'];
+	manageTagDefinitions(data['attributes']);
 }
 
 function createCustomDataset() {
@@ -8596,34 +8967,26 @@ function createCustomDataset() {
 	div.attr({'id': 'Copy'})
 }
 
-function showFileLink(predicate, count) {
-	if (count == null) {
-		count = 0;
-	}
+function showFileLink(predicate) {
 	var url = HOME + '/query/' + predicate + '(url;tagdef)';
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postShowFileLink(data[0]);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){showFileLink(predicate, count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postShowFileLink, null, null, 0);
 }
 
-function postShowFileLink(data) {
-	var url = data['url'];
-	var tagdef = data['tagdef'];
+/**
+ * initialize the show file link
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postShowFileLink(data, textStatus, jqXHR, param) {
+	var url = data[0]['url'];
+	var tagdef = data[0]['tagdef'];
 	if (url == null) {
 		alert('NULL url');
 	} else {
@@ -8637,85 +9000,57 @@ function postShowFileLink(data) {
 	}
 }
 
-function getTagDefinition(predicate, view, count) {
-	if (count == null) {
-		count = 0;
-	}
-	var url = HOME + '/session'
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			var uiDiv = $('#ui');
-			uiDiv.html('');
-			USER_ROLES = data['attributes'];
-			USER = data['client'];
-			tagsUI(predicate, view, data['attributes']);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){getTagDefinition(predicate, view, count)}, delay);
-			}
-		}
-	});
+function getTagDefinition(predicate, view) {
+	var url = HOME + '/session';
+	var param = {
+		'predicate': predicate,
+		'view': view
+	};
+	tagfiler.GET(url, true, postGetTagDefinition, param, null, 0);
 }
 
-function uploadStudy(count) {
-	if (count == null) {
-		count = 0;
-	}
+/**
+ * initialize the get tag definitions
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetTagDefinition(data, textStatus, jqXHR, param) {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	USER_ROLES = data['attributes'];
+	USER = data['client'];
+	tagsUI(param.predicate, param.view, data['attributes']);
+}
+
+function uploadStudy() {
 	var url = HOME + '/study?action=upload'
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postUploadStudy(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){uploadStudy(count)}, delay);
-			}
-		}
-	});
+	tagfiler.GET(url, true, postUploadStudy, null, null, 0);
 }
 
-function downloadStudy(url, count) {
-	if (count == null) {
-		count = 0;
-	}
-	$.ajax({
-		url: HOME + '/' + url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postDownloadStudy(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){downloadStudy(url, count)}, delay);
-			}
-		}
-	});
+function downloadStudy(url) {
+	tagfiler.GET(HOME + '/' + url, true, postDownloadStudy, null, null, 0);
 }
 
-function postUploadStudy(data) {
+/**
+ * initialize the upload study
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postUploadStudy(data, textStatus, jqXHR, param) {
 	var params = data.params;
 	var div1 = $('<div>');
 	var h3 = $('<h3>');
@@ -9028,7 +9363,19 @@ function postUploadStudy(data) {
 	uiDiv.append(div6);
 }
 
-function postDownloadStudy(data) {
+/**
+ * initialize the download study
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postDownloadStudy(data, textStatus, jqXHR, param) {
 	var params = data.params;
 	var div1 = $('<div>');
 	var h3 = $('<h3>');
@@ -9375,32 +9722,23 @@ function redirectApplet(url) {
 	}
 }
 
-function getAppletTreeStatus(url, count) {
-	if (count == null) {
-		count = 0;
-	}
-	$.ajax({
-		url: url,
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
- 		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postGetAppletTreeStatus(data);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){getAppletTreeStatus(url, count)}, delay);
-			}
-		}
-	});
-	
+function getAppletTreeStatus(url) {
+	tagfiler.GET(url, true, postGetAppletTreeStatus, null, null, 0);
 }
 
-function postGetAppletTreeStatus(data) {
+/**
+ * initialize the applet tree status
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postGetAppletTreeStatus(data, textStatus, jqXHR, param) {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var params = data.params;
@@ -9599,33 +9937,31 @@ function manageUserRoles(user) {
 	manageAllUsersAttributes(users);
 }
 
-function manageAllUsersAttributes(users, count) {
-	if (count == null) {
-		count = 0;
-	}
+function manageAllUsersAttributes(data, textStatus, jqXHR, param) {
 	// get all the available attributes
 	var url = HOME + '/attribute';
-	$.ajax({
-		url: url,
-		accepts: {text: 'application/json'},
-		dataType: 'json',
-		headers: {'User-agent': 'Tagfiler/1.0'},
-		async: true,
-  		timeout: AJAX_TIMEOUT,
-		success: function(data, textStatus, jqXHR) {
-			postManageAllUsersAttributes(data, users);
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			var retry = handleError(jqXHR, textStatus, errorThrown, ++count, url);
-			if (retry && count <= MAX_RETRIES) {
-				var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
-				setTimeout(function(){manageAllUsersAttributes(users, count)}, delay);
-			}
-		}
-	});
+	users = data;
+	var param = {
+		'users': users	
+	};
+	tagfiler.GET(url, true, postManageAllUsersAttributes, param, null, 0);
 }
 
-function postManageAllUsersAttributes(allAttributes, users) {
+/**
+ * initialize the manage all users attributes
+ * 
+ * @param data
+ * 	the data returned from the server
+ * @param textStatus
+ * 	the string describing the status
+ * @param jqXHR
+ * 	the jQuery XMLHttpRequest
+ * @param param
+ * 	the parameters to be used by the callback success function
+ */
+function postManageAllUsersAttributes(data, textStatus, jqXHR, param) {
+	var allAttributes = data;
+	var users = param.users;
 	var uiDiv = $('#ui');
 	uiDiv.html('');
 	var h2 = $('<h2>');
