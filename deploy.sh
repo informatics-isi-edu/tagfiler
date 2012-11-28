@@ -63,9 +63,6 @@ DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
 LOGDIR=${SVCDIR}-logs
 
-# location of platform installed file
-PGCONF=/var/lib/pgsql/data/postgresql.conf
-
 # set the services to run automatically?
 chkconfig httpd on
 chkconfig postgresql on
@@ -104,20 +101,6 @@ chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
 chown ${SVCUSER}: ${LOGDIR}
 chmod og= ${LOGDIR}
-
-# try some blind database setup as well
-if grep -e '^extra_float_digits = 2[^0-9].*' < ${PGCONF}
-then
-    :
-else
-    # need to set extra_float_digits = 2 for proper floating point handling
-    PGCONFTMP=${PGCONF}.tmp.$$
-    runuser -c "sed -e 's|^.*\(extra_float_digits[^=]*= *\)[-0-9]*\([^#]*#.*\)|\1 2  \2|' < $PGCONF > $PGCONFTMP" - ${PGADMIN} \
-	&& mv $PGCONFTMP $PGCONF
-    chmod u=rw,og= $PGCONF
-fi
-
-service postgresql restart
 
 if runuser -c "psql -c 'select * from pg_user' ${PGADMIN}" - ${PGADMIN} | grep ${SVCUSER} 1>/dev/null
 then
