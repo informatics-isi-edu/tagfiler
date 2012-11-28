@@ -58,6 +58,33 @@ CREATE FUNCTION val2json($1) RETURNS text AS \$\$
 EOF
 }
 
+get_index_name()
+{
+    # uses coroutined psql directly!
+
+    # get_index_name tablename indexspec
+    # e.g. get_index_name '_tagdef' 'subject, value'
+
+    cat >&${COPROC[1]} <<EOF
+SELECT count(*) FROM pg_catalog.pg_indexes
+WHERE tablename = '$1'
+  AND indexdef ~ '[(]$2[)]' ;
+EOF
+    read -u ${COPROC[0]} count
+
+    if [[ $count -ge 1 ]]
+    then
+	cat >&${COPROC[1]} <<EOF
+SELECT indexname FROM pg_catalog.pg_indexes
+WHERE tablename = '$1'
+  AND indexdef ~ '[(]$2[)]'
+LIMIT 1 ;
+EOF
+	read -u ${COPROC[0]} indexname
+	printf "%s\n" "$indexname"
+    fi
+}
+
 cat >&${COPROC[1]} <<EOF
 \\set ON_ERROR_STOP
 
@@ -94,10 +121,16 @@ CREATE FUNCTION jsonobj(text[]) RETURNS text AS \$\$
 \$\$ LANGUAGE SQL;
 
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
-CLUSTER resources USING resources_pkey;
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
 EOF
+
+resources_index=$(get_index_name 'resources' 'subject')
+
+cat >&${COPROC[1]} <<EOF
+CLUSTER resources USING "${resources_index}" ;
+EOF
+
 
 # pre-established stored data
 # MUST NOT be called more than once with same name during deploy 
@@ -392,14 +425,25 @@ tagdef_phase1()
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
 CREATE INDEX "_$1_value_idx" ON "_$1" (value) ;
-CLUSTER "_$1" USING "_$1_subject_key" ;
 EOF
+      if [[ "$6" = "true" ]]
+      then
+	  indexspec="subject, value"
+      else
+	  indexspec="subject"
+      fi
    else
       cat >&${COPROC[1]} <<EOF
 CREATE TABLE "_$1" ( subject bigint UNIQUE NOT NULL REFERENCES resources (subject) ON DELETE CASCADE );
-CLUSTER "_$1" USING "_$1_subject_key";
 EOF
+      indexspec="subject"
    fi
+
+   tagdef_cluster_index=$(get_index_name "_$1" "$indexspec")
+
+   cat >&${COPROC[1]} <<EOF
+CLUSTER "_$1" USING "${tagdef_cluster_index}" ;
+EOF
 
    dataset_core "" tagdef "$3" "*"
 }
