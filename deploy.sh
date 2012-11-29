@@ -65,7 +65,6 @@ LOGDIR=${SVCDIR}-logs
 
 # set the services to run automatically?
 chkconfig httpd on
-chkconfig postgresql on
 
 SVCHOME=$(eval "echo ~${SVCUSER}")
 
