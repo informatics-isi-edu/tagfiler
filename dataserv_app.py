@@ -2905,7 +2905,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 self.dbquery(query)
 
                 clusterindex = self.get_index_name(self.input_tablename, ['id'])
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
+                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
                 # do this test after cluster/analyze so it is faster
@@ -3030,7 +3030,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 raise NotFound(self, 'bulk-update subject(s)')
             else:
                 clusterindex = self.get_index_name(self.input_tablename, ['id'])
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
+                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
             # update graph tags based on input data, tracking set of modified tags
