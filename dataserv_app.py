@@ -1791,6 +1791,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                + " AND indexdef ~ %s" % wrapval('[(]%s[)]' % ', '.join(indexcols)) )
         results = self.dbquery(sql)
         if len(results) != 1:
+            web.debug(sql)
             web.debug(list(results))
             web.debug(list(self.dbquery('SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE tablename = %s' % wrapval(tablename))))
             raise IndexError()
@@ -2868,7 +2869,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     inits = ', '.join([ 'version = pv.version + 1',
                                         'writeok = pv.writeok' ])
                     
-                    wheres = ' AND '.join([ 'i.name = pv.%s' % wraptag('latest with name', '', ''),
+                    wheres = ' AND '.join([ 'i.in_name = pv.%s' % wraptag('latest with name', '', ''),
                                             'i.id IS NULL' ])
 
                     self.dbquery(('UPDATE %(intable)s AS i SET %(inits)s FROM ( %(pvquery)s ) AS pv WHERE %(wheres)s'
@@ -2903,7 +2904,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 #web.debug(query)
                 self.dbquery(query)
 
-                clusterindex = self.get_index_name(intable, ['id'])
+                clusterindex = self.get_index_name(self.input_tablename, ['id'])
                 self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
@@ -2947,14 +2948,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                     self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
                                             ('(SELECT DISTINCT ln.subject'
                                              + ' FROM %(intable)s i'
-                                             + ' JOIN %(lname)s ln ON (i.name = ln.value)'
+                                             + ' JOIN %(lname)s ln ON (i.in_name = ln.value)'
                                              + ' WHERE i.version > 1) s') % dict(intable=intable, lname=wraptag('latest with name')),
                                             idcol='subject', valcol=wrapval('latest with name') + '::text', unnest=False)
 
                     # avoid breaking foreign key refs to value column
                     count = self.dbquery(('UPDATE %(lname)s AS ln SET subject = i.id'
                                           + ' FROM %(intable)s AS i'
-                                          + ' WHERE ln.value = i.name'
+                                          + ' WHERE ln.value = i.in_name'
                                           + '   AND i.version > 1')
                                          % dict(intable=intable, lname=wraptag('latest with name')))
                     self.accum_table_changes(wraptag('latest with name'), count)
@@ -3028,7 +3029,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
                 raise NotFound(self, 'bulk-update subject(s)')
             else:
-                clusterindex = self.get_index_name(intable, ['id'])
+                clusterindex = self.get_index_name(self.input_tablename, ['id'])
                 self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
