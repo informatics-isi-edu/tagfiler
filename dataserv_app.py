@@ -1785,6 +1785,18 @@ class Application (webauthn2_handler_factory.RestHandler):
         
         self.deploy_tagdef(tagdef)
 
+    def get_index_name(self, tablename, indexcols):
+        sql = ('SELECT indexname FROM pg_catalog.pg_indexes' 
+               + " WHERE tablename = %s" % wrapval(tablename)
+               + " AND indexdef ~ %s" % wrapval('[(]%s[)]' % ', '.join(indexcols)) )
+        results = self.dbquery(sql)
+        if len(results) != 1:
+            web.debug(list(results))
+            web.debug(list(self.dbquery('SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE tablename = %s' % wrapval(tablename))))
+            raise IndexError()
+        else:
+            return results[0].indexname
+
     def deploy_tagdef(self, tagdef):
         tabledef = "CREATE TABLE %s" % (self.wraptag(tagdef.tagname))
         tabledef += " ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE"
@@ -1832,13 +1844,17 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             tabledef += ', UNIQUE(subject)'
 
-        clustercmd = 'CLUSTER %s USING %s' % (self.wraptag(tagdef.tagname), self.wraptag(tagdef.tagname, '_subject_key'))
-            
         tabledef += " )"
         #web.debug(tabledef)
         self.dbquery(tabledef)
         if indexdef:
             self.dbquery(indexdef)
+
+        if not tagdef.multivalue:
+            clusterindex = self.get_index_name('_' + tagdef.tagname, ['subject'])
+        else:
+            clusterindex = self.get_index_name('_' + tagdef.tagname, ['subject', 'value'])
+        clustercmd = 'CLUSTER %s USING %s' % (self.wraptag(tagdef.tagname), self.wraptag(clusterindex, prefix=''))
         self.dbquery(clustercmd)
 
     def delete_tagdef(self, tagdef):
@@ -2887,9 +2903,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 #web.debug(query)
                 self.dbquery(query)
 
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable,
-                                                                          index=wraptag(self.input_tablename, '_id_idx', '')))
-
+                clusterindex = self.get_index_name(intable, ['id'])
+                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
                 # do this test after cluster/analyze so it is faster
@@ -3013,9 +3028,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
                 raise NotFound(self, 'bulk-update subject(s)')
             else:
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable,
-                                                                          index=wraptag(self.input_tablename, '_id_idx', '')))
-
+                clusterindex = self.get_index_name(intable, ['id'])
+                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=clusterindex))
                 self.dbquery('ANALYZE %s ( id )' % intable)
 
             # update graph tags based on input data, tracking set of modified tags
