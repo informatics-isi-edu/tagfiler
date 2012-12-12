@@ -2490,7 +2490,7 @@ class Application (webauthn2_handler_factory.RestHandler):
               + 'FROM (SELECT n.value AS name, max(v.value) AS version'
               + '      FROM %(etable)s AS e'
               #     "n" finds all subjects named same as latest-with-name deletions
-              + '      JOIN "_name" AS n ON (e.lwn IS NOT NULL AND e.lwn = n.name)'
+              + '      JOIN "_name" AS n ON (e.lwn IS NOT NULL AND e.lwn = n.value)'
               #     "nx" excludes subjects in deletion set from consideration
               + '      JOIN (SELECT subject FROM "_name"'
               + '            EXCEPT SELECT id AS subject FROM %(etable)s) AS nx ON (n.subject = nx.subject)'
