@@ -12,7 +12,12 @@
      "dbnstr" : "The type of RDBMS (default 'postgres')",
      "dbmaxconnections" : "Limit the number of SQL connections when pooling",
      "admin" : "The administrative user role as known by the attribute provider",
-     "webauthn2" : "{... The webauthn2 config stanza ...}"
+     "webauthn2" : "{... The webauthn2 config stanza ...}",
+     "bulk tmp index" : "whether to index temporary tables used for bulk operations",
+     "bulk tmp cluster" : "whether to cluster temporary data used for bulk operations",
+     "bulk tmp analyze" : "whether to analyze temporary data used for bulk operations",
+     "transact cluster" : "whether to adaptively re-cluster tag tables after transactions",
+     "transact analyze" : "whether to adaptively re-analyze tag tables after transactions"
    },
 
    "user" : "svcuser",
@@ -24,6 +29,12 @@
    "_dbmaxconnections" : "8",
 
    "admin" : "adminrole",
+
+   "bulk tmp index" : false,
+   "bulk tmp cluster" : false,
+   "bulk tmp analyze" : false,
+   "transact cluster" : false,
+   "transact analyze" : false,
 
    "webauthn2" : {
       "require_attributes": true, 

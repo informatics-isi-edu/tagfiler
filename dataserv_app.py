@@ -1345,8 +1345,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         try:
             for table, count in self.table_changes.items():
                 if count > cluster_threshold:
-                    self.dbquery('CLUSTER %s' % table)
-                    self.dbquery('ANALYZE %s' % table)
+                    if bool(getParamEnv('transact cluster', False)):
+                        self.dbquery('CLUSTER %s' % table)
+                    if bool(getParamEnv('transact analyze', False)):
+                        self.dbquery('ANALYZE %s' % table)
         except:
             pass
 
@@ -2465,14 +2467,16 @@ class Application (webauthn2_handler_factory.RestHandler):
                       + ' SELECT e.id, e."latest with name", e.writeok'
                       + ' FROM ( %(equery)s ) AS e') % dict(equery=equery, etable=etable),
                      vars=evalues)
-        
-        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (id)'
-                     % dict(etable=etable, index=wraptag('tmp_e_%s_id_idx' % self.request_guid, '', '')))
-        
-        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (lwn)'
-                     % dict(etable=etable, index=wraptag('tmp_e_%s_ln_idx' % self.request_guid, '', '')))
 
-        self.dbquery('ANALYZE %s' % etable)
+        if bool(getParamEnv('bulk tmp index', False)):
+            self.dbquery('CREATE INDEX %(index)s ON %(etable)s (id)'
+                         % dict(etable=etable, index=wraptag('tmp_e_%s_id_idx' % self.request_guid, '', '')))
+        
+            self.dbquery('CREATE INDEX %(index)s ON %(etable)s (lwn)'
+                         % dict(etable=etable, index=wraptag('tmp_e_%s_ln_idx' % self.request_guid, '', '')))
+
+        if bool(getParamEnv('bulk tmp analyze', False)):
+            self.dbquery('ANALYZE %s' % etable)
 
         #self.log('TRACE', value='after deletion subject discovery')
 
@@ -2510,10 +2514,12 @@ class Application (webauthn2_handler_factory.RestHandler):
         #web.debug(q)
         self.dbquery(q)
 
-        self.dbquery('CREATE INDEX %(index)s ON %(etable)s (nlwn)'
-                     % dict(etable=etable, index=wraptag('tmp_e_%s_nln_idx' % self.request_guid, '', '')))
+        if bool(getParamEnv('bulk tmp index', False)):
+            self.dbquery('CREATE INDEX %(index)s ON %(etable)s (nlwn)'
+                         % dict(etable=etable, index=wraptag('tmp_e_%s_nln_idx' % self.request_guid, '', '')))
 
-        self.dbquery('ANALYZE %s' % etable)
+        if bool(getParamEnv('bulk tmp analyze', False)):
+            self.dbquery('ANALYZE %s' % etable)
 
         #self.log('TRACE', value='after nlwn calculation and indexing')
 
@@ -2759,19 +2765,13 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() input stored' % (self.input_tablename))
 
-            if True:
+            if bool(getParamEnv('bulk tmp index', False)):
                 self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( id )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
                                                                                    intable=wraptag(self.input_tablename, '', '')))
+            if bool(getParamEnv('bulk tmp analyze', False)):
                 self.dbquery('ANALYZE %s' % wraptag(self.input_tablename, '', ''))
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() ID index created' % (self.input_tablename))
 
-            if False:
-                self.dbquery('CREATE INDEX %s ON %s (%s)' % (wraptag(self.input_tablename, '_skey_idx', ''),
-                                                             wraptag(self.input_tablename, '', ''),
-                                                             ','.join([ wraptag(tag, '', 'in_')
-                                                                        for tag in self.spreds.keys()
-                                                                        if self.globals['tagdefsdict'][tag].unique or tag in [ 'name', 'version' ] ]) ))
-                
             # TODO: test input data against input constraints, aborting on conflict (L)
             # -- test in python during preceding insert loop?  or compile one SQL test?
             # -- until implemented, values out of range may have unexpected, but harmless, results
@@ -2849,7 +2849,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # -- delete mapped rows
                 pass
 
-            self.dbquery('ANALYZE %s' % intable)
+            if bool(getParamEnv('bulk tmp analyze', False)):
+                self.dbquery('ANALYZE %s' % intable)
 
             # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
             if on_missing == 'create':
@@ -2904,9 +2905,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 #web.debug(query)
                 self.dbquery(query)
 
-                clusterindex = self.get_index_name(self.input_tablename, ['id'])
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
-                self.dbquery('ANALYZE %s ( id )' % intable)
+                if bool(getParamEnv('bulk tmp index', False)) and bool(getParamEnv('bulk tmp cluster', False)):
+                    clusterindex = self.get_index_name(self.input_tablename, ['id'])
+                    self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
+
+                if bool(getParamEnv('bulk tmp analyze', False)):
+                    self.dbquery('ANALYZE %s ( id )' % intable)
 
                 # do this test after cluster/analyze so it is faster
                 if self.dbquery('SELECT max(count) AS max FROM (SELECT count(*) AS count FROM %s GROUP BY id) AS t' % intable)[0].max > 1:
@@ -3029,9 +3033,12 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
                 raise NotFound(self, 'bulk-update subject(s)')
             else:
-                clusterindex = self.get_index_name(self.input_tablename, ['id'])
-                self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
-                self.dbquery('ANALYZE %s ( id )' % intable)
+                if bool(getParamEnv('bulk tmp index', False)) and bool(getParamEnv('bulk tmp cluster', False)):
+                    clusterindex = self.get_index_name(self.input_tablename, ['id'])
+                    self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
+
+                if bool(getParamEnv('bulk tmp analyze', False)):
+                    self.dbquery('ANALYZE %s ( id )' % intable)
 
             # update graph tags based on input data, tracking set of modified tags
             for td in self.input_column_tds:
