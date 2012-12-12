@@ -29,7 +29,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag, jsonFileReader
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError
 
 myrand = random.Random()
 myrand.seed(os.getpid())
@@ -583,24 +583,19 @@ class Subject (Node):
 
         content_type = web.ctx.env.get('CONTENT_TYPE', "").lower()
 
-        if content_type:
-            if content_type in [ 'application/json' ]:
-                # try to dispatch input for bulk PUT
-                if self.partial_content:
-                    raise BadRequest(self, 'Bulk PUT of subjects does not support Content-Range partial content.')
+        if self.partial_content:
+            raise BadRequest(self, 'PUT of subjects does not support Content-Range partial content.')
 
-                if content_type == 'application/json':
-                    try:
-                        input = jsonFileReader(web.ctx.env['wsgi.input'])
-                    except:
-                        et, ev, tb = sys.exc_info()
-                        web.debug('got exception "%s" parsing JSON input from client' % str(ev),
-                                  traceback.format_exception(et, ev, tb))
-                        raise BadRequest(self, 'Invalid JSON input to bulk PUT of subjects.')
-                    if type(input) != list:
-                        raise BadRequest(self, 'JSON input must be a flat list of objects for bulk PUT of subjects.')
-                
-                self.bulk_update_transact(input, on_missing='create', on_existing='merge')
+        if content_type:
+            if content_type == 'application/json':
+                try:
+                    rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
+                    self.bulk_update_transact(rows, on_missing='create', on_existing='merge')
+                except JSONArrayError:
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception "%s" parsing JSON input from client' % str(ev),
+                              traceback.format_exception(et, ev, tb))
+                    raise BadRequest(self, 'Invalid JSON input to bulk PUT of subjects.')
                 
                 web.ctx.status = '204 No Content'
                 return ''

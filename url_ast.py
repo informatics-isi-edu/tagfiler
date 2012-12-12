@@ -20,7 +20,7 @@ import sys
 import web
 import re
 import os
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError
 from rest_fileio import FileIO, LogFileIO
 import subjects
 from subjects import Node
@@ -1054,20 +1054,19 @@ class FileTags (Node):
             content_type = web.ctx.env['CONTENT_TYPE'].lower()
         except:
             content_type = 'text/plain'
-        
-        if content_type in [ 'application/json' ]:
-            if content_type == 'application/json':
-                try:
-                    input = jsonFileReader(web.ctx.env['wsgi.input'])
-                except:
-                    et, ev, tb = sys.exc_info()
-                    web.debug('got exception "%s" parsing JSON input from client' % str(ev),
-                              traceback.format_exception(et, ev, tb))
-                    raise BadRequest(self, 'Invalid JSON input to bulk PUT of tags.')
-                if type(input) != list:
-                    raise BadRequest(self, 'JSON input must be a flat list of objects for bulk PUT of tags.')
-                
-            self.bulk_update_transact(input, on_missing='abort', on_existing='merge')
+
+        if self.partial_content:
+            raise BadRequest(self, 'PUT of subjects does not support Content-Range partial content.')
+
+        if content_type == 'application/json':
+            try:
+                rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
+                self.bulk_update_transact(rows, on_missing='abort', on_existing='merge')
+            except JSONArrayError:
+                et, ev, tb = sys.exc_info()
+                web.debug('got exception "%s" parsing JSON input from client' % str(ev),
+                          traceback.format_exception(et, ev, tb))
+                raise BadRequest(self, 'Invalid input to bulk PUT of tags.')
                 
             web.ctx.status = '204 No Content'
             return ''

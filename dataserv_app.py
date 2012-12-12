@@ -38,7 +38,83 @@ from logging.handlers import SysLogHandler
 import base64
 import struct
 
+import json
+
+try:
+    import simplejson
+    decodeError = simplejson.JSONDecodeError
+except:
+    decodeError = json.JSONDecodeError
+
 from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context, Manager
+
+json_whitespace = re.compile(r'[ \t\n\r]*')
+json_whitespace_str = ' \t\n\r['
+
+def jsonWhitespaceEat(buf, idx):
+    return json_whitespace.match(buf, idx).end()
+
+class JSONArrayError (ValueError):
+
+    def __init__(self, msg):
+        ValueError.__init__(self, msg)
+
+def jsonArrayFileReader(f):
+    """Iterate over elements in JSON array document.
+
+       Input stream must have a JSON array as outermost structure.
+
+       throws JSONArrayError if input doesn't parse properly.
+    """
+    max_read = 1024 * 1024
+
+    # read double buffer the first time
+    buf = f.read(max_read * 2)
+    input_done = len(buf) < (max_read * 2)
+
+    pos = jsonWhitespaceEat(buf, 0)
+
+    if pos == len(buf) or buf[pos] != '[':
+        raise JSONArrayError('input does not contain JSON array')
+
+    # eat the '[' starting the array
+    pos += 1
+
+    try:
+        decoder = simplejson.JSONDecoder()
+    except:
+        decoder = json.JSONDecoder()
+
+    while True:
+        try:
+            # parse and yield the next array element
+            pos = jsonWhitespaceEat(buf, pos)
+            elem, pos = decoder.raw_decode(buf, pos)
+            yield elem
+
+            # read more input if position has entered max_read guard zone
+            if pos >= max_read and not input_done:
+                buf2 = f.read(max_read)
+                input_done = len(buf2) < max_read
+                buf = buf[pos:] + buf2
+                pos = 0
+
+            # test the boundary condition
+            pos = jsonWhitespaceEat(buf, pos)
+            if pos == len(buf):
+                raise JSONArrayError('input JSON array incomplete')
+            elif buf[pos] == ',':
+                # eat the ',' between elements and continue
+                pos += 1
+            elif buf[pos] == ']':
+                # we're done processing the array
+                break
+            else:
+                raise JSONArrayError('input JSON array invalid')
+
+        except decodeError:
+            raise JSONArrayError('input JSON array invalid')
+
 
 # we interpret RFC 3986 reserved chars as metasyntax for dispatch and
 # structural understanding of URLs, and all escaped or
