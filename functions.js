@@ -7446,7 +7446,7 @@ function addTagValue(tag, row, allTags, predicate) {
 	var obj = new Object();
 	obj.action = 'put';
 	obj['set-'+tag] = true;
-	obj['val-'+tag] = $('#'+idquote(tag)+'_id').val();
+	obj['val-'+tag] = htmlEscape($('#'+idquote(tag)+'_id').val());
 	var param = {
 			'tag': tag,
 			'allTags': allTags,
@@ -7473,7 +7473,7 @@ function postAddTagValue(data, textStatus, jqXHR, param) {
 	var row = param.row;
 	var allTags = param.allTags;
 	var predicate = param.predicate;
-	var value = $('#'+idquote(tag)+'_id').val();
+	var value = htmlEscape($('#'+idquote(tag)+'_id').val());
 	value = sanitize(value);
 	var valueTr = $('<tr>');
 	valueTr.insertBefore(row);
