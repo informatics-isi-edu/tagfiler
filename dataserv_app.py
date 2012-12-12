@@ -42,9 +42,15 @@ import json
 
 try:
     import simplejson
-    decodeError = simplejson.JSONDecodeError
+    try:
+        decodeError = simplejson.JSONDecodeError
+    except:
+        decodeError = ValueError
 except:
-    decodeError = json.JSONDecodeError
+    try:
+        decodeError = json.JSONDecodeError
+    except:
+        decodeError = ValueError
 
 from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context, Manager
 
