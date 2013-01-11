@@ -85,7 +85,7 @@ function setDatasetLink(div_id, datasetLink) {
 function log(msg) {
     var node = document.getElementById("javascriptlog");
     if (node) {
-	node.innerHTML = (new Date()).toLocaleTimeString() + " " + msg + "<br />" + node.innerHTML
+	node.innerHTML = (new Date()).toLocaleTimeString() + " " + msg + "<br />" + node.innerHTML;
     }
 }
 
@@ -198,7 +198,7 @@ function runExtendRequest() {
 function processLogoutRequest() {
     if (ajax_request.readyState == 4) {
 	clearSessionTimer();
-	window.location = "/tagfiler/"
+	window.location = "/tagfiler/";
     }
 }
 
@@ -586,7 +586,7 @@ function deleteAll(dataname, url) {
 			ajax_client.send(null);
 			return;
 		}
-	}
+	};
 	ajax_client.send(null);
 }
 
@@ -636,7 +636,7 @@ Array.prototype.contains = function ( elem ) {
        if (this[i] == elem) return true;
    }
    return false;
-}
+};
 
 /**
  * Check that the input box is not empty
@@ -755,16 +755,16 @@ function validateNameForm(op, suffix) {
 		var prefix = '?';
 		if (document.getElementById('read users'+suffix).value == '*') {
 			action += '?read%20users=*';
-			prefix = '&'
+			prefix = '&';
 		}
 		if (document.getElementById('write users'+suffix).value == '*') {
 			action += prefix + 'write%20users=*';
-			prefix = '&'
+			prefix = '&';
 		}
 		var defaultView = document.getElementById('defaultView'+suffix).value;
 		if (defaultView != '') {
 			action += prefix + 'default%20view=' + encodeSafeURIComponent(defaultView);
-			prefix = '&'
+			prefix = '&';
 		}
 		if (document.getElementById('incomplete'+suffix).checked) {
 			action += prefix + 'incomplete';
@@ -883,7 +883,7 @@ function renderTagdefs(home, table) {
 	    var owner = ownercell.innerHTML;
 	    var ownerand = "";
 	    if (owner != "") {
-		ownerand = "\"" + owner + "\" and "
+		ownerand = "\"" + owner + "\" and ";
 	    }
 	    var policy = { "anonymous" : "anyone", 
 			   "users" : "authenticated users", 
@@ -1380,7 +1380,7 @@ var tagfiler = {
 					}
 				}
 			});
-		},
+		}
 };
 
 function initTypedefSelectValues(home, webauthnhome, typestr, id, pattern) {
@@ -1412,7 +1412,7 @@ function postInitTypedefSelectValues(data, textStatus, jqXHR, param) {
 	$.each(data, function(i, object) {
 		typedefSelectValues.push(object['typedef']);
 	});
-	initTypedefTagrefs(param.home, param.webauthnhome, param.typestr, param.id, param.pattern)
+	initTypedefTagrefs(param.home, param.webauthnhome, param.typestr, param.id, param.pattern);
 }
 
 function initTypedefTagrefs(home, webauthnhome, typestr, id, pattern) {
@@ -1567,7 +1567,7 @@ function chooseOptions(home, webauthnhome, typestr, id) {
 	var pattern = '';
 	if (typestr == 'rolepat') {
 		pattern = '*';
-		typestr = 'role'
+		typestr = 'role';
 	}
 	if (typedefSelectValues == null) {
 		initTypedefSelectValues(home, webauthnhome, typestr, id, pattern);
@@ -2029,6 +2029,14 @@ function errorSetGUIConfig(jqXHR, textStatus, errorThrown, retryCallback, url, o
 function postSetGUIConfig(data, textStatus, jqXHR, param) {
 	var values = data[0]['_cfg_enabled GUI features'];
 	if (values != null) {
+		// initialize defaults
+		bulk_value_edit = false;
+		cell_value_edit = false;
+		$('#enableEdit').css('display', 'none');
+		file_download = false;
+		view_tags = false;
+		view_URL = false;
+		
 		if (values.contains('bulk_value_edit')) {
 			bulk_value_edit = true;
 		}
@@ -3368,7 +3376,7 @@ function postInitDropDownListCount(data, textStatus, jqXHR, param) {
 		var queryUrl = getQueryUrl(param.predUrl, '&range=values', encodeURIArray(param.columnArray, ''), new Array(), '');
 		var param = {
 				'tag': tag
-		}
+		};
 		tagfiler.GET(queryUrl, false, postInitDropDownListValues, param, errorInitDropDownList, 0);
 	} else {
 		select_tags_count[tag] = totalRows;
@@ -3757,7 +3765,7 @@ function postShowQueryResultsTable(data, textStatus, jqXHR, param) {
 			}
 		}
 		tr.css('display', '');
-		tr.attr('recordId', row['id'])
+		tr.attr('recordId', row['id']);
 		odd = !odd;
 		if (getChild(tr, 1).get(0) == null) {
 			// context menu here
@@ -3953,7 +3961,7 @@ function fillIdContextMenu(ul) {
 	if (!view_tags && !view_URL && !file_download) {
 		return;
 	}
-	var id = ul.attr('idVal')
+	var id = ul.attr('idVal');
 	var subject = null;
 	var idUrl = HOME + '/query' + queryBasePath + 'id=' + id + '(' + probe_tags + ')';
 	var param = {
@@ -5251,7 +5259,7 @@ function deleteCell(td, origValue, column, id) {
  * 	the parameters to be used by the callback success function
  */
 function postDeleteCell(data, textStatus, jqXHR, param) {
-	var td = param.td
+	var td = param.td;
 	clickedCancelOK = true;
 	editCellInProgress = false;
 	td.html('');
@@ -6036,7 +6044,7 @@ function postInitUI(data, textStatus, jqXHR, param) {
 	var isLogin = false;
 	if (api.length > 0) {
 		if (api[0] == 'tagdef') {
-			var url = HOME + '/session'
+			var url = HOME + '/session';
 			var param = {
 					'api'	: api
 				};
@@ -6156,7 +6164,7 @@ function submitLogin() {
 function postSubmitLogin(data, textStatus, jqXHR, param) {
 	// check if the login page was loaded under an i-frame
 	if (window.top.location != window.location) {
-		alert("An expected frame was detected. For security reasons, you are logged out.")
+		alert("An expected frame was detected. For security reasons, you are logged out.");
 		userLogout();
 	}
 	document.body.style.cursor = "default";
@@ -6694,7 +6702,7 @@ function deleteTagdef(tag, row) {
 	var url = HOME + '/tagdef/' + tag;
 	var param = {
 		'row': row
-	}
+	};
 	tagfiler.DELETE(url, true, postDeleteTagdefs, param, null, 0);
 }
 
@@ -7026,7 +7034,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					var formTr = $('<tr>');
 					multivalueTable.append(formTr);
 					var formTd = $('<td>');
-					formTd.attr({'colspan': '2'})
+					formTd.attr({'colspan': '2'});
 					formTr.append(formTd);
 					var form = $('<form>');
 					formTd.append(form);
@@ -7356,13 +7364,17 @@ function writeAllowed(tag, allTags, roles, file) {
 }
 
 function removeTagValue(tag, value, row, predicate) {
+	if (predicate.indexOf('tags/') == 0) {
+		predicate = predicate.substr('tags/'.length);
+	}
 	var url = HOME + '/tags/' + predicate;
 	var obj = new Object();
 	obj.action = 'delete';
 	obj['tag'] = tag;
 	obj['value'] = unsanitize(value);
 	var param = {
-		'row': row	
+		'row': row,
+		'tag': tag
 	};
 	tagfiler.POST(url, obj, true, postRemoveTagValue, param, null, 0);
 }
@@ -7381,10 +7393,14 @@ function removeTagValue(tag, value, row, predicate) {
  */
 function postRemoveTagValue(data, textStatus, jqXHR, param) {
 	param.row.remove();
+	var tag = param.tag;
+	if (tag == '_cfg_enabled GUI features') {
+		setGUIConfig();
+	}
 }
 
 function removeAddTag(tag, value, row, predicate) {
-	var url = HOME + '/tags/' + predicate;
+	var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
 	var obj = new Object();
 	obj.action = value ? 'delete' : 'put';
 	obj['tag'] = tag;
@@ -7442,7 +7458,7 @@ function postRemoveAddTag(data, textStatus, jqXHR, param) {
 }
 
 function addTagValue(tag, row, allTags, predicate) {
-	var url = HOME + '/tags/' + predicate;
+	var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
 	var obj = new Object();
 	obj.action = 'put';
 	obj['set-'+tag] = true;
@@ -7510,10 +7526,13 @@ function postAddTagValue(data, textStatus, jqXHR, param) {
 	if (!allTags[tag]['tagdef multivalue']) {
 		valueTr.prev().remove();
 	}
+	if (tag == '_cfg_enabled GUI features') {
+		setGUIConfig();
+	}
 }
 
 function userInfo() {
-	var url = HOME + '/session'
+	var url = HOME + '/session';
 	tagfiler.GET(url, true, postUserInfo, null, null, 0);
 }
 
@@ -8307,12 +8326,12 @@ function postResetPassword(data, textStatus, jqXHR, param) {
 	uiDiv.html('');
 	var p = $('<p>');
 	uiDiv.append(p);
-	p.html('The password for "' + user + '" has been reset.')
+	p.html('The password for "' + user + '" has been reset.');
 	var ul = $('<ul>');
 	uiDiv.append(ul);
 	var li = $('<li>');
 	ul.append(li);
-	li.html('New password: "' + data[user] + '"')
+	li.html('New password: "' + data[user] + '"');
 }
 
 function disableLogin(user) {
@@ -8414,7 +8433,7 @@ function viewAvailableTagDefinitions() {
 }
 
 function viewLink(querypath) {
-	var url = HOME + '/ui/query/'
+	var url = HOME + '/ui/query/';
 	if (querypath != null) {
 		url += querypath;
 	}
@@ -8540,12 +8559,12 @@ function renderQueryHTML() {
 		'onmousedown': 'showRange();'});
 	li.addClass('item');
 	li.html('Show range');
-	var span = $('<span>')
+	var span = $('<span>');
 	td.append(span);
 	
 	td = $('<td>');
 	tr.append(td);
-	span = $('<span>')
+	span = $('<span>');
 	td.append(span);
 	span.attr({'id': 'ViewResults'});
 	var img = $('<img>');
@@ -8565,7 +8584,7 @@ function renderQueryHTML() {
 		'alt': 'Previous',
 		'onclick': 'setNextPage();'});
 	img.addClass('margin');
-	span = $('<span>')
+	span = $('<span>');
 	td.append(span);
 	span.attr({'id': 'totalResults'});
 	label = $('<label>');
@@ -8791,11 +8810,11 @@ function renderQueryHTML() {
 	label.html('Edit all subjects matching filters');
 	br = $('<br>');
 	fieldset.append(br);
-	div.append($('<br>'))
+	div.append($('<br>'));
 	label = $('<label>');
 	div.append(label);
 	label.html('Values:');
-	div.append($('<br>'))
+	div.append($('<br>'));
 	table = $('<table>');
 	div.append(table);
 	var tbody = $('<tbody>');
@@ -8849,7 +8868,7 @@ function renderQueryHTML() {
 }
 
 function manageAvailableTagDefinitions() {
-	var url = HOME + '/session'
+	var url = HOME + '/session';
 	tagfiler.GET(url, true, postManageAvailableTagDefinitions, null, null, 0);
 }
 
@@ -9009,7 +9028,7 @@ function createCustomDataset() {
 	form.append(input);
 	div = $('<div>');
 	uiDiv.append(div);
-	div.attr({'id': 'Copy'})
+	div.attr({'id': 'Copy'});
 }
 
 function showFileLink(predicate) {
@@ -9075,7 +9094,7 @@ function postGetTagDefinition(data, textStatus, jqXHR, param) {
 }
 
 function uploadStudy() {
-	var url = HOME + '/study?action=upload'
+	var url = HOME + '/study?action=upload';
 	tagfiler.GET(url, true, postUploadStudy, null, null, 0);
 }
 
@@ -9231,7 +9250,7 @@ function postUploadStudy(data, textStatus, jqXHR, param) {
 	td.attr({'id': 'ProgressBar'});
 	var tempString = '';
 	for (var i=0; i < 60; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	var div1_2 = $('<div>');
@@ -9289,7 +9308,7 @@ function postUploadStudy(data, textStatus, jqXHR, param) {
 	td.attr({'id': 'DestinationDirectory'});
 	var tempString = '';
 	for (var i=0; i < 60; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	td = $('<td>');
@@ -9391,7 +9410,7 @@ function postUploadStudy(data, textStatus, jqXHR, param) {
 	td.addClass('text-tree');
 	tempString = '';
 	for (var i=0; i < 60; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	var uiDiv = $('#ui');
@@ -9568,7 +9587,7 @@ function postDownloadStudy(data, textStatus, jqXHR, param) {
 	td.attr({'id': 'ProgressBar'});
 	var tempString = '';
 	for (var i=0; i < 60; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	var div1_2 = $('<div>');
@@ -9584,7 +9603,7 @@ function postDownloadStudy(data, textStatus, jqXHR, param) {
 	var table = $('<table>');
 	td.append(table);
 	table.addClass('table-wrapper');
-	table.attr({'rules': 'all'})
+	table.attr({'rules': 'all'});
 	var tr1 = $('<tr>');
 	table.append(tr1);
 	td = $('<td>');
@@ -9639,7 +9658,7 @@ function postDownloadStudy(data, textStatus, jqXHR, param) {
 	td.attr({'id': 'DestinationDirectory'});
 	var tempString = '';
 	for (var i=0; i < 80; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	td = $('<td>');
@@ -9720,7 +9739,7 @@ function postDownloadStudy(data, textStatus, jqXHR, param) {
 	td.addClass('text-tree');
 	tempString = '';
 	for (var i=0; i < 70; i++) {
-		tempString += '&nbsp;'
+		tempString += '&nbsp;';
 	}
 	td.html(tempString);
 	var uiDiv = $('#ui');
@@ -9883,7 +9902,7 @@ function postGetAppletTreeStatus(data, textStatus, jqXHR, param) {
 		var li = $('<li>');
 		ul.append(li);
 		var index = params['files'][i].indexOf('@');
-		li.html(index == -1 ? params['files'][i] : params['files'][i].substr(0, index))
+		li.html(index == -1 ? params['files'][i] : params['files'][i].substr(0, index));
 	}
 }
 
