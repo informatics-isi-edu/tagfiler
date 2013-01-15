@@ -7558,7 +7558,7 @@ function postUserInfo(data, textStatus, jqXHR, param) {
 	uiDiv.append(p);
 	var since = getLocaleTimestamp(data['since']);
 	since = since.split(" ")[1].split('.')[0];
-	p.html('You are logged in as "serban" since ' + since + '.');
+	p.html('You are logged in as "'+ data['client'] + '" since ' + since + '.');
 	var roles = [];
 	$.each(data.attributes, function (i, val) {
 		if (val != USER) {
