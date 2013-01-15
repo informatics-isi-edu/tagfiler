@@ -1055,9 +1055,6 @@ class FileTags (Node):
         except:
             content_type = 'text/plain'
 
-        if self.partial_content:
-            raise BadRequest(self, 'PUT of subjects does not support Content-Range partial content.')
-
         if content_type == 'application/json':
             try:
                 rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
