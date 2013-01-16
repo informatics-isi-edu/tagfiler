@@ -4843,8 +4843,19 @@ function getLocaleTimestamp(s) {
 	var values = s.split(' ');
 	var localValues = values[0].split('-');
 	var date = (new Date(parseInt(localValues[0], 10), parseInt(localValues[1], 10) - 1, parseInt(localValues[2], 10))).getTime();
-	var utc = values[1].slice(-6);
-	var time = values[1].slice(0, values[1].length - 6);
+	var utc = '00';
+	var utcSign = '-';
+	var time = values[1].split('-');
+	if (time.length == 1) {
+		time = values[1].split('+');
+		utcSign = '+';
+	}
+	if (time.length == 1) {
+		time = time[0];
+	} else {
+		utc = utcSign + time[1];
+		time = time[0];
+	}
 	var timeValues = time.split('.');
 	var ms = 0;
 	var msText = '';
