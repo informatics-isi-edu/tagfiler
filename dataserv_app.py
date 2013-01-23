@@ -2779,7 +2779,9 @@ class Application (webauthn2_handler_factory.RestHandler):
             if on_missing == 'create' and self.spreds.has_key('name'):
                 input_column_defs.append( 'version int8' )
 
-            self.dbquery('CREATE TABLE %s ( %s )' % (wraptag(self.input_tablename, '', ''), ','.join(input_column_defs)))
+            self.dbquery('CREATE %s TABLE %s ( %s )' % (subject_iter == False and 'TEMPORARY' or '',
+                                                        wraptag(self.input_tablename, '', ''), 
+                                                        ','.join(input_column_defs)))
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body1() complete' % (self.input_tablename))
 
@@ -2787,20 +2789,73 @@ class Application (webauthn2_handler_factory.RestHandler):
             """Destroy input table created by body1."""
             self.dbquery('DROP TABLE %s' % wraptag(self.input_tablename, '', ''))
 
-        def body2():
+        def wrapped_constant(td, v):
+            """Return one SQL literal representing values v"""
+            if td.typestr != 'empty':
+                param_type = td.dbtype
+            else:
+                param_type = 'bool'
+            if v != None:
+                if td.multivalue:
+                    if type(v) == list:
+                        return 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, param_type) for v in v ]), param_type)
+                    else:
+                        return 'ARRAY[ %s ]::%s[]' % (wrapval(v, param_type), param_type)
+                else:
+                    if type(v) == list:
+                        if v:
+                            return '%s::%s' % (wrapval(v[0], param_type), param_type)
+                        else:
+                            return 'NULL'
+                    else:
+                        return '%s::%s' % (wrapval(v, param_type), param_type)
+            else:
+                return 'NULL'
+
+        def body2patterned():
+            """Load input table using query path pattern only.
+
+               This only gets called with an 'id' based update and updates encoded in self.path
+
+            """
+            table = wraptag(self.input_tablename, '', '')
+
+            # compute subject IDs for in_id via spreds subquery
+            squery, svalues = self.build_files_by_predlist_path([ (spreds,
+                                                                   [ web.Storage(tag="id", op=None, vals=[]) ],
+                                                                   []) ],
+                                                                versions=self.versions,
+                                                                enforce_read_authz=enforce_read_authz)
+            
+            # initialize other in_* columns via self.lpreds assignment patterns
+            in_colnames = []
+            in_constants = []
+            for td in self.input_column_tds:
+                vals = set()
+                if td.tagname in self.lpreds:
+                    for pred in self.lpreds[td.tagname]:
+                        if pred.op == '=':
+                            vals.update(set(pred.vals))
+                        elif pred.op == None:
+                            pass
+                        else:
+                            raise BadRequest(self, 'Patterned bulk tag update does not support predicate operator "%s" for list predicates.' % pred.op )
+
+                    in_colnames.append( wraptag(td.tagname, '', 'in_') )
+                    in_constants.append( wrapped_constant(td, list(vals)) )
+
+            # put it all together... each row composes in_id from subquery and other in_* constants from lpreds
+            self.dbquery('INSERT INTO %(table)s ("in_id", %(in_colnames)s) SELECT "id", %(in_constants)s FROM (%(squery)s) s'
+                         % dict(table=table, in_colnames=', '.join(in_colnames), in_constants=', '.join(in_constants), squery=squery), 
+                         svalues)
+
+        def body2tabular():
             """Load input stream into input table and validate content.
 
                This body func can run at-most once since it consumes input stream.
             """
             table = wraptag(self.input_tablename, '', '')
             columns = ', '.join([ wraptag(td.tagname, '', 'in_') for td in self.input_column_tds ])
-            param_types = [ ]
-            for td in self.input_column_tds:
-                if td.typestr != 'empty':
-                    param_types.append(td.dbtype)
-                else:
-                    param_types.append('bool')
-
             tuples = []
 
             def insert_tuples(tuples):
@@ -2814,28 +2869,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # build up execute statement w/ subject values
                 for i in range(0, len(self.input_column_tds)):
                     td = self.input_column_tds[i]
-                    if td.dbtype == 'empty':
-                        dbtype = 'boolean'
-                    else:
-                        dbtype = td.dbtype
-
                     v = subject.get(td.tagname, None)
-                    if v != None:
-                        if td.multivalue:
-                            if type(v) == list:
-                                values.append( 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, dbtype) for v in v ]), param_types[i]) )
-                            else:
-                                values.append( 'ARRAY[ %s ]::%s[]' % (wrapval(v, dbtype), param_types[i]) )
-                        else:
-                            if type(v) == list:
-                                if v:
-                                    values.append( '%s::%s' % (wrapval(v[0], dbtype), param_types[i]) )
-                                else:
-                                    values.append( 'NULL' )
-                            else:
-                                values.append( '%s::%s' % (wrapval(v, dbtype), param_types[i]) )
-                    else:
-                        values.append( 'NULL' )
+                    values.append( wrapped_constant(td, v) )
 
                 tuples.append( '( %s )' % (', '.join(values)) )
 
@@ -3163,15 +3198,22 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() subject timestamps updated' % (self.input_tablename))
 
-        # allow retry as per usual
-        self.dbtransact(body1, lambda x: x)
-        try:
-            self.dbtransact(body2, lambda x: x, limit=0) # prevent retry with limit=0
-            return self.dbtransact(body3, lambda x: x)
-
-        finally:
-            # always clean up input table if we created one successfully in body1
-            self.dbtransact(body1compensation, lambda x: x)
+        if subject_iter == False:
+            # run under one unified transaction scoping our temporary table
+            def unified_body():
+                body1()
+                body2patterned()
+                return body3()
+            self.dbtransact(unified_body, lambda x: x)
+        else:
+            # run multi-phase transaction with non-temporary table
+            self.dbtransact(body1, lambda x: x)
+            try:
+                self.dbtransact(body2tabular, lambda x: x, limit=0) # prevent retry with limit=0
+                return self.dbtransact(body3, lambda x: x)
+            finally:
+                # always clean up input table if we created one successfully in body1
+                self.dbtransact(body1compensation, lambda x: x)
 
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"

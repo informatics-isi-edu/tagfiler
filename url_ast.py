@@ -972,88 +972,15 @@ class FileTags (Node):
         for r in self.dbtransact(self.get_body, self.get_postCommit):
             yield r
 
-    def put_body(self):
-        subjpreds, listpreds, ordertags = self.path[-1]
-        
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
-        if unique == False:
-            versions = 'latest'
-        else:
-            versions = 'any'
-
-        self.tagvals = dict()
-        for pred in listpreds:
-            if pred.op and pred.op != '=':
-                raise BadRequest(self, 'Invalid operation "%s" for tag binding in PUT.' % pred.op)
-            if self.tagvals.has_key(pred.tag):
-                raise BadRequest(self, 'Tag "%s" occurs in more than one binding predicate in PUT.' % pred.tag)
-            self.tagvals[pred.tag] = pred.vals
-        
-        listpreds =  [ web.Storage(tag=tag,op=None,vals=[])
-                       for tag in ['id', 'owner', 'write users', 'Image Set', 'Study Type', 'url', 'incomplete'] + [p.tag for p in subjpreds]  ]
-
-        simplepath = [ x for x in self.path ]
-        simplepath[-1] = ( simplepath[-1][0], [], [] )
-
-        self.path_modified = [ x for x in self.path ]
-        self.path_modified[-1] = (subjpreds, listpreds, ordertags)
-
-        ignorenotfound = parseBoolString(self.storage.get('ignorenotfound', 'false'))
-
-        results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
-        if len(results) == 0 and not ignorenotfound:
-            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
-
-        for subject in results:
-            if not self.referer:
-                # set updated referer based on updated subject(s), unless client provided a referer
-                if len(results) != 1:
-                    self.referer = '/tags/' + path_linearize(self.path)
-                else:
-                    self.referer = '/tags/' + self.subject2identifiers(subject)[0]
-            
-            # custom DEI EIU hack, proxy tag ops on Image Set to all member files
-            if subject['Image Set']:
-                path = [ ( [ web.Storage(tag='id', op='=', vals=[subject.id]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
-                         ( [], [], [] ) ]
-                subfiles = self.select_files_by_predlist_path(path=path)
-            else:
-                subfiles = []
-
-            for tag_id in self.tagvals.keys():
-                tagdef = self.globals['tagdefsdict'].get(tag_id, None)
-                if tagdef == None:
-                    raise NotFound(self, data='tag definition "%s"' % tag_id)
-                self.enforce_tag_authz('write', subject, tagdef)
-                self.txlog('SET', dataset=self.subject2identifiers(subject)[0], tag=tag_id, value=','.join(['%s' % val for val in self.tagvals[tag_id]]))
-                if self.tagvals[tag_id]:
-                    for value in self.tagvals[tag_id]:
-                        self.set_tag(subject, tagdef, value)
-                        if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ] and not tagdef.unique:
-                            for subfile in subfiles:
-                                self.enforce_tag_authz('write', subfile, tagdef)
-                                self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id, value=value)
-                                self.set_tag(subfile, tagdef, value)
-                else:
-                    self.set_tag(subject, tagdef)
-                    if tag_id not in ['Image Set', 'contains', 'vcontains', 'list on homepage', 'key', 'check point offset' ] and not tagdef.unique:
-                        for subfile in subfiles:
-                            self.enforce_tag_authz('write', subfile, tagdef)
-                            self.txlog('SET', dataset=self.subject2identifiers(subfile)[0], tag=tag_id)
-                            self.set_tag(subfile, tagdef)
-
-            
-        return None
-
-    def put_postCommit(self, results):
-        self.emit_headers()
-        return ''
 
     def PUT(self, uri):
         try:
             content_type = web.ctx.env['CONTENT_TYPE'].lower()
         except:
             content_type = 'text/plain'
+
+        # we may modify these below...
+        subjpreds, listpreds, ordertags = self.path[-1]
 
         if content_type == 'application/json':
             try:
@@ -1091,10 +1018,14 @@ class FileTags (Node):
                     vals = tagvals[tag]
                 vals.append(val)
 
-            subjpreds, listpreds, ordertags = self.path[-1]
             for tag, vals in tagvals.items():
                 listpreds.append( web.Storage(tag=tag,op='=', vals=vals) )
-        return self.dbtransact(self.put_body, self.put_postCommit)
+
+        # engage special patterned update mode using 'id' as correlation and False as subjects_iter to signal a path-based subjects query
+        subjpreds.append( web.Storage(tag='id', op=None, vals=[]) )
+        self.bulk_update_transact(False, on_missing='abort', on_existing='merge')
+        web.ctx.status = '204 No Content'
+        return ''
 
     def delete_body(self, previewOnly=False):
         subjpreds, origlistpreds, ordertags = self.path[-1]
@@ -1222,7 +1153,8 @@ class FileTags (Node):
         self.path[-1] = (subjpreds, listpreds, ordertags)
 
         if action == 'put':
-            return self.dbtransact(self.put_body, self.post_postCommit)
+            self.PUT(uri)
+            return self.post_postCommit(None)
         elif action == 'delete':
             return self.dbtransact(self.delete_body, self.post_postCommit)
         else:
