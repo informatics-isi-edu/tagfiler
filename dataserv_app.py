@@ -2812,43 +2812,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 return 'NULL'
 
-        def body2patterned():
-            """Load input table using query path pattern only.
-
-               This only gets called with an 'id' based update and updates encoded in self.path
-
-            """
-            table = wraptag(self.input_tablename, '', '')
-
-            # compute subject IDs for in_id via spreds subquery
-            squery, svalues = self.build_files_by_predlist_path([ (spreds,
-                                                                   [ web.Storage(tag="id", op=None, vals=[]) ],
-                                                                   []) ],
-                                                                versions=self.versions,
-                                                                enforce_read_authz=enforce_read_authz)
-            
-            # initialize other in_* columns via self.lpreds assignment patterns
-            in_colnames = []
-            in_constants = []
-            for td in self.input_column_tds:
-                vals = set()
-                if td.tagname in self.lpreds:
-                    for pred in self.lpreds[td.tagname]:
-                        if pred.op == '=':
-                            vals.update(set(pred.vals))
-                        elif pred.op == None:
-                            pass
-                        else:
-                            raise BadRequest(self, 'Patterned bulk tag update does not support predicate operator "%s" for list predicates.' % pred.op )
-
-                    in_colnames.append( wraptag(td.tagname, '', 'in_') )
-                    in_constants.append( wrapped_constant(td, list(vals)) )
-
-            # put it all together... each row composes in_id from subquery and other in_* constants from lpreds
-            self.dbquery('INSERT INTO %(table)s ("in_id", %(in_colnames)s) SELECT "id", %(in_constants)s FROM (%(squery)s) s'
-                         % dict(table=table, in_colnames=', '.join(in_colnames), in_constants=', '.join(in_constants), squery=squery), 
-                         svalues)
-
         def body2tabular():
             """Load input stream into input table and validate content.
 
@@ -2885,9 +2848,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if bool(getParamEnv('bulk tmp index', False)):
                 self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( id )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
                                                                                    intable=wraptag(self.input_tablename, '', '')))
-            if bool(getParamEnv('bulk tmp analyze', False)):
-                self.dbquery('ANALYZE %s' % wraptag(self.input_tablename, '', ''))
-                #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() ID index created' % (self.input_tablename))
+            #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() ID index created' % (self.input_tablename))
 
             # TODO: test input data against input constraints, aborting on conflict (L)
             # -- test in python during preceding insert loop?  or compile one SQL test?
@@ -2918,13 +2879,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                5. Update tagdef metadata summarizing column updates (for each column update)
             """
             
+            if bool(getParamEnv('bulk tmp analyze', False)):
+                self.dbquery('ANALYZE %s' % wraptag(self.input_tablename, '', ''))
+
             # get policy-remapping info if a rule exists
             remap, dstrole, readusers, writeusers = self.getPolicyRule()
             
             # query result will be table of all readable subjects matching spreds
             # and containing all spred and lpred columns, with array cells for multivalue
             equery, evalues = self.build_files_by_predlist_path([ (spreds,
-                                                                   [web.Storage(tag=td.tagname, op=None, vals=[]) for td in self.input_column_tds],
+                                                                   subject_iter != False 
+                                                                   and [web.Storage(tag=tag, op=None, vals=[]) for tag in set([ p.tag for p in spreds ])]
+                                                                   or [],
                                                                    []) ],
                                                                 versions=self.versions,
                                                                 enforce_read_authz=enforce_read_authz)
@@ -2933,17 +2899,39 @@ class Application (webauthn2_handler_factory.RestHandler):
             intable = wraptag(self.input_tablename, '', '')
             
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
-            assigns = ', '.join([ 'writeok = e.writeok',
-                                  'id = e.id',
-                                  'is_owner = CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.context.attributes ]) ])
+            assigns = [ ('writeok', 'e.writeok'),
+                        ('id', 'e.id'),
+                        ('is_owner', 'CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.context.attributes ])) ]
 
-            # join the subjects table to the input table on all spred tags which are unique or are name/version
-            wheres = [ '%s = e.%s' % (wraptag(td.tagname, '', "in_"), wraptag(td.tagname, '', ''))
-                       for td in [ self.globals['tagdefsdict'][tag] for tag in self.spreds.keys() ]
-                       if td.unique or td.tagname in [ 'name', 'version' ] ]
-            wheres = ' AND '.join(wheres)
+            if subject_iter == False:
+                # we're loading subjects for a pattern-based bulk-tag, so need to set static psuedo-input values
+                for td in self.input_column_tds:
+                    vals = set()
+                    if td.tagname in self.lpreds:
+                        for pred in self.lpreds[td.tagname]:
+                            if pred.op == '=':
+                                vals.update(set(pred.vals))
+                            elif pred.op == None:
+                                pass
+                            else:
+                                raise BadRequest(self, 'Patterned bulk tag update does not support predicate operator "%s" for list predicates.' % pred.op )
 
-            equery = 'UPDATE %(intable)s AS i SET %(assigns)s FROM ( %(equery)s ) AS e WHERE %(wheres)s' % dict(intable=intable, assigns=assigns, equery=equery, wheres=wheres)
+                            assigns.append( (wraptag(td.tagname, '', 'in_'),
+                                             wrapped_constant(td, list(vals))) )
+
+                cols = ', '.join([ lhs for lhs, rhs in assigns ])
+                vals = ', '.join([ rhs for lhs, rhs in assigns ])
+                equery = ('INSERT INTO %(intable)s (%(cols)s) SELECT %(vals)s FROM ( %(equery)s ) AS e' 
+                          % dict(intable=intable, cols=cols, vals=vals, equery=equery))
+            else:
+                # we're joining subjects against input already loaded from client
+                # join the subjects table to the input table on all spred tags which are unique or are name/version
+                wheres = [ '%s = e.%s' % (wraptag(td.tagname, '', "in_"), wraptag(td.tagname, '', ''))
+                           for td in [ self.globals['tagdefsdict'][tag] for tag in self.spreds.keys() ]
+                           if td.unique or td.tagname in [ 'name', 'version' ] ]
+                wheres = ' AND '.join(wheres)
+                assigns = ', '.join([ '%s = %s' % (lhs, rhs) for lhs, rhs in assigns])
+                equery = 'UPDATE %(intable)s AS i SET %(assigns)s FROM ( %(equery)s ) AS e WHERE %(wheres)s' % dict(intable=intable, assigns=assigns, equery=equery, wheres=wheres)
 
             self.dbquery(equery, evalues)
 
@@ -3202,7 +3190,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             # run under one unified transaction scoping our temporary table
             def unified_body():
                 body1()
-                body2patterned()
                 return body3()
             self.dbtransact(unified_body, lambda x: x)
         else:
