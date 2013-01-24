@@ -1338,7 +1338,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         except (ValueError, IndexError):
             # client is unauthenticated but require_client and/or require_attributes is enabled
             acceptTypes = self.acceptTypesPreferedOrder()
-            if acceptTypes and acceptTypes[0] == 'text/html':
+            if acceptTypes and (acceptTypes[0] == 'text/html' or acceptTypes[0] == '*/*'):
                 # render a page allowing AJAX login?
                 self.login_required = True
             else:
