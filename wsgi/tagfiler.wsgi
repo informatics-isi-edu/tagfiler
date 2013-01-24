@@ -105,6 +105,7 @@ class Dispatcher:
         ast.last_log_time = start_time
         
         try:
+            #web.debug(('env',web.ctx.env))
             ast.preDispatch(uri)
         except dataserv_app.WebException, e:
             if hasattr(e, 'detail'):
