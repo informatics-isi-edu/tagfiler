@@ -143,7 +143,7 @@ global_env = merge_config(jsonFileName='tagfiler-config.json',
                           )
 
 webauthn2_config = global_env.get('webauthn2', dict(web_cookie_name='tagfiler'))
-webauthn2_config.update(dict(web_cookie_path='/tagfiler/'))
+webauthn2_config.update(dict(web_cookie_path='/tagfiler'))
 
 webauthn2_manager = Manager(overrides=webauthn2_config)
 webauthn2_handler_factory = RestHandlerFactory(manager=webauthn2_manager)
