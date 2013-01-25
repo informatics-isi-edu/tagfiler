@@ -758,7 +758,10 @@ class Tagdef (Node):
                             unique = storage['unique-%s' % (key[4:])]
                         except:
                             unique = 'false'
-                        self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, downcast_value('boolean', multivalue), downcast_value('boolean', unique))
+                        try:
+                            self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, downcast_value('boolean', multivalue), downcast_value('boolean', unique))
+                        except ValueError, e:
+                            raise BadRequest(self, data=str(e))
             try:
                 self.tag_id = storage.tag
             except:

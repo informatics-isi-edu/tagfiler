@@ -411,11 +411,7 @@ def wrapval(value, dbtype=None, range_extensions=False):
         return 'NULL'
     
     if dbtype:
-        try:
-            value = downcast_value(dbtype, value, range_extensions)
-        except:
-            web.debug('value "%s" failed to cast to type "%s"' % (value, dbtype))
-            raise
+        value = downcast_value(dbtype, value, range_extensions)
 
     if type(value) == tuple:
         return ( '%s' % wrapval(value[0], dbtype),
@@ -1200,8 +1196,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             dbtype = type['typedef dbtype']
             try:
                 key = downcast_value(dbtype, key)
-            except:
-                raise BadRequest(self, data='The key "%s" cannot be converted to type "%s" (%s).' % (key, type['typedef description'], dbtype))
+            except ValueError, e:
+                raise Conflict(self, data=str(e))
 
     def validatePolicyRule(self, rule, tagdef=None, subject=None):
         tagname = ''
@@ -1761,8 +1757,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.delete_tag(prevsubject, self.globals['tagdefsdict']['tags present'], 'latest with name')
             self.set_tag_lastmodified(web.Storage(id=previd), self.globals['tagdefsdict']['latest with name'])
         else:
-            self.dbquery('INSERT INTO %s (subject, tagname) VALUES (%s, %s)'
-                         % (wraptag('latest with name'), wrapval(next_latest_id, 'int8'), wrapval(name)))
+            try:
+                self.dbquery('INSERT INTO %s (subject, tagname) VALUES (%s, %s)'
+                             % (wraptag('latest with name'), wrapval(next_latest_id, 'int8'), wrapval(name)))
+            except ValueError, e:
+                raise Conflict(self, data=str(e))
 
         self.set_tag(subject, self.globals['tagdefsdict']['tags present'], 'latest with name')
         self.set_tag_lastmodified(web.Storage(id=next_latest_id), self.globals['tagdefsdict']['latest with name'])
@@ -1856,12 +1855,18 @@ class Application (webauthn2_handler_factory.RestHandler):
         if owner:
             tags.append( ('owner', owner) )
         if self.multivalue:
-            self.multivalue = downcast_value('boolean', self.multivalue)
+            try:
+                self.multivalue = downcast_value('boolean', self.multivalue)
+            except ValueError, e:
+                raise Conflict(self, data=str(e))
             tags.append( ('tagdef multivalue', self.multivalue) )
         else:
             tags.append( ('tagdef multivalue', False) )
         if self.is_unique:
-            self.is_unique = downcast_value('boolean', self.is_unique)
+            try:
+                self.is_unique = downcast_value('boolean', self.is_unique)
+            except ValueError, e:
+                raise Conflict(self, data=str(e))
             tags.append( ('tagdef unique', self.is_unique) )
         else:
             tags.append( ('tagdef unique', False) )
@@ -2131,8 +2136,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             def convert(v):
                 try:
                     return downcast_value(dbtype, v)
-                except:
-                    raise BadRequest(self, data='The value "%s" cannot be converted to stored type "%s".' % (v, dbtype))
+                except ValueError, e:
+                    raise Conflict(self, data=str(e))
 
             if value:
                 if type(value) in [ list, set ]:
@@ -2922,19 +2927,22 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 param_type = 'bool'
             if v != None:
-                if td.multivalue:
-                    if type(v) == list:
-                        return 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, param_type) for v in v ]), param_type)
-                    else:
-                        return 'ARRAY[ %s ]::%s[]' % (wrapval(v, param_type), param_type)
-                else:
-                    if type(v) == list:
-                        if v:
-                            return '%s::%s' % (wrapval(v[0], param_type), param_type)
+                try:
+                    if td.multivalue:
+                        if type(v) == list:
+                            return 'ARRAY[ %s ]::%s[]' % (','.join([ wrapval(v, param_type) for v in v ]), param_type)
                         else:
-                            return 'NULL'
+                            return 'ARRAY[ %s ]::%s[]' % (wrapval(v, param_type), param_type)
                     else:
-                        return '%s::%s' % (wrapval(v, param_type), param_type)
+                        if type(v) == list:
+                            if v:
+                                return '%s::%s' % (wrapval(v[0], param_type), param_type)
+                            else:
+                                return 'NULL'
+                        else:
+                            return '%s::%s' % (wrapval(v, param_type), param_type)
+                except ValueError, e:
+                    raise Conflict(self, data=str(e))
             else:
                 return 'NULL'
 
@@ -3493,7 +3501,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                         vq, vqvalues = self.build_files_by_predlist_path(path, versions=versions, values=values)
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
-                    vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+                    try:
+                        vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+                    except ValueError, e:
+                        raise Conflict(self, data=str(e))
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
                     constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
                     bounds = [ '(%s::%s, %s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vals if type(v) == tuple ]
@@ -3679,7 +3690,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                                 )
                     otagexprs[listas.get(td.tagname, td.tagname)] = expr
                     if json:
-                        selects.append('jsonfield(%s, val2json(%s))' % (wrapval(listas.get(td.tagname, td.tagname)), expr))
+                        try:
+                            selects.append('jsonfield(%s, val2json(%s))' % (wrapval(listas.get(td.tagname, td.tagname)), expr))
+                        except ValueError, e:
+                            raise Conflict(self, data=str(e))
                     else:
                         selects.append('%s AS %s' % (expr, wraptag(listas.get(td.tagname, td.tagname), prefix='')))
                         
