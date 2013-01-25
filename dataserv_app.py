@@ -3305,14 +3305,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                     return s[3:]
                 else:
                     return s
-            results = self.dbquery('SELECT * FROM %s WHERE updated = True' % intable)
-            for res in results:
-                if res.created:
-                    self.txlog2('CREATE', parts=dict([ (decode_name(k), v) for k, v in res.iteritems()
-                                                       if v != None and k not in [ 'updated', 'writeok', 'is_owner', 'created' ] ]))
-                else:
-                    self.txlog2('SET', parts=dict([ (decode_name(k), v) for k, v in res.iteritems()
-                                                    if v != None and k not in [ 'updated', 'writeok', 'is_owner', 'created' ] ]))
+            if bool(getParamEnv('log bulk details', False)):
+                results = self.dbquery('SELECT * FROM %s WHERE updated = True' % intable)
+                for res in results:
+                    if res.created:
+                        self.txlog2('CREATE', parts=dict([ (decode_name(k), v) for k, v in res.iteritems()
+                                                           if v != None and k not in [ 'updated', 'writeok', 'is_owner', 'created' ] ]))
+                    else:
+                        self.txlog2('SET', parts=dict([ (decode_name(k), v) for k, v in res.iteritems()
+                                                        if v != None and k not in [ 'updated', 'writeok', 'is_owner', 'created' ] ]))
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() subject timestamps updated' % (self.input_tablename))
 
