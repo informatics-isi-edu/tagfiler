@@ -3535,9 +3535,13 @@ class Application (webauthn2_handler_factory.RestHandler):
             if enforce_read_authz:
                 if tagdef.readok == False:
                     wheres = [ 'False' ]
-                elif tagdef.readpolicy == 'subjectowner':
-                    extra_tag_columns.add('owner')
-                    wheres.append( '"_owner".value IN (%s)' % rolekeys )
+                elif tagdef.readok == None:
+                    if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
+                        m['table'] += ' JOIN (SELECT subject FROM _owner WHERE value IN (%s)) is_owner USING (subject)' % rolekeys
+                    elif tagdef.readpolicy in [ 'subject', 'tagandsubject', 'tagorsubject' ]:
+                        m['table'] += (' JOIN (SELECT subject FROM _owner WHERE value IN (%s)' % rolekeys
+                                       + '     UNION'
+                                       + '     SELECT subject FROM "_read users" WHERE value IN (%s)) readok USING (subject)' % rolekeys)
 
             for tag in extra_tag_columns:
                 m['table'] += ' LEFT OUTER JOIN %s USING (subject)' % wraptag(tag)
