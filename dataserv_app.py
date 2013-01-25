@@ -3448,19 +3448,17 @@ class Application (webauthn2_handler_factory.RestHandler):
                 m['value'] = ', subject AS value'
                 valcol = 'subject'
             elif tagdef.tagname == 'readok':
-                extra_tag_columns.add('owner')
-                extra_tag_columns.add('read users')
-                m['table'] = 'resources'
-                valcol = '"_owner".value IN (%(rolekeys)s) OR "_read users".value IN (%(rolekeys)s)' % dict(rolekeys=rolekeys)
-                m['value'] = ', bool_or(%s) AS value' % valcol
-                m['group'] = 'GROUP BY subject'
+                m['table'] = ('(SELECT subject, True AS value FROM _owner WHERE value IN (%s) ' % rolekeys
+                              + ' UNION '
+                              + 'SELECT subject, True AS value FROM "_read users" WHERE value IN (%s)) s' % rolekeys)
+                valcol = 'value'
+                m['value'] = ', value' 
             elif tagdef.tagname == 'writeok':
-                extra_tag_columns.add('owner')
-                extra_tag_columns.add('write users')
-                m['table'] = 'resources'
-                valcol = '"_owner".value IN (%(rolekeys)s) OR "_write users".value IN (%(rolekeys)s)' % dict(rolekeys=rolekeys)
-                m['value'] = ', bool_or(%s) AS value' % valcol
-                m['group'] = 'GROUP BY subject'
+                m['table'] = ('(SELECT subject, True AS value FROM _owner WHERE value IN (%s) ' % rolekeys
+                              + ' UNION '
+                              + 'SELECT subject, True AS value FROM "_write users" WHERE value IN (%s)) s' % rolekeys)
+                valcol = 'value'
+                m['value'] = ', value' 
             elif tagdef.multivalue and final:
                 m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
                 m['group'] = 'GROUP BY subject'
