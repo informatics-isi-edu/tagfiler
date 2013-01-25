@@ -3305,6 +3305,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     return s[3:]
                 else:
                     return s
+
             if bool(getParamEnv('log bulk details', False)):
                 results = self.dbquery('SELECT * FROM %s WHERE updated = True' % intable)
                 for res in results:
