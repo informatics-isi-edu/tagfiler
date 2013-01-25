@@ -1027,76 +1027,8 @@ class FileTags (Node):
         web.ctx.status = '204 No Content'
         return ''
 
-    def delete_body(self, previewOnly=False):
-        subjpreds, origlistpreds, ordertags = self.path[-1]
-        
-        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
-        if unique == False:
-            versions = 'latest'
-        else:
-            # unique is True or None
-            versions = 'any'
-
-        listpreds =  [ web.Storage(tag=tag,op=None,vals=[]) for tag in ['id', 'Image Set', 'Study Type', 'view', 'name', 'version', 'incomplete'] ] + origlistpreds
-
-        simplepath = [ x for x in self.path ]
-        simplepath[-1] = ( simplepath[-1][0], [], [] )
-
-        self.path_modified = [ x for x in self.path ]
-        self.path_modified[-1] = (subjpreds, listpreds, ordertags)
-         
-        results = self.select_files_by_predlist_path(self.path_modified, versions=versions)
-        if len(results) == 0:
-            raise NotFound(self, data='subject matching "%s"' % path_linearize(simplepath, lambda x: x))
-        self.subjects = [ res for res in results ]
-
-        # find subfiles of all subjects which are tagged Image Set
-        path = [ ( subjpreds + [ web.Storage(tag='Image Set', op='', vals=[]) ], [web.Storage(tag='vcontains',op=None,vals=[])], [] ),
-                 ( [], [web.Storage(tag='id',op=None,vals=[])], [] ) ]
-        self.subfiles = dict([ (res.id, res) for res in self.select_files_by_predlist_path(path=path) ])
-
-        for tag in set([pred.tag for pred in origlistpreds ]):
-            tagdef = self.globals['tagdefsdict'].get(tag, None)
-            if tagdef == None:
-                raise NotFound(self, 'tagdef="%s"' % tag)
-
-            if not previewOnly:
-                for subject in self.subjects:
-                    self.enforce_tag_authz('write', subject, tagdef)
-                    if tagdef.typestr == 'empty' and subject[tag]:
-                        vals = [None]
-                    elif tagdef.multivalue:
-                        if subject[tag]:
-                            vals = subject[tag]
-                        else:
-                            vals = None
-                    elif subject[tag] == None:
-                        vals = None
-                    else:
-                        vals = [subject[tag]]
-
-                    if vals:
-                        self.txlog('DELETE', dataset=self.subject2identifiers(subject)[0], tag=tag, value=((vals[0]!=None) and ','.join([u'%s' % val for val in vals])) or None)
-                        for val in vals:
-                            self.delete_tag(subject, tagdef, val)
-            
-                        if tag in [ 'read users', 'write users' ]:
-                            for subfile in self.subfiles.values():
-                                self.enforce_tag_authz('write', subfile, tagdef)
-                                self.txlog('DELETE', dataset=self.subject2identifiers(subfile)[0], tag=tag, value=((vals[0]!=None) and ','.join([u'%s' % val for val in vals])) or None)
-                                for val in vals:
-                                    self.delete_tag(subfile, tagdef, val)
-                    else:
-                        self.txlog('DELETE NONE MATCH', dataset=self.subject2identifiers(subject)[0], tag=tag)
-
-        if not previewOnly and not self.referer:
-            if len(self.subjects) == 1:
-                # set updated referer based on single match
-                self.referer = '/tags/' + self.subject2identifiers(self.subjects[0])[0]
-            else:
-                # for multi-subject results, redirect to subjpreds, which may no longer work but never happens in GUI
-                self.referer = '/tags/' + path_linearize(simplepath)
-            
+    def delete_body(self):
+        self.bulk_delete_tags()
         return None
 
     def delete_postCommit(self, results):

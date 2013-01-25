@@ -2491,6 +2491,8 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         self.accum_table_changes(table, count)
 
+        return count
+
     def mergepreds(self, predlist, tagdefs=None):
         """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
 
@@ -2524,6 +2526,121 @@ class Application (webauthn2_handler_factory.RestHandler):
             preds.sort(key=lambda p: (p.op, p.vals))
 
         return pd
+
+    def bulk_delete_tags(self, path=None, versions=None):
+        subjpreds, origlistpreds, ordertags = self.path[-1]
+        
+        unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=subjpreds)
+        if unique == False:
+            versions = 'latest'
+        else:
+            # unique is True or None
+            versions = 'any'
+
+        lpreds = self.mergepreds(origlistpreds)
+        dtags = lpreds.keys()
+        dtagdefs = []
+
+        # screen early for statically forbidden requests or not-found tagdefs
+        for tag in dtags:
+            try:
+                td = self.globals['tagdefsdict'][tag]
+                dtagdefs.append(td)
+            except KeyError:
+                raise Conflict(self, 'Tag "%s" not defined on this server.' % tag)
+
+            if td.writeok == False:
+                raise Forbidden(self, 'write to tag "%s"' % tag)
+
+        # topologically sort tagdefs based on tagref linkage
+        def td_cmp(td1, td2):
+            def ancestors(td):
+                a = set()
+                while td.tagref:
+                    td = self.globals['tagdefsdict'][td.tagref]
+                    a.add(td)
+                return a
+
+            def depends(td1, td2):
+                if td2 in ancestors(td1):
+                    return -1
+                elif td1 in ancestors(td2):
+                    return 1
+                else:
+                    return 0
+
+        dtagdefs.sort(cmp=td_cmp)
+                
+        def coltype(tag):
+            td = self.globals['tagdefsdict'][tag]
+
+            if td.multivalue:
+                suffix = '[]'
+            else:
+                suffix = ''
+
+            if td.typestr == 'empty':
+                dbtype = 'boolean'
+            else:
+                dbtype = td.dbtype
+
+            return '%s%s' % (dbtype, suffix)
+
+        # perform deletions in topological order so metadata updates are final including any cascading deletes
+        # TODO BUG: what about implicitly deleted tags not part of the client request?
+        #   need to invert the tagref graph and anticipate deletes in order to update metadata for those too!
+        for td in dtagdefs:
+            tag = td.tagname
+            tags = ['id', 'owner', 'writeok', tag]
+
+            # build a query matching original subjects plus the extra lpreds constraints for this tag
+            tagpath = list(self.path)
+            tagpath[-1] = ( subjpreds + lpreds[tag], lpreds[tag], [] )
+            dquery, dvalues = self.build_files_by_predlist_path(tagpath, versions=versions)
+    
+            tagpath[-1] = ( subjpreds + [web.Storage(tag=tag,op=None,vals=[])], [], [] )
+            dquerybrief, dvaluesbrief = self.build_files_by_predlist_path(tagpath, versions=versions)
+
+            if td.writeok == None:
+                # need to test permissions on per-subject basis for this tag before deleting triples
+                if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject' ]:
+                    count = self.dbquery('SELECT count(*) AS count FROM (%s) s WHERE NOT writeok' % dquerybrief, vars=dvaluesbrief)[0].count
+                    if count > 0:
+                        raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
+                elif td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
+                    count = self.dbquery(('SELECT count(*) AS count'
+                                          + ' FROM ( %(dquery)s ) s'
+                                          + ' WHERE NOT CASE'
+                                          + '              WHEN ARRAY[ %(roles)s ]::text[] @> ARRAY[ owner ]::text[] THEN True'
+                                          + '              ELSE False'
+                                          + '           END')
+                                         % dict(dquery=dquerybrief,
+                                                roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                         vars=dvaluesbrief)[0].count
+                    if count > 0:
+                        raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
+
+            # delete tuples from graph and update metadata
+            self.delete_tag_intable(td, '(%s) s' % dquery, 'id', wraptag(tag, '', ''))
+
+            self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+                                    ('(SELECT DISTINCT subject'
+                                     + ' FROM "_tags present" p'
+                                     + ' JOIN ( %(dquery)s ) d ON (p.subject = d.id)'
+                                     + ' WHERE p.value = %(tagname)s'
+                                     + ' EXCEPT SELECT subject FROM %(tagtable)s) s')
+                                    % dict(dquery=dquerybrief, tagname=wrapval(tag), tagtable=wraptag(tag)),
+                                    idcol='subject', 
+                                    valcol=wrapval(tag) + '::text', unnest=False)
+
+            for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                              ('subject last tagged txid', 'txid_current()') ]:
+                self.set_tag_intable(self.globals['tagdefsdict'][tag], '(%s)' % dquery,
+                                     idcol='id', valcol=val, flagcol=None,
+                                     wokcol='dummy', isowncol='dummy',
+                                     enforce_tag_authz=False, set_mode='merge')
+
+            self.set_tag_lastmodified(None, td)
 
     def bulk_delete_subjects(self, path=None, versions='latest'):
 
