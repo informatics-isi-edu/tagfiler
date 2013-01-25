@@ -3358,7 +3358,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if len(res) == 0:
                 return value
 
-    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None, json=False):
+    def build_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=True, unnest=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3460,8 +3460,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.multivalue and final:
-                m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
-                m['group'] = 'GROUP BY subject'
+                if unnest == tagdef.tagname:
+                    m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
+                else:
+                    m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
+                    m['group'] = 'GROUP BY subject'
             elif tagdef.typestr != 'empty':
                 m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
 
@@ -3579,11 +3582,13 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            if final and not json:
+            if final and not json and builtins:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
-                                    web.storage(tag='id', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
+                
+            if enforce_read_authz and final and not json:
+                spreds.append( web.Storage(tag='readok', op='=', vals=[True]) )
                 
             spreds = self.mergepreds(spreds, tagdefs)
             lpreds = self.mergepreds(lpreds, tagdefs)
@@ -3598,6 +3603,12 @@ class Application (webauthn2_handler_factory.RestHandler):
             selects = []
             inner = []
             outer = []
+
+            if 'id' not in lpreds and 'id' not in spreds:
+                if json:
+                    selects.append("jsonfield('id', val2json(subject))")
+                else:
+                    selects.append("subject AS id")
 
             versions_test_added = []
             if versions == 'latest':
@@ -3616,7 +3627,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     inner.append(sq)
 
-            if enforce_read_authz:
+            if enforce_read_authz and json or not final:
                 outer.append( '(SELECT subject FROM "_owner" WHERE value IN (%(rolekeys)s)) AS o' % dict(rolekeys=rolekeys) )
                 outer.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys=rolekeys) )
                 subject_wheres.append( 'o.subject IS NOT NULL OR ru.subject IS NOT NULL' )
