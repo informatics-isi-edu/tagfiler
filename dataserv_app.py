@@ -202,6 +202,7 @@ def downcast_value(dbtype, value, range_extensions=False):
             m = re.match('(?P<years>[0-9]{4})-(?P<months>[0-9]{2})-(?P<days>[0-9]{2}) *T *(?P<hours>[0-9]{2}):(?P<minutes>[0-9]{2}):(?P<seconds>[0-9]{2}(.[0-9]+)?)',
                          interval)
             if m:
+                # these casts to float work because the regexp above only matches decimal digits
                 g = dict([ (k, float(v)) for k, v in m.groupdict().items() if v != None ])
             else:
                 # assume ISO 8601 period with designators notation yY mM dD T hH mM sS
@@ -216,8 +217,8 @@ def downcast_value(dbtype, value, range_extensions=False):
                 if len(parts) > 2:
                     raise ValueError('Value %s not a valid ISO 8601 time period with designators.' % value)
 
+                # these casts to float work because the regexp only matches decimal digits
                 g = dict([ (dict(Y='years', M='months', W='weeks', D='days')[k], float(v)) for v, k in re.findall('([.0-9]+) *([YMWD])', datepart) ])
-
                 g.update(dict([ (dict(H='hours', M='minutes', S='seconds')[k], float(v)) for v, k in re.findall('([.0-9]+) *([HMS])', timepart) ]))
 
             if g.has_key('seconds'):
@@ -232,17 +233,25 @@ def downcast_value(dbtype, value, range_extensions=False):
             raise ValueError('Value %s not a valid ISO 8601 time period.' % value)
 
     elif dbtype == 'int8':
-        value = int(value)
+        try:
+            value = int(value)
+        except:
+            raise ValueError('Value %s cannot be coerced to integer' % str(value))
 
     elif dbtype == 'float8':
-        value = float(value)
+        try:
+            value = float(value)
+        except:
+            raise ValueError('Value %s cannot be coerced to floating point' % str(value))
 
     elif dbtype in [ 'date', 'timestamptz' ]:
-        if value == 'now':
-            value = datetime.datetime.now(pytz.timezone('UTC'))
-        elif type(value) in [ str, unicode ]:
-            value = dateutil.parser.parse(value)
-
+        try:
+            if value == 'now':
+                value = datetime.datetime.now(pytz.timezone('UTC'))
+            elif type(value) in [ str, unicode ]:
+                value = dateutil.parser.parse(value)
+        except:
+            raise ValueError('Value %s cannot be coerced to %s' % (value, dbtype))
     else:
         pass
 
