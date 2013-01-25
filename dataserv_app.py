@@ -2485,27 +2485,23 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     def delete_tag_intable(self, tagdef, intable, idcol, valcol, unnest=True):
         table = wraptag(tagdef.tagname)
-        dwheres = [ 'd.subject = i.subject' ]
-        iselects = [ '%s AS subject' % idcol ]
+        dcols = [ 'd.subject' ]
+        icols = [ idcol ]
+
         if valcol:
             if tagdef.multivalue and unnest:
                 valcol = 'unnest(%s)' % valcol
-            dwheres.append( 'd.value = i.value' )
-            iselects.append( '%s AS value' % valcol )
+            dcols.append( 'd.value' )
+            icols.append( valcol )
 
         sql = (('DELETE FROM %(table)s AS d'
-                + ' USING (SELECT %(iselects)s FROM %(intable)s) AS i'
-                + ' WHERE %(dwheres)s'
-                + ' RETURNING d.subject')
-               % dict(table=table, intable=intable,
-                      iselects=','.join(iselects),
-                      dwheres=' AND '.join(dwheres)))
+                + ' WHERE ROW( %(dcols)s )'
+                + '       NOT IN'
+                + '       (SELECT %(icols)s FROM %(intable)s)')
+               % dict(table=table, intable=intable, dcols=','.join(dcols), icols=','.join(icols)))
 
-        count = len(self.dbquery(sql))
-
-        self.accum_table_changes(table, count)
-
-        return count
+        #traceInChunks(sql)
+        self.dbquery(sql)
 
     def mergepreds(self, predlist, tagdefs=None):
         """Reorganize predlist into a map keyed by tag, listing all preds that constrain each tag.
