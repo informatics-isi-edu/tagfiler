@@ -3586,6 +3586,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
+                if 'id' not in lpreds:
+                    lpreds.append( web.Storage(tag='id', op=None, vals=[]) )
 
             if enforce_read_authz and final and not json:
                 spreds.append( web.Storage(tag='readok', op='=', vals=[True]) )
