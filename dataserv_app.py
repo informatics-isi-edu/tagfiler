@@ -2606,10 +2606,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             # build a query matching original subjects plus the extra lpreds constraints for this tag
             tagpath = list(self.path)
             tagpath[-1] = ( subjpreds + lpreds[tag], lpreds[tag], [] )
-            dquery, dvalues = self.build_files_by_predlist_path(tagpath, versions=versions)
+            dquery, dvalues = self.build_files_by_predlist_path(tagpath, versions=versions, builtins=False, unnest=tag)
     
-            tagpath[-1] = ( subjpreds + [web.Storage(tag=tag,op=None,vals=[])], [], [] )
-            dquerybrief, dvaluesbrief = self.build_files_by_predlist_path(tagpath, versions=versions)
+            tagpathbrief = list(self.path)
+            tagpathbrief[-1] = ( subjpreds, [], [] )
+            dquerybrief, dvaluesbrief = self.build_files_by_predlist_path(tagpathbrief, versions=versions)
 
             if td.writeok == None:
                 # need to test permissions on per-subject basis for this tag before deleting triples
@@ -2631,21 +2632,20 @@ class Application (webauthn2_handler_factory.RestHandler):
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
 
             # delete tuples from graph and update metadata
-            self.delete_tag_intable(td, '(%s) s' % dquery, 'id', wraptag(tag, '', ''))
+            self.delete_tag_intable(td, '(%s) s' % dquery, 'id', wraptag(tag, '', ''), unnest=False)
 
             self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
-                                    ('(SELECT DISTINCT subject'
+                                    ('(SELECT subject, value'
                                      + ' FROM "_tags present" p'
-                                     + ' JOIN ( %(dquery)s ) d ON (p.subject = d.id)'
                                      + ' WHERE p.value = %(tagname)s'
-                                     + ' EXCEPT SELECT subject FROM %(tagtable)s) s')
-                                    % dict(dquery=dquerybrief, tagname=wrapval(tag), tagtable=wraptag(tag)),
+                                     + ' EXCEPT SELECT subject, %(tagname)s FROM %(tagtable)s) s')
+                                    % dict(tagname=wrapval(tag), tagtable=wraptag(tag)),
                                     idcol='subject', 
                                     valcol=wrapval(tag) + '::text', unnest=False)
 
             for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                               ('subject last tagged txid', 'txid_current()') ]:
-                self.set_tag_intable(self.globals['tagdefsdict'][tag], '(%s)' % dquery,
+                self.set_tag_intable(self.globals['tagdefsdict'][tag], '(%s)' % dquerybrief,
                                      idcol='id', valcol=val, flagcol=None,
                                      wokcol='dummy', isowncol='dummy',
                                      enforce_tag_authz=False, set_mode='merge')
@@ -3586,7 +3586,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
-                
+
             if enforce_read_authz and final and not json:
                 spreds.append( web.Storage(tag='readok', op='=', vals=[True]) )
                 
