@@ -17,7 +17,6 @@
 RELEASE=$(shell svn info  | grep "Revision:" | awk  '{print $$2}')
 
 INSTALLSVC=tagfiler
-APPLETBUILD=../dei_applet-trunk
 
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
@@ -116,7 +115,7 @@ $(HOME)/.tagfiler.predeploy:
 	touch $(HOME)/.tagfiler.predeploy
 
 deploy: $(HOME)/.tagfiler.predeploy install
-	./deploy.sh $(INSTALLSVC) $(APPLETBUILD)
+	./deploy.sh $(INSTALLSVC)
 	./register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
@@ -140,7 +139,7 @@ restart: force install
 	service httpd restart
 
 deployPSOC: $(HOME)/.tagfiler.predeploy installPSOC
-	./deploy.sh $(INSTALLSVC) $(APPLETBUILD) psoc-pilot
+	./deploy.sh $(INSTALLSVC) psoc-pilot
 
 installPSOC: install
 	make --no-print-directory -f psoc/Makefile install

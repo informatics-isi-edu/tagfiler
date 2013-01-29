@@ -42,8 +42,7 @@ TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get
 # this is the URL base path of the service
 SVCPREFIX=${1:-tagfiler}
 
-APPLETBUILD=${2}
-DEMO=${3}
+DEMO=${2}
 
 # you can set this to override...
 HOME_HOST=
@@ -190,36 +189,6 @@ signedjar=signed-isi-misd-tagfiler-upload-applet.jar
 namespace=edu/isi/misd/tagfiler/util
 props=tagfiler.properties
 
-
-if [[ -n "$APPLETBUILD" ]] \
-    && [[ -f "${APPLETBUILD}/lib/${signedjar}" ]] \
-    && [[ -f "${APPLETBUILD}/src/${namespace}/${props}" ]]
-then
-    mkdir -p /var/www/html/${SVCPREFIX}/static/${namespace}/
-    cp "${APPLETBUILD}/lib/${signedjar}" ${deploydir}
-    cp "${APPLETBUILD}/src/${namespace}/${props}" ${deploydir}/${namespace}/
-else
-    cat <<EOF
-Integration notes
--------------------------
-
-Could not find one of:
-   "${APPLETBUILD}/lib/${signedjar}"
-   "${APPLETBUILD}/src/${namespace}/${props}"
-
-You need to build a signed jar and do this manually:
-
-cp signed-isi-misd-tagfiler-upload-applet.jar \
-   /var/www/html/${SVCPREFIX}/static/
-
-cp tagfiler.properties \
-   /var/www/html/${SVCPREFIX}/static/edu/isi/misd/tagfiler/util
-
-chmod -R a+r /var/www/html/${SVCPREFIX}/static/*
-chmod -R a+r ${deploydir}
-
-EOF
-fi
 
 detect_service()
 {
