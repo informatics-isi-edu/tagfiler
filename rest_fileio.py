@@ -29,7 +29,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, jsonWriter
 from subjects import Subject
 
 # build a map of mime type --> primary suffix
@@ -631,10 +631,14 @@ class FileIO (Subject):
                 pass
             if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
-            if web.ctx.env.get('HTTP_REFERER', None) != None:
+            acceptType = self.preferredType()
+            if acceptType in ['text/html', '*/*']:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
                 return self.renderui(['tags'], {'url': url})
                 #raise web.seeother(url)
+            elif acceptType == 'application/json':
+                self.header('Content-Type', 'application/json')
+                return jsonWriter(self.subject)
             else:
                 url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
                 self.header('Location', uri)

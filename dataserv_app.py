@@ -1342,8 +1342,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.context = self.manager.get_request_context()
         except (ValueError, IndexError):
             # client is unauthenticated but require_client and/or require_attributes is enabled
-            acceptTypes = self.acceptTypesPreferedOrder()
-            if acceptTypes and ('text/html' in acceptTypes or '*/*' in acceptTypes):
+            acceptType = self.preferredType()
+            if acceptType in ['text/html', '*/*']:
                 # render a page allowing AJAX login?
                 self.login_required = True
             else:
@@ -1462,6 +1462,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                  sorted([ self.acceptPair(s) for s in accept.lower().split(',') ],
                         key=lambda pair: pair[0]) ]
 
+    def preferredType(self):
+        acceptTypes = self.acceptTypesPreferedOrder()
+        if acceptTypes:
+            for acceptType in acceptTypes:
+                if acceptType in [ 'text/html', '*/*', 'text/uri-list', 'application/x-www-form-urlencoded', 'text/csv', 'application/json', 'text/plain' ]:
+                    return acceptType
+        return None
+                           
     # a bunch of little database access helpers for this app, to be run inside
     # the dbtransact driver
 
