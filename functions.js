@@ -7070,11 +7070,11 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					label.html('Replace with:');
 					
 					var select = $('<select>');
-					div.append(select);
 					select.attr({'name': 'type',
 						'id': 'type'+tags['id'],
 						'onchange': "changeNameFormType('replace', '" + tags['id'] + "');"
 					});
+					div.append(select);
 					var option = $('<option>');
 					select.append(option);
 					option.text('blank (Dataset node for metadata-only)');
@@ -8602,10 +8602,10 @@ function renderQueryHTML() {
 	td.append(label);
 	label.html(' with');
 	var select = $('<select>');
-	td.append(select);
 	select.attr({'id': 'previewLimit',
 		'name': 'previewLimit',
 		'onchange': 'updatePreviewLimit()'});
+	td.append(select);
 	var option = $('<option>');
 	select.append(option);
 	option.text('10');
@@ -8837,10 +8837,10 @@ function renderQueryHTML() {
 	div.attr({'id': 'Query_Preview'});
 
 	select = $('<select>');
-	psoc.append(select);
 	select.attr({'id': 'versions',
 		'name': 'versions',
 		'onchange': 'showPreview()'});
+	psoc.append(select);
 	option = $('<option>');
 	select.append(option);
 	option.text('Show latest version if matches');
@@ -8942,11 +8942,11 @@ function createCustomDataset() {
 	div.append(label);
 	label.html('Select a type of dataset definition:');
 	var select = $('<select>');
-	div.append(select);
 	select.attr({'name': 'type',
 		'id': 'type',
 		'onchange': "changeNameFormType('create', '');"
 	});
+	div.append(select);
 	var option = $('<option>');
 	select.append(option);
 	option.text('blank (Dataset node for metadata-only)');
