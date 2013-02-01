@@ -186,6 +186,8 @@ dataset_complete()
          onclick="$1"
          shift   
          ;;
+      rname)
+         ;;
       *)
          echo "Unsupported dataset format: $*" >&2
          exit 1
@@ -396,7 +398,7 @@ tagdef_phase1()
          default=""
       fi
 
-      if [[ "$1" = "vname" ]] || [[ "$8" = true ]]
+      if [[ "$1" = "vname" ]] || [[ "$1" = "rname" ]] || [[ "$8" = true ]]
       then
          fk="UNIQUE"
       else
@@ -569,6 +571,7 @@ tagdef version               int8        ""         anonymous   system       fal
 tagdef name                  text        ""         anonymous   system       false
 tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
 tagdef vname                 text        ""         anonymous   system       false      ""         true
+tagdef rname                 text        ""         anonymous   anonymous    false      ""         true
 tagdef parentof              int8        ""         subject     subject      true       id
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
@@ -607,6 +610,7 @@ typedef type         text          'Scalar value type'             typedef
 typedef tagdef       text          'Tag definition'                tagdef
 typedef name         text          'Subject name'                  "latest with name"
 typedef vname        text          'Subject name@version'          vname
+typedef rname        text          'Resource name'          	   rname
 typedef config       text          'Study Type'                    config
 typedef view         text          'View name'                     view
 typedef 'template mode' text       'Template rendering mode'       ""                 'embedded Embedded in Tagfiler HTML' 'page Standalone document'
@@ -635,6 +639,7 @@ typedef()
 tagdef 'default view'        text        ""         subject     subject      false      view       ""       view
 tagdef contains              text        ""         subject     subject      true       name       ""       "latest with name"
 tagdef vcontains             text        ""         subject     subject      true       vname      ""       vname
+tagdef rcontains             text        ""         anonymous   anonymous    true       rname      ""       rname
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
 
