@@ -2504,7 +2504,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         sql = (('DELETE FROM %(table)s AS d'
                 + ' WHERE ROW( %(dcols)s )'
-                + '       NOT IN'
+                + '       IN'
                 + '       (SELECT %(icols)s FROM %(intable)s)')
                % dict(table=table, intable=intable, dcols=','.join(dcols), icols=','.join(icols)))
 
