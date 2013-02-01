@@ -29,7 +29,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter, getParamEnv
 
 myrand = random.Random()
 myrand.seed(os.getpid())
@@ -254,8 +254,9 @@ class Subject (Node):
 
         #self.log('TRACE', value='after deleting subjects')
 
-        for r in results:
-            self.txlog('DELETE', dataset='id=%d' % r.id)
+        if bool(getParamEnv('log bulk details', False)):
+            for r in results:
+                self.txlog('DELETE', dataset='id=%d' % r.id)
 
         #self.log('TRACE', value='after txlogging delete of subjects')
 
