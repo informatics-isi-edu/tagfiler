@@ -395,6 +395,9 @@ class Subject (Node):
         if not basefile or self.context.client != basefile['modified by'] or basefile.id != newfile.id:
             self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.context.client)
 
+        # show virtual tags in inverse mapping too
+        self.set_tag(newfile, self.globals['tagdefsdict']['tags present'], ['id', 'readok', 'writeok', 'tags present'])
+
         now = datetime.datetime.now(pytz.timezone('UTC'))
         maxage = myrand.uniform(3, 8)
 

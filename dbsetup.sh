@@ -865,6 +865,10 @@ INSERT INTO "_tags present" (subject, value)
         then
            cat <<EOF2
   UNION SELECT DISTINCT subject, '${tagname}' FROM "_${tagname}"
+  UNION SELECT subject, 'id' FROM resources
+  UNION SELECT subject, 'readok' FROM resources
+  UNION SELECT subject, 'writeok' FROM resources
+  UNION SELECT subject, 'tags present' FROM resources
 EOF2
         fi
     done)

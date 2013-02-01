@@ -2479,7 +2479,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             count = 0
 
             # update subject-tags mappings
-            if tagdef.tagname != 'tags present':
+            if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                 self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
                                         '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(tagdef.tagname),)
                                         + ' EXCEPT SELECT subject FROM %s) s' % table, 
@@ -3258,7 +3258,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   ('modified', '%s::timestamptz' % wrapval('now')),
                                   ('modified by', mod_val),
                                   ('read users', readusers_val),
-                                  ('write users', writeusers_val) ]:
+                                  ('write users', writeusers_val),
+                                  ('tags present', 'ARRAY[%s]::text[]' % ','.join([wrapval(t) for t in 'id', 'readok', 'writeok', 'tags present'])) ]:
                     self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
                                          idcol='id', valcol=val, flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
