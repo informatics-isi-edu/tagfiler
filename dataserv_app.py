@@ -3587,7 +3587,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            if final and not json and builtins:
+            if final and (not json) and builtins:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
