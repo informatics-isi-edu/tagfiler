@@ -24,7 +24,6 @@ from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden,
 from rest_fileio import FileIO, LogFileIO
 import subjects
 from subjects import Node
-import json
 import datetime
 
 jsonMungeTypes = set([ datetime.datetime, datetime.date ])
