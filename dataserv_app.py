@@ -2784,10 +2784,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                  + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
         for r in subject_tags:
             self.set_tag_lastmodified(None, self.globals['tagdefsdict'][r.tagname])
-            self.delete_tag_intable(self.globals['tagdefsdict'][r.tagname],
-                                    etable,
-                                    idcol='id', valcol=None,
-                                    unnest=True)
 
         #self.log('TRACE', value='after set_tag_lastmodified loop')
         
