@@ -3610,12 +3610,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             inner = []
             outer = []
 
-            if 'id' not in lpreds and 'id' not in spreds:
-                if json:
-                    selects.append("jsonfield('id', val2json(subject))")
-                else:
-                    selects.append("subject AS id")
-
             versions_test_added = []
             if versions == 'latest':
                 subject_wheres.append( '%s.subject IS NULL OR %s.subject IS NOT NULL'
