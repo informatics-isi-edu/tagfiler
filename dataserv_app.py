@@ -3587,12 +3587,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
+            if 'id' not in lpreds:
+                lpreds.append( web.Storage(tag='id', op=None, vals=[]) )
             if final and (not json) and builtins:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
                                     web.storage(tag='owner', op=None, vals=[]) ]
-                if 'id' not in lpreds:
-                    lpreds.append( web.Storage(tag='id', op=None, vals=[]) )
 
             if enforce_read_authz and final and not json:
                 spreds = spreds + [ web.Storage(tag='readok', op='=', vals=[True]) ]
