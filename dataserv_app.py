@@ -2286,6 +2286,34 @@ class Application (webauthn2_handler_factory.RestHandler):
         table = wraptag(tagdef.tagname)
         count = 0
 
+        if tagdef.tagref:
+            # need to validate referential integrity of user input
+            targettagdef = self.globals['tagdefsdict'][tagdef.tagref]
+
+            if tagdef.multivalue and unnest:
+                refval = 'unnest(%s)' % valcol
+            else:
+                refval = valcol
+
+            if tagdef.tagref == 'id':
+                targetval = 'subject'
+                targettable = 'resources'
+            elif tagdef.tagref in [ 'readok', 'writeok' ]:
+                targetval = 'column1'
+                targettable = '(VALUES (True), (False))'
+            else:
+                targetval = 'value'
+                targettable = wraptag(tagdef.tagref)
+
+            undefined = self.dbquery(('SELECT value'
+                                           + ' FROM (SELECT %(refval)s AS value FROM %(intable)s s'
+                                           + '       EXCEPT'
+                                           + '       SELECT %(targetval)s AS value FROM %(targettable)s s) s LIMIT 5')
+                                     % dict(refval=refval, intable=intable, targetval=targetval, targettable=targettable))
+            if len(undefined) > 0:
+                undefined = ','.join([ str(r.value) for r in undefined ])
+                raise Conflict(self, 'Provided value or values "%s"=(%s) are not valid references to tag "%s".' % (tagdef.tagname, undefined, tagdef.tagref))
+
         if tagdef.multivalue:
             # multi-valued tags are straightforward set-algebra on triples
             
