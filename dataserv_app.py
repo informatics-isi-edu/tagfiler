@@ -2641,7 +2641,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # build a query matching original subjects plus the extra lpreds constraints for this tag
             tagpath = list(self.path)
-            tagpath[-1] = ( subjpreds + lpreds[tag], lpreds[tag], [] )
+            tagpath[-1] = ( subjpreds + lpreds[tag], lpreds[tag] + [web.storage(tag='id', op=None, vals=[])], [] )
             dquery, dvalues = self.build_files_by_predlist_path(tagpath, versions=versions, builtins=False, unnest=tag)
     
             tagpathbrief = list(self.path)
