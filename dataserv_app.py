@@ -2988,22 +2988,60 @@ class Application (webauthn2_handler_factory.RestHandler):
                     self.dbquery(('INSERT INTO %(table)s ( %(columns)s ) VALUES ' % dict(table=table,columns=columns))
                                  + ','.join(tuples))
             
-            for subject in subject_iter:
-                values = []
+            if hasattr(subject_iter, 'read'):
+                # assume this is the user input stream in CSV format
 
-                # build up execute statement w/ subject values
-                for i in range(0, len(self.input_column_tds)):
-                    td = self.input_column_tds[i]
-                    v = subject.get(td.tagname, None)
-                    values.append( wrapped_constant(td, v) )
+                # build column list in original URI predlist order, 
+                # since self.spreds and self.lpreds may be reordered due to using set operations
+                # use each column in order of first appearence in case duplicates are present
+                got_cols = set()
+                csv_cols = []
+                for pred in spreds + lpreds:
+                    if pred.tag not in got_cols:
+                        csv_cols.append(pred.tag)
+                        got_cols.add(pred.tag)
+                csv_cols = ', '.join([ wraptag(tag, '', 'in_') for tag in csv_cols ])
 
-                tuples.append( '( %s )' % (', '.join(values)) )
+                # drill down to psycopg2 cursor's efficient csv input handler
+                try:
+                    self.db._db_cursor().copy_expert("COPY %(table)s (%(columns)s) FROM STDIN CSV DELIMITER ','"
+                                                     % dict(table=table, columns=csv_cols),
+                                                     subject_iter,
+                                                     int(self.config['chunk bytes']))
+                except psycopg2.DataError, ev:
+                    # couldn't parse the input CSV
+                    m = re.match('(?P<msg>.*)\s*CONTEXT:[\s]*COPY input_[^,]*, line (?P<line>[0-9]*), column in_(?P<column>[^:]*): "(?P<value>.*)"[\s]*', str(ev))
+                    if m:
+                        msg = 'Bad CSV input for column "%(column)s", line %(line)s, value "%(value)s": %(msg)s' % m.groupdict()
+                    else:
+                        et, ev, tb = sys.exc_info()
+                        web.debug('got exception "%s" peforming CSV copy_from()' % str(ev),
+                                  traceback.format_exception(et, ev, tb))
+                        msg = 'Unknown error processing CSV input.'
+                    raise Conflict(self, msg)
+                except:
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception "%s" peforming CSV copy_from()' % str(ev),
+                              traceback.format_exception(et, ev, tb))
+                    raise
+            else:
+                # assume this is an iterable subject set
+                for subject in subject_iter:
+                    values = []
 
-                if len(tuples) > 200:
-                    insert_tuples(tuples)
-                    tuples = []
+                    # build up execute statement w/ subject values
+                    for i in range(0, len(self.input_column_tds)):
+                        td = self.input_column_tds[i]
+                        v = subject.get(td.tagname, None)
+                        values.append( wrapped_constant(td, v) )
 
-            insert_tuples(tuples)
+                    tuples.append( '( %s )' % (', '.join(values)) )
+
+                    if len(tuples) > 200:
+                        insert_tuples(tuples)
+                        tuples = []
+
+                insert_tuples(tuples)
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() input stored' % (self.input_tablename))
 
@@ -3365,7 +3403,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 return self.dbtransact(body3, lambda x: x)
             finally:
                 # always clean up input table if we created one successfully in body1
-                self.dbtransact(body1compensation, lambda x: x)
+                try:
+                    self.dbtransact(body1compensation, lambda x: x)
+                except:
+                    et, ev, tb = sys.exc_info()
+                    web.debug('got exception "%s" peforming body1compensation for %s' % (str(ev), self.input_tablename),
+                              traceback.format_exception(et, ev, tb))
 
     def select_next_transmit_number(self):
         query = "SELECT NEXTVAL ('transmitnumber')"

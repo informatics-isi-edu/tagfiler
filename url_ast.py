@@ -85,7 +85,7 @@ def yield_csv(files, tags):
         if val == None:
             return ''
         if type(val) in [ list, set ]:
-            return ' '.join([wrapval(v) for v in val])
+            val = '{' + ','.join([wrapval(v) for v in val]) + '}'
         if type(val) not in [ str, unicode ]:
             val = '%s' % val
         return '"' + val.replace('"','""') + '"'
@@ -994,6 +994,13 @@ class FileTags (Node):
                           traceback.format_exception(et, ev, tb))
                 raise BadRequest(self, 'Invalid input to bulk PUT of tags.')
                 
+            web.ctx.status = '204 No Content'
+            return ''
+
+        elif content_type == 'text/csv':
+            csvfp = web.ctx.env['wsgi.input']
+            self.bulk_update_transact(csvfp, on_missing='abort', on_existing='merge')
+
             web.ctx.status = '204 No Content'
             return ''
 

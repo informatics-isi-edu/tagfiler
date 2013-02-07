@@ -603,6 +603,14 @@ class Subject (Node):
                 
                 web.ctx.status = '204 No Content'
                 return ''
+
+            elif content_type == 'text/csv':
+                csvfp = web.ctx.env['wsgi.input']
+                self.bulk_update_transact(csvfp, on_missing='create', on_existing='merge')
+
+                web.ctx.status = '204 No Content'
+                return ''
+
             else:
                 raise BadRequest(self, 'Unsupported subject PUT content-type "%s"' % content_type)
 
