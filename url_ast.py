@@ -90,7 +90,6 @@ def yield_csv(files, tags):
             val = '%s' % val
         return '"' + val.replace('"','""') + '"'
 
-    yield  ','.join([ wrapval(tag) for tag in tags ]) + '\n'
     for file in files:
         yield ','.join([ wrapval(file[tag]) for tag in tags ]) + '\n'
     return
