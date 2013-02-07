@@ -19,6 +19,7 @@ import urllib
 import web
 import psycopg2
 import os
+import tempfile
 import logging
 import subprocess
 import itertools
@@ -65,6 +66,75 @@ class JSONArrayError (ValueError):
     def __init__(self, msg):
         ValueError.__init__(self, msg)
 
+def make_temporary_file(fname_prefix, dirname, accessmode):
+    """
+    Create and open temporary file with accessmode.
+
+    /dirname/fname_prefixXXXXXXXX 
+
+    Returns (fp, filename) on success or raises exception on failure.
+
+    """
+    count = 0
+    limit = 10
+    last_ev = IOError('unknown problem creating temporary file with prefix "%s/%s"' % (dirname, fname_prefix))
+    filename = None
+    while count < limit:
+
+        count = count + 1
+
+        try:
+            if not os.path.exists(dirname):
+                os.makedirs(dirname, mode=0755)
+        except Exception, ev:
+            last_ev = ev
+            continue
+
+        try:
+            fileHandle, filename = tempfile.mkstemp(prefix=fname_prefix, dir=dirname)
+        except Exception, ev:
+            last_ev = ev
+            continue
+
+        try:
+            os.close(fileHandle)
+        except Exception, ev:
+            last_ev = ev
+            try:
+                os.remove(filename)
+            except:
+                pass
+            continue
+
+        try:
+            f = open(filename, accessmode, 0)
+            return (f, filename)
+        except Exception, ev:
+            last_ev = ev
+            try:
+                os.remove(filename)
+            except:
+                pass
+ 
+    raise last_ev
+
+def yieldBytes(f, first, last, chunkbytes):
+    """Helper function yields range of file."""
+    f.seek(first, 0)  # first from beginning (os.SEEK_SET)
+    byte = first
+    while byte <= last:
+        readbytes = min(chunkbytes, last - byte + 1)
+        buf = f.read(readbytes)
+        rlen = len(buf)
+        byte += rlen
+        yield buf
+        if rlen < readbytes:
+            # undersized read means file got shorter (possible w/ concurrent truncates)
+            web.debug('tagfiler.dataserv_app.yieldBytes: short read to %d instead of %d bytes!' % (byte, last))
+            # compensate as if the file has a hole, since it is too late to signal an error now
+            byte = rlen
+            yield bytearray(readbytes - rlen)
+            
 def jsonArrayFileReader(f):
     """Iterate over elements in JSON array document.
 
@@ -3910,6 +3980,28 @@ class Application (webauthn2_handler_factory.RestHandler):
     def select_files_by_predlist_path(self, path=None, versions='latest', limit=None, enforce_read_authz=True, offset=None, json=False):
         #self.txlog('TRACE', value='select_files_by_predlist_path entered')
         query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz, offset=offset, json=json)
+        #self.txlog('TRACE', value='select_files_by_predlist_path query built')
+        result = self.dbquery(query, values)
+        #self.txlog('TRACE', value='select_files_by_predlist_path exiting')
+        return result
+
+    def copyto_csv_files_by_predlist_path(self, outfile, path, versions='latest', limit=None, enforce_read_authz=True, offset=None, json=False):
+        #self.txlog('TRACE', value='select_files_by_predlist_path entered')
+        spreds, lpreds, otags = path[-1]
+        got_cols = set()
+        csv_cols = []
+        for pred in lpreds:
+            if pred.tag not in got_cols:
+                csv_cols.append(pred.tag)
+                got_cols.add(pred.tag)
+        csv_cols = ', '.join([ wraptag(tag, '', '') for tag in csv_cols ])
+
+        query, values = self.build_files_by_predlist_path(path, versions, limit=limit, enforce_read_authz=enforce_read_authz, offset=offset, json=json)
+        query = 'SELECT %s FROM (%s) s' % (csv_cols, query)
+
+        self.db._db_cursor().copy_expert("COPY (%s) TO STDOUT CSV DELIMITER ','" % query,
+                                         outfile)
+
         #self.txlog('TRACE', value='select_files_by_predlist_path query built')
         result = self.dbquery(query, values)
         #self.txlog('TRACE', value='select_files_by_predlist_path exiting')

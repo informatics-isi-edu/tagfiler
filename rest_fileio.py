@@ -21,7 +21,6 @@ import sys
 import os
 import web
 import subprocess
-import tempfile
 import random
 import re
 import sys
@@ -29,7 +28,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, jsonWriter
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, jsonWriter, make_temporary_file, yieldBytes
 from subjects import Subject
 
 # build a map of mime type --> primary suffix
@@ -45,23 +44,6 @@ f.close()
 # we want .txt not .asc!
 mime_types_suffixes['text/plain'] = 'txt'
 
-def yieldBytes(f, first, last, chunkbytes):
-    """Helper function yields range of file."""
-    f.seek(first, 0)  # first from beginning (os.SEEK_SET)
-    byte = first
-    while byte <= last:
-        readbytes = min(chunkbytes, last - byte + 1)
-        buf = f.read(readbytes)
-        rlen = len(buf)
-        byte += rlen
-        yield buf
-        if rlen < readbytes:
-            # undersized read means file got shorter (possible w/ concurrent truncates)
-            web.debug('tagfiler.rest_fileio.yieldBytes: short read to %d instead of %d bytes!' % (byte, last))
-            # compensate as if the file has a hole, since it is too late to signal an error now
-            byte = rlen
-            yield bytearray(readbytes - rlen)
-            
 
 def choose_content_type(clientval, guessedval, taggedval, name=None):
     """Hueristic choice between client-supplied and guessed Content-Type.
@@ -525,24 +507,7 @@ class FileIO (Subject):
         # use final user part as base of random filename
         prefix = '%s-' % userparts[-1]
 
-        """posible race condition in mkdir and rmdir"""
-        count = 0
-        limit = 10
-        while True:
-            count = count + 1
-            try:
-                if not os.path.exists(dir):
-                    os.makedirs(dir, mode=0755)
-        
-                fileHandle, filename = tempfile.mkstemp(prefix=prefix, dir=dir)
-                os.close(fileHandle)
-                f = open(filename, mode, 0)
-                break
-            except:
-                if count > limit:
-                    raise
-            
-        return (f, filename)
+        return make_temporary_file(prefix, dir, mode)
 
     def put_preWriteBody_result(self):
         """Extension for returning writable file for byte I/O..."""

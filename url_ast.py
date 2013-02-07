@@ -20,7 +20,7 @@ import sys
 import web
 import re
 import os
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError
+from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes
 from rest_fileio import FileIO, LogFileIO
 import subjects
 from subjects import Node
@@ -877,6 +877,11 @@ class FileTags (Node):
 
         if self.acceptType == 'application/json':
             files = self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit, json=True)
+        elif self.acceptType == 'text/csv':
+            temporary_file = open(self.temporary_filename, 'wb')
+            self.copyto_csv_files_by_predlist_path(temporary_file, self.path_modified, versions=self.versions, limit=self.limit)
+            temporary_file.close()
+            return (False, all)
         else:
             files = list(self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit))
 
@@ -930,8 +935,26 @@ class FileTags (Node):
                             body.append(urlquote(tagdef.tagname) + '=' + urlquote(file[tagdef.tagname]))
                 yield '&'.join(body) + '\n'
         elif self.acceptType == 'text/csv':
-            self.header('Content-Type', 'text/csv')
-            yield ''.join([ res for res in yield_csv(files, [td.tagname for td in all]) ])
+            try:
+                f = open(self.temporary_filename, 'rb')
+
+                try:
+                    f.seek(0, 2)
+                    length = f.tell()
+
+                    self.header('Content-Type', 'text/csv')
+                    self.header('Content-Length', str(length))
+
+                    for buf in yieldBytes(f, 0, length-1, self.config['chunk bytes']):
+                        yield buf
+
+                finally:
+                    f.close()
+
+            finally:
+                os.remove(self.temporary_filename)
+
+            return
         elif self.acceptType == 'application/json':
             self.header('Content-Type', 'application/json')
             yield '['
@@ -969,6 +992,10 @@ class FileTags (Node):
 
         if self.acceptType == None:
             self.acceptType = 'text/html'
+
+        if self.acceptType == 'text/csv':
+            temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
+            temporary_file.close()
 
         for r in self.dbtransact(self.get_body, self.get_postCommit):
             yield r
@@ -1152,6 +1179,10 @@ class Query (Node):
                 contentType = acceptType
                 break
 
+        if contentType == 'text/csv':
+            temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
+            temporary_file.close()
+
         def body():
             #self.txlog('TRACE', value='Query::body entered')
             self.http_vary.add('Accept')
@@ -1176,7 +1207,15 @@ class Query (Node):
                 files = self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset, json=True)
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
-                return files                
+                return files      
+            elif contentType == 'text/csv':
+                self.txlog('QUERY', dataset=path_linearize(self.path))
+                self.queryopts['range'] = self.query_range
+                temporary_file = open(self.temporary_filename, 'wb')
+                self.copyto_csv_files_by_predlist_path(temporary_file, path, versions=self.versions, limit=self.limit, offset=self.offset)
+                self.queryopts['range'] = None
+                temporary_file.close()
+                return False
             elif contentType != 'text/html':
                 self.txlog('QUERY', dataset=path_linearize(self.path))
 
@@ -1226,9 +1265,25 @@ class Query (Node):
                 yield "\n".join([ "%s/file/%s" % (self.config.home + web.ctx.homepath, self.subject2identifiers(file)[0]) for file in files])
                 return
             elif contentType == 'text/csv':
-                self.header('Content-Type', 'text/csv')
-                for res in yield_csv(files, self.listtags):
-                    yield res
+                try:
+                    f = open(self.temporary_filename, 'rb')
+
+                    try:
+                        f.seek(0, 2)
+                        length = f.tell()
+
+                        self.header('Content-Type', 'text/csv')
+                        self.header('Content-Length', str(length))
+
+                        for buf in yieldBytes(f, 0, length-1, self.config['chunk bytes']):
+                            yield buf
+
+                    finally:
+                        f.close()
+
+                finally:
+                    os.remove(self.temporary_filename)
+
                 return
             elif contentType == 'application/json':
                 self.header('Content-Type', 'application/json')
