@@ -68,7 +68,7 @@ get_index_name()
     cat >&${COPROC[1]} <<EOF
 SELECT count(*) FROM pg_catalog.pg_indexes
 WHERE tablename = '$1'
-  AND indexdef ~ '[(]$2[)]' ;
+  AND indexdef ~ '[(]$2( text_pattern_ops)?[)]' ;
 EOF
     read -u ${COPROC[0]} count
 
@@ -77,7 +77,7 @@ EOF
 	cat >&${COPROC[1]} <<EOF
 SELECT indexname FROM pg_catalog.pg_indexes
 WHERE tablename = '$1'
-  AND indexdef ~ '[(]$2[)]'
+  AND indexdef ~ '[(]$2( text_pattern_ops)?[)]'
 LIMIT 1 ;
 EOF
 	read -u ${COPROC[0]} indexname
@@ -136,15 +136,13 @@ EOF
 # MUST NOT be called more than once with same name during deploy 
 # e.g. only deploys version 1 properly
 db_resources=( 0 )
-last_subject=
+last_subject=0
 dataset_core()
 {
-    local i=${#db_resources[@]}
-    db_resources+=( $i )
+    last_subject=$(( ${last_subject} + 1 ))
     cat >&${COPROC[1]} <<EOF
-INSERT INTO resources (subject) VALUES ($i);
+INSERT INTO resources (subject) VALUES (${last_subject});
 EOF
-    last_subject="$i"
 }
 
 dataset_complete()
@@ -388,9 +386,11 @@ tagdef_phase1()
 
    if [[ -n "$2" ]] && [[ "$2" != empty ]]
    then
+      opclass=''
       if [[ "$2" = "text" ]]
       then
          default="DEFAULT ''"
+	 opclass="text_pattern_ops"
       elif [[ "$2" = "boolean" ]]
       then
 	 default="DEFAULT False"
@@ -426,7 +426,7 @@ tagdef_phase1()
       cat >&${COPROC[1]} <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
                        value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
-CREATE INDEX "_$1_value_idx" ON "_$1" (value) ;
+CREATE INDEX "_$1_value_idx" ON "_$1" (value ${opclass}) ;
 EOF
       if [[ "$6" = "true" ]]
       then
@@ -873,6 +873,8 @@ EOF2
         fi
     done)
 ;
+
+SELECT setval('resources_subject_seq', $(( ${last_subject} + 1 )));
 
 COMMIT ;
 

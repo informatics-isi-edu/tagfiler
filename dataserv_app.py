@@ -1964,7 +1964,7 @@ class Application (webauthn2_handler_factory.RestHandler):
     def get_index_name(self, tablename, indexcols):
         sql = ('SELECT indexname FROM pg_catalog.pg_indexes' 
                + " WHERE tablename = %s" % wrapval(tablename)
-               + " AND indexdef ~ %s" % wrapval('[(]%s[)]' % ', '.join(indexcols)) )
+               + " AND indexdef ~ %s" % wrapval('[(]%s( text_pattern_ops)?[)]' % ', '.join(indexcols)) )
         results = self.dbquery(sql)
         if len(results) != 1:
             web.debug(sql)
@@ -2017,7 +2017,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
             indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
-            indexdef += ' (value)'
+            indexdef += ' (value %s)' % (dbtype == 'text' and 'text_pattern_ops' or '')
         else:
             tabledef += ', UNIQUE(subject)'
 
