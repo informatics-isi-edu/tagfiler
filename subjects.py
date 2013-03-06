@@ -265,7 +265,7 @@ class Subject (Node):
     def delete_postCommit(self, results, set_status=True):
         for r in results:
             if r.file != None:
-                filename = self.config['store path'] + '/' + result.file
+                filename = self.config['store path'] + '/' + r.file
                 dir = os.path.dirname(filename)
                 self.deleteFile(filename)
         if set_status:
