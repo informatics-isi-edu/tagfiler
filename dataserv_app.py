@@ -236,6 +236,8 @@ def downcast_value(dbtype, value, range_extensions=False):
     
     elif dbtype == 'text':
         value = '%s' % value
+        if value.find('\00') >= 0:
+            raise ValueError('Null bytes not allowed in text value "%s"' % value)
         
     elif dbtype in [ 'int8', 'float8', 'date', 'timestamptz', 'interval' ] and range_extensions and type(value) in [ str, unicode ]:
         m = re.match(' *[(](?P<lower>[^,()]+) *, *(?P<upper>[^,()]+)[)] *', value)
