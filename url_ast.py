@@ -712,6 +712,8 @@ class Tagdef (Node):
                 self.is_unique = False
 
         def body():
+            tag_id = downcast_value('text', self.tag_id) # force early validation
+
             if len( set(self.config['tagdef write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of tag definitions')
                 
