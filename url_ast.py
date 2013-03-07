@@ -759,7 +759,12 @@ class Tagdef (Node):
                         except:
                             unique = 'false'
                         try:
-                            self.tagdefs[storage[key]] = (typestr, readpolicy, writepolicy, downcast_value('boolean', multivalue), downcast_value('boolean', unique))
+                            self.tagdefs[downcast_value('text', storage[key])] = (
+                                        typestr, 
+                                        readpolicy, 
+                                        writepolicy, 
+                                        downcast_value('boolean', multivalue), 
+                                        downcast_value('boolean', unique))
                         except ValueError, e:
                             raise BadRequest(self, data=str(e))
             try:
