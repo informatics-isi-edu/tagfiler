@@ -23,7 +23,6 @@ import tempfile
 import logging
 import subprocess
 import itertools
-import socket
 import datetime
 import dateutil.parser
 import dateutil.relativedelta
@@ -1094,7 +1093,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
-        self.hostname = socket.gethostname()
+        self.hostname = web.ctx.host
 
         self.table_changes = {}
         
