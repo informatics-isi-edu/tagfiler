@@ -591,6 +591,8 @@ class Subject (Node):
             raise BadRequest(self, 'PUT of subjects does not support Content-Range partial content.')
 
         if content_type:
+            # remove any charset for the following check
+            content_type = content_type.split(";", 1)[0].strip() 
             if content_type == 'application/json':
                 try:
                     rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
