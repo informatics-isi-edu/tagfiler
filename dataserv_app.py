@@ -2675,12 +2675,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 a = set()
                 while td.tagref:
                     td = self.globals['tagdefsdict'][td.tagref]
-                    a.add(td)
+                    a.add(td.tagname)
                 return a
 
-            if td2 in ancestors(td1):
+            if td2.tagname in ancestors(td1):
                 return -1
-            elif td1 in ancestors(td2):
+            elif td1.tagname in ancestors(td2):
                 return 1
             else:
                 return 0
