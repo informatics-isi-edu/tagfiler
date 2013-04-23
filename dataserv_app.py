@@ -2678,13 +2678,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                     a.add(td)
                 return a
 
-            def depends(td1, td2):
-                if td2 in ancestors(td1):
-                    return -1
-                elif td1 in ancestors(td2):
-                    return 1
-                else:
-                    return 0
+            if td2 in ancestors(td1):
+                return -1
+            elif td1 in ancestors(td2):
+                return 1
+            else:
+                return 0
 
         dtagdefs.sort(cmp=td_cmp)
                 
