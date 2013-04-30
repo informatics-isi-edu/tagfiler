@@ -1141,44 +1141,12 @@ class Query (Node):
         if len(self.path) == 0:
             self.path = [ ( [], [], [] ) ]
         self.subjpreds = self.path[-1][0]
-        self.action = 'query'
-        self.globals['view'] = None
         #self.log('TRACE', 'Query() constructor exiting')
-
-    def qtarget(self):
-        qpath = []
-        for elem in self.path:
-            subjpreds, listpreds, ordertags = elem
-            #web.debug(listpreds)
-            if listpreds:
-                if len(listpreds) == 1 and listpreds[0].tag in [ 'contains', 'vcontains' ] and listpreds[0].op == None:
-                    listpart = ''
-                else:
-                    listpart = '(%s)' % predlist_linearize(listpreds, sort=False)
-            else:
-                listpart = ''
-
-            qpath.append( predlist_linearize(subjpreds, sort=False) + listpart )
-        return self.config['home'] + web.ctx.homepath + '/query/' + '/'.join(qpath)
 
     def GET(self, uri):
         #self.log('TRACE', value='Query::GET() entered')
         # this interface has both REST and form-based functions
         
-        # test if user predicate equals a predicate from subjpreds
-        def equals(pred, userpred):
-            return ({'tag' : pred.tag, 'op' : pred.op, 'vals' : str(pred.vals)} == userpred)
-
-        try:
-            self.title = self.queryopts['title']
-        except:
-            self.title = None
-
-        try:
-            self.globals['view'] = self.queryopts['view']
-        except:
-            pass
-
         contentType = 'text/html'
 
         for acceptType in self.acceptTypesPreferedOrder():
@@ -1251,17 +1219,6 @@ class Query (Node):
                 # caching short cut
                 return
             
-            if self.versions == 'any':
-                self.showversions = True
-            else:
-                self.showversions = False
-            
-            self.globals['showVersions'] = self.showversions
-            self.globals['queryTarget'] = self.qtarget()
-                
-            if self.action in set(['add', 'delete']):
-                raise web.seeother(self.globals['queryTarget'] + '?action=edit&versions=%s' % self.versions )
-
             #self.log('TRACE', value='Query::body postCommit dispatching on content type')
 
             if contentType == 'text/uri-list':
