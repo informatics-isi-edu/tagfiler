@@ -42,8 +42,6 @@ def p_start(p):
              | transmitnumber
              | study
              | appleterror
-             | loglist
-             | log
              | querypathroot
              | ui
 """
@@ -95,11 +93,6 @@ def p_filelist_opts1(p):
     """filelist : slash string queryopts"""
     p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[3])
     
-def p_loglist(p):
-    """loglist : slash string slash LOG
-               | slash string slash LOG slash"""
-    p[0] = url_ast.LogList(parser=url_parse_func, appname=p[2])
-
 def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[5])
@@ -119,14 +112,6 @@ def p_file(p):
 def p_file_opts(p):
     """file : slash string slash FILE slash querypath queryopts"""
     p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
-
-def p_log(p):
-    """log : slash string slash LOG slash string"""
-    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6])
-
-def p_log_opts(p):
-    """log : slash string slash LOG slash string queryopts"""
-    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF

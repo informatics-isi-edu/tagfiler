@@ -51,7 +51,6 @@ keywords = {
     'transmitnumber' : 'TRANSMITNUMBER',
     'study' : 'STUDY',
     'appleterror' : 'APPLETERROR',
-    'log' : 'LOG',
     'asc' : 'ASC',
     'desc' : 'DESC',
     'ui' : 'UI'

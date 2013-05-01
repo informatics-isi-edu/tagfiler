@@ -501,42 +501,6 @@ class FileList (Node):
         ast.preDispatchFake(uri, self)
         return ast.POST(uri)
 
-class LogList (Node):
-    """Represents a bare LOG/ URI
-
-       GET LOG or LOG/  -- gives a listing
-       """
-
-    def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-
-    def GET(self, uri):
-        #if not self.authn.hasRoles(['admin']):
-        raise Forbidden(self, 'listing of log files')
-        
-        if self.config['log path']:
-            lognames = sorted(os.listdir(self.config['log path']), reverse=True)
-                              
-        else:
-            lognames = []
-        
-        target = self.config['home'] + web.ctx.homepath
-        
-        self.http_vary.add('Accept')
-        self.emit_headers()
-
-        for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType == 'text/uri-list':
-                # return raw results for REST client
-                self.header('Content-Type', 'text/uri-list')
-                return self.render.LogUriList(lognames)
-            elif acceptType == 'text/html':
-                break
-
-        self.header('Content-Type', 'text/html')
-        return self.renderlist("Archived logs",
-                               [self.render.LogList(lognames)])
-
 class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI
 
@@ -556,16 +520,6 @@ class Subject(subjects.Subject):
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         if storage:
             self.storage = storage
-
-class LogId(LogFileIO):
-    """Represents a direct LOG/subjpreds URI
-
-       Just creates filename and lets LogFileIO do the work.
-
-    """
-    def __init__(self, parser, appname, name, queryopts={}):
-        LogFileIO.__init__(self, parser, appname, [], queryopts)
-        self.name = name
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
