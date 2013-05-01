@@ -169,7 +169,7 @@ class Subject (Node):
             self.versions = 'latest'
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'incomplete', 'template mode', 'template query']
+                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'incomplete']
                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]

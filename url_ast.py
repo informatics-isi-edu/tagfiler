@@ -182,53 +182,11 @@ class FileList (Node):
                 self.header('Content-Type', 'text/html')
                 return self.renderui(['home'])
                 
-        action = None
-        name = None
-        filetype = None
-        readers = None
-        writers = None
         try:
-            action = urlunquote(self.storage.action)
-            try:
-                name = urlunquote(self.storage.name)
-                filetype = urlunquote(self.storage.type)
-                readers = urlunquote(self.storage['read users'])
-                writers = urlunquote(self.storage['write users'])
-            except:
-                pass
+            self.globals['view'] = urlunquote(self.storage.view)
         except:
             pass
-
-        if action == 'define':
-            if name and filetype and readers and writers:
-                if readers not in [ '*', 'owner' ]:
-                    readers = 'owner'
-                if writers not in [ '*', 'owner' ]:
-                    writers = 'owner'
-                if filetype not in [ 'file', 'url', 'dataset' ]:
-                    filetype = 'file'
-
-                url = self.config['home'] + web.ctx.homepath + '/file/name=' + urlquote(name)
-                url += '?action=define'
-                url += '&type=' + urlquote(filetype)
-                if readers == '*':
-                    url += '&read%20users=*'
-                if writers == '*':
-                    url += '&write%20users=*'
-                raise web.seeother(url)
-            else:
-                def body():
-                    return None
-                def postCommit(ignore):
-                    self.header('Content-Type', 'text/html')
-                    return 'Define a dataset'
-                return self.dbtransact(body, postCommit)
-        else:
-            try:
-                self.globals['view'] = urlunquote(self.storage.view)
-            except:
-                pass
-            return self.dbtransact(body, postCommit)
+        return self.dbtransact(body, postCommit)
 
     def POST(self, uri):
         ast = FileId(parser=self.url_parse_func,
