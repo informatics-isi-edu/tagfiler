@@ -21,7 +21,7 @@ import web
 import re
 import os
 from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes
-from rest_fileio import FileIO, LogFileIO
+from rest_fileio import FileIO
 import subjects
 from subjects import Node
 import datetime
@@ -109,269 +109,6 @@ class Subquery (object):
     def __repr__(self):
         return "@(%s)" % path_linearize(self.path)
 
-class TransmitNumber (Node):
-    """Represents a transmitnumber URI
-
-       POST tagfiler/transmitnumber
-    """
-
-    def __init__(self, parser, appname):
-        Node.__init__(self, parser, appname)
-
-    def POST(self, uri):
-
-        def body():
-            if self.table == 'transmitnumber':
-                result  = self.select_next_transmit_number()
-            elif self.table == 'keygenerator':
-                result  = self.select_next_key_number()
-            else:
-                result = ''
-                
-            return result
-
-        def postCommit(results):
-            uri = self.config['home'] + '/transmitnumber/' + results
-            self.emit_headers()
-            self.header('Location', results)
-            self.header('Content-Type', 'text/plain')
-            return results
-
-        self.storage = web.input()
-        
-        try:
-            self.table = urlunquote(self.storage.table)
-        except:
-            pass
-        
-        return self.dbtransact(body, postCommit)
-
-class Study (Node):
-    """Represents a study URI
-
-       GET tagfiler/study?action=upload
-    """
-
-    def __init__(self, parser, appname, subjpreds=[], queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-        self.action = 'get'
-        self.study_type = None
-        self.study_size = None
-        self.count = None
-        self.status = None
-        self.direction = 'upload'
-        self.subjpreds = subjpreds
-        self.name = ''.join([ ''.join(res.vals) for res in self.subjpreds if res.tag == 'name' and res.op == '='] )
-        if len(self.name) == 0:
-            self.name = None
-        self.version = ''.join([ ''.join(res.vals) for res in self.subjpreds if res.tag == 'version' and res.op == '='] )
-        if len(self.version) == 0:
-            self.version = None
-
-    def GET(self, uri):
-        try:
-            self.action = urlunquote(self.storage.action)
-        except:
-            pass
-
-        try:
-            self.study_type = urlunquote(self.storage.type)
-        except:
-            pass
-
-        try:
-            self.direction = urlunquote(self.storage.direction)
-        except:
-            pass
-
-        try:
-            self.status = urlunquote(self.storage.status)
-        except:
-            pass
-
-        def body():
-            files = []
-
-            config = self.select_config_cached(self.db, self.study_type)
-            self.globals['appletTagnames'] = config['applet tags']
-            self.globals['appletTagnamesRequire'] = config['applet tags require']
-            
-            if self.action == 'get' and self.subjpreds:
-                self.unique = self.validate_subjpreds_unique(acceptName=True)
-                
-                if self.unique:
-                    versions = 'any'
-                else:
-                    versions = 'latest'
-                
-                results = self.select_files_by_predlist(self.subjpreds,
-                                                        listtags=['vcontains', 'id'] + [ tagname for tagname in self.globals['appletTagnames']],
-                                                        versions=versions)
-                if len(results) == 0:
-                    if not self.status:
-                        raise NotFound(self, 'study "%s@%s"' % (self.name, self.version))
-                else:
-                    self.subject = results[0]
-                    self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject)
-                    files = self.subject.vcontains
-                    if not files:
-                        files = []
-    
-                self.globals['appletTagvals'] = sorted([ (tagname,
-                                                   [ self.subject[tagname] ])
-                                                  for tagname in self.globals['appletTagnames'] ], key=lambda tagdef: tagdef[0].lower())
-                
-            elif self.action == 'upload' or self.action == 'download':
-                self.globals['tagdefsdict'] = dict([ item for item in self.globals['tagdefsdict'].iteritems()
-                                                     if item[0] in self.globals['appletTagnames'] ])
-            return files
-    
-        def postCommit(files):
-            self.emit_headers()
-            if self.action == 'upload':
-                self.header('Content-Type', 'application/json')
-                params = {}
-                params['tagfiler.server.url'] = self.globals['home']
-                params['tagfiler.applet.test'] = self.globals['appletTestProperties']
-                params['tagfiler.applet.log'] = self.globals['appletLogfile']
-                params['custom.properties'] = self.globals['appletCustomProperties']
-                params['tagfiler.connections'] = self.globals['clientConnections']
-                params['tagfiler.allow.chunks'] = self.globals['clientUploadChunks']
-                params['tagfiler.socket.buffer.size'] = self.globals['clientSocketBufferSize']
-                params['tagfiler.chunkbytes'] = self.globals['clientChunkbytes']
-                params['tagfiler.client.socket.timeout'] = self.globals['clientSocketTimeout']
-                params['tagfiler.retries'] = self.globals['clientRetryCount']
-                params['tagfiler.cookie.name'] = 'tagfiler'
-                self.uiopts = {}
-                self.uiopts['params'] = params
-                self.uiopts['appletTagnames'] = self.globals['appletTagnames']
-                self.uiopts['appletTagnamesRequire'] = self.globals['appletTagnamesRequire']
-                return jsonWriter(self.uiopts)
-            elif self.action == 'download':
-                self.globals['version'] = self.version
-                self.header('Content-Type', 'application/json')
-                params = {}
-                params['tagfiler.server.url'] = self.globals['home']
-                params['tagfiler.server.transmissionnum'] = self.name
-                params['tagfiler.server.version'] = self.globals['version']
-                params['tagfiler.applet.test'] = self.globals['appletTestProperties']
-                params['tagfiler.applet.log'] = self.globals['appletLogfile']
-                params['custom.properties'] = self.globals['appletCustomProperties']
-                params['tagfiler.connections'] = self.globals['clientConnections']
-                params['tagfiler.allow.chunks'] = self.globals['clientUploadChunks']
-                params['tagfiler.socket.buffer.size'] = self.globals['clientSocketBufferSize']
-                params['tagfiler.chunkbytes'] = self.globals['clientChunkbytes']
-                params['tagfiler.client.socket.timeout'] = self.globals['clientSocketTimeout']
-                params['tagfiler.retries'] = self.globals['clientRetryCount']
-                params['tagfiler.cookie.name'] = 'tagfiler'
-                self.uiopts = {}
-                self.uiopts['params'] = params
-                return jsonWriter(self.uiopts)
-            elif self.action == 'get':
-                success = None
-                error = None
-                if self.status == 'success':
-                    success = 'All files were successfully %sed.' % self.direction
-                elif self.status == 'error':
-                    error = 'An unknown error prevented a complete %s.' % self.direction
-                else:
-                    error = self.status
-    
-                if self.name:
-                    self.globals['version'] = self.version
-                    self.header('Content-Type', 'application/json')
-                    params = {}
-                    params['name'] = self.name
-                    params['direction'] = self.direction
-                    params['success'] = success
-                    params['error'] = error
-                    params['files'] = files
-                    params['appletTagvals'] = self.globals['appletTagvals']
-                    params['version'] = self.globals['version']
-                    self.uiopts = {}
-                    self.uiopts['params'] = params
-                    return jsonWriter(self.uiopts)
-                else:
-                    url = '/appleterror'
-                    if self.status:
-                        url += '?status=%s' % urlquote(self.status)
-                    raise web.seeother(self, url)
-            else:
-                raise BadRequest(self, 'Unrecognized action form field.')
-
-        return self.dbtransact(body, postCommit)
-
-    def PUT(self, uri):
-        self.storage = web.input()
-        try:
-            self.study_size = int(urlunquote(self.storage.study_size))
-        except:
-            pass
-
-        try:
-            self.count = int(urlunquote(self.storage.count))
-        except:
-            pass
-
-        try:
-            self.status = urlunquote(self.storage.status)
-        except:
-            pass
-
-        try:
-            self.direction = urlunquote(self.storage.direction)
-        except:
-            pass
-
-        try:
-            self.key = urlunquote(self.storage.key)
-        except:
-            pass
-
-        def body():
-            result = True
-            if self.direction == 'upload' and self.status == 'success':
-                results = self.select_dataset_size(self.key)[0]
-                if results.size != self.study_size or results.count != self.count:
-                    self.status = 'conflict'
-                    result = None
-            if self.status == 'success':
-                self.txlog('STUDY %s OK REPORT' % self.direction.upper(), dataset=self.name)
-            else:
-                self.txlog('STUDY %s FAILURE REPORT' % self.direction.upper(), dataset=self.name)
-            return result
-
-        def postCommit(result):
-            if not result:
-                raise Conflict(self, 'The size of the uploaded dataset "%s" does not match original file(s) size.' % (self.name))
-            return ''
-
-        return self.dbtransact(body, postCommit)
-
-class AppletError (Node):
-    """Represents an appleterror URI
-
-       GET tagfiler/appleterror?status=string
-    """
-
-    def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-        self.action = None
-        self.status = None
-
-    def GET(self, uri):
-        try:
-            self.status = urlunquote(self.storage.status)
-        except:
-            pass
-
-        # the applet needs to manage expiration itself
-        # since it may be active while the html page is idle
-        target = self.config['home'] + web.ctx.homepath
-        self.setNoCache()
-        self.emit_headers()
-        return 'AppletError: %s' % self.status
-
 class FileList (Node):
     """Represents a bare FILE/ URI
 
@@ -414,7 +151,7 @@ class FileList (Node):
                 subjpreds=[]
                 self.homepage = False
 
-            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['Image Set', 'id', 'Study Type',
+            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['id',
                                                                                                                      'name', 'version',
                                                                                                                      'tagdef', 'typedef',
                                                                                                                      'config', 'view', 'url'])) ]
@@ -682,7 +419,7 @@ class FileTags (Node):
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
                                       list_prefix='tag',
                                       extra_tags=
-                                      [ 'id', 'file', 'name', 'version', 'Image Set', 'Study Type',
+                                      [ 'id', 'file', 'name', 'version', 
                                         'write users', 'modified' ] 
                                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 

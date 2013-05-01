@@ -757,28 +757,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             pred = web.Storage(tag='config', op='=', vals=['tagfiler'])
 
         if params_and_defaults == None:
-            params_and_defaults = [ ('applet custom properties', []),
-                                    ('applet test properties', []),
-                                    ('applet tags', []),
-                                    ('applet tags require', []),
-                                    ('applet test log', None),
-                                    ('bugs', None),
+            params_and_defaults = [ ('bugs', None),
                                     ('chunk bytes', 64 * 1024),
-                                    ('client chunk bytes', 4194304),
-                                    ('client socket timeout', 120),
-                                    ('client connections', 2),
-                                    ('client download chunks', False),
-                                    ('client socket buffer size', 8192),
-                                    ('client retry count', 10),
-                                    ('client upload chunks', False),
-                                    ('contact', None),
                                     ('enabled GUI features', []),
                                     ('file list tags', []),
                                     ('file list tags write', []),
                                     ('file write users', []),
                                     ('help', None),
                                     ('home', 'https://%s' % self.hostname),
-                                    ('log path', '/var/www/%s-logs' % daemonuser),
                                     ('logo', ''),
                                     ('policy remappings', []),
                                     ('query', None),
@@ -891,7 +877,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('tagdef', 'text', 'Tag definition', 'tagdef', []),
                        ('name', 'text', 'Subject name', 'latest with name', []),
                        ('vname', 'text', 'Subject name@version', 'vname', []),
-                       ('config', 'text', 'Study Type', 'config', []),
+                       ('config', 'text', 'Configuration storage', 'config', []),
                        ('view', 'text', 'View name', 'view', []),
                        ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
                                                                                    'page Standalone document']),
@@ -941,28 +927,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('name', 'text', False, 'system', False),
                        ('version', 'int8', False, 'system', False),
                        ('latest with name', 'text', False, 'system', True),
-                       ('_cfg_applet custom properties', 'text', True, 'subject', False),
-                       ('_cfg_applet tags', 'tagdef', True, 'subject', False),
-                       ('_cfg_applet tags require', 'tagdef', True, 'subject', False),
-                       ('_cfg_applet test log', 'text', False, 'subject', False),
-                       ('_cfg_applet test properties', 'text', True, 'subject', False),
                        ('_cfg_bugs', 'text', False, 'subject', False),
                        ('_cfg_chunk bytes', 'text', False, 'subject', False),
-                       ('_cfg_client chunk bytes', 'int8', False, 'subject', False),
-                       ('_cfg_client socket timeout', 'int8', False, 'subject', False),
-                       ('_cfg_client connections', 'int8', False, 'subject', False),
-                       ('_cfg_client download chunks', 'boolean', False, 'subject', False),
-                       ('_cfg_client socket buffer size', 'int8', False, 'subject', False),
-                       ('_cfg_client retry count', 'int8', False, 'subject', False),
-                       ('_cfg_client upload chunks', 'boolean', False, 'subject', False),
-                       ('_cfg_contact', 'text', False, 'subject', False),
                        ('_cfg_enabled GUI features', 'text', True, 'subject', False),
                        ('_cfg_file list tags', 'tagdef', True, 'subject', False),
                        ('_cfg_file list tags write', 'tagdef', True, 'subject', False),
                        ('_cfg_file write users', 'rolepat', True, 'subject', False),
                        ('_cfg_help', 'text', False, 'subject', False),
                        ('_cfg_home', 'text', False, 'subject', False),
-                       ('_cfg_log path', 'text', False, 'subject', False),
                        ('_cfg_logo', 'text', False, 'subject', False),
                        ('_cfg_policy remappings', 'text', True, 'subject', False),
                        ('_cfg_query', 'text', False, 'subject', False),
@@ -1135,19 +1107,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.globals['query'] = self.globals['home'] + '/query'
         self.globals['subtitle'] = self.config.subtitle
         self.globals['logo'] = self.config.logo
-        self.globals['contact'] = self.config.contact
         self.globals['filelisttags'] = self.config['file list tags']
         self.globals['filelisttagswrite'] = self.config['file list tags write']
-        self.globals['appletTestProperties'] = self.config['applet test properties']
-        self.globals['appletLogfile'] = self.config['applet test log']
-        self.globals['appletCustomProperties'] = self.config['applet custom properties']
-        self.globals['clientChunkbytes'] = self.config['client chunk bytes']
-        self.globals['clientSocketTimeout'] = self.config['client socket timeout']
-        self.globals['clientConnections'] = self.config['client connections']
-        self.globals['clientUploadChunks'] = self.config['client upload chunks']
-        self.globals['clientDownloadChunks'] = self.config['client download chunks']
-        self.globals['clientSocketBufferSize'] = self.config['client socket buffer size']
-        self.globals['clientRetryCount'] = self.config['client retry count']
         self.globals['enabledGUIFeatures'] = self.config['enabled GUI features']
         self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
         

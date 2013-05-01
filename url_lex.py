@@ -48,9 +48,6 @@ keywords = {
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
     'absent' : 'ABSENT',
-    'transmitnumber' : 'TRANSMITNUMBER',
-    'study' : 'STUDY',
-    'appleterror' : 'APPLETERROR',
     'asc' : 'ASC',
     'desc' : 'DESC',
     'ui' : 'UI'

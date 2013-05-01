@@ -39,9 +39,6 @@ def p_start(p):
              | tagdef
              | tags
              | query
-             | transmitnumber
-             | study
-             | appleterror
              | querypathroot
              | ui
 """
@@ -365,34 +362,6 @@ def p_queryopts_grow_short(p):
         v.add(None)
     else:
         p[0][p[3]] = None
-
-def p_transmit_number(p):
-    """transmitnumber : slash string slash TRANSMITNUMBER """
-    p[0] = url_ast.TransmitNumber(parser=url_parse_func, appname=p[2])
-
-def p_study(p):
-    """study : slash string slash STUDY"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2])
-
-def p_study_num(p):
-    """study : slash string slash STUDY slash predlist_nonempty"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6])
-
-def p_study_num_opts(p):
-    """study : slash string slash STUDY slash predlist_nonempty queryopts"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6], queryopts=p[7])
-
-def p_study_opts(p):
-    """study : slash string slash STUDY queryopts"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], queryopts=p[5])
-
-def p_appleterror(p):
-    """appleterror : slash string slash APPLETERROR"""
-    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2])
-
-def p_appleterror_opts(p):
-    """appleterror : slash string slash APPLETERROR queryopts"""
-    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):

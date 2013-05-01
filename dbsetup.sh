@@ -572,19 +572,15 @@ tagdef name                  text        ""         anonymous   system       fal
 tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
 tagdef vname                 text        ""         anonymous   system       false      ""         true
 tagdef rname                 text        ""         anonymous   anonymous    false      ""         true
-tagdef parentof              int8        ""         subject     subject      true       id
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
 tagdef onclick               text        ""         anonymous   system       false
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
 tagdef key                   text        ""         anonymous   subject      false      ""         true
-tagdef "check point offset"  int8        ""         anonymous   subject      false
 tagdef "incomplete"          empty       ""         anonymous   subject      false
 tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
-tagdef "Image Set"           empty       "${admin}" subject     subject      false
-tagdef "Study Type"          text        "${admin}" subject     subject      false      config     ""       config
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
@@ -720,7 +716,6 @@ cfgtagdef 'tagdef write users'        text  ""      subject     subject       tr
 cfgtagdef 'file write users'          text  ""      subject     subject       true       rolepat
 cfgtagdef home                        text  ""      subject     subject       false
 cfgtagdef 'store path'                text  ""      subject     subject       false
-cfgtagdef 'log path'                  text  ""      subject     subject       false
 cfgtagdef 'template path'             text  ""      subject     subject       false
 cfgtagdef 'chunk bytes'               int8  ""      subject     subject       false
 cfgtagdef 'policy remappings'         text  ""      subject     subject       true
@@ -730,18 +725,6 @@ cfgtagdef contact                     text  ""      subject     subject       fa
 cfgtagdef help                        text  ""      subject     subject       false
 cfgtagdef bugs                        text  ""      subject     subject       false
 cfgtagdef query                       text  ""      subject     subject       false
-cfgtagdef 'client connections'        int8  ""      subject     subject       false
-cfgtagdef 'client upload chunks'      boolean ""      subject     subject       false
-cfgtagdef 'client download chunks'    boolean ""      subject     subject       false
-cfgtagdef 'client socket buffer size' int8  ""      subject     subject       false
-cfgtagdef 'client retry count'        int8  ""      subject     subject       false
-cfgtagdef 'client chunk bytes'        int8  ""      subject     subject       false
-cfgtagdef 'client socket timeout'     int8  ""      subject     subject       false
-cfgtagdef 'applet tags'               text  ""      subject     subject       true       tagdef    ''    tagdef
-cfgtagdef 'applet tags require'       text  ""      subject     subject       true       tagdef    ''    tagdef
-cfgtagdef 'applet custom properties'  text  ""      subject     subject       true
-cfgtagdef 'applet test log'           text  ""      subject     subject       false
-cfgtagdef 'applet test properties'    text  ""      subject     subject       true
 cfgtagdef 'system software'           text  ""      anonymous   system        false
 cfgtagdef 'enabled GUI features' 	  text  "" 		subject   	subject       true      'GUI features'
 
@@ -761,23 +744,11 @@ cfgtag()
 #cfgtag "template path" text '${TAGFILERDIR}/templates'
 cfgtag "chunk bytes" text '1048576'
 
-cfgtag "client connections" int8 '4'
-cfgtag "client upload chunks" boolean true
-cfgtag "client download chunks" boolean true
-cfgtag "client socket buffer size" int8 '8192'
-cfgtag "client retry count" int8 '10'
-cfgtag "client chunk bytes" int8 '8388608'
-cfgtag "client socket timeout" int8 '120'
-
 cfgtag "file write users" text "*" "admin"
 cfgtag "tagdef write users" text "*" "admin"
 
 cfgtag "file list tags" text 'id' 'name' bytes owner 'read users' 'write users'
 #cfgtag "file list tags write" text 'read users' 'write users' 'owner'
-
-#cfgtag "applet tags" text ...
-#cfgtag "applet tags require" text ...
-#cfgtag "applet properties" text 'tagfiler.properties'
 
 dataset "tagdef" view "${admin}" "*"
 tagdeftags=${last_subject}
@@ -847,12 +818,8 @@ fi
 
 cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${readok};${writeok}"
 
-#cfgtag "applet test properties" text '/home/userid/appletTest.properties'
-#cfgtag "applet test log" text '/home/userid/applet.log'
-
 cfgtag "subtitle" text "Tagfiler (trunk) on ${HOME_HOST}"
 cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/'"${SVCPREFIX}"'/static/logo.png" width="245" height="167" />'
-cfgtag "contact" text '<p>Your HTML here</p>'
 cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/~karlcz/Tagfiler'
 cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/PSOC'
 

@@ -169,7 +169,7 @@ class Subject (Node):
             self.versions = 'latest'
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'Image Set', 'Study Type', 'incomplete', 'template mode', 'template query']
+                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'incomplete', 'template mode', 'template query']
                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
@@ -672,10 +672,7 @@ class Subject (Node):
                 raise Forbidden(self, 'delete of dataset "%s"' % path_linearize(self.path))
             
             if self.subject.dtype == 'url':
-                if self.subject['Image Set']:
-                    ftype = 'imgset'
-                else:
-                    ftype = 'url'
+                ftype = 'url'
             else:
                 ftype = self.subject.dtype
                 
