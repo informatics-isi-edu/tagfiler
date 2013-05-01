@@ -537,24 +537,6 @@ class LogList (Node):
         return self.renderlist("Archived logs",
                                [self.render.LogList(lognames)])
 
-class Contact (Node):
-    """Represents a bare CONTACT URI
-
-       GET CONTACT
-       """
-
-    def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-        self.globals['webauthnrequire'] = False
-
-    def GET(self, uri):
-        
-        self.setNoCache()
-        self.emit_headers()
-        self.header('Content-Type', 'text/html')
-        return self.renderlist("Contact Us",
-                               [self.render.Contact()])
-
 class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI
 

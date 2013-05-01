@@ -52,7 +52,6 @@ keywords = {
     'study' : 'STUDY',
     'appleterror' : 'APPLETERROR',
     'log' : 'LOG',
-    'contact' : 'CONTACT',
     'asc' : 'ASC',
     'desc' : 'DESC',
     'ui' : 'UI'

@@ -44,7 +44,6 @@ def p_start(p):
              | appleterror
              | loglist
              | log
-             | contact
              | querypathroot
              | ui
 """
@@ -101,10 +100,6 @@ def p_loglist(p):
                | slash string slash LOG slash"""
     p[0] = url_ast.LogList(parser=url_parse_func, appname=p[2])
 
-def p_contact(p):
-    """contact : slash string slash CONTACT"""
-    p[0] = url_ast.Contact(parser=url_parse_func, appname=p[2])
-    
 def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
     p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[5])
