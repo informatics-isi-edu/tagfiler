@@ -1052,58 +1052,6 @@ class FileTags (Node):
         # RESTful delete of exactly one tag on 1 or more files...
         return self.dbtransact(self.delete_body, self.delete_postCommit)
 
-    def post_postCommit(self, results):
-        raise web.seeother(self.referer)
-
-    def POST(self, uri):
-        # simulate RESTful actions and provide helpful web pages to browsers
-        storage = web.input()
-
-        subjpreds, listpreds, ordertags = self.path[-1]
-        listpreds = [ x for x in listpreds ]
-        
-        try:
-            action = storage.action
-            tagvals = dict()
-            for key in storage.keys():
-                if key[0:4] == 'set-':
-                    tag_id = key[4:]
-                    try:
-                        vals = [ storage['val-%s' % (tag_id)] ]
-                    except:
-                        vals = []
-                    tagvals[urlunquote(tag_id)] = vals
-                elif key == 'tag':
-                    try:
-                        vals = [ storage.value ]
-                    except:
-                        vals = []
-                    tagvals[storage.tag] = vals
-                    
-            for tag, vals in tagvals.items():
-                op = '='
-                if len(vals) == 0:
-                    op = None
-                listpreds.append( web.Storage(tag=tag, op=op, vals=vals) )
-            try:
-                self.referer = storage.referer
-            except:
-                self.referer = None
-        except:
-            et, ev, tb = sys.exc_info()
-            web.debug('got exception during filetags form post parsing',
-                      traceback.format_exception(et, ev, tb))
-            raise BadRequest(self, data="Error extracting form data.")
-
-        self.path[-1] = (subjpreds, listpreds, ordertags)
-
-        if action == 'put':
-            self.PUT(uri)
-            return self.post_postCommit(None)
-        elif action == 'delete':
-            return self.dbtransact(self.delete_body, self.post_postCommit)
-        else:
-            raise BadRequest(self, data="Form field action=%s not understood." % action)
 
 class Query (Node):
     def __init__(self, parser, appname, queryopts={}, path=[]):
