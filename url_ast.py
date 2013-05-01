@@ -832,29 +832,6 @@ class FileTags (Node):
         else:
             self.path = [ ([], [], []) ]
         self.referer = None
-        self.globals['queryTarget'] = self.qtarget()
-        self.globals['queryAllTags'] = None
-
-    def qAllTags(self):
-        if self.queryopts.get('view') == 'default':
-            return None
-
-        url = self.config['home'] + web.ctx.homepath + '/tags' + path_linearize(self.path)
-        opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() if k != 'view' ])
-        url += '?view=default'
-        if opts:
-            url += '&' + opts
-        return url
-
-    def qtarget(self):
-        if self.queryopts.get('view') == 'default':
-            return None
-
-        url = self.config['home'] + web.ctx.homepath + '/tags/' + path_linearize(self.path)
-        opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() ])
-        if opts:
-            url += '?' + opts
-        return url
 
     def get_body(self):
         self.path_modified, self.listtags, writetags, self.limit, self.offset, self.versions = \
@@ -869,19 +846,17 @@ class FileTags (Node):
         self.http_vary.add('Accept')
         self.set_http_etag(self.select_predlist_path_txid(self.path_modified, versions=self.versions))
         if self.http_is_cached():
+            web.ctx.status = '304 Not Modified'
             return None, None
         
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
 
-        if len(self.listtags) == len(self.globals['tagdefsdict'].values()) and self.queryopts.get('view') != 'default':
-            try_default_view = True
-        else:
-            try_default_view = False
-            self.globals['queryAllTags'] = self.qAllTags()
-            
         all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
+        if self.acceptType == 'text/html':
+            # don't evaluate query if we're just rendering AJAX app
+            files = []
         if self.acceptType == 'application/json':
             files = self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit, json=True)
         elif self.acceptType == 'text/csv':
@@ -901,15 +876,11 @@ class FileTags (Node):
         files, all = results
 
         if files == None:
-            web.ctx.status = '304 Not Modified'
+            # caching short-cut
             return
         
         self.emit_headers()
-        if self.acceptType == 'text/html':
-            self.header('Content-Type', 'text/html')
-            url = 'tags/' + self.globals['queryTarget'][(self.globals['queryTarget'].find('/tags//')+len('/tags//')):]
-            yield self.renderui(['tags'], {'url': url})
-        elif self.acceptType == 'text/uri-list':
+        if self.acceptType == 'text/uri-list':
             def render_file(file):
               subject = self.subject2identifiers(file)[0]
               def render_tagvals(tagdef):
@@ -970,13 +941,14 @@ class FileTags (Node):
                 yield pref + f.json + '\n'
                 pref=','
             yield ']\n'
-        elif self.acceptType == 'text/plain' and len(files) == 1 and len(self.listtags) == 1:
-            self.header('Content-Type', 'text/plain')
-            val = files[0][self.listtags[0]]
-            if type(val) == list:
-                yield '\n'.join(val) + '\n'
-            else:
-                yield '%s\n' % val
+        else:
+            self.header('Content-Type', 'text/html')
+            url = 'tags' + path_linearize(self.path)
+            opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() ])
+            if opts:
+                url += '?' + opts
+            yield self.renderui(['tags'], {'url': url})
+
                 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
@@ -992,7 +964,6 @@ class FileTags (Node):
                               'application/x-www-form-urlencoded',
                               'text/csv',
                               'application/json',
-                              'text/plain'
                               'text/html']:
                 self.acceptType = acceptType
                 break
