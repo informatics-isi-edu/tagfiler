@@ -116,7 +116,6 @@ class Subject (Node):
         self.action = None
         self.key = None
         self.dtype = None
-        self.url = None
         self.file = None
         self.bytes = None
         self.referer = None
@@ -169,7 +168,7 @@ class Subject (Node):
             self.versions = 'latest'
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'incomplete']
+                      for tag in ['id', 'content-type', 'bytes', 'modified', 'modified by', 'name', 'version', 'incomplete']
                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
@@ -295,7 +294,6 @@ class Subject (Node):
         newfile.bytes = self.bytes
         newfile.dtype = self.dtype
         newfile.file = self.file
-        newfile.url = self.url
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         self.mergeSubjpredsTags = False
         status = web.ctx.status
@@ -384,7 +382,7 @@ class Subject (Node):
             for result in self.select_filetags_noauthn(basefile):
                 if result.tagname not in [ 'bytes', 'content-type', 'key', 'check point offset',
                                            'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
-                                           'url', 'file', 'version created', 'version', 'vname' ] \
+                                           'file', 'version created', 'version', 'vname' ] \
                                            and not self.globals['tagdefsdict'][result.tagname].unique:
                     tags = self.select_tag_noauthn(basefile, self.globals['tagdefsdict'][result.tagname])
                     for tag in tags:
@@ -408,12 +406,10 @@ class Subject (Node):
         if newfile.dtype == 'file':
             if newfile.bytes != None and (not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['bytes'], newfile.bytes)
-            if not basefile or basefile.url and basefile.version == newfile.version:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['url'])
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
-        elif newfile.dtype in [ None, 'url' ]:
+        elif newfile.dtype in [ None ]:
             if basefile and basefile.bytes != None and basefile.id == newfile.id:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
             if basefile and basefile['content-type'] != None and basefile.id == newfile.id:
@@ -671,10 +667,7 @@ class Subject (Node):
             if not self.subject.writeok:
                 raise Forbidden(self, 'delete of dataset "%s"' % path_linearize(self.path))
             
-            if self.subject.dtype == 'url':
-                ftype = 'url'
-            else:
-                ftype = self.subject.dtype
+            ftype = self.subject.dtype
                 
             if not ftype:
                 ftype = 'blank'

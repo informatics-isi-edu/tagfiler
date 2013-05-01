@@ -114,7 +114,6 @@ class FileIO (Subject):
         self.api = 'file'
         self.action = None
         self.key = None
-        self.url = None
         self.bytes = None
         self.referer = None
         self.update = False
@@ -153,23 +152,10 @@ class FileIO (Subject):
 
         def postCommit(results):
             f, render, cached = results
-            # if the dataset is a remote URL, just redirect client
             if cached:
                 web.ctx.status = '304 Not Modified'
                 self.emit_headers()
                 return results
-            elif self.subject.dtype == 'url':
-                opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
-                if len(opts) > 0:
-                    querystr = '&'.join(opts)
-                    if len(self.subject.url.split("?")) > 1:
-                        querystr = '&' + querystr
-                    else:
-                        querystr = '?' + querystr
-                else:
-                    querystr = ''
-                self.emit_headers()
-                raise web.seeother(self.subject.url + querystr)
             elif self.subject.dtype == 'file':
                 return results
             else:
@@ -486,7 +472,6 @@ class FileIO (Subject):
                 and self.context.client == self.subject['modified by'] \
                 and self.subject['modified'] and (now - self.subject['modified']).seconds < 5 \
                 and self.subject['bytes'] == self.bytes \
-                and not self.subject['url'] \
                 and len(self.queryopts.keys()) == 0:
             # skip tag update transaction if and only if it is a noop
             return self.put_postWritePostCommit([])

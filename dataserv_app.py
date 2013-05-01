@@ -860,8 +860,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('role', 'text', 'Role', None, []),
                        ('rolepat', 'text', 'Role pattern', None, []),
                        ('dtype', 'text', 'Dataset type', None, ['blank Dataset node for metadata-only',
-                                                                'file Named dataset for locally stored file',
-                                                                'url Named dataset for URL redirecting']),
+                                                                'file Named dataset for locally stored file']),
                        ('url', 'text', 'URL', None, []),
                        ('id', 'int8', 'Subject ID or subquery', None, []),
                        ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
@@ -1661,7 +1660,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
     def classify_subject(self, subject):
-        for dtype in [ 'url', 'tagdef', 'typedef', 'config', 'view', 'file', 'name' ] \
+        for dtype in [ 'tagdef', 'typedef', 'config', 'view', 'file', 'name' ] \
                 + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname if tagdef.tagname != 'id' ] \
                 + [ 'id' ] :
             keyv = subject.get(dtype, None)
@@ -1690,7 +1689,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 dataid = datapred
                 dataname = name
         else:
-            if dtype not in [ 'file', 'url' ]:
+            if dtype not in [ 'file' ]:
                 keyv = subject.get(dtype, None)
             else:
                 keyv = None
