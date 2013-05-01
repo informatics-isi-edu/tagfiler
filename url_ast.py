@@ -724,9 +724,8 @@ class Tagdef (Node):
             return None
 
         def postCommit(results):
-            # send client back to get new tag definition
-            # or should we just return empty success result?
-            raise web.seeother('/tagdef/' + urlquote(self.tag_id))
+            web.ctx.status = '201 Created'
+            return ''
 
         return self.dbtransact(body, postCommit)
 
