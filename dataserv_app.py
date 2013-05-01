@@ -879,8 +879,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('vname', 'text', 'Subject name@version', 'vname', []),
                        ('config', 'text', 'Configuration storage', 'config', []),
                        ('view', 'text', 'View name', 'view', []),
-                       ('template mode', 'text', 'Template rendering mode', None, ['embedded Embedded in Tagfiler HTML',
-                                                                                   'page Standalone document']),
                        ('GUI features', 'text', 'GUI configuration mode', None, ['bulk_value_edit bulk value editing',
                                                                                  'bulk_subject_delete bulk subject delete',
                                                                                  'cell_value_edit cell-based value editing',

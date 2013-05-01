@@ -133,73 +133,16 @@ class FileIO (Subject):
                 filename = self.config['store path'] + '/' + self.subject.file
                 f = None
                 render = None
-                if self.subject['template mode'] in ['embedded', 'page']:
-                    if self.subject['template query']:
-                        # execute each query specified as tags on this template file
-                        resultsdict = {}
-                        for tq in self.subject['template query']:
-                            try:
-                                # interpolate query params into query string prior to evaluation
-                                # every interpolated key MUST appear in self.storage (query params)
-                                # NOTE: this is hackish and has ugly quoting rules:
-                                #  1. components of query may be URL-quoted as per normal Tagfiler rules
-                                #  2. percent signs are escaped according to Python formatting rules or represent interpolation points
-                                #  3. whole value is URL-quoted in REST API, FORM input, etc.
-                                itq = tq % self.storage
-                                ast = self.url_parse_func(itq)
-                                if type(ast) in [ int, long ]:
-                                    pass
-                                elif hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                    txids.append(self.select_predlist_path_txid(ast.path))
-                                else:
-                                    raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
-                                                   % (self.subject2identifiers(self.subject)[2], tq))
-                                resultsdict[tq] = ast
-                            except (BadRequest), te:
-                                raise te
-                            except (KeyError), te:
-                                raise BadRequest(self, 'File "%s" requires query parameter: %s'
-                                                 % (self.subject2identifiers(self.subject)[2], str(te)))
-                            #except:
-                            #    et, ev, tb = sys.exc_info()
-                            #    web.debug('got exception "%s" during template query evaluation' % str(ev),
-                            #              traceback.format_exception(et, ev, tb))
-
-                        self.set_http_etag(max(txids))
-                        if self.http_is_cached():
-                            # skip the template queries and render
-                            return None, None, True
-
-                        # compute and save results for each template query
-                        for item in resultsdict.items():
-                            tq, ast = item
-                            if hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                self.txlog('QUERY', dataset=path_linearize(ast.path))
-                                resultsdict[tq] = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
-                        
-                        # put query results where template rendering pass can find them
-                        self.globals['template_query_results'] = resultsdict
-                    else:
-                        self.globals['template_query_results'] = None
-                        self.set_http_etag(max(txids))
-                        if self.http_is_cached():
-                            # skip the template render
-                            return None, None, True
-                    # use the file as a web template
-                    self.globals['ops'] = Application.ops
-                    self.globals['opsExcludeTypes'] = Application.opsExcludeTypes
-                    render = web.template.frender(filename, globals=self.globals)
-                else:
-                    # use the file as raw bytes
-                    self.set_http_etag(max(txids))
-                    if self.http_is_cached():
-                        # skip the file handling
-                        return None, None, True
-                    f = open(filename, "rb", 0)
-                    if self.subject.get('content-type', None) == None:
-                        p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
-                        line = p.stdout.readline()
-                        self.subject['content-type'] = line.strip().split(' ', 1)[0]
+                # use the file as raw bytes
+                self.set_http_etag(max(txids))
+                if self.http_is_cached():
+                    # skip the file handling
+                    return None, None, True
+                f = open(filename, "rb", 0)
+                if self.subject.get('content-type', None) == None:
+                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                    line = p.stdout.readline()
+                    self.subject['content-type'] = line.strip().split(' ', 1)[0]
                 return f, render, False
             else:
                 self.set_http_etag(max(txids))
@@ -238,22 +181,6 @@ class FileIO (Subject):
 
         if cached:
             # short out here
-            return
-
-        if render != None and self.subject['template mode'] == 'embedded':
-            # render the template in the tagfiler GUI
-            self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
-            self.emit_headers()
-            self.header('Content-Type', 'text/html')
-            for r in self.renderlist(None,
-                                     [render()]):
-                yield r
-            return
-        elif render != None and self.subject['template mode'] == 'page':
-            # render the template as a standalone page
-            self.emit_headers()
-            self.header('Content-Type', 'text/html')
-            yield render()
             return
 
         # we only get here if we were able to both:

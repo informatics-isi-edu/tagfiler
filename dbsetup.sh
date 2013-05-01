@@ -583,8 +583,6 @@ tagdef "list on homepage"    empty       "${admin}" anonymous   tag          fal
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
 tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
-tagdef 'template mode'       text        "${admin}" anonymous   tag          false      'template mode'
-tagdef 'template query'      text        "${admin}" subjectowner tag         true       ""
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
@@ -609,7 +607,6 @@ typedef vname        text          'Subject name@version'          vname
 typedef rname        text          'Resource name'          	   rname
 typedef config       text          'Study Type'                    config
 typedef view         text          'View name'                     view
-typedef 'template mode' text       'Template rendering mode'       ""                 'embedded Embedded in Tagfiler HTML' 'page Standalone document'
 typedef 'GUI features' text       'GUI configuration mode'       ""                 'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
 #       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
 
@@ -763,7 +760,7 @@ tag "$typedeftags" "_cfg_tag list tags" tagdef 'id' 'typedef' "typedef descripti
 dataset "file" view "${admin}" "*"
 filetags=${last_subject}
 tag "$filetags" "_cfg_file list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users'
-tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'template mode' 'template query' 'vcontains'
+tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'vcontains'
 dataset "view" view "${admin}" "*"
 viewtags=${last_subject}
 tag "$viewtags" "_cfg_file list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
