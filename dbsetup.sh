@@ -134,7 +134,6 @@ EOF
 
 # pre-established stored data
 # MUST NOT be called more than once with same name during deploy 
-# e.g. only deploys version 1 properly
 db_resources=( 0 )
 last_subject=0
 dataset_core()
@@ -184,8 +183,6 @@ dataset_complete()
          onclick="$1"
          shift   
          ;;
-      rname)
-         ;;
       *)
          echo "Unsupported dataset format: $*" >&2
          exit 1
@@ -209,9 +206,6 @@ dataset_complete()
    case "$type" in
       url|file|onclick)
 	 tag "$subject" name text "$file" >&2
-	 tag "$subject" 'latest with name' text "$file" >&2
-	 tag "$subject" vname text "$file@1" >&2
-	 tag "$subject" version int8 1 >&2
 
 	 case "$type" in
 	     url)
@@ -398,7 +392,7 @@ tagdef_phase1()
          default=""
       fi
 
-      if [[ "$1" = "vname" ]] || [[ "$1" = "rname" ]] || [[ "$8" = true ]]
+      if [[ "$8" = true ]]
       then
          fk="UNIQUE"
       else
@@ -557,7 +551,6 @@ tagdef 'tag read users'      text        ""         anonymous   subjectowner tru
 tagdef 'tag write users'     text        ""         anonymous   subjectowner true       rolepat
 tagdef owner                 text        ""         anonymous   tagorowner   false      role
 tagdef created               timestamptz ""         anonymous   system       false
-tagdef "version created"     timestamptz ""         anonymous   system       false
 tagdef "read users"          text        ""         anonymous   subjectowner true       rolepat
 tagdef "write users"         text        ""         anonymous   subjectowner true       rolepat
 tagdef "modified by"         text        ""         anonymous   system       false      role
@@ -567,11 +560,7 @@ tagdef "tag last modified"   timestamptz ""         anonymous   system       fal
 tagdef "subject last tagged txid" int8   ""         anonymous   system       false
 tagdef "tag last modified txid" int8     ""         anonymous   system       false
 tagdef bytes                 int8        ""         anonymous   system       false
-tagdef version               int8        ""         anonymous   system       false
-tagdef name                  text        ""         anonymous   system       false
-tagdef 'latest with name'    text        ""         anonymous   system       false      ""         true
-tagdef vname                 text        ""         anonymous   system       false      ""         true
-tagdef rname                 text        ""         anonymous   anonymous    false      ""         true
+tagdef name                  text        ""         anonymous   subjectowner false
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
 tagdef onclick               text        ""         anonymous   system       false
@@ -601,9 +590,6 @@ typedef id           int8          'Subject ID or subquery'
 typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'system No client can access'
 typedef type         text          'Scalar value type'             typedef
 typedef tagdef       text          'Tag definition'                tagdef
-typedef name         text          'Subject name'                  "latest with name"
-typedef vname        text          'Subject name@version'          vname
-typedef rname        text          'Resource name'          	   rname
 typedef config       text          'Study Type'                    config
 typedef view         text          'View name'                     view
 typedef 'GUI features' text       'GUI configuration mode'       ""                 'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
@@ -629,9 +615,6 @@ typedef()
 
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 tagdef 'default view'        text        ""         subject     subject      false      view       ""       view
-tagdef contains              text        ""         subject     subject      true       name       ""       "latest with name"
-tagdef vcontains             text        ""         subject     subject      true       vname      ""       vname
-tagdef rcontains             text        ""         anonymous   anonymous    true       rname      ""       rname
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
 
@@ -759,21 +742,11 @@ tag "$typedeftags" "_cfg_tag list tags" tagdef 'id' 'typedef' "typedef descripti
 dataset "file" view "${admin}" "*"
 filetags=${last_subject}
 tag "$filetags" "_cfg_file list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users'
-tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'version' 'modified' 'modified by' 'latest with name' 'subject last tagged' 'subject last tagged txid' 'vcontains'
+tag "$filetags" "_cfg_tag list tags" tagdef 'id' 'name' 'bytes' 'owner' 'read users' 'write users' 'sha256sum' 'content-type' 'created' 'homepage order' 'list on homepage' 'modified' 'modified by' 'subject last tagged' 'subject last tagged txid' 
 dataset "view" view "${admin}" "*"
 viewtags=${last_subject}
 tag "$viewtags" "_cfg_file list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
 tag "$viewtags" "_cfg_tag list tags" tagdef 'view' 'id' "_cfg_file list tags" "_cfg_file list tags write" "_cfg_tag list tags"
-
-dataset "vcontains" view "${admin}" "*"
-vcontainstags=${last_subject}
-tag "$vcontainstags" "_cfg_file list tags" tagdef 'id' 'name' 'version' 'vcontains'
-tag "$vcontainstags" "_cfg_tag list tags" tagdef 'id' 'name' 'version' 'vcontains'
-
-dataset "contains" view "${admin}" "*"
-containstags=${last_subject}
-tag "$containstags" "_cfg_file list tags" tagdef 'id' 'name' 'contains'
-tag "$containstags" "_cfg_tag list tags" tagdef 'id' 'name' 'contains'
 
 dataset "url" view "${admin}" "*"
 urltags=${last_subject}

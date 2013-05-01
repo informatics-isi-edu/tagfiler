@@ -153,9 +153,6 @@ def p_querypath_extend(p):
     """querypath : querypath slash querypath_elem"""
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
-    if len(plisttags) == 0:
-        # the parent path element has no listpreds, default to 'vcontains'
-        p[0][-1] = ( ppreds, [ web.Storage(tag='vcontains',op=None,vals=[]) ], pordertags )
     p[0].append( p[3] )
 
 def p_ordertags_empty(p):

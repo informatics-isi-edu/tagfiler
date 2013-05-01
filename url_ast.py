@@ -113,8 +113,6 @@ class FileList (Node):
     """Represents a bare FILE/ URI
 
        GET  FILE  or FILE/         -- gives a listing
-       GET  FILE?action=define     -- gives a new NameForm
-       POST FILE?name=foo&type=t   -- redirects to GET FILE/name?type=t&action=define
     """
 
     def __init__(self, parser, appname, queryopts={}):
@@ -152,7 +150,7 @@ class FileList (Node):
                 self.homepage = False
 
             listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['id',
-                                                                                                                     'name', 'version',
+                                                                                                                     'name', 
                                                                                                                      'tagdef', 'typedef',
                                                                                                                      'config', 'view', 'url'])) ]
 
@@ -202,10 +200,9 @@ class FileId(FileIO):
        Just creates filename and lets FileIO do the work.
 
     """
-    def __init__(self, parser, appname, path, queryopts={}, versions='any', storage=None):
+    def __init__(self, parser, appname, path, queryopts={}, storage=None):
         FileIO.__init__(self, parser, appname, path, queryopts)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
-        self.versions = versions
         if storage:
             self.storage = storage
 
@@ -372,17 +369,17 @@ class FileTags (Node):
         self.referer = None
 
     def get_body(self):
-        self.path_modified, self.listtags, writetags, self.limit, self.offset, self.versions = \
+        self.path_modified, self.listtags, writetags, self.limit, self.offset = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
                                       list_prefix='tag',
                                       extra_tags=
-                                      [ 'id', 'file', 'name', 'version', 
+                                      [ 'id', 'file', 'name', 
                                         'write users', 'modified' ] 
                                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
 
         self.http_vary.add('Accept')
-        self.set_http_etag(self.select_predlist_path_txid(self.path_modified, versions=self.versions))
+        self.set_http_etag(self.select_predlist_path_txid(self.path_modified))
         if self.http_is_cached():
             web.ctx.status = '304 Not Modified'
             return None, None
@@ -396,14 +393,14 @@ class FileTags (Node):
             # don't evaluate query if we're just rendering AJAX app
             files = []
         if self.acceptType == 'application/json':
-            files = self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit, json=True)
+            files = self.select_files_by_predlist_path(self.path_modified, limit=self.limit, json=True)
         elif self.acceptType == 'text/csv':
             temporary_file = open(self.temporary_filename, 'wb')
-            self.copyto_csv_files_by_predlist_path(temporary_file, self.path_modified, versions=self.versions, limit=self.limit)
+            self.copyto_csv_files_by_predlist_path(temporary_file, self.path_modified, limit=self.limit)
             temporary_file.close()
             return (False, all)
         else:
-            files = list(self.select_files_by_predlist_path(self.path_modified, versions=self.versions, limit=self.limit))
+            files = list(self.select_files_by_predlist_path(self.path_modified, limit=self.limit))
 
         if len(files) == 0:
             raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0], lambda x: x))
@@ -619,14 +616,14 @@ class Query (Node):
             #self.txlog('TRACE', value='Query::body entered')
             self.http_vary.add('Accept')
 
-            path, self.listtags, writetags, self.limit, self.offset, self.versions = \
+            path, self.listtags, writetags, self.limit, self.offset = \
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
                                           list_prefix='file',
                                           extra_tags=[ ])
 
             #self.txlog('TRACE', value='Query::body query prepared')
-            self.set_http_etag(txid=self.select_predlist_path_txid(path, versions=self.versions, limit=self.limit))
+            self.set_http_etag(txid=self.select_predlist_path_txid(path, limit=self.limit))
             #self.txlog('TRACE', value='Query::body txid computed')
             cached = self.http_is_cached()
 
@@ -636,7 +633,7 @@ class Query (Node):
             elif contentType == 'application/json':
                 self.txlog('QUERY', dataset=path_linearize(self.path))
                 self.queryopts['range'] = self.query_range
-                files = self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset, json=True)
+                files = self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset, json=True)
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
                 return files      
@@ -644,7 +641,7 @@ class Query (Node):
                 self.txlog('QUERY', dataset=path_linearize(self.path))
                 self.queryopts['range'] = self.query_range
                 temporary_file = open(self.temporary_filename, 'wb')
-                self.copyto_csv_files_by_predlist_path(temporary_file, path, versions=self.versions, limit=self.limit, offset=self.offset)
+                self.copyto_csv_files_by_predlist_path(temporary_file, path, limit=self.limit, offset=self.offset)
                 self.queryopts['range'] = None
                 temporary_file.close()
                 return False
@@ -652,7 +649,7 @@ class Query (Node):
                 self.txlog('QUERY', dataset=path_linearize(self.path))
 
                 self.queryopts['range'] = self.query_range
-                files = [file for file in  self.select_files_by_predlist_path(path=path, versions=self.versions, limit=self.limit, offset=self.offset) ]
+                files = [file for file in  self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset) ]
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
 

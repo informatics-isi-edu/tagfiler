@@ -28,7 +28,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, jsonWriter, make_temporary_file, yieldBytes
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, jsonWriter, make_temporary_file, yieldBytes
 from subjects import Subject
 
 # build a map of mime type --> primary suffix
@@ -190,7 +190,6 @@ class FileIO (Subject):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        #self.header('Content-Location', self.globals['homepath'] + '/file/%s@%d' % (urlquote(self.subject.name), self.subject.version))
         if sendBody:
 
             try:
@@ -486,7 +485,7 @@ class FileIO (Subject):
         def preWritePostCommit(results):
             f = results
             if f != None:
-                raise BadRequest(self, data='Cannot update an existing file version via POST.')
+                raise BadRequest(self, data='Cannot update an existing file via POST.')
             return None
         
         def putPostCommit(junk_files):
@@ -502,13 +501,13 @@ class FileIO (Subject):
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
             if acceptType in ['text/html', '*/*']:
-                url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
+                url = '/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view)
                 return self.renderui(['tags'], {'url': url})
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
+                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
                 self.header('Location', uri)
                 web.ctx.status = '204 No Content'
                 return ''
