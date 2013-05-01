@@ -144,11 +144,7 @@ class FileIO (Subject):
                     self.subject['content-type'] = line.strip().split(' ', 1)[0]
                 return f, render, False
             else:
-                self.set_http_etag(max(txids))
-                if self.http_is_cached():
-                    # skip the redirect
-                    return None, None, True
-                return None, None, False
+                raise Conflict(self, data='The resource "%s" does not support file IO.' % path_linearize(self.path))
 
         def postCommit(results):
             f, render, cached = results
@@ -156,11 +152,7 @@ class FileIO (Subject):
                 web.ctx.status = '304 Not Modified'
                 self.emit_headers()
                 return results
-            elif self.subject.dtype == 'file':
-                return results
             else:
-                # this emits headers for us
-                Subject.get_postCommit(self, f, sendBody)
                 return results
 
         f, render, cached = self.dbtransact(body, postCommit)
@@ -512,7 +504,6 @@ class FileIO (Subject):
             if acceptType in ['text/html', '*/*']:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
                 return self.renderui(['tags'], {'url': url})
-                #raise web.seeother(url)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)

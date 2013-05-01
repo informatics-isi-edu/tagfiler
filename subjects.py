@@ -222,17 +222,11 @@ class Subject (Node):
         # read authz implied by finding subject
         return None
 
-    def get_postCommit(self, ignore, sendBody=True):
-        datapred, dataid, dataname, dtype = self.subject2identifiers(self.subject)
-        self.emit_headers()
-        raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
-
-    def GET(self, uri, sendBody=True):
-        return self.dbtransact(lambda : self.get_body(),
-                               lambda result : self.get_postCommit(result, sendBody))
-
     def HEAD(self, uri):
-        return self.GET(uri, sendBody=False)
+        if hasattr(self, 'GET'):
+            return self.GET(uri, sendBody=False)
+        else:
+            raise web.NoMethod()
 
     def delete_body(self):
         spreds, lpreds, otags = self.path[-1]
@@ -645,7 +639,6 @@ class Subject (Node):
             if acceptType in ['text/html', '*/*']:
                 url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
                 return self.renderui(['tags'], {'url': url})
-                #raise web.seeother(url)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
@@ -659,8 +652,7 @@ class Subject (Node):
             return self.delete_body()
 
         def deletePostCommit(result):
-            self.delete_postCommit(result, set_status=False)
-            raise web.seeother(self.referer)
+            return self.delete_postCommit(result)
 
         def preDeleteBody():
             self.populate_subject(allow_blank=True, allow_multiple=True)
@@ -699,13 +691,7 @@ class Subject (Node):
             if self.action == None:
                 raise BadRequest(self, 'Form field "action" is required.')
 
-            self.referer = get_param('referer', "/file")
-
-            if self.action == 'CancelDelete':
-                raise web.seeother(self.referer)
-            elif self.action == 'ConfirmDelete':
-                return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' , 'post' ]:
+            if self.action in [ 'put', 'putsq' , 'post' ]:
                 # we only support non-file PUT and POST simulation this way
                 self.url = get_param('url')
                 name = get_param('name')
