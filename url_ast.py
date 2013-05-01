@@ -727,34 +727,3 @@ class Query (Node):
 
         #self.log('TRACE', value='Query::GET exiting')
 
-class UI (Node):
-    """Represents a generic template for the user interface"""
-
-    def __init__(self, parser, appname, uiopts, path=[], queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
-        self.uiopts = uiopts
-        self.path = path
-        self.queryopts = queryopts
-        
-    def GET(self, uri):
-        def body():
-            path, self.listtags, writetags, self.limit, self.offset, self.versions = \
-                  self.prepare_path_query(self.path,
-                                          list_priority=['path', 'list', 'view', 'default'],
-                                          list_prefix='file',
-                                          extra_tags=[ ])
-            self.basepath = path_linearize(path[0:-1])
-            self.querypath = [ dict(spreds=[dict(s) for s in spreds],
-                                               lpreds=[dict(l) for l in lpreds],
-                                               otags=otags)
-                                          for spreds, lpreds, otags in path ]
-            return None
-
-        def postCommit(files):
-            self.uiopts = {}
-            self.uiopts['basepath'] = self.basepath
-            self.uiopts['querypath'] = self.querypath
-            return jsonWriter(self.uiopts)
-
-        return self.dbtransact(body, postCommit)
-    

@@ -49,8 +49,7 @@ keywords = {
     'ciregexp' : 'CIREGEXP',
     'absent' : 'ABSENT',
     'asc' : 'ASC',
-    'desc' : 'DESC',
-    'ui' : 'UI'
+    'desc' : 'DESC'
 }
 
 tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())

@@ -40,40 +40,8 @@ def p_start(p):
              | tags
              | query
              | querypathroot
-             | ui
 """
     p[0] = p[1]
-
-def p_ui_empty(p):
-    """ui : slash string slash UI
-          | slash string slash UI slash"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=[])
-    
-def p_ui(p):
-    """ui : slash string slash UI uiopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5])
-    
-def p_ui_queryopts(p):
-    """ui : slash string slash UI uiopts queryopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], queryopts=p[6])
-    
-def p_ui_querypath(p):
-    """ui : slash string slash UI uiopts querypath"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[6])
-    
-def p_ui_queryopts_querypath(p):
-    """ui : slash string slash UI uiopts querypath queryopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[6], queryopts=p[7])
-    
-def p_uiopts(p):
-    """uiopts : slash string slash"""
-    p[0] = []
-    p[0].append(p[2])
-
-def p_uiopts_grow(p):
-    """uiopts : uiopts string slash"""
-    p[0] = p[1]
-    p[0].append(p[2])
 
 def p_querypathroot(p):
     """querypathroot : querypath"""

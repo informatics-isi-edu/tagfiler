@@ -8444,7 +8444,7 @@ function viewAvailableTagDefinitions() {
 }
 
 function viewLink(querypath) {
-	var url = HOME + '/ui/query/';
+	var url = HOME + '/query/';
 	if (querypath != null) {
 		url += querypath;
 	}
