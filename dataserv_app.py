@@ -719,16 +719,15 @@ class Application (webauthn2_handler_factory.RestHandler):
         def helper(config):
             config['policy remappings'] = buildPolicyRules(config['policy remappings'])
             return config
-        return lambda : [ helper(config) for config in self.select_config(pred=web.Storage(tag='config', op=None, vals=[])) ]
+        return lambda : [ helper(self.select_config(pred=web.Storage(tag='config', op=None, vals=['tagfiler']))) ]
 
     def select_config_cached(self, db, configname=None):
         if configname == None:
             configname = 'tagfiler'
         config = config_cache.select(self.db, self.config_filler(db), None, configname)
         if config == None:
-            return config_cache.select(self.db, self.config_filler(db), None, 'tagfiler')
-        else:
-            return config
+            config = config_cache.select(self.db, self.config_filler(db), None, 'tagfiler')
+        return config
 
     def select_config(self, pred=None, params_and_defaults=None, fake_missing=True):
         
@@ -739,8 +738,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             params_and_defaults = [ ('bugs', None),
                                     ('chunk bytes', 64 * 1024),
                                     ('enabled GUI features', []),
-                                    ('file list tags', []),
-                                    ('file list tags write', []),
                                     ('file write users', []),
                                     ('help', None),
                                     ('home', 'https://%s' % self.hostname),
@@ -749,29 +746,46 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     ('query', None),
                                     ('store path', '/var/www/%s-data' % daemonuser),
                                     ('subtitle', ''),
-                                    ('tag list tags', []),
                                     ('tagdef write users', []),
                                     ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()) ]
 
-        results = self.select_files_by_predlist(subjpreds=[pred],
-                                                tagdefs=Application.static_tagdefs,
-                                                typedefs=Application.static_typedefs,
-                                                listtags=[ "_cfg_%s" % key for key, default in params_and_defaults] + [ pred.tag, 'subject last tagged', 'subject last tagged txid' ],
-                                                listas=dict([ ("_cfg_%s" % key, key) for key, default in params_and_defaults]))
+        path = [ 
+            ( [pred], [web.Storage(tag='config binding', op=None, vals=[])], [] ),
+            ( [], [web.Storage(tag=tagname, op=None, vals=[]) for tagname in ['config parameter', 'config value', 'subject last tagged', 'subject last tagged txid']], [] ) 
+            ]
+        
+        query, values = self.build_files_by_predlist_path(path=path,
+                                                          tagdefs=Application.static_tagdefs,
+                                                          typedefs=Application.static_typedefs)
 
-        def set_defaults(config):
-            for key, default in params_and_defaults:
-                #web.debug('config "%s" = %s' % (key, config[key]), default)
-                if config[key] == None or config[key] == []:
+        config = web.Storage()
+        mtimes = []
+        txids = []
+
+        for result in self.dbquery(query, values):
+            mtimes.append(result['subject last tagged'])
+            txids.append(result['subject last tagged txid'])
+            config[ result['config parameter'] ] = result['config value']
+
+        config['config'] = 'tagfiler' # BUG: we cannot support config lookup for anything but tagfiler!
+        config['subject last tagged'] = max(mtimes)
+        config['subject last tagged txid'] = max(txids)
+
+        for key, default in params_and_defaults:
+            if type(default) == list:
+                config[key] = config.get(key, default)
+            else:
+                vals = config.get(key, [])
+                if len(vals) == 1:
+                    config[key] = vals[0]
+                else:
                     config[key] = default
-            return config
 
-        return [ set_defaults(config) for config in results ]
+        return config
 
     def select_view_all(self):
         return self.select_files_by_predlist(subjpreds=[ web.Storage(tag='view', op=None, vals=[]) ],
-                                             listtags=[ 'view' ] + [ "_cfg_%s" % key for key in ['file list tags', 'file list tags write', 'tag list tags'] ],
-                                             listas=dict([ ("_cfg_%s" % key, key) for key in ['file list tags', 'file list tags write', 'tag list tags'] ]))
+                                             listtags=[ 'view', "view tags" ])
 
     def select_view(self, viewname=None, default='default'):
         return self.select_view_prioritized( [viewname, default] )
@@ -872,6 +886,9 @@ class Application (webauthn2_handler_factory.RestHandler):
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
     for prototype in [ ('config', 'text', False, 'subject', True),
+                       ('config binding', 'id', True, 'subject', False),
+                       ('config parameter', 'text', False, 'subject', False),
+                       ('config value', 'text', True, 'subject', False),
                        ('id', 'int8', False, 'system', True),
                        ('readok', 'boolean', False, 'system', False),
                        ('writeok', 'boolean', False, 'system', False),
@@ -898,22 +915,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('subject last tagged txid', 'int8', False, 'system', False),
                        ('tag last modified', 'timestamptz', False, 'system', False),
                        ('name', 'text', False, 'subjectowner', False),
-                       ('_cfg_bugs', 'text', False, 'subject', False),
-                       ('_cfg_chunk bytes', 'text', False, 'subject', False),
-                       ('_cfg_enabled GUI features', 'text', True, 'subject', False),
-                       ('_cfg_file list tags', 'tagdef', True, 'subject', False),
-                       ('_cfg_file list tags write', 'tagdef', True, 'subject', False),
-                       ('_cfg_file write users', 'rolepat', True, 'subject', False),
-                       ('_cfg_help', 'text', False, 'subject', False),
-                       ('_cfg_home', 'text', False, 'subject', False),
-                       ('_cfg_logo', 'text', False, 'subject', False),
-                       ('_cfg_policy remappings', 'text', True, 'subject', False),
-                       ('_cfg_query', 'text', False, 'subject', False),
-                       ('_cfg_store path', 'text', False, 'subject', False),
-                       ('_cfg_subtitle', 'text', False, 'subject', False),
-                       ('_cfg_tag list tags', 'tagdef', True, 'subject', False),
-                       ('_cfg_tagdef write users', 'rolepat', True, 'subject', False),
-                       ('_cfg_template path', 'text', False, 'subject', False) ]:
+                       ('view', 'text', False, 'subject', True),
+                       ('view tags', 'tagdef', True, 'subject', False) ]:
         deftagname, typestr, multivalue, writepolicy, unique = prototype
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
@@ -1077,8 +1080,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.globals['query'] = self.globals['home'] + '/query'
         self.globals['subtitle'] = self.config.subtitle
         self.globals['logo'] = self.config.logo
-        self.globals['filelisttags'] = self.config['file list tags']
-        self.globals['filelisttagswrite'] = self.config['file list tags write']
         self.globals['enabledGUIFeatures'] = self.config['enabled GUI features']
         self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
         
@@ -1815,7 +1816,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if referenced_tagdef == None:
                     raise Conflict(self, 'Referenced tag "%s" not found.' % tagref)
 
-                if referenced_tagdef.unique and referenced_tagdef.typestr != 'empty':
+                if referenced_tagdef.unique and referenced_tagdef.typestr != 'empty' and referenced_tagdef.tagname not in ['id']:
                     tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
             if not tagdef.multivalue:
@@ -3493,7 +3494,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if i > 0:
                 cpreds = path[i-1][1]
                 tagtypes = set([ tagdefs[pred.tag].typestr for pred in cpreds ])
-                tagrefs = set([ typedefs[t]['typedef tagref'] for t in tagtypes ])
+                tagrefs = set([ typedefs[t]['typedef tagref'] for t in tagtypes if typedefs[t]['typedef tagref'] is not None ])
                 if len(tagrefs) > 1:
                     raise BadRequest(self, 'Path element %d has %d disjoint projection tag-references when at most 1 is supported.' % (i-1, len(tagrefs)))
                 elif len(tagrefs) == 1:
@@ -3652,7 +3653,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         return relevant_tags_txid(path)
 
-    def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'subject', 'default'], list_prefix=None, extra_tags=[]):
+    def prepare_path_query(self, path, list_priority=['path', 'list', 'view', 'subject', 'default'], extra_tags=[]):
         """Prepare (path, listtags, writetags, limit) from input path, web environment, and input policies.
 
            list_priority  -- chooses first successful source of listtags
@@ -3663,12 +3664,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                 'subject' : use view named by 'default view' tag of subject ... REQUIRES EXTRA QUERY STEP AND SINGLE SUBJECT
                 'default' : use 'default' view
                 'all' : use all defined tags
-
-           view_list_prefix -- enables consultation of view tags
-
-                '%s list tags' % prefix : for listtags
-                '%s list tags write' % prefix : for writetags
-
 
            extra_tags  -- tags to add to listpreds of path[-1] without adding to listtags or writetags."""
 
@@ -3733,8 +3728,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 return wrap_results(listpreds=listpreds, ordered=True)
             return None
 
-        listname = '%s list tags' % list_prefix
-        writename = '%s list tags write' % list_prefix
+        listname = 'view tags'
+        writename = 'view tags'
 
         def derive_from_listopt():
             # derive from 'list' query opt

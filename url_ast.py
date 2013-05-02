@@ -132,8 +132,8 @@ class FileList (Node):
             if not listtags:
                 view = self.select_view(self.globals['view'])
                 if view:
-                    listtags = view['file list tags']
-                    writetags = view['file list tags write']
+                    listtags = view['view tags']
+                    writetags = view['view tags']
                 else:
                     listtags = []
                     writetags = []
@@ -372,7 +372,6 @@ class FileTags (Node):
         self.path_modified, self.listtags, writetags, self.limit, self.offset = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
-                                      list_prefix='tag',
                                       extra_tags=
                                       [ 'id', 'file', 'name', 
                                         'write users', 'modified' ] 
@@ -619,7 +618,6 @@ class Query (Node):
             path, self.listtags, writetags, self.limit, self.offset = \
                   self.prepare_path_query(self.path,
                                           list_priority=['path', 'list', 'view', 'default'],
-                                          list_prefix='file',
                                           extra_tags=[ ])
 
             #self.txlog('TRACE', value='Query::body query prepared')
