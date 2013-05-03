@@ -590,7 +590,7 @@ typedef rolepat      text          'Role pattern'
 typedef url          text          'URL'
 typedef onclick      text          'Javascript function'
 typedef id           int8          'Subject ID or subquery'
-typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'system No client can access'
+typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'objectowner Object owner may access' 'object Object authorization is observed' 'tagandsubjectandobject Tag, subject, and object authorization are required' 'tagorsubjectandobject Either tag or both of subject and object authorization is required' 'subjectandobject Subject and object authorization are required' 'system No client can access'
 typedef type         text          'Scalar value type'             typedef
 typedef tagdef       text          'Tag definition'                tagdef
 typedef view         text          'View name'                     view

@@ -857,9 +857,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
                                                                         'subject Subject authorization is observed',
                                                                         'subjectowner Subject owner may access',
+                                                                        'object Object authorization is observed',
+                                                                        'objectowner Object owner may access',
                                                                         'tag Tag authorization is observed',
                                                                         'tagorsubject Tag or subject authorization is sufficient',
                                                                         'tagandsubject Tag and subject authorization are required',
+                                                                        'tagandsubjectandobject Tag, subject, and object authorization are required',
+                                                                        'tagorsubjectandobject Either tag or both of subject and object authorization is required',
+                                                                        'subjectandobject Subject and object authorization are required',
                                                                         'tagorowner Tag authorization or subject ownership is sufficient',
                                                                         'tagandowner Tag authorization and subject ownership is required',
                                                                         'system No client can access']),
@@ -929,7 +934,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           writepolicy=writepolicy,
                                           unique=unique,
                                           tagreaders=[],
-                                          tagwriters=[]))
+                                          tagwriters=[],
+                                          tagref=static_typedefs[typestr].get('typedef tagref')))
 
     static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
 
@@ -1140,6 +1146,20 @@ class Application (webauthn2_handler_factory.RestHandler):
         results = self.select_tagdef(tag)
         if len(results) == 0:
             raise Conflict(self, 'Supplied tag name "%s" is not defined.' % tag)
+
+    def validateTagdefPolicy(self, tag, tagdef=None, subject=None):
+        typedef = self.globals['typesdict']['tagpolicy']
+
+        if tagdef and tagdef.tagname == 'tagdef readpolicy':
+            # remap read policies to their simplest functional equivalent based on graph ACL enforcement always present for reads
+            tag = dict(subject="anonymous",              # subject read enforcement already happens 
+                       object="object",                  # TODO: change to "anonymous" once object tagref ACL enforcement is implemented
+                       tagandsubject="tag",              # subject read enforcement already happens
+                       tagandsubjectandobject="object",  # TODO: change to "tag" once object tagref ACL enforcement is implemented
+                       subjectandobject="object")        # TODO: change to "anonymous" once object tagref ACL enforcement is implemented
+
+        if tag not in typedef['typedef values']:
+            raise Conflict(self, 'Supplied tagdef policy "%s" is not defined.' % tag)
 
     def validateRole(self, role, tagdef=None, subject=None):
         # TODO: fixme with webauthn2
@@ -1377,6 +1397,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             db_globals_dict = dict(typeinfo=lambda : [ x for x in typedef_cache.select(db, lambda: self.get_type(), self.context.client)],
                                    typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
                                    tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
+
             #self.log('TRACE', value='preparing needed_db_globals')
             for key in self.needed_db_globals:
                 if not self.globals.has_key(key):
@@ -1512,13 +1533,17 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             return True
 
-    def test_tag_authz(self, mode, subject, tagdef):
+    def test_tag_authz(self, mode, subject, tagdef, value=None, tagdefs=None):
         """Check whether access is allowed to user given policy_tag and owner.
 
            True: access allowed
            False: access forbidden
            None: user needs to authenticate to be sure
-                 or subject is None and subject is needed to make determination"""
+                 or subject is None and subject is needed to make determination
+                 or value is None and value is needed to make determination"""
+        if tagdefs is None:
+            tagdefs = self.globals['tagdefsdict']
+
         policy = tagdef['%spolicy' % mode]
 
         tag_ok = tagdef.owner in self.context.attributes \
@@ -1532,13 +1557,39 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             subject_ok = None
             subject_owner = None
-        
+
+        obj_ok = None
+        obj_owner = None
+
+        if tagdef.tagref:
+            reftagdef = tagdefs[tagdef.tagref]
+            obj_ok = self.test_tag_authz(mode, None, reftagdef, tagdefs=tagdefs)
+
+            if value is not None and obj_ok is None:
+                results = self.select_files_by_predlist_path([web.Storage(tag=tagdef.tagref, op='=', vals=[value])], tagdefs=tagdefs)
+                if len(results) == 1:
+                    obj = results[0]
+                    obj_ok = self.test_tag_authz(mode, obj, reftagdef, tagdefs=tagdefs)
+                    obj_owner = obj.owner in self.context.attributes
+                else:
+                    raise Conflict(self, data='Referenced object "%s"="%s" is not found.' % (tagdef.tagref, value))
+
         if policy == 'system':
             return False
         elif policy == 'subjectowner':
             return subject_owner
         elif policy == 'subject':
             return subject_ok
+        elif policy == 'objectowner':
+            return obj_owner
+        elif policy == 'object':
+            return obj_ok
+        elif policy == 'subjectandobject':
+            return subject_ok and obj_ok
+        elif policy == 'tagandsubjectandobject':
+            return tag_ok and subject_ok and obj_ok
+        elif policy == 'tagorsubjectandobject':
+            return tag_ok or (subject_ok and obj_ok)
         elif policy == 'tagandsubject':
             return tag_ok and subject_ok
         elif policy == 'tagorsubject':
@@ -1571,9 +1622,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         elif allow == None:
             raise Unauthorized(self, data=data)
 
-    def enforce_tag_authz(self, mode, subject, tagdef):
+    def enforce_tag_authz(self, mode, subject, tagdef, value=None):
         """Check whether access is allowed and throw web exception if not."""
-        allow = self.test_tag_authz(mode, subject, tagdef)
+        allow = self.test_tag_authz(mode, subject, tagdef, value)
         data = '%s of tag "%s" on dataset "%s"' % (mode, tagdef.tagname, self.subject2identifiers(subject)[0])
         if allow == False:
             raise Forbidden(self, data=data)
@@ -1704,18 +1755,21 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             ordertags = []
 
-        def augment(tagdef):
-            for mode in ['read', 'write']:
-                tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef)
-
+        def augment1(tagdef):
             try:
                 typedef = self.globals['typesdict'][tagdef.typestr]
             except:
                 typedef = Application.static_typedefs[tagdef.typestr]
-                
+             
             tagdef['tagref'] = typedef['typedef tagref']
             tagdef['dbtype'] = typedef['typedef dbtype']
+
+            return tagdef
             
+        def augment2(tagdef, tagdefs):
+            for mode in ['read', 'write']:
+                tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef, tagdefs=tagdefs)
+
             return tagdef
             
         if tagname:
@@ -1723,7 +1777,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ augment(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ augment1(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
+        results = [ augment2(tagdef, dict([ (res.tagname, res) for res in results ])) for tagdef in results ]
+
         #web.debug(results)
         return results
 
@@ -2144,19 +2200,27 @@ class Application (webauthn2_handler_factory.RestHandler):
                 raise Forbidden(self, data='write on tag "%s"' % tagdef.tagname)
             elif tagdef.writeok == None:
                 # tagdef write policy depends on per-row information
-                if tagdef.writepolicy in [ 'subject', 'tagorsubject', 'tagandsubject' ]:
+                if tagdef.writepolicy in [ 'subject', 'tagorsubject', 'tagandsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                     # None means we need subject writeok for this user
                     if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
                                     % dict(intable=intable,
                                            wheres=' AND '.join([ '%s = False' % wokcol ] + wheres)))[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
-                elif tagdef.writepolicy in [ 'subjectowner', 'tagorowner', 'tagandowner' ]:
+                if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
+                    # None means we need object writeok for this user
+                    # TODO: implement test against objects
+                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+                if tagdef.writepolicy in [ 'subjectowner', 'tagorowner', 'tagandowner' ]:
                     # None means we need subject is_owner for this user
                     query = 'SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s' % dict(intable=intable,
                                                                                                 wheres=' AND '.join([ '%s = False' % isowncol ] + wheres))
-                    #web.debug(query)
                     if self.dbquery(query)[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
+
+                if tagdef.writepolicy in [ 'objectowner' ]:
+                    # None meansn we need object is_owner for this user
+                    # TODO: implement test against objects
+                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
             else:
                 # tagdef write policy accepts statically for this user and tag
                 pass
@@ -2522,11 +2586,15 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             if td.writeok == None:
                 # need to test permissions on per-subject basis for this tag before deleting triples
-                if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject' ]:
+                if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                     count = self.dbquery('SELECT count(*) AS count FROM (%s) s WHERE NOT writeok' % dquerybrief, vars=dvaluesbrief)[0].count
                     if count > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
-                elif td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
+                if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
+                    # None means we need object writeok for this user
+                    # TODO: implement test against objects
+                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+                if td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
                     count = self.dbquery(('SELECT count(*) AS count'
                                           + ' FROM ( %(dquery)s ) s'
                                           + ' WHERE NOT CASE'
@@ -2538,6 +2606,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          vars=dvaluesbrief)[0].count
                     if count > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
+                if tagdef.writepolicy in [ 'objectowner' ]:
+                    # None meansn we need object is_owner for this user
+                    # TODO: implement test against objects
+                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
 
             # delete tuples from graph and update metadata
             self.delete_tag_intable(td, '(%s) s' % dquery, 'id', wraptag(tag, '', ''), unnest=False)
@@ -3186,6 +3258,9 @@ class Application (webauthn2_handler_factory.RestHandler):
             wheres = []
             extra_tag_columns = set()
 
+            # make a copy so we can mutate it safely
+            preds = list(preds)
+
             valcol = '%s.value'  % wraptag(tagdef.tagname)
             if tagdef.tagname == 'id':
                 m['table'] = 'resources'
@@ -3214,6 +3289,24 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             used_not_op = False
             used_other_op = False
+
+            if tagdef.tagref:
+                # add a constraint so that we can only see tags referencing another entry we can see
+                reftagdef = tagdefs[tagdef.tagref]
+                refvalcol = wraptag(tagdef.tagref, prefix='')
+                if reftagdef.multivalue:
+                    refvalcol = 'unnest(%s)' % refvalcol
+                refquery = "SELECT %s FROM (%s) s" % (
+                    refvalcol,
+                    self.build_files_by_predlist_path([ ([web.Storage(tag=tagdef.tagref, op=None, vals=[])],
+                                                         [web.Storage(tag=tagdef.tagref, op=None, vals=[])],
+                                                         []) ],
+                                                      values=values,
+                                                      tagdefs=tagdefs,
+                                                      typedefs=typedefs)[0]
+                    )
+                preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
+                
             for pred in preds:
                 if pred.op == ':absent:':
                     used_not_op = True
@@ -3289,6 +3382,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                         m['table'] += (' JOIN (SELECT subject FROM _owner WHERE value IN (%s)' % rolekeys
                                        + '     UNION'
                                        + '     SELECT subject FROM "_read users" WHERE value IN (%s)) readok USING (subject)' % rolekeys)
+                    elif tagdef.readpolicy in [ 'objectowner', 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
+                        # TODO: implement test against objects
+                        raise Forbidden(self, data='read on tag "%s" authz not implemented yet' % tagdef.tagname)
 
             for tag in extra_tag_columns:
                 m['table'] += ' LEFT OUTER JOIN %s USING (subject)' % wraptag(tag)
@@ -3794,7 +3890,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                           'write users' : validateRolePattern,
                           'modified by' : validateRole,
                           'typedef values' : validateEnumeration,
-                          '_cfg_policy remappings' : validatePolicyRule }
+                          'tagdef readpolicy': validateTagdefPolicy,
+                          'tagdef writepolicy': validateTagdefPolicy }
 
     tagtypeValidators = { 'tagname' : validateTagname,
                           'id' : validateSubjectQuery }
