@@ -29,7 +29,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter, getParamEnv
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter, getParamEnv
 
 myrand = random.Random()
 myrand.seed(os.getpid())
@@ -116,7 +116,6 @@ class Subject (Node):
         self.action = None
         self.key = None
         self.dtype = None
-        self.url = None
         self.file = None
         self.bytes = None
         self.referer = None
@@ -133,7 +132,7 @@ class Subject (Node):
             return (self.subjects, self.path_txid)
 
         subjpreds, listpreds, ordertags = self.path[-1]
-        self.unique = self.validate_subjpreds_unique(acceptName=True, subjpreds=subjpreds)
+        self.unique = self.validate_subjpreds_unique(subjpreds=subjpreds)
         
         if self.unique != None:
             self.subjects, self.path_txid = subject_cache.select(self.db, searchfunc, path_linearize(self.path), self.context.client)
@@ -156,20 +155,10 @@ class Subject (Node):
                 pass
             raise BadRequest(self, 'FileIO module does not support general subject tag list "%s".' % predlist_linearize(listpreds))
         
-        self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, subjpreds=subjpreds)
-
-        if self.unique == None:
-            # this happens only with allow_blank=True when there is no uniqueness and no name
-            self.versions = 'any'
-        elif self.unique:
-            # this means we have an exact match which may not be the latest version
-            self.versions = 'any'
-        elif self.unique == False:
-            # this happens when we accept a name w/o version in lieu of unique predicate(s)
-            self.versions = 'latest'
+        self.unique = self.validate_subjpreds_unique(acceptBlank=allow_blank, subjpreds=subjpreds)
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'url','modified', 'modified by', 'name', 'version', 'Image Set', 'Study Type', 'incomplete', 'template mode', 'template query']
+                      for tag in ['id', 'content-type', 'bytes', 'modified', 'modified by', 'incomplete']
                       + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
@@ -178,7 +167,7 @@ class Subject (Node):
 
         if enforce_parent and len(self.path) > 1:
             # this is a context requiring the parent path to exist
-            results = self.select_files_by_predlist_path(path=querypath[0:-1], versions=self.versions, enforce_read_authz=enforce_read_authz)
+            results = self.select_files_by_predlist_path(path=querypath[0:-1], enforce_read_authz=enforce_read_authz)
             parent = '/' + '/'.join([ '%s(%s)' % (predlist_linearize(s), predlist_linearize(l)) for s, l, o in self.path[0:-1] ])
             if len(results) != 1:
                 raise Conflict(self, 'The parent path "%s" does not resolve to a unique parent.' % parent)
@@ -188,8 +177,8 @@ class Subject (Node):
         if post_method and self.unique == None:
             results = []
         else:
-            self.path_txid = self.select_predlist_path_txid(querypath, versions=self.versions, enforce_read_authz=enforce_read_authz)
-            results = self.select_files_by_predlist_path(path=querypath, versions=self.versions, enforce_read_authz=enforce_read_authz)
+            self.path_txid = self.select_predlist_path_txid(querypath, enforce_read_authz=enforce_read_authz)
+            results = self.select_files_by_predlist_path(path=querypath, enforce_read_authz=enforce_read_authz)
 
         if len(results) == 0:
             raise NotFound(self, 'dataset matching "%s"' % request)
@@ -223,34 +212,18 @@ class Subject (Node):
         # read authz implied by finding subject
         return None
 
-    def get_postCommit(self, ignore, sendBody=True):
-        datapred, dataid, dataname, dtype = self.subject2identifiers(self.subject)
-        self.emit_headers()
-        raise web.seeother('%s/tags/%s' % (self.globals['home'], datapred))
-
-    def GET(self, uri, sendBody=True):
-        return self.dbtransact(lambda : self.get_body(),
-                               lambda result : self.get_postCommit(result, sendBody))
-
     def HEAD(self, uri):
-        return self.GET(uri, sendBody=False)
+        if hasattr(self, 'GET'):
+            return self.GET(uri, sendBody=False)
+        else:
+            raise web.NoMethod()
 
     def delete_body(self):
         spreds, lpreds, otags = self.path[-1]
         
-        self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, subjpreds=spreds)
+        self.unique = self.validate_subjpreds_unique(acceptBlank=True, subjpreds=spreds)
 
-        if self.unique == None:
-            # this happens only with allow_blank=True when there is no uniqueness and no name
-            self.versions = 'any'
-        elif self.unique:
-            # this means we have an exact match which may not be the latest version
-            self.versions = 'any'
-        elif self.unique == False:
-            # this happens when we accept a name w/o version in lieu of unique predicate(s)
-            self.versions = 'latest'
-
-        results = [ r for r in self.bulk_delete_subjects(self.path, self.versions) ]
+        results = [ r for r in self.bulk_delete_subjects(self.path) ]
 
         #self.log('TRACE', value='after deleting subjects')
 
@@ -295,7 +268,6 @@ class Subject (Node):
         newfile.bytes = self.bytes
         newfile.dtype = self.dtype
         newfile.file = self.file
-        newfile.url = self.url
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
         self.mergeSubjpredsTags = False
         status = web.ctx.status
@@ -312,48 +284,27 @@ class Subject (Node):
             if len( set(self.config['file write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
-            self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=allow_blank, restrictSchema=True, subjpreds=self.path[-1][0])
+            self.unique = self.validate_subjpreds_unique(acceptBlank=allow_blank, restrictSchema=True, subjpreds=self.path[-1][0])
             self.mergeSubjpredsTags = True
-
-        if self.unique == False:
-            # this is the case where we are using name/version semantics for files
-            if self.subject:
-                newfile.version = self.subject.version + 1
-                newfile.name = self.subject.name
-            else:
-                newfile.version = 1
-                newfile.name = reduce(reduce_name_pred, self.path[-1][0] + [ web.Storage(tag='', op='', vals=[]) ] )
-        else:
-            newfile.name = None
-            newfile.version = None
 
         # determine content_type with extensible callout for subtypes
         content_type = self.insertForStore_contentType(newfile)
 
         if self.subject:
-            if self.unique == False:
-                # this is the case where we create a new version of an existing named file
-                self.txlog('UPDATE', dataset=path_linearize(self.path))
-                newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
-            elif self.unique:
-                # this is the case where we update an existing uniquely tagged file in place
-                self.txlog('UPDATE', dataset=path_linearize(self.path))
-                newfile.id = None
-                if self.subject.file:
-                    junk_files.append(self.subject.file)
-                if newfile.file:
-                    self.set_tag(self.subject, self.globals['tagdefsdict']['file'], newfile.file)
-                elif self.subject.file:
-                    self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
-            else:
-                # this is the case where we create a new blank node similar to an existing blank node
-                self.txlog('CREATE', dataset=path_linearize(self.path))
-                newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
+            # this is the case where we update an existing uniquely tagged file in place
+            self.txlog('UPDATE', dataset=path_linearize(self.path))
+            newfile.id = None
+            if self.subject.file:
+                junk_files.append(self.subject.file)
+            if newfile.file:
+                self.set_tag(self.subject, self.globals['tagdefsdict']['file'], newfile.file)
+            elif self.subject.file:
+                self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
         else:
-            # anybody is free to insert new uniquely named file
+            # anybody is free to insert new file
             self.txlog('CREATE', dataset=path_linearize(self.path))
             #web.debug(self.file)
-            newfile.id = self.insert_file(newfile.name, newfile.version, newfile.file)
+            newfile.id = self.insert_file(newfile.file)
 
         if newfile.id != None:
             newfile.owner=self.context.client
@@ -372,26 +323,6 @@ class Subject (Node):
             # set initial tags on all new, independent objects
             self.set_tag(newfile, self.globals['tagdefsdict']['owner'], newfile.owner)
             self.set_tag(newfile, self.globals['tagdefsdict']['created'], 'now')
-            if newfile.version:
-                self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
-            if newfile.name and newfile.version:
-                self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
-        elif newfile.id != basefile.id and newfile.version and basefile.version:
-            # create derived versioned file from existing versioned file
-            self.set_tag(newfile, self.globals['tagdefsdict']['version created'], 'now')
-            self.set_tag(newfile, self.globals['tagdefsdict']['vname'], '%s@%s' % (newfile.name, newfile.version))
-
-            for result in self.select_filetags_noauthn(basefile):
-                if result.tagname not in [ 'bytes', 'content-type', 'key', 'check point offset',
-                                           'latest with name', 'modified', 'modified by', 'name', 'sha256sum',
-                                           'url', 'file', 'version created', 'version', 'vname' ] \
-                                           and not self.globals['tagdefsdict'][result.tagname].unique:
-                    tags = self.select_tag_noauthn(basefile, self.globals['tagdefsdict'][result.tagname])
-                    for tag in tags:
-                        if hasattr(tag, 'value'):
-                            self.set_tag(newfile, self.globals['tagdefsdict'][result.tagname], tag.value)
-                        else:
-                            self.set_tag(newfile, self.globals['tagdefsdict'][result.tagname])
 
         if not basefile or self.context.client != basefile['modified by'] or basefile.id != newfile.id:
             self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.context.client)
@@ -408,12 +339,10 @@ class Subject (Node):
         if newfile.dtype == 'file':
             if newfile.bytes != None and (not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['bytes'], newfile.bytes)
-            if not basefile or basefile.url and basefile.version == newfile.version:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['url'])
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.id != newfile.id):
                 self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
-        elif newfile.dtype in [ None, 'url' ]:
+        elif newfile.dtype in [ None ]:
             if basefile and basefile.bytes != None and basefile.id == newfile.id:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
             if basefile and basefile['content-type'] != None and basefile.id == newfile.id:
@@ -431,7 +360,7 @@ class Subject (Node):
         tagvals = [ (k, [v]) for k, v in self.queryopts.items() ]
 
         if self.mergeSubjpredsTags:
-            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.tag not in [ 'name', 'version' ] and pred.op in [ '=', None ] ]
+            tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.op in [ '=', None ] ]
 
         for tagname, values in tagvals:
             tagdef = self.globals['tagdefsdict'].get(tagname, None)
@@ -490,16 +419,12 @@ class Subject (Node):
                 self.path = [ ( [], [], [] ) ]
             
             subjpreds, listpreds, ordertags = self.path[-1]
-            self.versioned_unique = self.unique and self.validate_subjpreds_unique(acceptName=False, acceptBlank=post_method, subjpreds=subjpreds)
-            if self.versioned_unique:
-                # special corner case where we cannot create the missing, unique file
-                raise
             
             # not found and not unique, treat as new file put
             if len( set(self.config['file write users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
                 raise Forbidden(self, 'creation of datasets')
             # raise exception if subjpreds invalid for creating objects
-            self.unique = self.validate_subjpreds_unique(acceptName=True, acceptBlank=True, restrictSchema=True)
+            self.unique = self.validate_subjpreds_unique(acceptBlank=True, restrictSchema=True)
             self.mergeSubjpredsTags = True
 
         return None
@@ -647,14 +572,13 @@ class Subject (Node):
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
             if acceptType in ['text/html', '*/*']:
-                url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
+                url = '/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view)
                 return self.renderui(['tags'], {'url': url})
-                #raise web.seeother(url)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
+                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
                 self.header('Location', url)
                 web.ctx.status = '201 Created'
                 return '%s\n' % url
@@ -663,21 +587,14 @@ class Subject (Node):
             return self.delete_body()
 
         def deletePostCommit(result):
-            self.delete_postCommit(result, set_status=False)
-            raise web.seeother(self.referer)
+            return self.delete_postCommit(result)
 
         def preDeleteBody():
             self.populate_subject(allow_blank=True, allow_multiple=True)
             if not self.subject.writeok:
                 raise Forbidden(self, 'delete of dataset "%s"' % path_linearize(self.path))
             
-            if self.subject.dtype == 'url':
-                if self.subject['Image Set']:
-                    ftype = 'imgset'
-                else:
-                    ftype = 'url'
-            else:
-                ftype = self.subject.dtype
+            ftype = self.subject.dtype
                 
             if not ftype:
                 ftype = 'blank'
@@ -709,25 +626,13 @@ class Subject (Node):
             if self.action == None:
                 raise BadRequest(self, 'Form field "action" is required.')
 
-            self.referer = get_param('referer', "/file")
-
-            if self.action == 'CancelDelete':
-                raise web.seeother(self.referer)
-            elif self.action == 'ConfirmDelete':
-                return self.dbtransact(deleteBody, deletePostCommit)
-            elif self.action in [ 'put', 'putsq' , 'post' ]:
+            if self.action in [ 'put', 'putsq' , 'post' ]:
                 # we only support non-file PUT and POST simulation this way
                 self.url = get_param('url')
-                name = get_param('name')
-                if name:
-                    self.path.append( ( [web.Storage(tag='name', op='=', vals=[name])], [], [] ) )
                 self.dtype = None
                 if self.action in ['put', 'post']:
                     if self.url != None:
                         self.dtype = 'url'
-                elif self.action == 'putsq':
-                    # add title=name queryopt for stored queries
-                    self.url = get_param('url', '/query') + '?title=%s' % name
                        
                 return self.dbtransact(lambda : self.insertForStore(allow_blank=True, post_method=True),
                                        putPostCommit)

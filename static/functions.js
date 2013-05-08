@@ -27,12 +27,7 @@ function subject2identifiers(subject) {
                     dtype: 'blank'
                   };
 
-    /* prefer names over raw ID numbers */
-    if (subject['vname']) {
-		results.datapred = "vname=" + encodeSafeURIComponent(subject['vname']);
-		results.dataname = subject['vname'];
-    }
-    else {
+    {
 	/* TODO: search a prepared list of unique tagnames;
 	   if subject[tagname] is found non-NULL, override defaults and break loop...
 
@@ -50,13 +45,7 @@ function subject2identifiers(subject) {
 		 });
     }
 
-    if (subject['Image Set']) {
-		results.dtype = 'Image Set';
-    }
-    else if (subject['template mode']) {
-		results.dtype = 'template';
-    }
-    else if (subject['url']) {
+    if (subject['url']) {
 		results.dtype = 'url';
     }
     else if (subject['bytes']) {
@@ -1976,7 +1965,7 @@ function postLoadTagRangeValues(data, textStatus, jqXHR, param) {
 }
 
 function setGUIConfig() {
-	var url = HOME + '/query/config=tagfiler(' + encodeSafeURIComponent('_cfg_enabled GUI features') + ')';
+	var url = HOME + '/query/config=tagfiler(config%20binding)/config%20parameter=enabled%20GUI%20features(config%20value)';
 	tagfiler.GET(url, false, postSetGUIConfig, null, errorSetGUIConfig, 0);
 }
 
@@ -2027,7 +2016,7 @@ function errorSetGUIConfig(jqXHR, textStatus, errorThrown, retryCallback, url, o
  * 	the parameters to be used by the callback success function
  */
 function postSetGUIConfig(data, textStatus, jqXHR, param) {
-	var values = data[0]['_cfg_enabled GUI features'];
+	var values = data[0]['config value'];
 	if (values != null) {
 		// initialize defaults
 		bulk_value_edit = false;
@@ -2674,7 +2663,7 @@ function postLoadTags(data, textStatus, jqXHR, param) {
 	availableTags = new Object();
 	availableTagdefs = new Array();
 	allTagdefs = new Object();
-	var results = ['bytes', 'vname', 'url', 'template%20mode', 'id', 'Image%20Set'];
+	var results = ['bytes', 'url', 'id'];
 	$.each(data, function(i, object) {
 		availableTagdefs.push(object['tagdef']);
 		availableTags[object['tagdef']] = object['tagdef type'];
@@ -2750,7 +2739,7 @@ function setViewTags(tag) {
 	if (viewListTags[tag] != null) {
 		return;
 	}
-	var url = HOME + '/query/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('_cfg_file list tags') + ')' + encodeSafeURIComponent('_cfg_file list tags');
+	var url = HOME + '/query/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('view tags') + ')' + encodeSafeURIComponent('view tags');
 	var param = {
 		'tag': tag	
 	};
@@ -2772,7 +2761,7 @@ function setViewTags(tag) {
 function postSetViewTags(data, textStatus, jqXHR, param) {
 	var tag = param.tag;
 	viewListTags[tag] = new Array();
-	var tags = data[0]['_cfg_file list tags'];
+	var tags = data[0]['view tags'];
 	$.each(tags, function(i, value) {
 		viewListTags[tag].push(value);
 	});
@@ -6342,18 +6331,6 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:uploadStudy()'});
-	a.html('Upload study');
-	td = $('<td>');
-	tr.append(td);
-	a = $('<a>');
-	td.append(a);
-	a.attr({'href': 'javascript:downloadStudy("study?action=download")'});
-	a.html('Download study');
-	td = $('<td>');
-	tr.append(td);
-	a = $('<a>');
-	td.append(a);
 	a.attr({'href': 'javascript:queryByTags()'});
 	a.html('Query by tags');
 	td = $('<td>');
@@ -6368,12 +6345,6 @@ function showTopMenu() {
 	td.append(a);
 	a.attr({'href': BUGS_URL});
 	a.html('Bugs');
-	td = $('<td>');
-	tr.append(td);
-	a = $('<a>');
-	td.append(a);
-	a.attr({'href': HOME + '/log'});
-	a.html('Logs');
 }
 
 function manageTagDefinitions(roles) {
@@ -7283,9 +7254,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					tagType == 'name' ||
 					tagType == 'data provider id' ||
 					tagType == 'view' ||
-					tagType == 'config' ||
-					tagType == 'template mode' ||
-					tagType == 'vname') {
+					tagType == 'config') {
 				valueTd.addClass('input');
 				var select = $('<select>');
 				valueTd.append(select);
@@ -7314,12 +7283,8 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					text = 'Choose a View name';
 				} else if (tagType == 'config') {
 					text = 'Choose a Study Type';
-				} else if (tagType == 'template mode') {
-					text = 'Choose a Template rendering mode';
-				} else if (tagType == 'vname') {
-					text = 'Choose a Subject name@version';
 				}
-				option.text(text);
+                                option.text(text);
 				option.attr('value', '');
 				select.append(option);
 			}
@@ -8444,7 +8409,7 @@ function viewAvailableTagDefinitions() {
 }
 
 function viewLink(querypath) {
-	var url = HOME + '/ui/query/';
+	var url = HOME + '/query/';
 	if (querypath != null) {
 		url += querypath;
 	}

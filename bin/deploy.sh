@@ -127,11 +127,11 @@ sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > $
 chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
 chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 
-cp dbsetup.sh ${SVCHOME}/dbsetup.sh
+cp bin/dbsetup.sh ${SVCHOME}/dbsetup.sh
 chown ${SVCUSER}: ${SVCHOME}/dbsetup.sh
 chmod a+x ${SVCHOME}/dbsetup.sh
 
-cp dbsetup-*-demo.sh ${SVCHOME}/
+cp bin/dbsetup-*-demo.sh ${SVCHOME}/
 chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
 chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
 

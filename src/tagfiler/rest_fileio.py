@@ -28,7 +28,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, reduce_name_pred, jsonWriter, make_temporary_file, yieldBytes
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, jsonWriter, make_temporary_file, yieldBytes
 from subjects import Subject
 
 # build a map of mime type --> primary suffix
@@ -114,7 +114,6 @@ class FileIO (Subject):
         self.api = 'file'
         self.action = None
         self.key = None
-        self.url = None
         self.bytes = None
         self.referer = None
         self.update = False
@@ -133,127 +132,33 @@ class FileIO (Subject):
                 filename = self.config['store path'] + '/' + self.subject.file
                 f = None
                 render = None
-                if self.subject['template mode'] in ['embedded', 'page']:
-                    if self.subject['template query']:
-                        # execute each query specified as tags on this template file
-                        resultsdict = {}
-                        for tq in self.subject['template query']:
-                            try:
-                                # interpolate query params into query string prior to evaluation
-                                # every interpolated key MUST appear in self.storage (query params)
-                                # NOTE: this is hackish and has ugly quoting rules:
-                                #  1. components of query may be URL-quoted as per normal Tagfiler rules
-                                #  2. percent signs are escaped according to Python formatting rules or represent interpolation points
-                                #  3. whole value is URL-quoted in REST API, FORM input, etc.
-                                itq = tq % self.storage
-                                ast = self.url_parse_func(itq)
-                                if type(ast) in [ int, long ]:
-                                    pass
-                                elif hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                    txids.append(self.select_predlist_path_txid(ast.path))
-                                else:
-                                    raise Conflict(self, 'File "%s" template query "%s" is not a valid subquery'
-                                                   % (self.subject2identifiers(self.subject)[2], tq))
-                                resultsdict[tq] = ast
-                            except (BadRequest), te:
-                                raise te
-                            except (KeyError), te:
-                                raise BadRequest(self, 'File "%s" requires query parameter: %s'
-                                                 % (self.subject2identifiers(self.subject)[2], str(te)))
-                            #except:
-                            #    et, ev, tb = sys.exc_info()
-                            #    web.debug('got exception "%s" during template query evaluation' % str(ev),
-                            #              traceback.format_exception(et, ev, tb))
-
-                        self.set_http_etag(max(txids))
-                        if self.http_is_cached():
-                            # skip the template queries and render
-                            return None, None, True
-
-                        # compute and save results for each template query
-                        for item in resultsdict.items():
-                            tq, ast = item
-                            if hasattr(ast, 'is_subquery') and ast.is_subquery:
-                                self.txlog('QUERY', dataset=path_linearize(ast.path))
-                                resultsdict[tq] = [ r for r in self.select_files_by_predlist_path(path=ast.path) ]
-                        
-                        # put query results where template rendering pass can find them
-                        self.globals['template_query_results'] = resultsdict
-                    else:
-                        self.globals['template_query_results'] = None
-                        self.set_http_etag(max(txids))
-                        if self.http_is_cached():
-                            # skip the template render
-                            return None, None, True
-                    # use the file as a web template
-                    self.globals['ops'] = Application.ops
-                    self.globals['opsExcludeTypes'] = Application.opsExcludeTypes
-                    render = web.template.frender(filename, globals=self.globals)
-                else:
-                    # use the file as raw bytes
-                    self.set_http_etag(max(txids))
-                    if self.http_is_cached():
-                        # skip the file handling
-                        return None, None, True
-                    f = open(filename, "rb", 0)
-                    if self.subject.get('content-type', None) == None:
-                        p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
-                        line = p.stdout.readline()
-                        self.subject['content-type'] = line.strip().split(' ', 1)[0]
-                return f, render, False
-            else:
+                # use the file as raw bytes
                 self.set_http_etag(max(txids))
                 if self.http_is_cached():
-                    # skip the redirect
+                    # skip the file handling
                     return None, None, True
-                return None, None, False
+                f = open(filename, "rb", 0)
+                if self.subject.get('content-type', None) == None:
+                    p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
+                    line = p.stdout.readline()
+                    self.subject['content-type'] = line.strip().split(' ', 1)[0]
+                return f, render, False
+            else:
+                raise Conflict(self, data='The resource "%s" does not support file IO.' % path_linearize(self.path))
 
         def postCommit(results):
             f, render, cached = results
-            # if the dataset is a remote URL, just redirect client
             if cached:
                 web.ctx.status = '304 Not Modified'
                 self.emit_headers()
                 return results
-            elif self.subject.dtype == 'url':
-                opts = [ '%s=%s' % (opt[0], urlquote(opt[1])) for opt in self.queryopts.iteritems() ]
-                if len(opts) > 0:
-                    querystr = '&'.join(opts)
-                    if len(self.subject.url.split("?")) > 1:
-                        querystr = '&' + querystr
-                    else:
-                        querystr = '?' + querystr
-                else:
-                    querystr = ''
-                self.emit_headers()
-                raise web.seeother(self.subject.url + querystr)
-            elif self.subject.dtype == 'file':
-                return results
             else:
-                # this emits headers for us
-                Subject.get_postCommit(self, f, sendBody)
                 return results
 
         f, render, cached = self.dbtransact(body, postCommit)
 
         if cached:
             # short out here
-            return
-
-        if render != None and self.subject['template mode'] == 'embedded':
-            # render the template in the tagfiler GUI
-            self.datapred, self.dataid, self.dataname, self.subject.dtype = self.subject2identifiers(self.subject, showversions=False)
-            self.emit_headers()
-            self.header('Content-Type', 'text/html')
-            for r in self.renderlist(None,
-                                     [render()]):
-                yield r
-            return
-        elif render != None and self.subject['template mode'] == 'page':
-            # render the template as a standalone page
-            self.emit_headers()
-            self.header('Content-Type', 'text/html')
-            yield render()
             return
 
         # we only get here if we were able to both:
@@ -285,7 +190,6 @@ class FileIO (Subject):
         # f.seek(0, os.SEEK_SET)
         f.seek(0, 0)
 
-        #self.header('Content-Location', self.globals['homepath'] + '/file/%s@%d' % (urlquote(self.subject.name), self.subject.version))
         if sendBody:
 
             try:
@@ -559,7 +463,6 @@ class FileIO (Subject):
                 and self.context.client == self.subject['modified by'] \
                 and self.subject['modified'] and (now - self.subject['modified']).seconds < 5 \
                 and self.subject['bytes'] == self.bytes \
-                and not self.subject['url'] \
                 and len(self.queryopts.keys()) == 0:
             # skip tag update transaction if and only if it is a noop
             return self.put_postWritePostCommit([])
@@ -582,7 +485,7 @@ class FileIO (Subject):
         def preWritePostCommit(results):
             f = results
             if f != None:
-                raise BadRequest(self, data='Cannot update an existing file version via POST.')
+                raise BadRequest(self, data='Cannot update an existing file via POST.')
             return None
         
         def putPostCommit(junk_files):
@@ -598,14 +501,13 @@ class FileIO (Subject):
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
             if acceptType in ['text/html', '*/*']:
-                url = '/tags/%s%s' % (self.subject2identifiers(self.subject, showversions=True)[0], view)
+                url = '/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view)
                 return self.renderui(['tags'], {'url': url})
-                #raise web.seeother(url)
             elif acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject, showversions=True)[0]
+                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
                 self.header('Location', uri)
                 web.ctx.status = '204 No Content'
                 return ''
@@ -668,59 +570,3 @@ class FileIO (Subject):
             return self.PUT(uri, post_method=True)
 
 
-class LogFileIO (FileIO):
-
-    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
-        FileIO.__init__(self, parser, appname, path, queryopts)
-        self.skip_preDispatch = False
-
-
-    def GET(self, uri, sendBody=True):
-
-        #if not self.authn.hasRoles(['admin']):
-        raise Forbidden(self, 'read access to log file "%s"' % self.name)
-
-        if not self.config['log path']:
-            raise Conflict(self, 'log_path is not configured on this server.')
-
-        if self.queryopts.get('action', None) == 'view':
-            disposition_name = None
-        else:
-            disposition_name = self.name
-
-        filename = self.config['log path'] + '/' + self.name
-        try:
-            f = open(filename, "rb")
-            
-            f.seek(0, 2)
-            length = f.tell()
-            f.seek(0, 0)
-
-            web.ctx.status = '200 OK'
-            if disposition_name:
-                self.header('Content-type', "text/plain")
-                self.header('Content-Disposition', 'attachment; filename="%s"' % (disposition_name))
-                self.header('Content-Length', length)
-            else:
-                pollmins = 1
-                top = "<pre>"
-                bottom = "</pre>"
-                self.header('Content-type', "text/html")
-                self.header('Content-Length', len(top) + length + len(bottom))
-                    
-            if sendBody:
-                if not disposition_name:
-                    yield top
-                for buf in yieldBytes(f, 0, length - 1, self.config['chunk bytes']):
-                    self.midDispatch()
-                    yield buf
-                if not disposition_name:
-                    yield bottom
-
-            f.close()
-        
-        except:
-            et, ev, tb = sys.exc_info()
-            web.debug('got exception in logfileIO',
-                      traceback.format_exception(et, ev, tb))
-            raise NotFound(self, 'log file "%s"' % self.name)

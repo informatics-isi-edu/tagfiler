@@ -39,47 +39,9 @@ def p_start(p):
              | tagdef
              | tags
              | query
-             | transmitnumber
-             | study
-             | appleterror
-             | loglist
-             | log
-             | contact
              | querypathroot
-             | ui
 """
     p[0] = p[1]
-
-def p_ui_empty(p):
-    """ui : slash string slash UI
-          | slash string slash UI slash"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=[])
-    
-def p_ui(p):
-    """ui : slash string slash UI uiopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5])
-    
-def p_ui_queryopts(p):
-    """ui : slash string slash UI uiopts queryopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], queryopts=p[6])
-    
-def p_ui_querypath(p):
-    """ui : slash string slash UI uiopts querypath"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[6])
-    
-def p_ui_queryopts_querypath(p):
-    """ui : slash string slash UI uiopts querypath queryopts"""
-    p[0] = url_ast.UI(parser=url_parse_func, appname=p[2], uiopts=p[5], path=p[6], queryopts=p[7])
-    
-def p_uiopts(p):
-    """uiopts : slash string slash"""
-    p[0] = []
-    p[0].append(p[2])
-
-def p_uiopts_grow(p):
-    """uiopts : uiopts string slash"""
-    p[0] = p[1]
-    p[0].append(p[2])
 
 def p_querypathroot(p):
     """querypathroot : querypath"""
@@ -95,15 +57,6 @@ def p_filelist(p):
 def p_filelist_opts1(p):
     """filelist : slash string queryopts"""
     p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[3])
-    
-def p_loglist(p):
-    """loglist : slash string slash LOG
-               | slash string slash LOG slash"""
-    p[0] = url_ast.LogList(parser=url_parse_func, appname=p[2])
-
-def p_contact(p):
-    """contact : slash string slash CONTACT"""
-    p[0] = url_ast.Contact(parser=url_parse_func, appname=p[2])
     
 def p_filelist_opts2(p):
     """filelist : slash string slash FILE queryopts"""
@@ -124,14 +77,6 @@ def p_file(p):
 def p_file_opts(p):
     """file : slash string slash FILE slash querypath queryopts"""
     p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
-
-def p_log(p):
-    """log : slash string slash LOG slash string"""
-    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6])
-
-def p_log_opts(p):
-    """log : slash string slash LOG slash string queryopts"""
-    p[0] = url_ast.LogId(parser=url_parse_func, appname=p[2], name=p[6], queryopts=p[7])
 
 def p_tagdef(p):
     """tagdef : slash string slash TAGDEF
@@ -208,9 +153,6 @@ def p_querypath_extend(p):
     """querypath : querypath slash querypath_elem"""
     p[0] = p[1]
     ppreds, plisttags, pordertags = p[0][-1]
-    if len(plisttags) == 0:
-        # the parent path element has no listpreds, default to 'vcontains'
-        p[0][-1] = ( ppreds, [ web.Storage(tag='vcontains',op=None,vals=[]) ], pordertags )
     p[0].append( p[3] )
 
 def p_ordertags_empty(p):
@@ -385,34 +327,6 @@ def p_queryopts_grow_short(p):
         v.add(None)
     else:
         p[0][p[3]] = None
-
-def p_transmit_number(p):
-    """transmitnumber : slash string slash TRANSMITNUMBER """
-    p[0] = url_ast.TransmitNumber(parser=url_parse_func, appname=p[2])
-
-def p_study(p):
-    """study : slash string slash STUDY"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2])
-
-def p_study_num(p):
-    """study : slash string slash STUDY slash predlist_nonempty"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6])
-
-def p_study_num_opts(p):
-    """study : slash string slash STUDY slash predlist_nonempty queryopts"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], subjpreds=p[6], queryopts=p[7])
-
-def p_study_opts(p):
-    """study : slash string slash STUDY queryopts"""
-    p[0] = url_ast.Study(parser=url_parse_func, appname=p[2], queryopts=p[5])
-
-def p_appleterror(p):
-    """appleterror : slash string slash APPLETERROR"""
-    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2])
-
-def p_appleterror_opts(p):
-    """appleterror : slash string slash APPLETERROR queryopts"""
-    p[0] = url_ast.AppletError(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 # treat any sequence of '/'+ as a path divider
 def p_slash(p):

@@ -85,7 +85,9 @@ class Dispatcher:
             #web.debug(traceback.format_exception(TypeError, te, sys.exc_info()[2]))
             ast = None
         except:
-            web.debug('unknown parse error on URI %s' % uri)
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception "%s" during URI parse' % str(ev),
+                      traceback.format_exception(et, ev, tb))
             ast = None
             raise
         if ast != None:

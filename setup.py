@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 # 
 # Copyright 2010 University of Southern California
@@ -17,18 +16,28 @@
 #
 # ...
 
-from setuptools import setup
+from distutils.core import setup
 
-setup(name='tagfiler',
-      version='1.0',
-      description='service of a tag catalog',
-      author='MISD',
-      author_email='misd@isi.edu',
-      url='https://confluence.misd.isi.edu:8443/display/PSOC/PSOC+Tagfiler+Data+Repository',
+setup(name="tagfiler",
+      version="1.0",
+      description="service of a tag catalog",
+      package_dir={"tagfiler": "src/tagfiler"},
+      packages=["tagfiler"],
+      package_data={
+        "tagfiler": ["templates/*"],
+      },
+      scripts=map(lambda x: "scripts/" + x,
+                  ["tagfiler-webauthn2-deploy.py",
+                   "tagfiler-webauthn2-manage.py"]),
+      #requires=["web.py", "ply", "pytz", "psycopg2", "python-dateutil"],
+      author="MISD",
+      author_email="misd@isi.edu",
+      url="https://confluence.misd.isi.edu:8443/display/PSOC/PSOC+Tagfiler+Data+Repository",
       long_description="For data sharing, tagfiler is using a data repository developed at the USC/ISI Medical Information Systems Division (MISD).",
-      license="University of Southern California",
-      platforms=["CentOS 5.5"],
-      install_requires=['httpd', 'mod_wsgi',
-                        'postgresql', 'postgresql-devel', 'postgresql-server',  
-                        'python', 'python-psycopg2', 'python-webpy', 'python-ply']
+
+      classifiers=[
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python",
+        "Topic :: Internet :: WWW/HTTP",
+        ],
      )

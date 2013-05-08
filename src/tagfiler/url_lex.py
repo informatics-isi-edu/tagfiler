@@ -48,14 +48,8 @@ keywords = {
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
     'absent' : 'ABSENT',
-    'transmitnumber' : 'TRANSMITNUMBER',
-    'study' : 'STUDY',
-    'appleterror' : 'APPLETERROR',
-    'log' : 'LOG',
-    'contact' : 'CONTACT',
     'asc' : 'ASC',
-    'desc' : 'DESC',
-    'ui' : 'UI'
+    'desc' : 'DESC'
 }
 
 tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())
