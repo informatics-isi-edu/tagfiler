@@ -1153,10 +1153,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         if tagdef and tagdef.tagname == 'tagdef readpolicy':
             # remap read policies to their simplest functional equivalent based on graph ACL enforcement always present for reads
             tag = dict(subject="anonymous",              # subject read enforcement already happens 
-                       object="object",                  # TODO: change to "anonymous" once object tagref ACL enforcement is implemented
+                       object="anonymous",               # object read enforcement already happens
                        tagandsubject="tag",              # subject read enforcement already happens
-                       tagandsubjectandobject="object",  # TODO: change to "tag" once object tagref ACL enforcement is implemented
-                       subjectandobject="object")        # TODO: change to "anonymous" once object tagref ACL enforcement is implemented
+                       tagandsubjectandobject="tag",     # subject and object read enforcement already happens
+                       subjectandobject="anonymous")     # subject and object read enforcement already happens
 
         if tag not in typedef['typedef values']:
             raise Conflict(self, 'Supplied tagdef policy "%s" is not defined.' % tag)
@@ -1570,8 +1570,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if len(results) == 1:
                     obj = results[0]
                     obj_ok = self.test_tag_authz(mode, obj, reftagdef, tagdefs=tagdefs)
-                    obj_owner = obj.owner in self.context.attributes
+                    obj_owner = ('*' in self.context.attributes) or (obj.owner in self.context.attributes)
                 else:
+                    # this could happen on simple tag writes
                     raise Conflict(self, data='Referenced object "%s"="%s" is not found.' % (tagdef.tagref, value))
 
         if policy == 'system':
@@ -3290,10 +3291,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             used_not_op = False
             used_other_op = False
 
-            if tagdef.tagref:
+            if tagdef.tagref and enforce_read_authz:
                 # add a constraint so that we can only see tags referencing another entry we can see
                 reftagdef = tagdefs[tagdef.tagref]
                 refvalcol = wraptag(tagdef.tagref, prefix='')
+                refpreds = [web.Storage(tag=tagdef.tagref, op=None, vals=[])]
+                if tagdef.readpolicy in [ 'objectowner' ]:
+                    # need to add object ownership test that is more strict than baseline object readok enforcement
+                    refpreds.append( web.Storage(tag='owner', op='=', vals=list(roles)) )
                 if reftagdef.multivalue:
                     refvalcol = 'unnest(%s)' % refvalcol
                 refquery = "SELECT %s FROM (%s) s" % (
@@ -3306,7 +3311,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                       typedefs=typedefs)[0]
                     )
                 preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
-                
+
             for pred in preds:
                 if pred.op == ':absent:':
                     used_not_op = True
@@ -3374,17 +3379,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                     
             if enforce_read_authz:
                 if tagdef.readok == False:
+                    # this tag is statically unreadable for this user, i.e. user roles not in required tag ACL
                     wheres = [ 'False' ]
                 elif tagdef.readok == None:
+                    # this tag is dynamically unreadable for this user, i.e. depends on subject or object status
                     if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
-                        m['table'] += ' JOIN (SELECT subject FROM _owner WHERE value IN (%s)) is_owner USING (subject)' % rolekeys
-                    elif tagdef.readpolicy in [ 'subject', 'tagandsubject', 'tagorsubject' ]:
-                        m['table'] += (' JOIN (SELECT subject FROM _owner WHERE value IN (%s)' % rolekeys
-                                       + '     UNION'
-                                       + '     SELECT subject FROM "_read users" WHERE value IN (%s)) readok USING (subject)' % rolekeys)
-                    elif tagdef.readpolicy in [ 'objectowner', 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                        # TODO: implement test against objects
-                        raise Forbidden(self, data='read on tag "%s" authz not implemented yet' % tagdef.tagname)
+                        # need to add subject ownership test that is more strict than baseline subject readok enforcement
+                        m['table'] += ' JOIN (SELECT subject FROM _owner WHERE value IN (%s)) is_sowner USING (subject)' % rolekeys
+                    # other authz modes need no further tests here:
+                    # -- subject readok status enforced by enclosing elem_query
+                    # -- object status enforced by value IN subquery predicate injected before processing preds list
+                    #    -- object readok enforced by default
+                    #    -- object ownership enforced if necessary by extra owner predicate
 
             for tag in extra_tag_columns:
                 m['table'] += ' LEFT OUTER JOIN %s USING (subject)' % wraptag(tag)
