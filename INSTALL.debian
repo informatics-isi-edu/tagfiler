@@ -1,0 +1,94 @@
+Overview
+========
+
+This document describes how to install tagfiler on debian based distributions.
+The instruction should also work on other distributions after taking into
+account directory layout and package manager naming differences.
+
+Dependencies
+============
+
+Tagfiler requires python 2.6+, Apache with mod_ssl and mod_wsgi, and postgresql
+8.4+. For ubuntu 12.04:
+
+    sudo apt-get install postgresql-9.1 apache2 libapache2-mod-wsgi
+
+It also has several python library dependencies. These can be installed
+automatically using setuptools, but it may be preferrable to use an officail
+package when available. Again for ubuntu 12.04:
+
+    sudo apt-get install python-{webpy,psycopg2,tz,dateutil,ply}
+
+Install Library
+===============
+
+The simplest way to install tagfiler is using the setup.py script:
+
+    sudo python setup.py install
+
+If you installed the dependencies above as packages, this will just install
+webauthn2. If not it will pull in the dependencies from PyPI and install them
+as well.
+
+This can also be done as a standard user by using the --user option
+(see python setup.py install -h), or using a virtualenv.
+
+Create User
+===========
+
+The tagfiler user is used to connect to a local postgresql server, and
+config data is stored in the user's home directory.
+
+    sudo useradd -m -r tagfiler
+
+Database
+========
+
+Create postgres user and db for tagfiler:
+
+    sudo -u postgres createuser -S -D -R tagfiler
+    sudo -u postgres createdb -O tagfiler tagfiler
+
+Populate with initial tag model:
+
+    sudo cp dbsetup.sh /home/tagfiler
+    sudo chown tagfiler.tagfiler /home/tagfiler/dbsetup.sh
+    sudo chmod +x /home/tagfiler/dbsetup.sh
+    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup.sh $(hostname) tagfiler admin uploader download curator grader)"
+
+WSGI Application
+================
+
+Make sure ssl and wsgi modules are enabled:
+
+    sudo a2enmod ssl
+    sudo a2enmod wsgi
+
+Copy etc/apache/tagfiler.conf to /etc/apache2/conf.d/tagfiler.conf, or
+just /etc/apache2 to include it only from the ssl virtualhost. Edit the
+template variables and paths appropriately and restart apache.
+
+Static Content
+==============
+
+Copy images etc to web root:
+
+    sudo mkdir -p /var/www/tagfiler/static/images
+    sudo cp *.js *.css /var/www/tagfiler/static
+    sudo cp *.jpg *.png *.gif /var/www/tagfiler/static/images
+    sudo cp logo.png /var/www/tagfiler/static
+
+Config File
+===========
+
+Copy and modify the config file as needed. At a minimum you will need to
+replace svcuser with tagfiler:
+
+    sudo cp tagfiler-config.json /home/tagfiler/
+
+Register Version
+================
+
+As tagfiler user:
+
+    ./register-software-version.sh tagfiler
