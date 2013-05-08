@@ -20,9 +20,6 @@ INSTALLSVC=tagfiler
 
 INSTALLDIR=$(shell python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()')/tagfiler
 
-WEBROOTDIR=/var/www
-WEBSTATICDIR=$(WEBROOTDIR)/html/$(INSTALLSVC)/static
-
 WSGIFILE=tagfiler.wsgi
 
 IMAGEBASES= \
@@ -41,69 +38,47 @@ IMAGEBASES= \
 	ui-icons_ffd27a_256x240.png \
 	ui-icons_ffffff_256x240.png
 
-SCRIPTFILES=functions.js \
-			jquery.js \
-			jquery-ui.js \
-			jquery-ui-timepicker-addon.js \
-			jquery.contextMenu.js \
-			main.css \
-			jquery-ui.css \
-			StyleSheet.css \
-			jquery.contextMenu.css \
-			calendar.gif \
-			new.png \
-			delete.png \
-			arrow_left.png \
-			arrow_right.png \
-			bullet_arrow_down.png \
-			bullet_arrow_up.png \
-			control_stop.png \
-			minus.png \
-			plus.png \
-			back.jpg \
-			forward.jpg \
-			back_disabled.jpg \
-			forward_disabled.jpg \
-			arrow_down.gif
+SCRIPTFILEBASES=logo.png \
+				functions.js \
+				jquery.js \
+				jquery-ui.js \
+				jquery-ui-timepicker-addon.js \
+				jquery.contextMenu.js \
+				main.css \
+				jquery-ui.css \
+				StyleSheet.css \
+				jquery.contextMenu.css \
+				calendar.gif \
+				new.png \
+				delete.png \
+				arrow_left.png \
+				arrow_right.png \
+				bullet_arrow_down.png \
+				bullet_arrow_up.png \
+				control_stop.png \
+				minus.png \
+				plus.png \
+				back.jpg \
+				forward.jpg \
+				back_disabled.jpg \
+				forward_disabled.jpg \
+				arrow_down.gif
 
-FILES=dataserv_app.py rest_fileio.py subjects.py \
+FILEBASES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
 
-SBINFILES=runuser-rsh
+SBINFILES=sbin/runuser-rsh
 
-BINFILES=tagfiler-webauthn2-deploy.py \
+BINFILEBASES=tagfiler-webauthn2-deploy.py \
 	tagfiler-webauthn2-manage.py
-
-WEBSTATICFILES=logo.png \
-	functions.js \
-	jquery.js \
-	jquery-ui.js \
-	jquery-ui-timepicker-addon.js \
-	jquery.contextMenu.js \
-	main.css \
-	jquery-ui.css \
-	StyleSheet.css \
-	jquery.contextMenu.css \
-	calendar.gif \
-	new.png \
-	delete.png \
-	arrow_left.png \
-	arrow_right.png \
-	bullet_arrow_down.png \
-	bullet_arrow_up.png \
-	control_stop.png \
-	minus.png \
-	plus.png \
-	back.jpg \
-	forward.jpg \
-	back_disabled.jpg \
-	forward_disabled.jpg \
-	arrow_down.gif
 
 TEMPLATEBASES=UI.html
 
-TEMPLATES=$(TEMPLATEBASES:%=templates/%)
+FILES=$(FILEBASES:%=src/tagfiler/%)
+BINFILES=$(BINFILEBASES:%=scripts/%)
+SCRIPTFILES=$(SCRIPTFILEBASES:%=static/%)
+TEMPLATES=$(TEMPLATEBASES:%=src/tagfiler/templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)
 IMAGEFILES=$(IMAGEBASES:%=images/%)
 
@@ -115,8 +90,8 @@ $(HOME)/.tagfiler.predeploy:
 	touch $(HOME)/.tagfiler.predeploy
 
 deploy: $(HOME)/.tagfiler.predeploy install
-	./deploy.sh $(INSTALLSVC)
-	./register-software-version.sh $(INSTALLSVC)
+	./bin/deploy.sh $(INSTALLSVC)
+	./bin/register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p /usr/local/sbin
@@ -124,22 +99,20 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/
-	mkdir -p $(WEBSTATICDIR)
 	rsync -av $(FILES) $(INSTALLDIR)/.
 	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
-	rsync -av $(WEBSTATICFILES) $(WEBSTATICDIR)/.
 	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
 	rsync -av $(BINFILES) /usr/local/bin/.
 	rsync -av $(SBINFILES) /usr/local/sbin/.
-	./register-software-version.sh $(INSTALLSVC)
+	./bin/register-software-version.sh $(INSTALLSVC)
 
 restart: force install
 	service httpd restart
 
 deployPSOC: $(HOME)/.tagfiler.predeploy installPSOC
-	./deploy.sh $(INSTALLSVC) psoc-pilot
+	./bin/deploy.sh $(INSTALLSVC) psoc-pilot
 
 installPSOC: install
 	make --no-print-directory -f psoc/Makefile install
