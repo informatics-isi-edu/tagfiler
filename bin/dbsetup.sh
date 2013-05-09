@@ -560,7 +560,7 @@ tagdef "tag last modified"   timestamptz ""         anonymous   system       fal
 tagdef "subject last tagged txid" int8   ""         anonymous   system       false
 tagdef "tag last modified txid" int8     ""         anonymous   system       false
 tagdef bytes                 int8        ""         anonymous   system       false
-tagdef name                  text        ""         anonymous   subjectowner false
+tagdef name                  text        ""         anonymous   subjectowner false      ""         true
 tagdef file                  text        ""         system      system       false      ""         true
 tagdef url                   text        ""         subject     subject      false      url
 tagdef onclick               text        ""         anonymous   system       false
