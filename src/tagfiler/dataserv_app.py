@@ -3303,7 +3303,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     refvalcol = 'unnest(%s)' % refvalcol
                 refquery = "SELECT %s FROM (%s) s" % (
                     refvalcol,
-                    self.build_files_by_predlist_path([ ([web.Storage(tag=tagdef.tagref, op=None, vals=[])],
+                    self.build_files_by_predlist_path([ (refpreds,
                                                          [web.Storage(tag=tagdef.tagref, op=None, vals=[])],
                                                          []) ],
                                                       values=values,
