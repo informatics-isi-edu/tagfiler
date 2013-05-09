@@ -295,6 +295,7 @@ class Tagdef (Node):
 
         def postCommit(results):
             self.emit_headers()
+            web.ctx.status = '204 No Content'
             return ''
 
         if len(self.queryopts) > 0:
