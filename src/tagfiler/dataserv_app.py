@@ -919,7 +919,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('subject last tagged', 'timestamptz', False, 'system', False),
                        ('subject last tagged txid', 'int8', False, 'system', False),
                        ('tag last modified', 'timestamptz', False, 'system', False),
-                       ('name', 'text', False, 'subjectowner', False),
+                       ('name', 'text', False, 'subjectowner', True),
                        ('view', 'text', False, 'subject', True),
                        ('view tags', 'tagdef', True, 'subject', False) ]:
         deftagname, typestr, multivalue, writepolicy, unique = prototype
@@ -1790,7 +1790,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
         owner = self.context.client
-        newid = self.insert_file(None, None, None)
+        newid = self.insert_file(None)
         subject = web.Storage(id=newid)
         tags = [ ('created', 'now'),
                  ('tagdef', self.tag_id),
@@ -2194,6 +2194,26 @@ class Application (webauthn2_handler_factory.RestHandler):
             # we require a non-empty list for SQL constructs below...
             wheres = [ 'True' ]
         
+        if tagdef.tagref:
+            # tagdef write policy may depend on per-object information
+            reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
+            refval = valcol
+            refcol = wraptag(tagdef.tagref, prefix='')
+            if reftagdef.multivalue:
+                refcol = 'unnest(%s)' % refcol
+            if tagdef.multivalue and unnest:
+                refval = 'unnest(%s)' % refval
+            refquery, refvalues = self.build_files_by_predlist_path([ ([web.Storage(tag=tagdef.tagref, op=None, vals=[])],
+                                                                       [web.Storage(tag=tagdef.tagref, op=None, vals=[]),
+                                                                        web.Storage(tag='owner', op=None, vals=[]),
+                                                                        web.Storage(tag='writeok', op=None, vals=[])],
+                                                                       []) ],
+                                                                    enforce_read_authz=enforce_tag_authz)
+        else:
+            refquery = None
+            refcol = None
+            refval = None
+
         if enforce_tag_authz:
             # do the write-authz tests for the active set of intable rows
             if tagdef.writeok == False:
@@ -2205,12 +2225,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                     # None means we need subject writeok for this user
                     if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
                                     % dict(intable=intable,
-                                           wheres=' AND '.join([ '%s = False' % wokcol ] + wheres)))[0].count > 0:
+                                           wheres=' AND '.join([ 'coalesce(NOT %s, True)' % wokcol ] + wheres)))[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
-                if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    # None means we need object writeok for this user
-                    # TODO: implement test against objects
-                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+                    
                 if tagdef.writepolicy in [ 'subjectowner', 'tagorowner', 'tagandowner' ]:
                     # None means we need subject is_owner for this user
                     query = 'SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s' % dict(intable=intable,
@@ -2218,10 +2235,24 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if self.dbquery(query)[0].count > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
 
+                if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
+                    # None means we need object writeok for this user
+                    query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+                              + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
+                              + ' WHERE coalesce(NOT r.writeok, True)'
+                              ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
+                    if self.dbquery(query, vars=refvalues)[0].count > 0:
+                        raise Forbidden(self, data='write on tag "%s" for one or more matching objects' % tagdef.tagname)
+
                 if tagdef.writepolicy in [ 'objectowner' ]:
-                    # None meansn we need object is_owner for this user
-                    # TODO: implement test against objects
-                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+                    # None means we need object is_owner for this user
+                    rolekeys = ','.join([ wrapval(r, 'text') for r in set(self.context.attributes).union(set(['*'])) ])
+                    query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+                              + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
+                              + ' WHERE coalesce(r.owner NOT IN (%(rolekeys)s), True)'
+                              ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres), rolekeys=rolekeys))
+                    if self.dbquery(query, vars=refvalues)[0].count > 0:
+                        raise Forbidden(self, data='write on tag "%s" for one or more matching objects' % tagdef.tagname)
             else:
                 # tagdef write policy accepts statically for this user and tag
                 pass
@@ -2230,32 +2261,13 @@ class Application (webauthn2_handler_factory.RestHandler):
         count = 0
 
         if tagdef.tagref:
-            # need to validate referential integrity of user input
-            targettagdef = self.globals['tagdefsdict'][tagdef.tagref]
-
-            if tagdef.multivalue and unnest:
-                refval = 'unnest(%s)' % valcol
-            else:
-                refval = valcol
-
-            if tagdef.tagref == 'id':
-                targetval = 'subject'
-                targettable = 'resources'
-            elif tagdef.tagref in [ 'readok', 'writeok' ]:
-                targetval = 'column1'
-                targettable = '(VALUES (True), (False))'
-            else:
-                targetval = 'value'
-                targettable = wraptag(tagdef.tagref)
-
-            undefined = self.dbquery(('SELECT value'
-                                           + ' FROM (SELECT %(refval)s AS value FROM %(intable)s s'
-                                           + '       EXCEPT'
-                                           + '       SELECT %(targetval)s AS value FROM %(targettable)s s) s LIMIT 5')
-                                     % dict(refval=refval, intable=intable, targetval=targetval, targettable=targettable))
-            if len(undefined) > 0:
-                undefined = ','.join([ str(r.value) for r in undefined ])
-                raise Conflict(self, 'Provided value or values "%s"=(%s) are not valid references to tag "%s".' % (tagdef.tagname, undefined, tagdef.tagref))
+            # need to validate referential integrity of user input on visible graph content
+            query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+                      + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
+                      + ' WHERE r.%(refcol)s IS NULL'
+                      ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
+            if self.dbquery(query, vars=refvalues)[0].count > 0:
+                raise Conflict(self, data='Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
 
         if tagdef.multivalue:
             # multi-valued tags are straightforward set-algebra on triples
@@ -3306,6 +3318,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     self.build_files_by_predlist_path([ (refpreds,
                                                          [web.Storage(tag=tagdef.tagref, op=None, vals=[])],
                                                          []) ],
+                                                      enforce_read_authz=enforce_read_authz,
                                                       values=values,
                                                       tagdefs=tagdefs,
                                                       typedefs=typedefs)[0]
