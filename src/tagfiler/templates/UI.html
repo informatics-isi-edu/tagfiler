@@ -30,7 +30,7 @@ $if None:
   <script type="text/javascript" src="${home}/static/jquery.contextMenu.js"></script>
   <script type="text/javascript" src="${home}/static/functions.js"></script>
 </head>
-<body>
+<body onload="initUI(\"${home}\", \"${client}\", \"FIXME\", \"$:{jsonWriter(uiopts).replace('\"','\\\"')}\")">
 <div id="Idle_Session_Warning" style="display: none">
 <p>
 Warning, your session will soon expire due to idle timeout...
@@ -51,11 +51,6 @@ Warning, your session will soon expire due to idle timeout...
 <div id="ui" onmouseup="document.body.style.cursor = 'default';" >
 
 </div>
-<script type="text/javascript">
-\$(document).ready(function() {
-	initUI("${home}", "${client}", "FIXME", "$:{jsonWriter(uiopts).replace('"','\\"')}");
-});
-</script>
 
 </div>
 </div>
