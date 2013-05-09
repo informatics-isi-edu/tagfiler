@@ -347,8 +347,6 @@ class Subject (Node):
                 self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
             if basefile and basefile['content-type'] != None and basefile.id == newfile.id:
                 self.delete_tag(newfile, self.globals['tagdefsdict']['content-type'])
-            if newfile.url:
-                self.set_tag(newfile, self.globals['tagdefsdict']['url'], newfile.url)
             if self.key:
                 if basefile:
                     self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
@@ -628,11 +626,7 @@ class Subject (Node):
 
             if self.action in [ 'put', 'putsq' , 'post' ]:
                 # we only support non-file PUT and POST simulation this way
-                self.url = get_param('url')
                 self.dtype = None
-                if self.action in ['put', 'post']:
-                    if self.url != None:
-                        self.dtype = 'url'
                        
                 return self.dbtransact(lambda : self.insertForStore(allow_blank=True, post_method=True),
                                        putPostCommit)
