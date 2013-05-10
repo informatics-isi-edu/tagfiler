@@ -1,13 +1,24 @@
 #!/bin/sh
 
-if [[ $# -lt 3 ]]
+if [[ $# -lt 4 ]]
 then
     cat >&2 <<EOF
-usage: $0 <user> <password> <non-user role>
+usage: $0 <user> <password> <non-user role> <mutable role>
 
 Test against a default tagfiler installation on localhost with default
 security behavior allowing username and password POST to the /session
-API.
+API using <user> and <password>.
+
+The <non-user role> is used to set ownership of subjects to something
+other than the user or its inherited roles, to test non-ownership
+conditions.
+
+The <mutable role> is used to temporarily drop ownership of tagdefs in
+order to test non-ownership conditions for tagdefs, but then to
+reacquire ownership by granting this mutable role to the user so the
+test tagdefs can be purged.  For this feature to work, the
+tagfiler-config.json must also grant the user rights via the webauthn2
+manageusers and manageroles permissions.
 
 This script runs tests of tag policy models by creating tagdefs and
 using them to create and retrieve graph content.  The non-user role is
@@ -16,12 +27,14 @@ to access.  Some content will remain in the graph since this script
 cannot remove it when authz works properly.
 
 EOF
+    exit 1
 fi
 
 API="https://localhost/tagfiler"
 username=$1
 password=$2
 otherrole=$3
+mutablerole=$4
 
 testno=${RANDOM}
 
@@ -41,17 +54,50 @@ mycurl()
     curl -b cookie -c cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
 }
 
+tagdef_writepolicies=(
+    subject
+    subjectowner
+    tag
+    tagorsubject
+    tagandsubject
+    tagorowner
+    tagandowner
+)
+
+tagdefref_writepolicies=(
+    object
+    objectowner
+    subjectandobject
+    tagorsubjectandobject
+    tagandsubjectandobject
+)
+
+reset()
+{
+    # blindly tear down everything we setup in this test
+    if [[ -n "$mutablerole" ]]
+    then
+	mycurl "/user/${username}/attribute/${mutablerole}" -X PUT > /dev/null
+	mycurl "/session" -X DELETE > /dev/null
+	mycurl "/session" -d username="$username" -d password="$password" > /dev/null
+    fi
+
+    for i in ${!tagdef_writepolicies[@]}
+    do
+	for j in ${!tagdefref_writepolicies[@]}
+	do
+	    mycurl "/tagdef/foo${i}_${j}" -X DELETE > /dev/null
+	done
+	mycurl "/subject/typedef=foo${i}ref" -X DELETE > /dev/null
+	mycurl "/tagdef/foo${i}" -X DELETE > /dev/null
+    done
+
+    mycurl "/session" -X DELETE > /dev/null
+}
+
 error()
 {
-    mycurl "/tagdef/foo1A" -X DELETE > /dev/null
-    mycurl "/tagdef/foo1B" -X DELETE > /dev/null
-    mycurl "/tagdef/foo2A" -X DELETE > /dev/null
-    mycurl "/tagdef/foo2B" -X DELETE > /dev/null
-    mycurl "/subject/typedef=foo1ref" -X DELETE > /dev/null
-    mycurl "/subject/typedef=foo2ref" -X DELETE > /dev/null
-    mycurl "/tagdef/foo1" -X DELETE > /dev/null
-    mycurl "/tagdef/foo2" -X DELETE > /dev/null
-    mycurl "/session" -X DELETE > /dev/null
+    reset
     cat >&2 <<EOF
 $0: $@
 EOF
@@ -61,51 +107,62 @@ EOF
 status=$(mycurl "/session" -d username="$username" -d password="$password" -o /dev/null)
 [[ "$status" -eq 201 ]] || error got "$status" during login
 
-status=$(mycurl "/tagdef/foo1?typestr=text&multivalue=false&readpolicy=anonymous&writepolicy=subject" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo1
+# setup the test schema
+for i in ${!tagdef_writepolicies[@]}
+do
+    status=$(mycurl "/tagdef/foo${i}?typestr=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o /dev/null)
+    [[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}
 
-status=$(mycurl "/tagdef/foo2?typestr=text&multivalue=false&readpolicy=anonymous&writepolicy=subjectowner" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo1
+    status=$(mycurl "/subject/typedef=foo${i}ref?typedef%20dbtype=text&typedef%20tagref=foo${i}" -X PUT -o /dev/null)
+    [[ "$status" = 201 ]] || error got "$status" creating typedef foo${i}ref
 
-status=$(mycurl "/subject/typedef=foo1ref?typedef%20dbtype=text&typedef%20tagref=foo1" -X PUT -o /dev/null)
-[[ "$status" = 201 ]] || error got "$status" creating typedef foo1ref
+    for j in ${!tagdefref_writepolicies[@]}
+    do
+	status=$(mycurl "/tagdef/foo${i}_${j}?typestr=foo${i}ref&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}" -X PUT -o /dev/null)
+	[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}_${j}
+    done
 
-status=$(mycurl "/subject/typedef=foo2ref?typedef%20dbtype=text&typedef%20tagref=foo2" -X PUT -o /dev/null)
-[[ "$status" = 201 ]] || error got "$status" creating typedef foo2ref
-
-status=$(mycurl "/tagdef/foo1A?typestr=foo1ref&multivalue=false&readpolicy=anonymous&writepolicy=object" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo1A
-
-status=$(mycurl "/tagdef/foo1B?typestr=foo2ref&multivalue=false&readpolicy=anonymous&writepolicy=objectowner" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo2A
-
-status=$(mycurl "/tagdef/foo2A?typestr=foo2ref&multivalue=false&readpolicy=anonymous&writepolicy=object" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo2A
-
-status=$(mycurl "/tagdef/foo2B?typestr=foo2ref&multivalue=false&readpolicy=anonymous&writepolicy=objectowner" -X PUT -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo2B
+done
 
 #mycurl "/query/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
 
 cat > $tempfile <<EOF
-test${testno}-1,${username},{*},{*}
-test${testno}-2,${username},{${username}},{${username}}
-test${testno}-3,${username},{},{}
-test${testno}-4,${otherrole},{*},{*}
-test${testno}-5,${otherrole},{${username}},{${username}}
-test${testno}-6,${otherrole},{*},{}
-test${testno}-7,${otherrole},{${otherrole}},{${otherrole}}
+test${testno}-1,${username},{*},{*},,,,,,,
+test${testno}-2,${username},{${username}},{${username}},,,,,,,
+test${testno}-3,${username},{},{},,,,,,,
+test${testno}-4,${otherrole},{*},{*},,,,,,,
+test${testno}-5,${otherrole},{${username}},{${username}},,,,,,,
+test${testno}-6,${otherrole},{*},{},,,,,,,
+test${testno}-7,${otherrole},{${otherrole}},{${otherrole}},,,,,,,
+test${testno}-1B,${username},{*},{*},1B,1B,1B,1B,1B,1B,1B
+test${testno}-2B,${username},{${username}},{${username}},2B,2B,2B,2B,2B,2B,2B
+test${testno}-3B,${username},{},{},3B,3B,3B,3B,3B,3B,3B
+test${testno}-4B,${otherrole},{*},{*},4B,4B,4B,4B,4B,4B,4B
+test${testno}-5B,${otherrole},{${username}},{${username}},5B,5B,5B,5B,5B,5B,5B
+test${testno}-6B,${otherrole},{*},{},6B,6B,6B,6B,6B,6B,6B
+test${testno}-7B,${otherrole},{${otherrole}},{${otherrole}},7B,7B,7B,7B,7B,7B,7B
 EOF
 
-NUMVIS=6
+NUMVIS=12
 
-status=$(mycurl "/subject/name(name;owner;read%20users;write%20users)" -H "Content-Type: text/csv" -T ${tempfile} -o /dev/null)
-[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects "test${testno}-{1..5}"
+status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o /dev/null)
+[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects 
 
 lines=$(mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users)" -H "Accept: text/csv" | wc -l)
 [[ "$lines" -eq $(( $NUMVIS + 1 )) ]] || error got $(( $lines - 1 )) results querying when $NUMVIS should be visible
 
 #mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
+
+tagerror()
+{
+    local tag=$1
+    local subj=$2
+    local obj=$3
+    shift 3
+    mycurl "/query/tagdef=${tag}(tagdef;tagdef%20writepolicy;owner;tag%20write%20users)" -H "Accept: application/json" >&2
+    mycurl "/query/name=${subj}(owner;read%20users;write%20users;readok;writeok)" -H "Accept: application/json" >&2
+    error "$@"
+}
 
 tagtest()
 {
@@ -115,115 +172,144 @@ tagtest()
 
     for s in $@
     do
-	echo "test${testno}-${s},value$s" > $tempfile
+	local subj="test${testno}-${s}"
+	local obj="value$s"
+	echo "${subj},${obj}" > $tempfile
 	
 	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o /dev/null)
-	[[ "$status" -eq $code ]] || error got "$status" instead of $code while bulk putting tag $tag on subjects $@
-
-	status=$(mycurl "/tags/name=test${testno}-${s}(${tag}=value${s}prime)" -X PUT -o /dev/null)
-	[[ "$status" -eq $code ]] || error got "$status" instead of $code while bulk putting tag $tag on subjects $@
+	[[ "$status" -eq $code ]] || tagerror "${tag}" "$subj" "$obj" got "$status" instead of $code while bulk putting tag $tag on subjects $@
 
     done > $tempfile
 
 }
 
-tagtest 204 foo1 1 2 3 4 5
-tagtest 403 foo1 6
-
-tagtest 204 foo2 1 2 3
-tagtest 403 foo2 4 5 6
-
-cat > $tempfile <<EOF
-test${testno}-1B,${username},{*},{*},1B,1B
-test${testno}-2B,${username},{${username}},{${username}},2B,2B
-test${testno}-3B,${username},{},{},3B,3B
-test${testno}-4B,${otherrole},{*},{*},4B,4B
-test${testno}-5B,${otherrole},{${username}},{${username}},5B,5B
-test${testno}-6B,${otherrole},{*},{},6B,6B
-test${testno}-7B,${otherrole},{${otherrole}},{${otherrole}},7B,7B
-EOF
-
-status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo1;foo2)" -H "Content-Type: text/csv" -T ${tempfile} -o /dev/null)
-[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects "test${testno}-{1..5}"
-
-lines=$(mycurl "/query/name:regexp:test${testno}-.B(name;owner;read%20users;write%20users)" -H "Accept: text/csv" | wc -l)
-[[ "$lines" -eq $(( $NUMVIS + 1 )) ]] || error got $(( $lines - 1 )) results querying when $NUMVIS should be visible
+tagreferror()
+{
+    local tag=$1
+    local subj=$2
+    local obj=$3
+    local reftag=${tag%_*}
+    shift 3
+    mycurl "/query/tagdef=${tag}(tagdef;tagdef%20writepolicy;owner;tag%20write%20users;tagdef%20type)" -H "Accept: application/json" >&2
+    mycurl "/query/typedef=${reftag}ref(typedef;typedef%20tagref)" -H "Accept: application/json" >&2
+    mycurl "/query/name=${subj}(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: application/json" >&2
+    mycurl "/query/${reftag}=${obj}(name;owner;read%20users;write%20users;readok;writeok;${reftag})" -H "Accept: application/json" >&2
+    error "$@"
+}
 
 tagreftest()
 {
     local code=$1
-    local tag=$2
-    local val=$3
-    shift 3
+    local tagref=$2
+    shift 2
 
-    for s in $@
+    local subjects=()
+    local objects=()
+    while [[ $1 != '--' ]]
     do
-	echo "test${testno}-${s},$val" > $tempfile
+	subjects+=( "$1" )
+	shift
+    done
+    shift
+    while [[ $# -gt 0 ]]
+    do
+	objects+=( "$1" )
+	shift
+    done
 
-	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o /dev/null)
-	[[ "$status" -eq $code ]] || error got "$status" instead of $code while bulk putting tag $tag on subjects $@
-
-	status=$(mycurl "/tags/name=test${testno}-${s}(${tag}=${val})" -X PUT -o /dev/null)
-	[[ "$status" -eq $code ]] || error got "$status" instead of $code while bulk putting tag $tag on subjects $@
-
-    done > $tempfile
-
+    for i in ${!tagdef_writepolicies[@]}
+    do
+	local tag=foo${i}_${tagref}
+	for s in "${subjects[@]}"
+	do
+	    for o in "${objects[@]}"
+	    do
+		local subj="test${testno}-${s}"
+		echo "${subj},${o}" > $tempfile
+		url="/tags/name(${tag})"
+		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o /dev/null)
+		[[ "$status" -eq $code ]] || tagreferror "$tag" "$subj" "$o" got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
+	    done
+	done
+    done
 }
 
-tagreftest 204 foo1A 1B 1 2 3 4 5 6
-tagreftest 204 foo1A 2B 1 2 3 4 5 6
-tagreftest 204 foo1A 3B 1 2 3 4 5 6
-tagreftest 204 foo1A 4B 1 2 3 4 5 6
-tagreftest 204 foo1A 5B 1 2 3 4 5 6
-tagreftest 403 foo1A 6B 1 2 3 4 5 6
+# test writepolicy=subject
+tagtest 204 foo0 1 2 3 4 5   # subjects where writeok=True
+tagtest 403 foo0           6 # subject where writeok=False
 
-tagreftest 204 foo1B 1B 1 2 3 4 5 6
-tagreftest 204 foo1B 2B 1 2 3 4 5 6
-tagreftest 204 foo1B 3B 1 2 3 4 5 6
-tagreftest 403 foo1B 4B 1 2 3 4 5 6
-tagreftest 403 foo1B 5B 1 2 3 4 5 6
-tagreftest 403 foo1B 6B 1 2 3 4 5 6
+# test writepolicy=subjectowner
+tagtest 204 foo1 1 2 3       # subjects where owner=username
+tagtest 403 foo1       4 5 6 # subjects where owner=otherrole
 
-tagreftest 204 foo2A 1B 1 2 3 4 5 6
-tagreftest 204 foo2A 2B 1 2 3 4 5 6
-tagreftest 204 foo2A 3B 1 2 3 4 5 6
-tagreftest 204 foo2A 4B 1 2 3 4 5 6
-tagreftest 204 foo2A 5B 1 2 3 4 5 6
-tagreftest 403 foo2A 6B 1 2 3 4 5 6
+# multiple test combinations here to make sure we observe the right tagpolicy
+# e.g. the tagpolicy of the referenced tag is irrelevant when authorizing writes
+# to referencing tags
 
-tagreftest 204 foo2B 1B 1 2 3 4 5 6
-tagreftest 204 foo2B 2B 1 2 3 4 5 6
-tagreftest 204 foo2B 3B 1 2 3 4 5 6
-tagreftest 403 foo2B 4B 1 2 3 4 5 6
-tagreftest 403 foo2B 5B 1 2 3 4 5 6
-tagreftest 403 foo2B 6B 1 2 3 4 5 6
+# test writepolicy=object
+tagreftest 204 0 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B    # objects where writeok=True
+tagreftest 403 0 1 2 3 4 5 6 --                6B # object where writeok=False
 
-status=$(mycurl "/tagdef/foo1A" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo1A
+# test writepolicy=objectowner
+tagreftest 204 1 1 2 3 4 5 6 -- 1B 2B 3B          # objects which we own
+tagreftest 403 1 1 2 3 4 5 6 --          4B 5B 6B # objects which we do not own
 
-status=$(mycurl "/tagdef/foo1B" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo1B
+# test writepolicy=subjectandobject
+tagreftest 204 2 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # subjects where writeok=True and objects where writeok=True
+tagreftest 403 2 1 2 3 4 5   --                6B # subjects where writeok=True and objects where writeok=False
+tagreftest 403 2           6 -- 1B 2B 3B 4B 5B    # subjects where writeok=False and objects where writeok=True
+tagreftest 403 2           6 --                6B # subject and object where writeok=False
 
-status=$(mycurl "/tagdef/foo2A" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo2A
+# now test with us in ACLs... (we're in ACL because we own tagdef)
+tagtest 204 foo2 1 2 3 4 5 6 # writepolicy=tag and tag ACL is True
+tagtest 204 foo3 1 2 3 4 5 6 # writepolicy=tagorsubject and tag ACL is True
+tagtest 204 foo4 1 2 3 4 5   # writepolicy=tagandsubject and tag ACL is True and subject writeok=True
+tagtest 403 foo4           6 # writepolicy=tagandsubject and subject writeok=False
+tagtest 204 foo5 1 2 3 4 5 6 # writepolicy=tagorowner and ACL is True
+tagtest 204 foo6 1 2 3       # writepolicy=tagandowner and ACL is True and owner=username
+tagtest 403 foo6 4 5 6       # writepolicy=tagandowner and owner=otherrole
+tagreftest 204 3 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagorsubjectandobject and ACL is True
+tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectandobject and ACL is True and subject writeok=True and object writeok=True
+tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
+tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
 
-status=$(mycurl "/tagdef/foo2B" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo2B
 
-status=$(mycurl "/subject/typedef=foo1ref" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting typedef foo1ref
+if [[ -n "$mutablerole" ]]
+then
+    # can only test negative tag ACLs if we can rescind ownership while reacquiring it for cleanup later
 
-status=$(mycurl "/subject/typedef=foo2ref" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting typedef foo2ref
+    # make sure we're not in mutablerole
+    status=$(mycurl "/user/${username}/attribute/${mutablerole}" -X DELETE -o /dev/null)
+    [[ "$status" = 204 ]] || [[ "$status" = 404 ]] || error got "$status" removing ${username} from ${mutablerole}
 
-status=$(mycurl "/tagdef/foo1" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo1
+    # restart session to ensure fresh attribute set
+    status=$(mycurl "/session" -X DELETE -o /dev/null)
+    [[ "$status" = 204 ]] || error got "$status" during logout
+    
+    status=$(mycurl "/session" -d username="$username" -d password="$password" -o /dev/null)
+    [[ "$status" -eq 201 ]] || error got "$status" during login
 
-status=$(mycurl "/tagdef/foo2" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" deleting tagdef foo2
+    # change owner of tagdefs to mutablerole
+    status=$(mycurl "/tags/tagdef:regexp:foo;owner=${username}(owner=${mutablerole})" -X PUT -o /dev/null)
+    [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
+    
+    # test without us in tag ACLs...
+    tagtest 403 foo2 1 2 3 4 5 6 # writepolicy=tag and tag ACL is False
+    tagtest 204 foo3 1 2 3 4 5   # writepolicy=tagorsubject and subject writeok=True
+    tagtest 403 foo3           6 # writepolicy=tagorsubject and subject writeok=True
+    tagtest 403 foo4 1 2 3 4 5 6 # writepolicy=tagandsubject and tag ACL is False
+    tagtest 204 foo5 1 2 3       # writepolicy=tagorowner and owner=username
+    tagtest 403 foo5 4 5 6       # writepolicy=tagorowner and owner=otherrole and ACL is False
+    tagtest 403 foo6 1 2 3 4 5 6 # writepolicy=tagandowner and ACL is False
+    tagreftest 204 3 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagorsubjectandobject and subject writeok=True and object writeok=True
+    tagreftest 403 3           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagorsubjectandobject and subject writeok=False
+    tagreftest 403 3 1 2 3 4 5   --                6B # writepolicy=tagorsubjectandobject and object writeok=False
+    tagreftest 403 4 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject and ACL is False
 
-status=$(mycurl "/session" -X DELETE -o /dev/null)
-[[ "$status" = 204 ]] || error got "$status" during logout
+fi
 
+
+# tear down the test schema
+reset
 exit 0
 
