@@ -30,7 +30,8 @@ $if None:
   <script type="text/javascript" src="${home}/static/jquery.contextMenu.js"></script>
   <script type="text/javascript" src="${home}/static/functions.js"></script>
 </head>
-<body onload="initUI(\"${home}\", \"${client}\", \"FIXME\", \"$:{jsonWriter(uiopts).replace('\"','\\\"')}\")">
+$ onload='initUI("%s", "%s", "FIXME", "%s")' % (home, client, jsonWriter(uiopts).replace('"', '\\"'))
+<body onload="${onload}">
 <div id="Idle_Session_Warning" style="display: none">
 <p>
 Warning, your session will soon expire due to idle timeout...
