@@ -1563,7 +1563,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdef.tagref:
             reftagdef = tagdefs[tagdef.tagref]
-            obj_ok = self.test_tag_authz(mode, None, reftagdef, tagdefs=tagdefs)
 
             if value is not None and obj_ok is None:
                 results = self.select_files_by_predlist_path([web.Storage(tag=tagdef.tagref, op='=', vals=[value])], tagdefs=tagdefs)
