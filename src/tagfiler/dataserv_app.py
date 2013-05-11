@@ -843,90 +843,93 @@ class Application (webauthn2_handler_factory.RestHandler):
     
     # static representation of core schema
     static_typedefs = []
-    for prototype in [ ('empty', '', 'No Content', None, []),
-                       ('boolean', 'boolean', 'Boolean', None, ['T true', 'F false']),
-                       ('int8', 'int8', 'Integer', None, []),
-                       ('float8', 'float8', 'Floating point', None, []),
-                       ('date', 'date', 'Date', None, []),
-                       ('timestamptz', 'timestamptz', 'Date and time with timezone', None, []),
-                       ('text', 'text', 'Text', None, []),
-                       ('role', 'text', 'Role', None, []),
-                       ('rolepat', 'text', 'Role pattern', None, []),
-                       ('url', 'text', 'URL', None, []),
-                       ('id', 'int8', 'Subject ID or subquery', None, []),
-                       ('tagpolicy', 'text', 'Tag policy model', None, ['anonymous Any client may access',
-                                                                        'subject Subject authorization is observed',
-                                                                        'subjectowner Subject owner may access',
-                                                                        'object Object authorization is observed',
-                                                                        'objectowner Object owner may access',
-                                                                        'tag Tag authorization is observed',
-                                                                        'tagorsubject Tag or subject authorization is sufficient',
-                                                                        'tagandsubject Tag and subject authorization are required',
-                                                                        'tagandsubjectandobject Tag, subject, and object authorization are required',
-                                                                        'tagorsubjectandobject Either tag or both of subject and object authorization is required',
-                                                                        'subjectandobject Subject and object authorization are required',
-                                                                        'tagorowner Tag authorization or subject ownership is sufficient',
-                                                                        'tagandowner Tag authorization and subject ownership is required',
-                                                                        'system No client can access']),
-                       ('type', 'text', 'Scalar value type', 'typedef', []),
-                       ('tagdef', 'text', 'Tag definition', 'tagdef', []),
-                       ('name', 'text', 'Subject name', None, []),
-                       ('config', 'text', 'Configuration storage', 'config', []),
-                       ('view', 'text', 'View name', 'view', []),
-                       ('GUI features', 'text', 'GUI configuration mode', None, ['bulk_value_edit bulk value editing',
-                                                                                 'bulk_subject_delete bulk subject delete',
-                                                                                 'cell_value_edit cell-based value editing',
-                                                                                 'file_download per-row file download',
-                                                                                 'subject_delete per-row subject delete',
-                                                                                 'view_tags per-row tag page',
-                                                                                 'view_URL per-row view URL']) ]:
-        typedef, dbtype, desc, tagref, enum = prototype
+    for prototype in [
+        ('empty', '', 'No Content',[]),
+        ('boolean', 'boolean', 'Boolean', ['T true', 'F false']),
+        ('int8', 'int8', 'Integer', []),
+        ('float8', 'float8', 'Floating point', []),
+        ('date', 'date', 'Date', []),
+        ('timestamptz', 'timestamptz', 'Date and time with timezone', []),
+        ('text', 'text', 'Text', []),
+        ('role', 'text', 'Role', []),
+        ('rolepat', 'text', 'Role pattern', []),
+        ('url', 'text', 'URL', []),
+        ('id', 'int8', 'Subject ID or subquery', []),
+        ('tagpolicy', 'text', 'Tag policy model', [
+                'anonymous Any client may access',
+                'subject Subject authorization is observed',
+                'subjectowner Subject owner may access',
+                'object Object authorization is observed',
+                'objectowner Object owner may access',
+                'tag Tag authorization is observed',
+                'tagorsubject Tag or subject authorization is sufficient',
+                'tagandsubject Tag and subject authorization are required',
+                'tagandsubjectandobject Tag, subject, and object authorization are required',
+                'tagorsubjectandobject Either tag or both of subject and object authorization is required',
+                'subjectandobject Subject and object authorization are required',
+                'tagorowner Tag authorization or subject ownership is sufficient',
+                'tagandowner Tag authorization and subject ownership is required',
+                'system No client can access']),
+        ('type', 'text', 'Scalar value type', []),
+        ('tagdef', 'text', 'Tag definition', []),
+        ('name', 'text', 'Subject name', []),
+        ('config', 'text', 'Configuration storage', []),
+        ('view', 'text', 'View name', []),
+        ('GUI features', 'text', 'GUI configuration mode', [
+                'bulk_value_edit bulk value editing',
+                'bulk_subject_delete bulk subject delete',
+                'cell_value_edit cell-based value editing',
+                'file_download per-row file download',
+                'subject_delete per-row subject delete',
+                'view_tags per-row tag page',
+                'view_URL per-row view URL']) ]:
+        typedef, dbtype, desc, enum = prototype
         static_typedefs.append(web.Storage({'typedef' : typedef,
                                             'typedef description' : desc,
                                             'typedef dbtype' : dbtype,
-                                            'typedef tagref' : tagref,
                                             'typedef values' : enum}))
 
     static_typedefs = dict( [ (typedef.typedef, typedef) for typedef in static_typedefs ] )
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
-    for prototype in [ ('config', 'text', False, 'subject', True),
-                       ('config binding', 'id', True, 'subject', False),
-                       ('config parameter', 'text', False, 'subject', False),
-                       ('config value', 'text', True, 'subject', False),
-                       ('id', 'int8', False, 'system', True),
-                       ('readok', 'boolean', False, 'system', False),
-                       ('writeok', 'boolean', False, 'system', False),
-                       ('tagdef', 'text', False, 'system', True),
-                       ('tagdef type', 'type', False, 'system', False),
-                       ('tagdef multivalue', 'boolean', False, 'system', False),
-                       ('tagdef active', 'boolean', False, 'system', False),
-                       ('tagdef readpolicy', 'tagpolicy', False, 'system', False),
-                       ('tagdef writepolicy', 'tagpolicy', False, 'system', False),
-                       ('tagdef unique', 'boolean', False, 'system', False),
-                       ('tags present', 'tagdef', True, 'system', False),
-                       ('tag read users', 'rolepat', True, 'subjectowner', False),
-                       ('tag write users', 'rolepat', True, 'subjectowner', False),
-                       ('typedef', 'text', False, 'subject', True),
-                       ('typedef description', 'text', False, 'subject', False),
-                       ('typedef dbtype', 'text', False, 'subject', False),
-                       ('typedef values', 'text', True, 'subject', False),
-                       ('typedef tagref', 'text', False, 'subject', False),
-                       ('read users', 'rolepat', True, 'subjectowner', False),
-                       ('write users', 'rolepat', True, 'subjectowner', False),
-                       ('owner', 'role', False, 'tagorowner', False),
-                       ('modified', 'timestamptz', False, 'system', False),
-                       ('subject last tagged', 'timestamptz', False, 'system', False),
-                       ('subject last tagged txid', 'int8', False, 'system', False),
-                       ('tag last modified', 'timestamptz', False, 'system', False),
-                       ('name', 'text', False, 'subjectowner', True),
-                       ('view', 'text', False, 'subject', True),
-                       ('view tags', 'tagdef', True, 'subject', False) ]:
-        deftagname, typestr, multivalue, writepolicy, unique = prototype
+    for prototype in [ ('config', 'text', 'text', None, False, 'subject', True),
+                       ('config binding', 'int8', 'id', 'id', True, 'subject', False),
+                       ('config parameter', 'text', 'text', None, False, 'subject', False),
+                       ('config value', 'text', 'text', None, True, 'subject', False),
+                       ('id', 'int8', 'int8', None, False, 'system', True),
+                       ('readok', 'boolean', 'boolean', None, False, 'system', False),
+                       ('writeok', 'boolean', 'boolean', None, False, 'system', False),
+                       ('tagdef', 'text', 'text', None, False, 'system', True),
+                       ('tagdef type', 'text', 'type', 'typedef', False, 'system', False),
+                       ('tagdef dbtype', 'text', 'text', None, False, 'system', False),
+                       ('tagdef tagref', 'text', 'tagdef', 'tagdef', False, 'system', False),
+                       ('tagdef multivalue', 'boolean', 'boolean', None, False, 'system', False),
+                       ('tagdef active', 'boolean', 'boolean', None, False, 'system', False),
+                       ('tagdef readpolicy', 'text', 'tagpolicy', None, False, 'system', False),
+                       ('tagdef writepolicy', 'text', 'tagpolicy', None, False, 'system', False),
+                       ('tagdef unique', 'boolean', 'boolean', None, False, 'system', False),
+                       ('tags present', 'text', 'tagdef', 'tagdef', True, 'system', False),
+                       ('tag read users', 'text', 'rolepat', None, True, 'subjectowner', False),
+                       ('tag write users', 'text', 'rolepat', None, True, 'subjectowner', False),
+                       ('typedef', 'text', 'text', None, False, 'subject', True),
+                       ('typedef description', 'text', 'text', None, False, 'subject', False),
+                       ('typedef dbtype', 'text', 'text', None, False, 'subject', False),
+                       ('typedef values', 'text', 'text', None, True, 'subject', False),
+                       ('read users', 'text', 'rolepat', None, True, 'subjectowner', False),
+                       ('write users', 'text', 'rolepat', None, True, 'subjectowner', False),
+                       ('owner', 'text', 'role', None, False, 'tagorowner', False),
+                       ('modified', 'timestamptz', 'timestamptz', None, False, 'system', False),
+                       ('subject last tagged', 'timestamptz', 'timestamptz', None, False, 'system', False),
+                       ('subject last tagged txid', 'int8', 'int8', None, False, 'system', False),
+                       ('tag last modified', 'timestamptz', 'timestamptz', None, False, 'system', False),
+                       ('name', 'text', 'text', None, False, 'subjectowner', True),
+                       ('view', 'text', 'text', None, False, 'subject', True),
+                       ('view tags', 'text', 'tagdef', 'tagdef', True, 'subject', False) ]:
+        deftagname, dbtype, typestr, tagref, multivalue, writepolicy, unique = prototype
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
                                           typestr=typestr,
-                                          dbtype=static_typedefs[typestr]['typedef dbtype'],
+                                          dbtype=dbtype,
                                           multivalue=multivalue,
                                           active=True,
                                           readpolicy='anonymous',
@@ -935,7 +938,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           unique=unique,
                                           tagreaders=[],
                                           tagwriters=[],
-                                          tagref=static_typedefs[typestr].get('typedef tagref')))
+                                          tagref=tagref))
 
     static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
 
@@ -1188,7 +1191,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             type = typedef_cache.select(self.db, lambda: self.get_type(), self.context.client, typename)
             if type == None:
                 raise Conflict(self, 'The type "%s" is not defined!' % typename)
-            dbtype = type['typedef dbtype']
+            dbtype = tagdef.dbtype
             try:
                 key = downcast_value(dbtype, key)
             except ValueError, e:
@@ -1704,7 +1707,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             subjpreds = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
         else:
             subjpreds = [ web.Storage(tag='typedef', op=None, vals=[]) ]
-        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values', 'typedef tagref' ]
+        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
         return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs) ]
 
     def insert_file(self, file=None):
@@ -1733,7 +1736,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.dbquery(query, vars=dict(id=subject.id))
 
     tagdef_listas =  { 'tagdef': 'tagname', 
+                       'tagdef dbtype': 'dbtype',
                        'tagdef type': 'typestr', 
+                       'tagdef tagref': 'tagref',
                        'tagdef multivalue': 'multivalue',
                        'tagdef active': 'active',
                        'tagdef readpolicy': 'readpolicy',
@@ -1755,18 +1760,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             ordertags = []
 
-        def augment1(tagdef):
-            try:
-                typedef = self.globals['typesdict'][tagdef.typestr]
-            except:
-                typedef = Application.static_typedefs[tagdef.typestr]
-             
-            tagdef['tagref'] = typedef['typedef tagref']
-            tagdef['dbtype'] = typedef['typedef dbtype']
-
-            return tagdef
-            
-        def augment2(tagdef, tagdefs):
+        def augment(tagdef, tagdefs):
             for mode in ['read', 'write']:
                 tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef, tagdefs=tagdefs)
 
@@ -1777,8 +1771,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = [ augment1(tagdef) for tagdef in self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz) ]
-        results = [ augment2(tagdef, dict([ (res.tagname, res) for res in results ])) for tagdef in results ]
+        results = list(self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz))
+        tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in results ])
+        results = [ augment(tagdef, tagdefs) for tagdef in results ]
 
         #web.debug(results)
         return results
@@ -1788,18 +1783,25 @@ class Application (webauthn2_handler_factory.RestHandler):
         if len(results) > 0:
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
+        if self.dbtype is None:
+            typedef = self.globals['typesdict'][self.typestr]
+            self.dbtype = typedef['typedef dbtype']
+
         owner = self.context.client
         newid = self.insert_file(None)
         subject = web.Storage(id=newid)
         tags = [ ('created', 'now'),
                  ('tagdef', self.tag_id),
                  ('tagdef active', None),
+                 ('tagdef dbtype', self.dbtype),
                  ('tagdef type', self.typestr),
                  ('tagdef readpolicy', self.readpolicy),
                  ('tagdef writepolicy', self.writepolicy),
                  ('read users', '*') ]
         if owner:
             tags.append( ('owner', owner) )
+        if self.tagref:
+            tags.append( ('tagdef tagref', self.tagref) )
         if self.multivalue:
             try:
                 self.multivalue = downcast_value('boolean', self.multivalue)
@@ -1822,10 +1824,11 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
         tagdef.id = newid
-        if owner == None:
+        if owner is None:
             tagdef.owner = None
+        if self.tagref is None:
+            tagdef.tagref = None
         tagdef.multivalue = self.multivalue
-        tagdef.unique = self.is_unique
         
         self.deploy_tagdef(tagdef)
 
@@ -1852,7 +1855,11 @@ class Application (webauthn2_handler_factory.RestHandler):
         if type == None:
             raise Conflict(self, 'Referenced type "%s" is not defined.' % tagdef.typestr)
 
-        dbtype = type['typedef dbtype']
+        dbtype = tagdef.dbtype
+        tagref = tagdef.tagref
+        if dbtype is None:
+            dbtype = ''
+
         if dbtype != '':
             tabledef += ", value %s" % dbtype
             if dbtype == 'text':
@@ -1864,8 +1871,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             if tagdef.unique:
                 tabledef += ' UNIQUE'
 
-            tagref = type['typedef tagref']
-                
             if tagref:
                 referenced_tagdef = self.globals['tagdefsdict'].get(tagref, None)
 
@@ -3608,7 +3613,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if i > 0:
                 cpreds = path[i-1][1]
                 tagtypes = set([ tagdefs[pred.tag].typestr for pred in cpreds ])
-                tagrefs = set([ typedefs[t]['typedef tagref'] for t in tagtypes if typedefs[t]['typedef tagref'] is not None ])
+                tagrefs = set([ tagdefs[pred.tag].tagref for pred in cpreds if tagdefs[pred.tag].tagref is not None ])
                 if len(tagrefs) > 1:
                     raise BadRequest(self, 'Path element %d has %d disjoint projection tag-references when at most 1 is supported.' % (i-1, len(tagrefs)))
                 elif len(tagrefs) == 1:

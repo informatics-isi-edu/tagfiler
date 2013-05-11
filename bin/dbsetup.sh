@@ -322,17 +322,6 @@ tagdef_phase2()
 {
    # args: subject tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey [tagref]]]
 
-   # policy is one of:
-   #   anonymous  -- any client can access
-   #   subject  -- subject access rule is observed for tag access
-   #   subjectowner  -- only subject owner can access
-   #   tag -- tag access rule is observed for tag access
-   #   tagorsubject -- tag or subject access rules are sufficient
-   #   tagandsubject -- tag and subject access rules are required
-   #   tagorowner -- tag or ownership is sufficient
-   #   tagandowner -- tag and ownership are required
-   #   system  -- no client can access
-
    echo "populate tagdef '$2'..." >&2
 
    dataset_complete "$1" "" tagdef "$4" "*"
@@ -351,6 +340,8 @@ tagdef_phase2()
       tag "$subject" "tagdef multivalue" boolean false >&2
    fi
 
+   tag "$subject" "tagdef dbtype" text "$3" >&2
+
    if [[ -n "$8" ]]
    then
       tag "$subject" "tagdef type" type "$8" >&2
@@ -363,6 +354,11 @@ tagdef_phase2()
       tag "$subject" "tagdef unique" boolean true >&2
    else
       tag "$subject" "tagdef unique" boolean false >&2
+   fi
+
+   if [[ -n "${10}" ]]
+   then
+      tag "$subject" "tagdef tagref" tagdef "${10}" >&2
    fi
 
    insert_or_update $subject "tag last modified" "'now'"
@@ -483,7 +479,6 @@ typedef_core()
    typename="$1"
    dbtype="$2"
    desc="$3"
-   tagref="$4"
    shift 3
    shift  # shift 4 can fail to shift when only 3 args were passed!
    dataset_core "" typedef "" "*"
@@ -497,34 +492,21 @@ typedef_core()
    fi
 }
 
-typedef_tagref()
-{
-    local subject="$1"
-    local tagref="$2"
-    dataset_complete "$subject" "" typedef "" "*"
-    if [[ -n "$tagref" ]]
-    then
-	tag "$subject" "typedef tagref" text "$tagref" >&2
-    fi
-}
-
 type_subjects=()
-type_tagrefs=()
 
 typedef()
 {
     typedef_core "$@"
     local subject=${last_subject}
     type_subjects[${#type_subjects[*]}]="$subject"
-    type_tagrefs[${#type_tagrefs[*]}]="$4"
 }
 
 typedefs_complete()
 {
     local i
-    for i in ${!type_subjects[*]}
+    for subject in ${type_subjects[*]}
     do
-      typedef_tagref "${type_subjects[$i]}" "${type_tagrefs[$i]}"
+	dataset_complete "$subject" "" typedef "" "*"
     done
 }
 
@@ -532,6 +514,8 @@ typedefs_complete()
 
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 tagdef 'tagdef'              text        ""         anonymous   system       false      ""         true  
+tagdef 'tagdef tagref'       text        ""         anonymous   system       false      tagdef     false    tagdef
+tagdef 'tagdef dbtype'       text        ""         anonymous   system       false
 tagdef 'typedef'             text        ""         anonymous   subject      false      ""         true
 tagdef 'typedef description' text        ""         anonymous   subject      false
 tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
@@ -571,15 +555,14 @@ tagdef "incomplete"          empty       ""         anonymous   subject      fal
 tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
 tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
-tagdef 'typedef tagref'      text        ""         anonymous   subject      false      tagdef     ""       tagdef 
 tagdef 'config binding'      int8        ""         subject     subject      true       id         ""       id
 tagdef 'config parameter'    text        ""         subject     subject      false
 tagdef 'config value'        text        ""         subject     subject      true
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
 
-#       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
+#       TYPENAME     DBTYPE        DESC                            ENUMs
 typedef empty        ''            'No content'
-typedef boolean      boolean       'Boolean (true or false)'       ''                 'True True' 'False False'
+typedef boolean      boolean       'Boolean (true or false)'       'True True' 'False False'
 typedef int8         int8          'Integer'
 typedef float8       float8        'Floating point'
 typedef date         date          'Date (yyyy-mm-dd)'
@@ -590,12 +573,12 @@ typedef rolepat      text          'Role pattern'
 typedef url          text          'URL'
 typedef onclick      text          'Javascript function'
 typedef id           int8          'Subject ID or subquery'
-typedef tagpolicy    text          'Tag policy model'              ""                 'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'objectowner Object owner may access' 'object Object authorization is observed' 'tagandsubjectandobject Tag, subject, and object authorization are required' 'tagorsubjectandobject Either tag or both of subject and object authorization is required' 'subjectandobject Subject and object authorization are required' 'system No client can access'
-typedef type         text          'Scalar value type'             typedef
-typedef tagdef       text          'Tag definition'                tagdef
-typedef view         text          'View name'                     view
-typedef 'GUI features' text       'GUI configuration mode'       ""                 'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
-#       TYPENAME     DBTYPE        DESC                            TAGREF             ENUMs
+typedef tagpolicy    text          'Tag policy model'              'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'objectowner Object owner may access' 'object Object authorization is observed' 'tagandsubjectandobject Tag, subject, and object authorization are required' 'tagorsubjectandobject Either tag or both of subject and object authorization is required' 'subjectandobject Subject and object authorization are required' 'system No client can access'
+typedef type         text          'Scalar value type'             
+typedef tagdef       text          'Tag definition'                
+typedef view         text          'View name'                     
+typedef 'GUI features' text       'GUI configuration mode'         'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
+#       TYPENAME     DBTYPE        DESC                            ENUMs
 
 # complete split-phase definitions and redefine as combined phase
 tagdefs_complete
@@ -612,7 +595,7 @@ typedef()
 {
     typedef_core "$@"
     local subject=${last_subject}
-    typedef_tagref "$subject" "$4"
+    dataset_complete "$subject" "" typedef "" "*"
 }
 
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
@@ -712,8 +695,8 @@ viewdef()
 
 viewdef default 'id' 'name' bytes owner 'read users' 'write users' "subject last tagged"
 viewdef config 'config parameter' 'config value'
-viewdef tagdef 'tagdef' "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
-viewdef typedef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values" "typedef tagref"
+viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
+viewdef typedef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values"
 viewdef view 'view' "view tags" "read users" "write users" "owner"
 viewdef alltags
 

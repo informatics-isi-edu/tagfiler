@@ -225,6 +225,8 @@ class Tagdef (Node):
         self.multivalue = None
         self.is_unique = None
         self.action = None
+        self.dbtype = None
+        self.tagref = None
         self.tagdefs = {}
 
     def GET(self, uri):
@@ -315,6 +317,18 @@ class Tagdef (Node):
                 self.typestr = self.queryopts['typestr']
             except:
                 self.typestr = 'empty'
+
+        if self.dbtype is None:
+            try:
+                self.dbtype = self.queryopts['dbtype']
+            except:
+                pass
+
+        if self.tagref == None:
+            try:
+                self.tagref = self.queryopts['tagref']
+            except:
+                pass
 
         if self.readpolicy == None:
             try:

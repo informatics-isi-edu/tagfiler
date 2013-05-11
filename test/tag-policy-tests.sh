@@ -113,12 +113,12 @@ do
     status=$(mycurl "/tagdef/foo${i}?typestr=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o /dev/null)
     [[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}
 
-    status=$(mycurl "/subject/typedef=foo${i}ref?typedef%20dbtype=text&typedef%20tagref=foo${i}" -X PUT -o /dev/null)
+    status=$(mycurl "/subject/typedef=foo${i}ref?typedef%20dbtype=text" -X PUT -o /dev/null)
     [[ "$status" = 201 ]] || error got "$status" creating typedef foo${i}ref
 
     for j in ${!tagdefref_writepolicies[@]}
     do
-	status=$(mycurl "/tagdef/foo${i}_${j}?typestr=foo${i}ref&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}" -X PUT -o /dev/null)
+	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&typestr=foo${i}ref&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o /dev/null)
 	[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}_${j}
     done
 
