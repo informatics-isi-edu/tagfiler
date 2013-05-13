@@ -25,6 +25,7 @@ from rest_fileio import FileIO
 import subjects
 from subjects import Node
 import datetime
+import StringIO
 
 jsonMungeTypes = set([ datetime.datetime, datetime.date ])
 
@@ -533,6 +534,15 @@ class FileTags (Node):
         if content_type == 'application/json':
             try:
                 rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
+
+                try:
+                    clen = int(web.ctx.env['CONTENT_LENGTH'])
+                except:
+                    clen = None
+
+                if clen is not None and clen < 1024 * 1024:
+                    rows = list(rows)
+
                 self.bulk_update_transact(rows, on_missing='abort', on_existing='merge')
             except JSONArrayError:
                 et, ev, tb = sys.exc_info()
@@ -545,7 +555,20 @@ class FileTags (Node):
 
         elif content_type == 'text/csv':
             csvfp = web.ctx.env['wsgi.input']
-            self.bulk_update_transact(csvfp, on_missing='abort', on_existing='merge')
+
+            try:
+                clen = int(web.ctx.env['CONTENT_LENGTH'])
+            except:
+                clen = None
+
+            if clen is not None and clen < 1024 * 1024:
+                buf = csvfp.read(min(1024*1024, clen))
+                csvfp = StringIO.StringIO(buf)
+                rewind = True
+            else:
+                rewind = False
+
+            self.bulk_update_transact(csvfp, on_missing='abort', on_existing='merge', subject_iter_rewindable=rewind)
 
             web.ctx.status = '204 No Content'
             return ''

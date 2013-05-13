@@ -2621,7 +2621,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         return results
 
-    def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False):
+    def bulk_update_transact(self, subject_iter, path=None, on_missing='create', on_existing='merge', copy_on_write=False, enforce_read_authz=True, enforce_write_authz=True, enforce_path_constraints=False, subject_iter_rewindable=False):
         """Perform efficient bulk-update of tag graph for iterator of subject dictionaries (rows) and query path giving shape of update.
 
            *NOTE*: This function performs its own top-level transaction control. DO NOT run it inside another transaction body.
@@ -2712,7 +2712,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                    'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True',
                                    'updated boolean DEFAULT False', 'created boolean DEFAULT False' ]
 
-            self.dbquery('CREATE %s TABLE %s ( %s )' % (subject_iter == False and 'TEMPORARY' or '',
+            self.dbquery('CREATE %s TABLE %s ( %s )' % ((subject_iter == False or subject_iter_rewindable or type(subject_iter) == list) and 'TEMPORARY' or '',
                                                         wraptag(self.input_tablename, '', ''), 
                                                         ','.join(input_column_defs)))
 
@@ -3084,6 +3084,15 @@ class Application (webauthn2_handler_factory.RestHandler):
             # run under one unified transaction scoping our temporary table
             def unified_body():
                 body1()
+                return body3()
+            self.dbtransact(unified_body, lambda x: x)
+        elif subject_iter_rewindable or type(subject_iter) == list:
+            # run under one unified transaction scoping our temporary table
+            def unified_body():
+                body1()
+                if subject_iter_rewindable:
+                    subject_iter.seek(0,0)
+                body2tabular()
                 return body3()
             self.dbtransact(unified_body, lambda x: x)
         else:
