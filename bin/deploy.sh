@@ -60,7 +60,6 @@ SVCUSER=${SVCPREFIX}
 SVCDIR=/var/www/${SVCPREFIX}
 DATADIR=${SVCDIR}-data
 RUNDIR=/var/run/wsgi
-LOGDIR=${SVCDIR}-logs
 
 # set the services to run automatically?
 chkconfig httpd on
@@ -75,8 +74,6 @@ restorecon -rvF ${DATADIR}
 
 mkdir -p ${RUNDIR}
 
-mkdir -p ${LOGDIR}
-restorecon -rvF ${LOGDIR}
 
 if ! runuser -c "/bin/true" ${SVCUSER}
 then
@@ -97,8 +94,6 @@ restorecon -rvF "${SVCHOME}"
 
 chown ${SVCUSER}: ${DATADIR}
 chmod og=rx ${DATADIR}
-chown ${SVCUSER}: ${LOGDIR}
-chmod og= ${LOGDIR}
 
 if runuser -c "psql -c 'select * from pg_user' ${PGADMIN}" - ${PGADMIN} | grep ${SVCUSER} 1>/dev/null
 then
