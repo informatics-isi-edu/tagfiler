@@ -151,7 +151,7 @@ class FileList (Node):
 
             listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['id',
                                                                                                                      'name', 
-                                                                                                                     'tagdef', 'typedef',
+                                                                                                                     'tagdef',
                                                                                                                      'config', 'view', 'url'])) ]
 
             if self.globals['tagdefsdict'].has_key('homepage order') and self.homepage:
@@ -216,10 +216,9 @@ class Subject(subjects.Subject):
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    def __init__(self, parser, appname, tag_id=None, typestr=None, queryopts={}):
+    def __init__(self, parser, appname, tag_id=None, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
         self.tag_id = tag_id
-        self.typestr = typestr
         self.writepolicy = None
         self.readpolicy = None
         self.multivalue = None
@@ -272,7 +271,7 @@ class Tagdef (Node):
             try:
                 self.emit_headers()
                 self.header('Content-Type', 'application/x-www-form-urlencoded')
-                return ('typestr=' + urlquote(tagdef.typestr) 
+                return ('dbtype=' + urlquote(tagdef.dbtype) 
                         + '&readpolicy=' + urlquote(tagdef.readpolicy)
                         + '&writepolicy=' + urlquote(tagdef.writepolicy)
                         + '&multivalue=' + urlquote(tagdef.multivalue)
@@ -310,13 +309,7 @@ class Tagdef (Node):
         if self.tag_id == None:
             raise BadRequest(self, data="Tag definitions require a non-empty tag name.")
 
-        # self.typestr and self.writepolicy take precedence over queryopts...
-
-        if self.typestr == None:
-            try:
-                self.typestr = self.queryopts['typestr']
-            except:
-                self.typestr = 'empty'
+        # self.writepolicy take precedence over queryopts...
 
         if self.dbtype is None:
             try:
@@ -434,7 +427,7 @@ class FileTags (Node):
               subject = self.subject2identifiers(file)[0]
               def render_tagvals(tagdef):
                  home = self.config.home + web.ctx.homepath
-                 if tagdef.typestr == 'empty':
+                 if tagdef.dbtype == '':
                     return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + ")\n"
                  elif tagdef.multivalue and file[tagdef.tagname]:
                     return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname ) + "=" + ','.join([urlquote(str(val)) for val in file[tagdef.tagname]]) + ")\n"
@@ -453,7 +446,7 @@ class FileTags (Node):
                 body = []
                 for tagdef in all:
                     if file[tagdef.tagname]:
-                        if tagdef.typestr == 'empty':
+                        if tagdef.dbtype == '':
                             body.append(urlquote(tagdef.tagname))
                         elif tagdef.multivalue:
                             for val in file[tagdef.tagname]:

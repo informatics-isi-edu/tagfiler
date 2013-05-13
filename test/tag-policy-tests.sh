@@ -40,9 +40,11 @@ testno=${RANDOM}
 
 tempfile=$(mktemp)
 
+logfile=$(mktemp)
+
 cleanup()
 {
-    rm -f "$tempfile"
+    rm -f "$tempfile" "$logfile"
 }
 
 trap cleanup 0
@@ -88,7 +90,6 @@ reset()
 	do
 	    mycurl "/tagdef/foo${i}_${j}" -X DELETE > /dev/null
 	done
-	mycurl "/subject/typedef=foo${i}ref" -X DELETE > /dev/null
 	mycurl "/tagdef/foo${i}" -X DELETE > /dev/null
     done
 
@@ -100,26 +101,24 @@ error()
     reset
     cat >&2 <<EOF
 $0: $@
+$(cat $logfile)
 EOF
     exit 1
 }
 
-status=$(mycurl "/session" -d username="$username" -d password="$password" -o /dev/null)
-[[ "$status" -eq 201 ]] || error got "$status" during login
+status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
+[[ "$status" = 201 ]] || error got "$status" during login
 
 # setup the test schema
 for i in ${!tagdef_writepolicies[@]}
 do
-    status=$(mycurl "/tagdef/foo${i}?typestr=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o /dev/null)
-    [[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}
-
-    status=$(mycurl "/subject/typedef=foo${i}ref?typedef%20dbtype=text" -X PUT -o /dev/null)
-    [[ "$status" = 201 ]] || error got "$status" creating typedef foo${i}ref
+    status=$(mycurl "/tagdef/foo${i}?dbtype=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
+    [[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}
 
     for j in ${!tagdefref_writepolicies[@]}
     do
-	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&typestr=foo${i}ref&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o /dev/null)
-	[[ "$status" -eq 201 ]] || error got "$status" creating tagdef foo${i}_${j}
+	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o $logfile)
+	[[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}_${j}
     done
 
 done
@@ -145,7 +144,7 @@ EOF
 
 NUMVIS=12
 
-status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o /dev/null)
+status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 [[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects 
 
 lines=$(mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users)" -H "Accept: text/csv" | wc -l)
@@ -176,7 +175,7 @@ tagtest()
 	local obj="value$s"
 	echo "${subj},${obj}" > $tempfile
 	
-	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o /dev/null)
+	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 	[[ "$status" -eq $code ]] || tagerror "${tag}" "$subj" "$obj" got "$status" instead of $code while bulk putting tag $tag on subjects $@
 
     done > $tempfile
@@ -227,7 +226,7 @@ tagreftest()
 		local subj="test${testno}-${s}"
 		echo "${subj},${o}" > $tempfile
 		url="/tags/name(${tag})"
-		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o /dev/null)
+		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 		[[ "$status" -eq $code ]] || tagreferror "$tag" "$subj" "$o" got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
 	    done
 	done
@@ -279,18 +278,18 @@ then
     # can only test negative tag ACLs if we can rescind ownership while reacquiring it for cleanup later
 
     # make sure we're not in mutablerole
-    status=$(mycurl "/user/${username}/attribute/${mutablerole}" -X DELETE -o /dev/null)
+    status=$(mycurl "/user/${username}/attribute/${mutablerole}" -X DELETE -o $logfile)
     [[ "$status" = 204 ]] || [[ "$status" = 404 ]] || error got "$status" removing ${username} from ${mutablerole}
 
     # restart session to ensure fresh attribute set
-    status=$(mycurl "/session" -X DELETE -o /dev/null)
+    status=$(mycurl "/session" -X DELETE -o $logfile)
     [[ "$status" = 204 ]] || error got "$status" during logout
     
-    status=$(mycurl "/session" -d username="$username" -d password="$password" -o /dev/null)
+    status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
     [[ "$status" -eq 201 ]] || error got "$status" during login
 
     # change owner of tagdefs to mutablerole
-    status=$(mycurl "/tags/tagdef:regexp:foo;owner=${username}(owner=${mutablerole})" -X PUT -o /dev/null)
+    status=$(mycurl "/tags/tagdef:regexp:foo;owner=${username}(owner=${mutablerole})" -X PUT -o $logfile)
     [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
     
     # test without us in tag ACLs...

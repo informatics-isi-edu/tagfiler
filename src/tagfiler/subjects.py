@@ -365,7 +365,7 @@ class Subject (Node):
             if tagdef == None:
                 raise NotFound(self, 'tagdef="%s"' % tagname)
             self.enforce_tag_authz('write', newfile, tagdef)
-            if tagdef.typestr == 'empty':
+            if tagdef.dbtype == '':
                 self.set_tag(newfile, tagdef)
             else:
                 for value in values:

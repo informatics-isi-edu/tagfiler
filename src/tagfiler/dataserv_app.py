@@ -471,7 +471,6 @@ class PerUserDbCache (object):
 
 config_cache = PerUserDbCache('config')
 tagdef_cache = PerUserDbCache('tagdef', 'tagname')
-typedef_cache = PerUserDbCache('typedef')
 view_cache = PerUserDbCache('view')
 
 def wraptag(tagname, suffix='', prefix='_'):
@@ -755,8 +754,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             ]
         
         query, values = self.build_files_by_predlist_path(path=path,
-                                                          tagdefs=Application.static_tagdefs,
-                                                          typedefs=Application.static_typedefs)
+                                                          tagdefs=Application.static_tagdefs)
 
         config = web.Storage()
         mtimes = []
@@ -815,18 +813,18 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     opsExcludeTypes = dict([ ('', []),
                              (':absent:', []),
-                             ('=', ['empty']),
-                             ('!=', ['empty']),
-                             (':lt:', ['empty', 'boolean']),
-                             (':leq:', ['empty', 'boolean']),
-                             (':gt:', ['empty', 'boolean']),
-                             (':geq:', ['empty', 'boolean']),
-                             (':like:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':simto:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':!regexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':!ciregexp:', ['empty', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
+                             ('=', ['']),
+                             ('!=', ['']),
+                             (':lt:', ['', 'boolean']),
+                             (':leq:', ['', 'boolean']),
+                             (':gt:', ['', 'boolean']),
+                             (':geq:', ['', 'boolean']),
+                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
 
     opsDB = dict([ ('=', '='),
                    ('!=', '!='),
@@ -841,94 +839,39 @@ class Application (webauthn2_handler_factory.RestHandler):
                    (':ciregexp:', '~*'),
                    (':!ciregexp:', '!~*') ])
     
-    # static representation of core schema
-    static_typedefs = []
-    for prototype in [
-        ('empty', '', 'No Content',[]),
-        ('boolean', 'boolean', 'Boolean', ['T true', 'F false']),
-        ('int8', 'int8', 'Integer', []),
-        ('float8', 'float8', 'Floating point', []),
-        ('date', 'date', 'Date', []),
-        ('timestamptz', 'timestamptz', 'Date and time with timezone', []),
-        ('text', 'text', 'Text', []),
-        ('role', 'text', 'Role', []),
-        ('rolepat', 'text', 'Role pattern', []),
-        ('url', 'text', 'URL', []),
-        ('id', 'int8', 'Subject ID or subquery', []),
-        ('tagpolicy', 'text', 'Tag policy model', [
-                'anonymous Any client may access',
-                'subject Subject authorization is observed',
-                'subjectowner Subject owner may access',
-                'object Object authorization is observed',
-                'objectowner Object owner may access',
-                'tag Tag authorization is observed',
-                'tagorsubject Tag or subject authorization is sufficient',
-                'tagandsubject Tag and subject authorization are required',
-                'tagandsubjectandobject Tag, subject, and object authorization are required',
-                'tagorsubjectandobject Either tag or both of subject and object authorization is required',
-                'subjectandobject Subject and object authorization are required',
-                'tagorowner Tag authorization or subject ownership is sufficient',
-                'tagandowner Tag authorization and subject ownership is required',
-                'system No client can access']),
-        ('type', 'text', 'Scalar value type', []),
-        ('tagdef', 'text', 'Tag definition', []),
-        ('name', 'text', 'Subject name', []),
-        ('config', 'text', 'Configuration storage', []),
-        ('view', 'text', 'View name', []),
-        ('GUI features', 'text', 'GUI configuration mode', [
-                'bulk_value_edit bulk value editing',
-                'bulk_subject_delete bulk subject delete',
-                'cell_value_edit cell-based value editing',
-                'file_download per-row file download',
-                'subject_delete per-row subject delete',
-                'view_tags per-row tag page',
-                'view_URL per-row view URL']) ]:
-        typedef, dbtype, desc, enum = prototype
-        static_typedefs.append(web.Storage({'typedef' : typedef,
-                                            'typedef description' : desc,
-                                            'typedef dbtype' : dbtype,
-                                            'typedef values' : enum}))
-
-    static_typedefs = dict( [ (typedef.typedef, typedef) for typedef in static_typedefs ] )
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
-    for prototype in [ ('config', 'text', 'text', None, False, 'subject', True),
-                       ('config binding', 'int8', 'id', 'id', True, 'subject', False),
-                       ('config parameter', 'text', 'text', None, False, 'subject', False),
-                       ('config value', 'text', 'text', None, True, 'subject', False),
-                       ('id', 'int8', 'int8', None, False, 'system', True),
-                       ('readok', 'boolean', 'boolean', None, False, 'system', False),
-                       ('writeok', 'boolean', 'boolean', None, False, 'system', False),
-                       ('tagdef', 'text', 'text', None, False, 'system', True),
-                       ('tagdef type', 'text', 'type', 'typedef', False, 'system', False),
-                       ('tagdef dbtype', 'text', 'text', None, False, 'system', False),
-                       ('tagdef tagref', 'text', 'tagdef', 'tagdef', False, 'system', False),
-                       ('tagdef multivalue', 'boolean', 'boolean', None, False, 'system', False),
-                       ('tagdef active', 'boolean', 'boolean', None, False, 'system', False),
-                       ('tagdef readpolicy', 'text', 'tagpolicy', None, False, 'system', False),
-                       ('tagdef writepolicy', 'text', 'tagpolicy', None, False, 'system', False),
-                       ('tagdef unique', 'boolean', 'boolean', None, False, 'system', False),
-                       ('tags present', 'text', 'tagdef', 'tagdef', True, 'system', False),
-                       ('tag read users', 'text', 'rolepat', None, True, 'subjectowner', False),
-                       ('tag write users', 'text', 'rolepat', None, True, 'subjectowner', False),
-                       ('typedef', 'text', 'text', None, False, 'subject', True),
-                       ('typedef description', 'text', 'text', None, False, 'subject', False),
-                       ('typedef dbtype', 'text', 'text', None, False, 'subject', False),
-                       ('typedef values', 'text', 'text', None, True, 'subject', False),
-                       ('read users', 'text', 'rolepat', None, True, 'subjectowner', False),
-                       ('write users', 'text', 'rolepat', None, True, 'subjectowner', False),
-                       ('owner', 'text', 'role', None, False, 'tagorowner', False),
-                       ('modified', 'timestamptz', 'timestamptz', None, False, 'system', False),
-                       ('subject last tagged', 'timestamptz', 'timestamptz', None, False, 'system', False),
-                       ('subject last tagged txid', 'int8', 'int8', None, False, 'system', False),
-                       ('tag last modified', 'timestamptz', 'timestamptz', None, False, 'system', False),
-                       ('name', 'text', 'text', None, False, 'subjectowner', True),
-                       ('view', 'text', 'text', None, False, 'subject', True),
-                       ('view tags', 'text', 'tagdef', 'tagdef', True, 'subject', False) ]:
-        deftagname, dbtype, typestr, tagref, multivalue, writepolicy, unique = prototype
+    for prototype in [ ('config', 'text', None, False, 'subject', True),
+                       ('config binding', 'int8', 'id', True, 'subject', False),
+                       ('config parameter', 'text', None, False, 'subject', False),
+                       ('config value', 'text', None, True, 'subject', False),
+                       ('id', 'int8', None, False, 'system', True),
+                       ('readok', 'boolean', None, False, 'system', False),
+                       ('writeok', 'boolean', None, False, 'system', False),
+                       ('tagdef', 'text', None, False, 'system', True),
+                       ('tagdef dbtype', 'text', None, False, 'system', False),
+                       ('tagdef tagref', 'text', 'tagdef', False, 'system', False),
+                       ('tagdef multivalue', 'boolean', None, False, 'system', False),
+                       ('tagdef active', 'boolean', None, False, 'system', False),
+                       ('tagdef readpolicy', 'text', None, False, 'system', False),
+                       ('tagdef writepolicy', 'text', None, False, 'system', False),
+                       ('tagdef unique', 'boolean', None, False, 'system', False),
+                       ('tags present', 'text', 'tagdef', True, 'system', False),
+                       ('tag read users', 'text', None, True, 'subjectowner', False),
+                       ('tag write users', 'text', None, True, 'subjectowner', False),
+                       ('read users', 'text', None, True, 'subjectowner', False),
+                       ('write users', 'text', None, True, 'subjectowner', False),
+                       ('owner', 'text', None, False, 'tagorowner', False),
+                       ('modified', 'timestamptz', None, False, 'system', False),
+                       ('subject last tagged', 'timestamptz', None, False, 'system', False),
+                       ('subject last tagged txid', 'int8', None, False, 'system', False),
+                       ('tag last modified', 'timestamptz', None, False, 'system', False),
+                       ('name', 'text', None, False, 'subjectowner', True),
+                       ('view', 'text', None, False, 'subject', True),
+                       ('view tags', 'text', 'tagdef', True, 'subject', False) ]:
+        deftagname, dbtype, tagref, multivalue, writepolicy, unique = prototype
         static_tagdefs.append(web.Storage(tagname=deftagname,
                                           owner=None,
-                                          typestr=typestr,
                                           dbtype=dbtype,
                                           multivalue=multivalue,
                                           active=True,
@@ -1043,7 +986,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.query_range = None
 
         # this ordered list can be pruned to optimize transactions
-        self.needed_db_globals = [  'typeinfo', 'typesdict', 'tagdefsdict']
+        self.needed_db_globals = [ 'tagdefsdict' ]
 
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
@@ -1140,6 +1083,15 @@ class Application (webauthn2_handler_factory.RestHandler):
             return [ subject.id for subject in self.select_files_by_predlist_path(path=query.path) ]
         raise BadRequest(self, 'Sub-query expression "%s" not a valid expression.' % query)
         
+
+    def validateTagdefDbtype(self, dbtype, tagdef=None, subject=None):
+        """restrict value range for "tagdef dbtype"
+
+           this is enforced during set_tag() during insert_tagdef() and cannot happen during bulk inserts
+        """
+        if dbtype not in set(['', 'boolean', 'int8', 'float8', 'text', 'date', 'timestamptz']):
+            raise Conflict(self, 'Supplied dbtype "%s" is not supported.' % dbtype)
+
     def validateTagname(self, tag, tagdef=None, subject=None):
         tagname = ''
         if tagdef:
@@ -1150,19 +1102,38 @@ class Application (webauthn2_handler_factory.RestHandler):
         if len(results) == 0:
             raise Conflict(self, 'Supplied tag name "%s" is not defined.' % tag)
 
-    def validateTagdefPolicy(self, tag, tagdef=None, subject=None):
-        typedef = self.globals['typesdict']['tagpolicy']
+    def remapTagdefReadPolicy(self, pol):
+        """remap read policies to their simplest functional equivalent based on graph ACL enforcement always present for reads"""
+        map = dict(subject="anonymous",              # subject read enforcement already happens 
+                   object="anonymous",               # object read enforcement already happens
+                   tagandsubject="tag",              # subject read enforcement already happens
+                   tagandsubjectandobject="tag",     # subject and object read enforcement already happens
+                   subjectandobject="anonymous")     # subject and object read enforcement already happens
+        if pol in map:
+            return map[pol]
+        else:
+            return pol
 
-        if tagdef and tagdef.tagname == 'tagdef readpolicy':
-            # remap read policies to their simplest functional equivalent based on graph ACL enforcement always present for reads
-            tag = dict(subject="anonymous",              # subject read enforcement already happens 
-                       object="anonymous",               # object read enforcement already happens
-                       tagandsubject="tag",              # subject read enforcement already happens
-                       tagandsubjectandobject="tag",     # subject and object read enforcement already happens
-                       subjectandobject="anonymous")     # subject and object read enforcement already happens
+    def validateTagdefPolicy(self, value, tagdef=None, subject=None):
+        policies = set([ 
+                'system',
+                'subjectowner',
+                'subject',
+                'objectowner',
+                'object',
+                'subjectandobject',
+                'tagandsubjectandobject',
+                'tagorsubjectandobject',
+                'tagandsubject',
+                'tagorsubject',
+                'tagorowner',
+                'tagandowner',
+                'tag',
+                'anonymous'
+                ])
 
-        if tag not in typedef['typedef values']:
-            raise Conflict(self, 'Supplied tagdef policy "%s" is not defined.' % tag)
+        if value not in policies:
+            raise Conflict(self, 'Supplied tagdef policy "%s" is not recognized.' % tag)
 
     def validateRole(self, role, tagdef=None, subject=None):
         # TODO: fixme with webauthn2
@@ -1172,30 +1143,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         if role in [ '*' ]:
             return
         return self.validateRole(role)
-
-    def validateEnumeration(self, enum, tagdef=None, subject=None):
-        tagname = ''
-        if tagdef:
-            tagname = tagdef.tagname
-        try:
-            key, desc = enum.split(" ", 1)
-            key = urlunquote(key)
-        except:
-            raise BadRequest(self, 'Supplied enumeration value "%s" does not have key and description fields.' % enum)
-
-        if tagname == 'typedef values':
-            results = self.gettagvals(subject, self.globals['tagdefsdict']['typedef'])
-            if len(results) == 0:
-                raise Conflict(self, 'Set the "typedef" tag before trying to set "typedef values".')
-            typename = results[0]
-            type = typedef_cache.select(self.db, lambda: self.get_type(), self.context.client, typename)
-            if type == None:
-                raise Conflict(self, 'The type "%s" is not defined!' % typename)
-            dbtype = tagdef.dbtype
-            try:
-                key = downcast_value(dbtype, key)
-            except ValueError, e:
-                raise Conflict(self, data=str(e))
 
     def validatePolicyRule(self, rule, tagdef=None, subject=None):
         tagname = ''
@@ -1397,9 +1344,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # build up globals useful to almost all classes, to avoid redundant coding
             # this is fragile to make things fast and simple
-            db_globals_dict = dict(typeinfo=lambda : [ x for x in typedef_cache.select(db, lambda: self.get_type(), self.context.client)],
-                                   typesdict=lambda : dict([ (type['typedef'], type) for type in self.globals['typeinfo'] ]),
-                                   tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
+            db_globals_dict = dict(tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
 
             #self.log('TRACE', value='preparing needed_db_globals')
             for key in self.needed_db_globals:
@@ -1501,8 +1446,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             if restrictSchema:
                 if tagdef.writeok == False:
                     raise Conflict(self, 'Subject predicate sets restricted tag "%s".' % tagdef.tagname)
-                if tagdef.typestr == 'empty' and pred.op or \
-                       tagdef.typestr != 'empty' and pred.op != '=':
+                if tagdef.dbtype == '' and pred.op or \
+                       tagdef.dbtype != '' and pred.op != '=':
                     raise Conflict(self, 'Subject predicate has inappropriate operator "%s" on tag "%s".' % (pred.op, tagdef.tagname))
                     
             if tagdef.get('unique', False) and pred.op == '=' and pred.vals:
@@ -1647,7 +1592,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         return '"' + prefix + tagname.replace('"','""') + suffix + '"'
 
     def classify_subject(self, subject):
-        for dtype in [ 'tagdef', 'typedef', 'config', 'view', 'file' ] \
+        for dtype in [ 'tagdef', 'config', 'view', 'file' ] \
                 + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname if tagdef.tagname != 'id' ] \
                 + [ 'id' ] :
             keyv = subject.get(dtype, None)
@@ -1687,29 +1632,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         return (datapred, dataid, dataname, dtype)
 
-    def get_type(self, typename=None):
-        def valexpand(res):
-            # replace raw "key desc" string with (key, desc) pair
-            dbtype = res['typedef dbtype']
-            if dbtype == None:
-                dbtype = ''
-                res['typedef dbtype'] = dbtype
-            if res['typedef values'] != None:
-                vals = []
-                for val in res['typedef values']:
-                    key, desc = val.split(" ", 1)
-                    key = urlunquote(key)
-                    key = downcast_value(dbtype, key)
-                    vals.append( (key, desc) )
-                res['typedef values'] = dict(vals)
-            return res
-        if typename != None:
-            subjpreds = [ web.Storage(tag='typedef', op='=', vals=[typename]) ]
-        else:
-            subjpreds = [ web.Storage(tag='typedef', op=None, vals=[]) ]
-        listtags = [ 'typedef', 'typedef description', 'typedef dbtype', 'typedef values' ]
-        return [ valexpand(res) for res in self.select_files_by_predlist(subjpreds=subjpreds, listtags=listtags, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs) ]
-
     def insert_file(self, file=None):
         newid = self.dbquery("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)
@@ -1737,7 +1659,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     tagdef_listas =  { 'tagdef': 'tagname', 
                        'tagdef dbtype': 'dbtype',
-                       'tagdef type': 'typestr', 
                        'tagdef tagref': 'tagref',
                        'tagdef multivalue': 'multivalue',
                        'tagdef active': 'active',
@@ -1771,7 +1692,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
-        results = list(self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, typedefs=Application.static_typedefs, enforce_read_authz=enforce_read_authz))
+        results = list(self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz))
         tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in results ])
         results = [ augment(tagdef, tagdefs) for tagdef in results ]
 
@@ -1784,8 +1705,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
         if self.dbtype is None:
-            typedef = self.globals['typesdict'][self.typestr]
-            self.dbtype = typedef['typedef dbtype']
+            # force default empty type
+            self.dbtype = ''
 
         owner = self.context.client
         newid = self.insert_file(None)
@@ -1794,8 +1715,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                  ('tagdef', self.tag_id),
                  ('tagdef active', None),
                  ('tagdef dbtype', self.dbtype),
-                 ('tagdef type', self.typestr),
-                 ('tagdef readpolicy', self.readpolicy),
+                 ('tagdef readpolicy', self.remapTagdefReadPolicy(self.readpolicy)),
                  ('tagdef writepolicy', self.writepolicy),
                  ('read users', '*') ]
         if owner:
@@ -1851,10 +1771,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         indexdef = ''
         clustercmd = ''
 
-        type = self.globals['typesdict'].get(tagdef.typestr, None)
-        if type == None:
-            raise Conflict(self, 'Referenced type "%s" is not defined.' % tagdef.typestr)
-
         dbtype = tagdef.dbtype
         tagref = tagdef.tagref
         if dbtype is None:
@@ -1877,7 +1793,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if referenced_tagdef == None:
                     raise Conflict(self, 'Referenced tag "%s" not found.' % tagref)
 
-                if referenced_tagdef.unique and referenced_tagdef.typestr != 'empty' and referenced_tagdef.tagname not in ['id']:
+                if referenced_tagdef.unique and referenced_tagdef.dbtype != '' and referenced_tagdef.tagname not in ['id']:
                     tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
             if not tagdef.multivalue:
@@ -1920,7 +1836,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             vars['subject'] = subject.id
             wheres.append('subject = $subject')
             
-        if tagdef.typestr != 'empty' and value != None:
+        if tagdef.dbtype != '' and value != None:
             if value == '':
                 wheres.append('tag.value IS NULL')
             else:
@@ -1932,7 +1848,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         if wheres:
             query += ' WHERE ' + ' AND '.join(wheres)
 
-        if tagdef.typestr != 'empty':
+        if tagdef.dbtype != '':
             query += '  ORDER BY value'
 
         #web.debug(query, vars)
@@ -2049,7 +1965,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # update in-memory representation too for caller's sake
             if tagdef.multivalue:
                 subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
-            elif tagdef.typestr != 'empty':
+            elif tagdef.dbtype != '':
                 results = self.select_tag_noauthn(subject, tagdef)
                 if len(results) > 0:
                     subject[tagdef.tagname] = results[0].value
@@ -2062,27 +1978,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                 self.doPolicyRule(subject)
 
     def set_tag(self, subject, tagdef, value=None):
-        typedef = self.globals['typesdict'].get(tagdef.typestr, None)
-        if typedef == None:
-            raise Conflict(self, 'The tag definition references a field type "%s" which is not defined!' % typestr)
-        dbtype = typedef['typedef dbtype']
-
         if tagdef.writepolicy != 'system':
             # only run extra validation on user-provided values...
             validator = Application.tagnameValidators.get(tagdef.tagname)
             if validator:
                 validator(self, value, tagdef, subject)
 
-            validator = Application.tagtypeValidators.get(typedef.typedef)
-            if validator:
-                results = validator(self, value, tagdef, subject)
-                if results != None:
-                    # validator converted user-supplied value to internal form to use instead
-                    value = results
-
             def convert(v):
                 try:
-                    return downcast_value(dbtype, v)
+                    return downcast_value(tagdef.dbtype, v)
                 except ValueError, e:
                     raise Conflict(self, data=str(e))
 
@@ -2101,10 +2005,16 @@ class Application (webauthn2_handler_factory.RestHandler):
         if tagdef.unique:
             results = self.select_tag_noauthn(None, tagdef, value)
             if len(results) > 0 and results[0].subject != subject.id:
-                if tagdef.typestr != 'empty':
+                if tagdef.dbtype != '':
                     raise Conflict(self, 'Tag "%s" is defined as unique and value "%s" is already bound to another subject.' % (tagdef.tagname, value))
                 else:
                     raise Conflict(self, 'Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
+
+        if tagdef.tagref and value is not None:
+            reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
+            results = self.select_tag_noauthn(None, reftagdef, value)
+            if len(results) == 0:
+                raise Conflict(self, 'Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
 
         # check whether triple already exists
         results = self.select_tag_noauthn(subject, tagdef, value)
@@ -2115,7 +2025,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if not tagdef.multivalue:
             # check pre-conditions before inserting triple
-            if dbtype == '':
+            if tagdef.dbtype == '':
                 # subject must not be tagged yet or we wouldn't be here...
                 pass
             else:
@@ -2141,7 +2051,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     return
 
         # if we get here, insertion is needed
-        if dbtype != '' and value != None:
+        if tagdef.dbtype != '' and value != None:
             query = 'INSERT INTO %s' % self.wraptag(tagdef.tagname) \
                     + ' (subject, value) VALUES ($subject, $value)'
         else:
@@ -2154,7 +2064,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         # update in-memory representation too for caller's sake
         if tagdef.multivalue:
             subject[tagdef.tagname] = [ res.value for res in self.select_tag_noauthn(subject, tagdef) ]
-        elif tagdef.typestr != 'empty':
+        elif tagdef.dbtype != '':
             subject[tagdef.tagname] = self.select_tag_noauthn(subject, tagdef)[0].value
         else:
             subject[tagdef.tagname] = True
@@ -2356,7 +2266,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             updwheres = [ 't.subject = i.subject', '(i.value IS NOT NULL)' ]
             flagwheres = [ '((%s) IS NOT NULL)' % valcol ]
 
-            if tagdef.dbtype != 'empty':
+            if tagdef.dbtype != '':
                 incols.append( '%(valcol)s AS value' % dict(valcol=valcol) )
                 excols.append( 'value' )
                 addwheres.append( '((%(valcol)s) IS NOT NULL)' % dict(valcol=valcol) )
@@ -2369,7 +2279,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             excols = ', '.join(excols)
             addwheres = ' AND '.join(addwheres)
 
-            if tagdef.dbtype != 'empty':
+            if tagdef.dbtype != '':
                 # input null value represents absence of triples w/ values
                 where = '(%s) IS NULL' % valcol
             else:
@@ -2401,7 +2311,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                              idcol=idcol, valcol=valcol,
                                              wheres=' AND '.join(wheres + [ where ])))
                 
-            if test and tagdef.unique and tagdef.dbtype != 'empty':
+            if test and tagdef.unique and tagdef.dbtype != '':
                 # test for uniqueness violations
                 query = ('SELECT max(count) AS max'
                          + ' FROM (SELECT count(subject) AS count'
@@ -2443,7 +2353,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             #web.debug(query)
             count += self.dbquery(query)
 
-            if tagdef.dbtype != 'empty':
+            if tagdef.dbtype != '':
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
                          + ' FROM (SELECT %(idcol)s AS subject,'
@@ -2578,7 +2488,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 suffix = ''
 
-            if td.typestr == 'empty':
+            if td.dbtype == '':
                 dbtype = 'boolean'
             else:
                 dbtype = td.dbtype
@@ -2792,7 +2702,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # remap multivalue tags to value array
             # 1 column per tag: in_tag
             input_column_defs = [ '%s %s%s' % (wraptag(td.tagname, '', 'in_'),
-                                               (lambda dbtype: {'empty': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
+                                               (lambda dbtype: {'': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
                                                (lambda multival: {True: '[]'}.get(multival, ''))(td.multivalue))
                                   for td in self.input_column_tds ]
 
@@ -2814,7 +2724,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         def wrapped_constant(td, v):
             """Return one SQL literal representing values v"""
-            if td.typestr != 'empty':
+            if td.dbtype != '':
                 param_type = td.dbtype
             else:
                 param_type = 'bool'
@@ -3191,7 +3101,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     web.debug('got exception "%s" peforming body1compensation for %s' % (str(ev), self.input_tablename),
                               traceback.format_exception(et, ev, tb))
 
-    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, typedefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=True, unnest=None):
+    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=True, unnest=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3203,7 +3113,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
            'path'         defaults to self.path if not supplied
            'tagdefs'      defaults to self.globals['tagdefsdict'] if not supplied
-           'typedefs'     defaults to self.globals['typesdict'] if not supplied
            'listas'       provides an optional relabeling of list tags (projected result attributes)
 
            Optional args 'values'used for recursive calls, not client calls.
@@ -3216,9 +3125,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdefs == None:
             tagdefs = self.globals['tagdefsdict']
-
-        if typedefs == None:
-            typedefs = self.globals['typesdict']
 
         if listas == None:
             listas = dict()
@@ -3301,7 +3207,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
                     m['group'] = 'GROUP BY subject'
-            elif tagdef.typestr != 'empty':
+            elif tagdef.dbtype != '':
                 m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
 
             used_not_op = False
@@ -3324,8 +3230,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                          []) ],
                                                       enforce_read_authz=enforce_read_authz,
                                                       values=values,
-                                                      tagdefs=tagdefs,
-                                                      typedefs=typedefs)[0]
+                                                      tagdefs=tagdefs)[0]
                     )
                 preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
 
@@ -3338,7 +3243,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if pred.op == 'IN':
                     wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
                 elif pred.op != ":absent:" and pred.op and pred.vals:
-                    if tagdef.typestr == 'empty':
+                    if tagdef.dbtype == '':
                         raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
 
                     def vq_compile(ast):
@@ -3416,7 +3321,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             if w:
                 m['where'] = 'WHERE ' + w
 
-            if tagdef.typestr != 'empty':
+            if tagdef.dbtype != '':
                 if tagdef.multivalue and wheres and spred:
                     # multivalue spred requires SUBJECT to match all preds, possibly using different triples for each match
                     m['where'] = ''
@@ -3496,7 +3401,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                         acl = dict(readok='read', writeok='write')[tag]
                         range_table = 'resources LEFT OUTER JOIN "_%s users" acl USING (subject) LEFT OUTER JOIN "_owner" o USING (subject)' % acl
                         range_column = 'NOT (acl.value IS NULL OR acl.value NOT IN (%(rolekeys)s)) OR NOT (o.value IS NULL OR o.value NOT IN (%(rolekeys)s))' % dict(rolekeys=rolekeys)
-                    elif td.typestr != 'empty':
+                    elif td.dbtype != '':
                         # find active value range for given tag
                         range_column = wraptag(td.tagname) + '.value'
                         range_table = wraptag(td.tagname) + ' JOIN resources USING (subject)'
@@ -3522,7 +3427,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                             tprefix = 'l_'
                         else:
                             tprefix = 's_'
-                        if td.typestr != 'empty':
+                        if td.dbtype != '':
                             expr = '%s.value' % wraptag(td.tagname, prefix=tprefix)
                         else:
                             expr = '%s.subject IS NOT NULL' % wraptag(td.tagname, prefix=tprefix)
@@ -3612,7 +3517,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             spreds, lpreds, otags = path[i]
             if i > 0:
                 cpreds = path[i-1][1]
-                tagtypes = set([ tagdefs[pred.tag].typestr for pred in cpreds ])
+                tagtypes = set([ tagdefs[pred.tag].dbtype for pred in cpreds ])
                 tagrefs = set([ tagdefs[pred.tag].tagref for pred in cpreds if tagdefs[pred.tag].tagref is not None ])
                 if len(tagrefs) > 1:
                     raise BadRequest(self, 'Path element %d has %d disjoint projection tag-references when at most 1 is supported.' % (i-1, len(tagrefs)))
@@ -3649,7 +3554,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         return (cq, values.pack())
 
 
-    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, qd=0, listas=None, tagdefs=None, typedefs=None, enforce_read_authz=True, limit=None, listpreds=None, vprefix=''):
+    def build_select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, qd=0, listas=None, tagdefs=None, enforce_read_authz=True, limit=None, listpreds=None, vprefix=''):
         """Backwards compatibility interface, pass to general predlist path function."""
 
         if subjpreds == None:
@@ -3668,12 +3573,12 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             listpreds = [ x for x in listpreds ]
 
-        return self.build_files_by_predlist_path(path=[ (subjpreds, listpreds, ordertags) ], limit=limit, enforce_read_authz=enforce_read_authz, tagdefs=tagdefs, typedefs=typedefs, listas=listas)
+        return self.build_files_by_predlist_path(path=[ (subjpreds, listpreds, ordertags) ], limit=limit, enforce_read_authz=enforce_read_authz, tagdefs=tagdefs, listas=listas)
 
 
-    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, listas=None, tagdefs=None, typedefs=None, enforce_read_authz=True, limit=None, listpreds=None):
+    def select_files_by_predlist(self, subjpreds=None, listtags=None, ordertags=[], id=None, listas=None, tagdefs=None, enforce_read_authz=True, limit=None, listpreds=None):
 
-        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, listas=listas, tagdefs=tagdefs, typedefs=typedefs, enforce_read_authz=enforce_read_authz, limit=limit, listpreds=None)
+        query, values = self.build_select_files_by_predlist(subjpreds, listtags, ordertags, id=id, listas=listas, tagdefs=tagdefs, enforce_read_authz=enforce_read_authz, limit=limit, listpreds=None)
 
         #web.debug(len(query), query, values)
         #web.debug('%s bytes in query:' % len(query))
@@ -3912,10 +3817,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                           'read users' : validateRolePattern,
                           'write users' : validateRolePattern,
                           'modified by' : validateRole,
-                          'typedef values' : validateEnumeration,
                           'tagdef readpolicy': validateTagdefPolicy,
-                          'tagdef writepolicy': validateTagdefPolicy }
-
-    tagtypeValidators = { 'tagname' : validateTagname,
-                          'id' : validateSubjectQuery }
+                          'tagdef writepolicy': validateTagdefPolicy,
+                          'tagdef dbtype': validateTagdefDbtype}
 

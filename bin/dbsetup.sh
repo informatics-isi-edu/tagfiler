@@ -148,7 +148,6 @@ dataset_complete()
 {
    # args: <subjectid> <name> url <url> <owner> [<readuser>]...
    # args: <subjectid> <name> blank <owner> [<readuser>]...
-   # args: <subjectid> <name> typedef <owner> [<readuser>]...
    # args: <subjectid> <name> tagdef <owner> [<readuser>]...
    # args: <subjectid> <name> config <owner> [<readuser>]...
    # args: <subjectid> <name> view <owner> [<readuser>]...
@@ -176,7 +175,7 @@ dataset_complete()
               ;;
          esac
          ;;
-      blank|typedef|tagdef|config|view)
+      blank|dbtype|tagdef|config|view)
          :
          ;;
       onclick)
@@ -255,19 +254,19 @@ EOF
 
 tag()
 {
-   # args: file tag typestr [value]...
-   # for non-empty typestr
+   # args: file tag dbtype [value]...
+   # for non-empty dbtype
    #     does one default value insert for 0 values
    #     does N value inserts for N>0 values
 
    local file="$1"
    local tagname="$2"
-   local typestr="$3"
+   local dbtype="$3"
    local count
    shift 3
 
    echo "set /tags/$file/$tagname=" "$@"
-   if [[ -z "$typestr" ]] || [[ $# -eq 0 ]]
+   if [[ -z "$dbtype" ]] || [[ $# -eq 0 ]]
    then
        cat >&${COPROC[1]}  <<EOF
 SELECT count(*) FROM "_$tagname" WHERE subject = '$file';
@@ -320,7 +319,7 @@ EOF
 
 tagdef_phase2()
 {
-   # args: subject tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey [tagref]]]
+   # args: subject tagname dbtype owner readpolicy writepolicy multivalue [primarykey [tagref]]
 
    echo "populate tagdef '$2'..." >&2
 
@@ -342,23 +341,16 @@ tagdef_phase2()
 
    tag "$subject" "tagdef dbtype" text "$3" >&2
 
-   if [[ -n "$8" ]]
-   then
-      tag "$subject" "tagdef type" type "$8" >&2
-   else
-      tag "$subject" "tagdef type" type "$3" >&2
-   fi
-
-   if [[ "$9" == "true" ]]
+   if [[ "$8" == "true" ]]
    then
       tag "$subject" "tagdef unique" boolean true >&2
    else
       tag "$subject" "tagdef unique" boolean false >&2
    fi
 
-   if [[ -n "${10}" ]]
+   if [[ -n "$9" ]]
    then
-      tag "$subject" "tagdef tagref" tagdef "${10}" >&2
+      tag "$subject" "tagdef tagref" tagdef "$9" >&2
    fi
 
    insert_or_update $subject "tag last modified" "'now'"
@@ -367,14 +359,14 @@ tagdef_phase2()
 
 tagdef_phase1()
 {
-   # args: tagname dbtype owner readpolicy writepolicy multivalue [typestr [primarykey [tagref]]]
+   # args: tagname dbtype owner readpolicy writepolicy multivalue [primarykey [tagref]]
 
    local tagref
    local fk
    local default
    local uniqueval
 
-   if [[ -n "$2" ]] && [[ "$2" != empty ]]
+   if [[ -n "$2" ]]
    then
       opclass=''
       if [[ "$2" = "text" ]]
@@ -388,14 +380,14 @@ tagdef_phase1()
          default=""
       fi
 
-      if [[ "$8" = true ]]
+      if [[ "$7" = true ]]
       then
          fk="UNIQUE"
       else
          fk=""
       fi
 
-      tagref="$9"
+      tagref="$8"
 
       if [[ -n "$tagref" ]] && [[ "$tagref" != 'id' ]]
       then
@@ -447,7 +439,6 @@ tag_owners=()
 tag_readpolicies=()
 tag_writepolicies=()
 tag_multivalues=()
-tag_typestrs=()
 
 tagdef()
 {
@@ -457,9 +448,8 @@ tagdef()
    tag_readpolicies[${#tag_readpolicies[*]}]="$4"
    tag_writepolicies[${#tag_writepolicies[*]}]="$5"
    tag_multivalues[${#tag_multivalues[*]}]="$6"
-   tag_typestrs[${#tag_typestrs[*]}]="$7"
-   tag_uniques[${#tag_uniques[*]}]="$8"
-   tag_tagrefs[${#tag_tagrefs[*]}]="$9"
+   tag_uniques[${#tag_uniques[*]}]="$7"
+   tag_tagrefs[${#tag_tagrefs[*]}]="$8"
    tagdef_phase1 "$@"
    tag_subjects[${#tag_subjects[*]}]=${last_subject}
 }
@@ -470,115 +460,54 @@ tagdefs_complete()
    echo ${!tag_names[*]}
    for i in ${!tag_names[*]}
    do
-      tagdef_phase2 "${tag_subjects[$i]}" "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_typestrs[$i]}" "${tag_uniques[$i]}" "${tag_tagrefs[$i]}"
+      tagdef_phase2 "${tag_subjects[$i]}" "${tag_names[$i]}" "${tag_dbtypes[$i]}" "${tag_owners[$i]}" "${tag_readpolicies[$i]}" "${tag_writepolicies[$i]}" "${tag_multivalues[$i]}" "${tag_uniques[$i]}" "${tag_tagrefs[$i]}"
    done
-}
-
-typedef_core()
-{
-   typename="$1"
-   dbtype="$2"
-   desc="$3"
-   shift 3
-   shift  # shift 4 can fail to shift when only 3 args were passed!
-   dataset_core "" typedef "" "*"
-   local subject=${last_subject}
-   tag "$subject" "typedef" text "${typename}" >&2
-   tag "$subject" "typedef dbtype" text "${dbtype}" >&2
-   tag "$subject" "typedef description" text "${desc}" >&2
-   if [[ $# -gt 0 ]]
-   then
-      tag "$subject" "typedef values" text "$@" >&2
-   fi
-}
-
-type_subjects=()
-
-typedef()
-{
-    typedef_core "$@"
-    local subject=${last_subject}
-    type_subjects[${#type_subjects[*]}]="$subject"
-}
-
-typedefs_complete()
-{
-    local i
-    for subject in ${type_subjects[*]}
-    do
-	dataset_complete "$subject" "" typedef "" "*"
-    done
 }
 
 # sequencing is crucial here to avoid unresolved dependencies!
 
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
-tagdef 'tagdef'              text        ""         anonymous   system       false      ""         true  
-tagdef 'tagdef tagref'       text        ""         anonymous   system       false      tagdef     false    tagdef
-tagdef 'tagdef dbtype'       text        ""         anonymous   system       false
-tagdef 'typedef'             text        ""         anonymous   subject      false      ""         true
-tagdef 'typedef description' text        ""         anonymous   subject      false
-tagdef 'typedef dbtype'      text        ""         anonymous   subject      false
-tagdef 'typedef values'      text        ""         anonymous   subject      true
-tagdef 'tagdef unique'       boolean       ""         anonymous   system       false      ""
-tagdef 'tagdef multivalue'   boolean       ""         anonymous   system       false
-tagdef 'tagdef active'       boolean       ""         anonymous   system       false
-tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false      tagpolicy
-tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false      tagpolicy
-tagdef 'id'                  int8        ""         anonymous   system       false      ""         true
-tagdef 'readok'              boolean     ""         anonymous   system       false      ""
-tagdef 'writeok'             boolean     ""         anonymous   system       false      ""
-tagdef 'tags present'        text        ""         anonymous   system       true       tagdef     false     tagdef
-tagdef 'config'              text        ""         anonymous   subject      false      ""         true
-tagdef 'view'                text        ""         anonymous   subject      false      ""         true
-tagdef 'tag read users'      text        ""         anonymous   subjectowner true       rolepat
-tagdef 'tag write users'     text        ""         anonymous   subjectowner true       rolepat
-tagdef owner                 text        ""         anonymous   tagorowner   false      role
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
+tagdef 'tagdef'              text        ""         anonymous   system       false      true  
+tagdef 'tagdef tagref'       text        ""         anonymous   system       false      false    tagdef
+tagdef 'tagdef dbtype'       text        ""         anonymous   system       false      false
+tagdef 'tagdef unique'       boolean     ""         anonymous   system       false
+tagdef 'tagdef multivalue'   boolean     ""         anonymous   system       false
+tagdef 'tagdef active'       boolean     ""         anonymous   system       false
+tagdef 'tagdef readpolicy'   text        ""         anonymous   system       false
+tagdef 'tagdef writepolicy'  text        ""         anonymous   system       false
+tagdef 'id'                  int8        ""         anonymous   system       false      true
+tagdef 'readok'              boolean     ""         anonymous   system       false
+tagdef 'writeok'             boolean     ""         anonymous   system       false
+tagdef 'tags present'        text        ""         anonymous   system       true       false     tagdef
+tagdef 'config'              text        ""         anonymous   subject      false      true
+tagdef 'view'                text        ""         anonymous   subject      false      true
+tagdef 'tag read users'      text        ""         anonymous   subjectowner true
+tagdef 'tag write users'     text        ""         anonymous   subjectowner true
+tagdef owner                 text        ""         anonymous   tagorowner   false
 tagdef created               timestamptz ""         anonymous   system       false
-tagdef "read users"          text        ""         anonymous   subjectowner true       rolepat
-tagdef "write users"         text        ""         anonymous   subjectowner true       rolepat
-tagdef "modified by"         text        ""         anonymous   system       false      role
+tagdef "read users"          text        ""         anonymous   subjectowner true
+tagdef "write users"         text        ""         anonymous   subjectowner true
+tagdef "modified by"         text        ""         anonymous   system       false
 tagdef modified              timestamptz ""         anonymous   system       false
 tagdef "subject last tagged" timestamptz ""         anonymous   system       false
 tagdef "tag last modified"   timestamptz ""         anonymous   system       false
 tagdef "subject last tagged txid" int8   ""         anonymous   system       false
 tagdef "tag last modified txid" int8     ""         anonymous   system       false
 tagdef bytes                 int8        ""         anonymous   system       false
-tagdef name                  text        ""         anonymous   subjectowner false      ""         true
-tagdef file                  text        ""         system      system       false      ""         true
-tagdef url                   text        ""         subject     subject      false      url
+tagdef name                  text        ""         anonymous   subjectowner false      true
+tagdef file                  text        ""         system      system       false      true
+tagdef url                   text        ""         subject     subject      false
 tagdef onclick               text        ""         anonymous   system       false
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
-tagdef key                   text        ""         anonymous   subject      false      ""         true
-tagdef "incomplete"          empty       ""         anonymous   subject      false
-tagdef "list on homepage"    empty       "${admin}" anonymous   tag          false
+tagdef key                   text        ""         anonymous   subject      false      true
+tagdef "incomplete"          ""          ""         anonymous   subject      false
+tagdef "list on homepage"    ""          "${admin}" anonymous   tag          false
 tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
-tagdef 'tagdef type'         text        ""         anonymous   system       false      type       ""       typedef
-tagdef 'config binding'      int8        ""         subject     subject      true       id         ""       id
+tagdef 'config binding'      int8        ""         subject     subject      true       false    id
 tagdef 'config parameter'    text        ""         subject     subject      false
 tagdef 'config value'        text        ""         subject     subject      true
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
-
-#       TYPENAME     DBTYPE        DESC                            ENUMs
-typedef empty        ''            'No content'
-typedef boolean      boolean       'Boolean (true or false)'       'True True' 'False False'
-typedef int8         int8          'Integer'
-typedef float8       float8        'Floating point'
-typedef date         date          'Date (yyyy-mm-dd)'
-typedef timestamptz  timestamptz   'Date and time with timezone'
-typedef text         text          'Text'
-typedef role         text          'Role'
-typedef rolepat      text          'Role pattern'
-typedef url          text          'URL'
-typedef onclick      text          'Javascript function'
-typedef id           int8          'Subject ID or subquery'
-typedef tagpolicy    text          'Tag policy model'              'anonymous Any client may access' 'subject Subject authorization is observed' 'subjectowner Subject owner may access' 'tag Tag authorization is observed' 'tagorsubject Tag or subject authorization is sufficient' 'tagandsubject Tag and subject authorization are required' 'objectowner Object owner may access' 'object Object authorization is observed' 'tagandsubjectandobject Tag, subject, and object authorization are required' 'tagorsubjectandobject Either tag or both of subject and object authorization is required' 'subjectandobject Subject and object authorization are required' 'system No client can access'
-typedef type         text          'Scalar value type'             
-typedef tagdef       text          'Tag definition'                
-typedef view         text          'View name'                     
-typedef 'GUI features' text       'GUI configuration mode'         'bulk_value_edit bulk value editing' 'bulk_subject_delete bulk subject delete' 'cell_value_edit cell-based value editing' 'file_download per-row file download' 'subject_delete per-row subject delete' 'view_tags per-row tag page' 'view_URL per-row view URL'
-#       TYPENAME     DBTYPE        DESC                            ENUMs
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
 
 # complete split-phase definitions and redefine as combined phase
 tagdefs_complete
@@ -590,21 +519,13 @@ tagdef()
     tag_names[${#tag_names[*]}]="$1"
 }
 
-typedefs_complete
-typedef()
-{
-    typedef_core "$@"
-    local subject=${last_subject}
-    dataset_complete "$subject" "" typedef "" "*"
-}
-
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
-tagdef 'default view'        text        ""         subject     subject      false      view       ""       view
-tagdef 'view tags'           text        ""         subject     subject      true       tagdef     ""       tagdef
-#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   TYPESTR    PKEY     TAGREF
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
+tagdef 'default view'        text        ""         subject     subject      false      false    view
+tagdef 'view tags'           text        ""         subject     subject      true       false    tagdef
+#      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
 
 
-# drop storage for psuedo tag 'id' which we can synthesize from any subject column
+# drop storage for psuedo tags which we can synthesize from other data
 cat >&${COPROC[1]} <<EOF
 DROP TABLE "_id";
 DROP TABLE "_readok";
@@ -634,7 +555,6 @@ homelink()
 homelink "Query by tags"                        onclick "${homepath}/query"                           "${admin}" "${curator}" "${downloader}"
 #homelink "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}"
 homelink "View tag definitions"                 onclick "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*"
-homelink "View type definitions"                onclick "${homepath}/query/typedef?view=typedef"      "${admin}" "*"
 homelink "View view definitions"                onclick "${homepath}/query/view?view=view"            "${admin}" "*"
 #homelink "Manage tag definitions (expert mode)" onclick "${homepath}/tagdef"                          "${admin}"
 homelink "Manage catalog configuration"         onclick "${homepath}/query/config=tagfiler(config%20binding)/?view=config"            "${admin}"
@@ -642,7 +562,6 @@ homelink "Manage catalog configuration"         onclick "${homepath}/query/confi
 #homelink "Query by tags"                        onclick "javascript:queryByTags()"                           "${admin}" "${curator}" "${downloader}"
 homelink "Create catalog entries (expert mode)" onclick "javascript:createCustomDataset()"              "${admin}" "*"
 #homelink "View tag definitions"                 onclick "javascript:viewLink(\"tagdef?view=tagdef\")"        "${admin}" "*"
-#homelink "View type definitions"                onclick "javascript:viewLink(\"typedef?view=typedef\")"      "${admin}" "*"
 #homelink "View view definitions"                onclick "javascript:viewLink(\"view?view=view\")"            "${admin}" "*"
 homelink "Manage tag definitions (expert mode)" onclick "javascript:manageAvailableTagDefinitions()"                          "${admin}"
 #homelink "Manage catalog configuration"         onclick "javascript:getTagDefinition(\"tags/config=tagfiler\", null)"            "${admin}"
@@ -652,8 +571,6 @@ homelink "Manage tag definitions (expert mode)" onclick "javascript:manageAvaila
 dataset "tagfiler" config "${admin}" "*"
 tagfilercfg=${last_subject}
 
-
-#      TAGNAME                        TYPE  OWNER   READPOL     WRITEPOL   MULTIVAL      TYPESTR    PKEY  TAGREF
 
 #tag "file list tags write" text 'read users' 'write users' 'owner'
 
@@ -695,8 +612,7 @@ viewdef()
 
 viewdef default 'id' 'name' bytes owner 'read users' 'write users' "subject last tagged"
 viewdef config 'config parameter' 'config value'
-viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef type" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
-viewdef typedef 'id' 'typedef' "typedef description" "typedef dbtype" "typedef values"
+viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 viewdef view 'view' "view tags" "read users" "write users" "owner"
 viewdef alltags
 
