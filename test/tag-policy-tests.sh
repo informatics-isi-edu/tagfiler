@@ -236,6 +236,10 @@ tagreftest()
 			mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
 			error got $count results instead of 1 while querying "/query/name=${subj}(${tag}=${o})"
 		    }
+		    
+		    local url3="/tags/name=${subj}(${tag}=${o})"
+		    status=$(mycurl "$url3" -X DELETE -o $logfile)
+		    [[ "$status" = 204 ]] || error got "$status" instead of 204 while deleting "$url3"
 		fi
 	    done
 	done
@@ -286,41 +290,6 @@ getreftest()
     done
 }
 
-refdeltest()
-{
-    local code=$1
-    local tagref=$2
-    shift 2
-
-    local subjects=()
-    local objects=()
-    while [[ $1 != '--' ]]
-    do
-	subjects+=( "$1" )
-	shift
-    done
-    shift
-    while [[ $# -gt 0 ]]
-    do
-	objects+=( "$1" )
-	shift
-    done
-
-    for i in ${!tagdef_writepolicies[@]}
-    do
-	local tag=foo${i}_${tagref}
-	for s in "${subjects[@]}"
-	do
-	    for o in "${objects[@]}"
-	    do
-		local subj="test${testno}-${s}"
-		local url="/tags/name=${subj}(${tag}=${o})"
-		status=$(mycurl "$url" -X DELETE -o $logfile)
-		[[ "$status" -eq $code ]] || error DELETE "$url" got "$status" instead of $code
-	    done
-	done
-    done
-}
 
 # test writepolicy=subject
 tagdeltest 403 foo1 ''             6B    8B # subjects where writeok=False
@@ -348,7 +317,6 @@ tagtest 409 foo1             7   # subject which is not visible
 # test writepolicy=object
 tagreftest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B          # objects where writeok=True
 getreftest 200 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B 
-refdeltest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B 
 
 tagreftest 403 0 1 2 3 4 5 6  8 --                6B    8B # object where writeok=False
 tagreftest 409 0 1 2 3 4 5 6  8 --                   7B    # object which is not visible
