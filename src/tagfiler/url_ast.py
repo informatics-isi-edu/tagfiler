@@ -611,6 +611,7 @@ class FileTags (Node):
 
     def delete_postCommit(self, results):
         self.emit_headers()
+        web.ctx.status = '204 No Content'
         return ''
 
     def DELETE(self, uri):

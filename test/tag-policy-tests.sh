@@ -39,12 +39,13 @@ mutablerole=$4
 testno=${RANDOM}
 
 tempfile=$(mktemp)
+tempfile2=$(mktemp)
 
 logfile=$(mktemp)
 
 cleanup()
 {
-    rm -f "$tempfile" "$logfile"
+    rm -f "$tempfile" "$logfile" "$tempfile2"
 }
 
 trap cleanup 0
@@ -53,6 +54,7 @@ mycurl()
 {
     local url="$1"
     shift
+    truncate -s 0 $logfile
     curl -b cookie -c cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
 }
 
@@ -133,6 +135,7 @@ test${testno}-4,${otherrole},{*},{*},,,,,,,
 test${testno}-5,${otherrole},{${username}},{${username}},,,,,,,
 test${testno}-6,${otherrole},{*},{},,,,,,,
 test${testno}-7,${otherrole},{${otherrole}},{${otherrole}},,,,,,,
+test${testno}-8,${otherrole},{*},{${otherrole}},,,,,,,
 test${testno}-1B,${username},{*},{*},1B,1B,1B,1B,1B,1B,1B
 test${testno}-2B,${username},{${username}},{${username}},2B,2B,2B,2B,2B,2B,2B
 test${testno}-3B,${username},{},{},3B,3B,3B,3B,3B,3B,3B
@@ -140,9 +143,10 @@ test${testno}-4B,${otherrole},{*},{*},4B,4B,4B,4B,4B,4B,4B
 test${testno}-5B,${otherrole},{${username}},{${username}},5B,5B,5B,5B,5B,5B,5B
 test${testno}-6B,${otherrole},{*},{},6B,6B,6B,6B,6B,6B,6B
 test${testno}-7B,${otherrole},{${otherrole}},{${otherrole}},7B,7B,7B,7B,7B,7B,7B
+test${testno}-8B,${otherrole},{*},{${otherrole}},8B,8B,8B,8B,8B,8B,8B
 EOF
 
-NUMVIS=12
+NUMVIS=14
 
 status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 [[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects 
@@ -151,17 +155,6 @@ lines=$(mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%
 [[ "$lines" -eq $(( $NUMVIS + 1 )) ]] || error got $(( $lines - 1 )) results querying when $NUMVIS should be visible
 
 #mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
-
-tagerror()
-{
-    local tag=$1
-    local subj=$2
-    local obj=$3
-    shift 3
-    mycurl "/query/tagdef=${tag}(tagdef;tagdef%20writepolicy;owner;tag%20write%20users)" -H "Accept: application/json" >&2
-    mycurl "/query/name=${subj}(owner;read%20users;write%20users;readok;writeok)" -H "Accept: application/json" >&2
-    error "$@"
-}
 
 tagtest()
 {
@@ -176,24 +169,27 @@ tagtest()
 	echo "${subj},${obj}" > $tempfile
 	
 	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
-	[[ "$status" -eq $code ]] || tagerror "${tag}" "$subj" "$obj" got "$status" instead of $code while bulk putting tag $tag on subjects $@
+	[[ "$status" = $code ]] || error "/tags/name=$subj(${tag}=$obj)" got "$status" instead of $code while bulk putting tag
 
     done > $tempfile
 
 }
 
-tagreferror()
+tagdeltest()
 {
-    local tag=$1
-    local subj=$2
-    local obj=$3
-    local reftag=${tag%_*}
+    local code=$1
+    local tag=$2
+    local prefix=$3
     shift 3
-    mycurl "/query/tagdef=${tag}(tagdef;tagdef%20writepolicy;owner;tag%20write%20users;tagdef%20type)" -H "Accept: application/json" >&2
-    mycurl "/query/typedef=${reftag}ref(typedef;typedef%20tagref)" -H "Accept: application/json" >&2
-    mycurl "/query/name=${subj}(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: application/json" >&2
-    mycurl "/query/${reftag}=${obj}(name;owner;read%20users;write%20users;readok;writeok;${reftag})" -H "Accept: application/json" >&2
-    error "$@"
+
+    for s in $@
+    do
+	local subj="test${testno}-${s}"
+	local obj="${prefix}$s"
+	
+	status=$(mycurl "/tags/name=${subj}(${tag}=${obj})" -X DELETE -o $logfile)
+	[[ "$status" = $code ]] || error DELETE "/tags/name=$subj(${tag}=$obj)" got "$status" instead of $code
+    done
 }
 
 tagreftest()
@@ -227,43 +223,153 @@ tagreftest()
 		echo "${subj},${o}" > $tempfile
 		url="/tags/name(${tag})"
 		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
-		[[ "$status" -eq $code ]] || tagreferror "$tag" "$subj" "$o" got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
+		[[ "$status" = $code ]] || error got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
+
+		if [[ "$status" = 204 ]]
+		then
+		    local url2="/query/name=${subj};${tag}=${o}(name;${tag})"
+		    status=$(mycurl "$url2" -H "Accept: text/csv" -o $tempfile2)
+		    [[ "$status" = 200 ]] || error got "$status" instead of 200 while querying "$url2"
+		    count=$(grep "test${testno}-${s}" "$tempfile" | wc -l)
+		    [[ "$count" -eq 1 ]] || {
+			cat $tempfile2
+			mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+			error got $count results instead of 1 while querying "/query/name=${subj}(${tag}=${o})"
+		    }
+		fi
+	    done
+	done
+    done
+}
+
+getreftest()
+{
+    local code=$1
+    local tagref=$2
+    shift 2
+
+    local subjects=()
+    local objects=()
+    while [[ $1 != '--' ]]
+    do
+	subjects+=( "$1" )
+	shift
+    done
+    shift
+    while [[ $# -gt 0 ]]
+    do
+	objects+=( "$1" )
+	shift
+    done
+
+    for i in ${!tagdef_writepolicies[@]}
+    do
+	local tag=foo${i}_${tagref}
+	for s in "${subjects[@]}"
+	do
+	    for o in "${objects[@]}"
+	    do
+		local subj="test${testno}-${s}"
+		url="/query/name=${subj};${tag}=${o}(name;${tag})"
+		status=$(mycurl "$url" -H "Accept: text/csv" -o $tempfile)
+		[[ "$status" -eq $code ]] || {
+		    error got "$status" instead of $code while getting "$url" 
+		    mycurl "/query/name=${subj}(name;${tag})" -H "Accept: application/json" 
+		    }
+		count=$(wc -l < $tempfile)
+		[[ $count -eq 1 ]] || {
+		    error got "$count" results while querying "$url" 
+		    mycurl "/query/name=${subj}(name;${tag})" -H "Accept: application/json" 
+		}
+	    done
+	done
+    done
+}
+
+refdeltest()
+{
+    local code=$1
+    local tagref=$2
+    shift 2
+
+    local subjects=()
+    local objects=()
+    while [[ $1 != '--' ]]
+    do
+	subjects+=( "$1" )
+	shift
+    done
+    shift
+    while [[ $# -gt 0 ]]
+    do
+	objects+=( "$1" )
+	shift
+    done
+
+    for i in ${!tagdef_writepolicies[@]}
+    do
+	local tag=foo${i}_${tagref}
+	for s in "${subjects[@]}"
+	do
+	    for o in "${objects[@]}"
+	    do
+		local subj="test${testno}-${s}"
+		local url="/tags/name=${subj}(${tag}=${o})"
+		status=$(mycurl "$url" -X DELETE -o $logfile)
+		[[ "$status" -eq $code ]] || error DELETE "$url" got "$status" instead of $code
 	    done
 	done
     done
 }
 
 # test writepolicy=subject
-tagtest 204 foo0 1 2 3 4 5   # subjects where writeok=True
-tagtest 403 foo0           6 # subject where writeok=False
+tagdeltest 403 foo1 ''             6B    8B # subjects where writeok=False
+
+tagdeltest 404 foo0 value 1 2 3 4 5 6 7 8 # where subject and/or tag is not found
+
+tagtest 204 foo0 1 2 3 4 5       # subjects where writeok=True
+tagtest 403 foo0           6   8 # subject where writeok=False
+tagtest 409 foo0             7   # subject which is not visible
+
+tagdeltest 204 foo0 value 1 2 3 4 5       # triples where writeok=True
+tagdeltest 404 foo0 value           6 7 8 # triples not found
 
 # test writepolicy=subjectowner
-tagtest 204 foo1 1 2 3       # subjects where owner=username
-tagtest 403 foo1       4 5 6 # subjects where owner=otherrole
+tagdeltest 403 foo1 ''        4B 5B 6B   8B # subjects where owner=otherrole
+
+tagtest 204 foo1 1 2 3           # subjects where owner=username
+tagtest 403 foo1       4 5 6   8 # subjects where owner=otherrole
+tagtest 409 foo1             7   # subject which is not visible
 
 # multiple test combinations here to make sure we observe the right tagpolicy
 # e.g. the tagpolicy of the referenced tag is irrelevant when authorizing writes
 # to referencing tags
 
 # test writepolicy=object
-tagreftest 204 0 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B    # objects where writeok=True
-tagreftest 403 0 1 2 3 4 5 6 --                6B # object where writeok=False
+tagreftest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B          # objects where writeok=True
+getreftest 200 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B 
+refdeltest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B 
+
+tagreftest 403 0 1 2 3 4 5 6  8 --                6B    8B # object where writeok=False
+tagreftest 409 0 1 2 3 4 5 6  8 --                   7B    # object which is not visible
+
 
 # test writepolicy=objectowner
-tagreftest 204 1 1 2 3 4 5 6 -- 1B 2B 3B          # objects which we own
-tagreftest 403 1 1 2 3 4 5 6 --          4B 5B 6B # objects which we do not own
+tagreftest 204 1 1 2 3 4 5 6  8 -- 1B 2B 3B                # objects which we own
+tagreftest 403 1 1 2 3 4 5 6  8 --          4B 5B 6B    8B # objects which we do not own
+tagreftest 409 1 1 2 3 4 5 6  8 --                   7B    # object which is not visible
 
 # test writepolicy=subjectandobject
-tagreftest 204 2 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # subjects where writeok=True and objects where writeok=True
-tagreftest 403 2 1 2 3 4 5   --                6B # subjects where writeok=True and objects where writeok=False
-tagreftest 403 2           6 -- 1B 2B 3B 4B 5B    # subjects where writeok=False and objects where writeok=True
-tagreftest 403 2           6 --                6B # subject and object where writeok=False
+tagreftest 204 2 1 2 3 4 5      -- 1B 2B 3B 4B 5B          # subjects where writeok=True and objects where writeok=True
+tagreftest 403 2 1 2 3 4 5      --                6B    8B # subjects where writeok=True and objects where writeok=False
+tagreftest 403 2           6  8 -- 1B 2B 3B 4B 5B          # subjects where writeok=False and objects where writeok=True
+tagreftest 403 2           6  8 --                6B    8B # subject and object where writeok=False
 
 # now test with us in ACLs... (we're in ACL because we own tagdef)
-tagtest 204 foo2 1 2 3 4 5 6 # writepolicy=tag and tag ACL is True
-tagtest 204 foo3 1 2 3 4 5 6 # writepolicy=tagorsubject and tag ACL is True
-tagtest 204 foo4 1 2 3 4 5   # writepolicy=tagandsubject and tag ACL is True and subject writeok=True
-tagtest 403 foo4           6 # writepolicy=tagandsubject and subject writeok=False
+tagtest 204 foo2 1 2 3 4 5 6  8 # writepolicy=tag and tag ACL is True
+tagtest 204 foo3 1 2 3 4 5 6  8 # writepolicy=tagorsubject and tag ACL is True
+tagtest 204 foo4 1 2 3 4 5      # writepolicy=tagandsubject and tag ACL is True and subject writeok=True
+tagtest 403 foo4           6  8 # writepolicy=tagandsubject and subject writeok=False
 tagtest 204 foo5 1 2 3 4 5 6 # writepolicy=tagorowner and ACL is True
 tagtest 204 foo6 1 2 3       # writepolicy=tagandowner and ACL is True and owner=username
 tagtest 403 foo6 4 5 6       # writepolicy=tagandowner and owner=otherrole
@@ -307,6 +413,29 @@ then
 
 fi
 
+tagdeltest 204 foo0 '' 1B 2B 3B 4B 5B
+tagdeltest 403 foo0 ''                6B    8B
+tagdeltest 409 foo0 ''                   7B
+
+deletetest()
+{
+    local code=$1
+    shift
+
+    for n in $@
+    do
+	status=$(mycurl "/subject/name=test${testno}-${n}" -X DELETE -o $logfile)
+	[[ "$status" = ${code} ]] || error got "$status" instead of "$code" removing "name=test${testno}-${n}"
+    done
+}
+
+deletetest 403           6   8           # subjects not writeable
+deletetest 404             7             # subject not visible
+deletetest 204 1 2 3 4 5                 # subjects writeable
+
+deletetest 403                6B    8B  # subjects not writeable
+deletetest 404                   7B     # subject not visible
+deletetest 204 1B 2B 3B 4B 5B           # subjects writeable
 
 # tear down the test schema
 reset

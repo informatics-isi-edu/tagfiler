@@ -1681,12 +1681,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             ordertags = []
 
-        def augment(tagdef, tagdefs):
-            for mode in ['read', 'write']:
-                tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef, tagdefs=tagdefs)
-
-            return tagdef
-            
         if tagname:
             subjpreds = subjpreds + [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
         else:
@@ -1694,7 +1688,16 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         results = list(self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz))
         tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in results ])
-        results = [ augment(tagdef, tagdefs) for tagdef in results ]
+
+        for tagdef in results:
+            for mode in ['read', 'write']:
+                tagdef['%sok' % mode] = self.test_tag_authz(mode, None, tagdef, tagdefs=tagdefs)
+
+            tagdef['reftags'] = set()
+
+        for tagdef in results:
+            if tagdef.tagref:
+                tagdefs[tagdef.tagref].reftags.add(tagdef.tagname)
 
         #web.debug(results)
         return results
@@ -2393,7 +2396,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         dcols = [ 'd.subject' ]
         icols = [ idcol ]
 
-        if valcol:
+        if tagdef.dbtype != '' and valcol:
             if tagdef.multivalue and unnest:
                 valcol = 'unnest(%s)' % valcol
             dcols.append( 'd.value' )
@@ -2405,6 +2408,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 + '       (SELECT %(icols)s FROM %(intable)s)')
                % dict(table=table, intable=intable, dcols=','.join(dcols), icols=','.join(icols)))
 
+        #web.debug(tagdef)
         #traceInChunks(sql)
         self.dbquery(sql)
 
@@ -2442,14 +2446,24 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         return pd
 
+    def tagdef_reftags_closure(self, tagdef):
+        refs = set()
+        def helper(tagname):
+            refs.add(tagname)
+            td = self.globals['tagdefsdict'][tagname]
+            for ref in td.reftags:
+                helper(ref)
+        for ref in tagdef.reftags:
+            helper(ref)
+        return refs
+
     def bulk_delete_tags(self, path=None):
         subjpreds, origlistpreds, ordertags = self.path[-1]
-        
-        unique = self.validate_subjpreds_unique(acceptBlank=True, subjpreds=subjpreds)
 
         lpreds = self.mergepreds(origlistpreds)
-        dtags = lpreds.keys()
+        dtags = set(lpreds.keys())
         dtagdefs = []
+        dtqueries = {}
 
         # screen early for statically forbidden requests or not-found tagdefs
         for tag in dtags:
@@ -2462,103 +2476,140 @@ class Application (webauthn2_handler_factory.RestHandler):
             if td.writeok == False:
                 raise Forbidden(self, 'write to tag "%s"' % tag)
 
-        # topologically sort tagdefs based on tagref linkage
-        def td_cmp(td1, td2):
-            def ancestors(td):
-                a = set()
-                while td.tagref:
-                    td = self.globals['tagdefsdict'][td.tagref]
-                    a.add(td.tagname)
-                return a
+        dtable = wraptag(self.request_guid, '', 'tmp_d_')   # all subjects for explicit deletion
+        mtable = wraptag(self.request_guid, '', 'tmp_m_')   # modified subjects for metadata tracking
 
-            if td2.tagname in ancestors(td1):
-                return -1
-            elif td1.tagname in ancestors(td2):
-                return 1
+        # find the path-matching subjects and save in temporary table dtable
+        self.path[-1] = (subjpreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok'] ], [])
+        dquery, dvalues = self.build_files_by_predlist_path(self.path)
+        
+        self.dbquery("CREATE TEMPORARY TABLE %(dtable)s AS %(dquery)s" 
+                     % dict(dtable=dtable, dquery=dquery), vars=dvalues)
+
+        if self.dbquery('SELECT count(*) AS count FROM %s' % dtable)[0].count == 0:
+            raise NotFound(self, 'subjects matching subject constraints')
+
+        self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8)" % dict(mtable=mtable))
+
+        # first pass: do fine-grained authz and compute affected subjects and tags
+        for tagdef in dtagdefs:
+            dtquery, dtvalues = self.build_files_by_predlist_path([(
+                        [ web.Storage(tag=tagdef.tagname, op=None, vals=[]) ],
+                        lpreds[tagdef.tagname] + [ web.Storage(tag='id', op=None, vals=[]) ],
+                        []
+                        )],
+                                                                  values=dvalues,
+                                                                  unnest=tagdef.tagname)
+            if tagdef.dbtype != '':
+                valtest = ' IS NOT NULL'
             else:
-                return 0
+                valtest = '' # boolean False represents NULL empty tag
 
-        dtagdefs.sort(cmp=td_cmp)
-                
-        def coltype(tag):
-            td = self.globals['tagdefsdict'][tag]
+            dtquery = 'SELECT * FROM (%s) s WHERE %s%s' % (dtquery, self.wraptag(tagdef.tagname, '', ''), valtest)
 
-            if td.multivalue:
-                suffix = '[]'
-            else:
-                suffix = ''
+            dtqueries[tagdef.tagname] = dtquery
 
-            if td.dbtype == '':
-                dbtype = 'boolean'
-            else:
-                dbtype = td.dbtype
+            # track subjects we'll modify explicitly
+            self.dbquery(("INSERT INTO %(mtable)s (id)"
+                          + " SELECT DISTINCT id FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)"
+                          + " EXCEPT SELECT id FROM %(mtable)s")
+                         % dict(mtable=mtable, dtable=dtable, dtquery=dtquery),
+                         vars=dvalues)
 
-            return '%s%s' % (dbtype, suffix)
+            # find all implicitly mutable tagnames
+            reftags = self.tagdef_reftags_closure(tagdef)
+            dtags.update(reftags)
 
-        # perform deletions in topological order so metadata updates are final including any cascading deletes
-        # TODO BUG: what about implicitly deleted tags not part of the client request?
-        #   need to invert the tagref graph and anticipate deletes in order to update metadata for those too!
-        for td in dtagdefs:
-            tag = td.tagname
-            tags = ['id', 'owner', 'writeok', tag]
+            # track subjects we'll modify implicitly
+            for reftag in reftags:
+                reftagdef = self.globals['tagdefsdict'][reftag]
+                self.dbquery(("INSERT INTO %(mtable)s (id)"
+                              + " SELECT DISTINCT r.subject"
+                              + " FROM %(dtable)s s"
+                              + " JOIN (%(dtquery)s) d USING (id)"
+                              + " JOIN %(reftag)s r ON (d.id = r.subject AND d.%(tagname)s = r.value)"
+                              + " EXCEPT SELECT id FROM %(mtable)s")
+                         % dict(mtable=mtable, dtable=dtable, dtquery=dtquery, reftag=self.wraptag(reftag), tagname=self.wraptag(tagdef.tagname, '', '')),
+                         vars=dvalues)
 
-            # build a query matching original subjects plus the extra lpreds constraints for this tag
-            tagpath = list(self.path)
-            tagpath[-1] = ( subjpreds + lpreds[tag], lpreds[tag] + [web.storage(tag='id', op=None, vals=[])], [] )
-            dquery, dvalues = self.build_files_by_predlist_path(tagpath, unnest=tag)
-    
-            tagpathbrief = list(self.path)
-            tagpathbrief[-1] = ( subjpreds, [], [] )
-            dquerybrief, dvaluesbrief = self.build_files_by_predlist_path(tagpathbrief)
+            if tagdef.tagref:
+                otagdef = self.globals['tagdefsdict'][tagdef.tagref]
+                oquery, ovalues = self.build_files_by_predlist_path([(
+                            [ web.Storage(tag=tagdef.tagref, op=None, vals=[]) ],
+                            [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok', tagdef.tagref] ],
+                            []
+                            )],
+                                                                    values=dvalues,
+                                                                    unnest=otagdef.tagname)
+                if tagdef.writeok is None:
+                    # may need to test permissions on per-object basis for this tag before deleting triples
+                    if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
+                        count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                                              + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
+                                              + ' WHERE NOT coalesce(o.writeok, False)')
+                                             % dict(dtable=dtable, dtquery=dtquery, oquery=oquery, 
+                                                    tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', '')),
+                                             vars=dvalues)[0].count
+                        if count > 0:
+                            raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
 
-            if td.writeok == None:
-                # need to test permissions on per-subject basis for this tag before deleting triples
+                    if tagdef.writepolicy in [ 'objectowner' ]:
+                        count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                                              + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
+                                              + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)')
+                                             % dict(dtable=dtable, dtquery=dtquery, oquery=oquery, 
+                                                    tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', ''),
+                                                    roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                             vars=dvalues)[0].count
+                        if count > 0:
+                            raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
+                                                                  
+            if td.writeok is None:
+                # may need to test permissions on per-subject basis for this tag before deleting triples
                 if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    count = self.dbquery('SELECT count(*) AS count FROM (%s) s WHERE NOT writeok' % dquerybrief, vars=dvaluesbrief)[0].count
+                    count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                                          + ' WHERE NOT coalesce(s.writeok, False)')
+                                         % dict(dtable=dtable, dtquery=dtquery), 
+                                         vars=dvalues)[0].count
                     if count > 0:
-                        raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
-                if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    # None means we need object writeok for this user
-                    # TODO: implement test against objects
-                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+                        raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tagdef.tagname)
+
                 if td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
-                    count = self.dbquery(('SELECT count(*) AS count'
-                                          + ' FROM ( %(dquery)s ) s'
-                                          + ' WHERE NOT CASE'
-                                          + '              WHEN ARRAY[ %(roles)s ]::text[] @> ARRAY[ owner ]::text[] THEN True'
-                                          + '              ELSE False'
-                                          + '           END')
-                                         % dict(dquery=dquerybrief,
-                                                roles=','.join([ wrapval(r) for r in self.context.attributes ])),
-                                         vars=dvaluesbrief)[0].count
+                    count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                                          + ' WHERE NOT coalesce(s.owner = ANY (ARRAY[%(roles)s]), False)')
+                                         % dict(dtable=dtable, dtquery=dtquery, roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                         vars=dvalues)[0].count
                     if count > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
-                if tagdef.writepolicy in [ 'objectowner' ]:
-                    # None meansn we need object is_owner for this user
-                    # TODO: implement test against objects
-                    raise Forbidden(self, data='write on tag "%s" authz not implemented yet' % tagdef.tagname)
+            
+        if self.dbquery('SELECT count(*) AS count FROM %s' % mtable)[0].count == 0:
+            raise NotFound(self, "tags matching constraints")
 
-            # delete tuples from graph and update metadata
-            self.delete_tag_intable(td, '(%s) s' % dquery, 'id', wraptag(tag, '', ''), unnest=False)
-
+        # second pass: remove triples
+        for tagdef in dtagdefs:
+            self.delete_tag_intable(tagdef, '(%s) s' % dtqueries[tagdef.tagname], 'id', wraptag(tagdef.tagname, '', ''), unnest=False)
+            
+        # third pass: update per-tag metadata based on explicit and implicit changes
+        for dtag in dtags:
             self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
                                     ('(SELECT subject, value'
                                      + ' FROM "_tags present" p'
                                      + ' WHERE p.value = %(tagname)s'
                                      + ' EXCEPT SELECT subject, %(tagname)s FROM %(tagtable)s) s')
-                                    % dict(tagname=wrapval(tag), tagtable=wraptag(tag)),
+                                    % dict(tagname=wrapval(dtag), tagtable=wraptag(dtag)),
                                     idcol='subject', 
-                                    valcol=wrapval(tag) + '::text', unnest=False)
+                                    valcol=wrapval(dtag) + '::text', unnest=False)
+            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][dtag])
 
-            for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
-                              ('subject last tagged txid', 'txid_current()') ]:
-                self.set_tag_intable(self.globals['tagdefsdict'][tag], '(%s)' % dquerybrief,
-                                     idcol='id', valcol=val, flagcol=None,
-                                     wokcol='dummy', isowncol='dummy',
-                                     enforce_tag_authz=False, set_mode='merge')
-
-            self.set_tag_lastmodified(None, td)
-
+        # finally: update subject metadata for all modified subjects
+        for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                          ('subject last tagged txid', 'txid_current()') ]:
+            self.set_tag_intable(self.globals['tagdefsdict'][tag], mtable,
+                                 idcol='id', valcol=val, flagcol=None,
+                                 wokcol=None, isowncol=None,
+                                 enforce_tag_authz=False, set_mode='merge')
+            
+        
     def bulk_delete_subjects(self, path=None):
 
         if path == None:
@@ -2568,21 +2619,29 @@ class Application (webauthn2_handler_factory.RestHandler):
             path = [ ( [], [], [] ) ]
 
         spreds, lpreds, otags = path[-1]
-        lpreds = [ web.Storage(tag=tag, vals=[], op=None) for tag in [ 'file' ] ]
+        lpreds = [ web.Storage(tag=tag, vals=[], op=None) for tag in [ 'file', 'writeok', 'id' ] ]
         path[-1] = spreds, lpreds, otags
 
         equery, evalues = self.build_files_by_predlist_path(path)
 
         etable = wraptag('tmp_e_%s' % self.request_guid, '', '')
+        mtable = wraptag('tmp_m_%s' % self.request_guid, '', '')
+        mtags = set()
 
         # save subject-selection results, i.e. subjects we are deleting
         self.dbquery('CREATE TEMPORARY TABLE %(etable)s ( id int8, file text, writeok boolean )'
                      % dict(etable=etable))
         
+        self.dbquery('CREATE TEMPORARY TABLE %(mtable)s ( id int8 )'
+                     % dict(mtable=mtable))
+        
         self.dbquery(('INSERT INTO %(etable)s (id, writeok)'
                       + ' SELECT e.id, e.writeok'
                       + ' FROM ( %(equery)s ) AS e') % dict(equery=equery, etable=etable),
                      vars=evalues)
+
+        if self.dbquery('SELECT count(*) AS count FROM %s' % etable)[0].count == 0:
+            raise NotFound(self, 'bulk-delete subjects')
 
         if bool(getParamEnv('bulk tmp index', False)):
             self.dbquery('CREATE INDEX %(index)s ON %(etable)s (id)'
@@ -2593,19 +2652,33 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         #self.log('TRACE', value='after deletion subject discovery')
 
-        if self.dbquery('SELECT count(id) AS count FROM %(etable)s AS e WHERE e.writeok = False' % dict(etable=etable),
+        if self.dbquery('SELECT count(id) AS count FROM %(etable)s AS e WHERE coalesce(NOT e.writeok, True)' % dict(etable=etable),
                         vars=evalues)[0].count > 0:
             raise Forbidden(self, 'delete of one or more matching subjects')
 
-        # TODO: deletion of tuples MAY expand effect into other tables and subjects due to cascading delete...
-        #       need to update metadata on tagdefs and/or subjects in those cases too?
+        # find all tags in use by all subjects we are deleting...
+        subject_tags = [ r.tagname for r in self.dbquery(('SELECT DISTINCT st.value AS tagname'
+                                                          + ' FROM "_tags present" AS st'
+                                                          + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
 
-        # update tagdef metadata for all tags which will lose tuples due to subject deletion
-        subject_tags = [ r for r in self.dbquery(('SELECT DISTINCT st.value AS tagname'
-                                                 + ' FROM "_tags present" AS st'
-                                                 + ' JOIN %(etable)s AS e ON (st.subject = e.id)') % dict(etable=etable)) ]
-        for r in subject_tags:
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][r.tagname])
+        # update per-tag metadata and track all subjects whose tags are modified due to cascading tagref deletion
+        for tagname in subject_tags:
+            tagdef = self.globals['tagdefsdict'][tagname]
+            self.set_tag_lastmodified(None, tagdef)
+
+            stquery, stvalues = self.build_files_by_predlist_path([ (spreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', tagname]], [])],
+                                                                  values=evalues,
+                                                                  unnest=tagname)
+            reftags = self.tagdef_reftags_closure(tagdef)
+            mtags.update(reftags)
+
+            for reftag in reftags:
+                self.dbquery(('INSERT INTO %(mtable)s (id)'
+                              + ' SELECT DISTINCT r.subject FROM (%(stquery)s) s JOIN %(reftable)s r ON (s.%(tagname)s = r.value)'
+                              + ' EXCEPT SELECT id FROM %(mtable)s'
+                              + ' EXCEPT SELECT id FROM %(etable)s')
+                             % dict(mtable=mtable, etable=etable, stquery=stquery, reftable=self.wraptag(reftag), tagname=self.wraptag(tagname, '', '')),
+                             vars=evalues)
 
         #self.log('TRACE', value='after set_tag_lastmodified loop')
         
@@ -2617,7 +2690,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                                 + '        LEFT OUTER JOIN "_file" AS f ON (e.id = f.subject)) AS e'
                                 + ' WHERE d.subject = e.id'
                                 + ' RETURNING e.id AS id, e.file AS file') % dict(etable=etable))
-        self.accum_table_changes('"resources"', len(results))
+
+        # finally: update subject metadata for all modified subjects
+        for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                          ('subject last tagged txid', 'txid_current()') ]:
+            self.set_tag_intable(self.globals['tagdefsdict'][tag], mtable,
+                                 idcol='id', valcol=val, flagcol=None,
+                                 wokcol=None, isowncol=None,
+                                 enforce_tag_authz=False, set_mode='merge')
 
         return results
 
@@ -2874,7 +2954,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
             assigns = [ ('writeok', 'e.writeok'),
                         ('id', 'e.id'),
-                        ('is_owner', 'CASE WHEN ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[] THEN True ELSE False END' % ','.join([ wrapval(r) for r in self.context.attributes ])) ]
+                        ('is_owner', 'coalesce(ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[], False)' % ','.join([ wrapval(r) for r in self.context.attributes ])) ]
 
             if subject_iter == False:
                 # we're loading subjects for a pattern-based bulk-tag, so need to set static psuedo-input values
@@ -3028,7 +3108,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif on_missing == 'ignore':
                 self.dbquery('DELETE FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))
             elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
-                raise NotFound(self, 'bulk-update subject(s)')
+                raise Conflict(self, 'One or more bulk-update subject(s) not found.')
             else:
                 if bool(getParamEnv('bulk tmp index', False)) and bool(getParamEnv('bulk tmp cluster', False)):
                     clusterindex = self.get_index_name(self.input_tablename, ['id'])
