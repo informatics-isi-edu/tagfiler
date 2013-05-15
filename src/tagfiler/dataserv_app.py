@@ -2422,11 +2422,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                             + ' EXCEPT SELECT subject FROM %s) s' % reftable, 
                                             idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', unnest=False)
                     
-                    self.set_tag_intable(self.globals['tagdefsdict']['tags present'], '(SELECT DISTINCT subject FROM %s)' % reftable,
-                                         idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', 
-                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
-
-                # finally: update subject metadata for all modified subjects
+                # update subject metadata for all implicitly modified subjects
                 if reftags:
                     for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                                       ('subject last tagged txid', 'txid_current()') ]:
