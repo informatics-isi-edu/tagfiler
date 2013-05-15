@@ -40,12 +40,13 @@ testno=${RANDOM}
 
 tempfile=$(mktemp)
 tempfile2=$(mktemp)
+cookie=$(mktemp)
 
 logfile=$(mktemp)
 
 cleanup()
 {
-    rm -f "$tempfile" "$logfile" "$tempfile2"
+    rm -f "$tempfile" "$logfile" "$tempfile2" "$cookie"
 }
 
 trap cleanup 0
@@ -55,7 +56,7 @@ mycurl()
     local url="$1"
     shift
     truncate -s 0 $logfile
-    curl -b cookie -c cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
+    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
 }
 
 tagdef_writepolicies=(
@@ -114,7 +115,7 @@ status=$(mycurl "/session" -d username="$username" -d password="$password" -o $l
 # setup the test schema
 for i in ${!tagdef_writepolicies[@]}
 do
-    status=$(mycurl "/tagdef/foo${i}?dbtype=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
+    status=$(mycurl "/tagdef/foo${i}?dbtype=text&unique=true&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
     [[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}
 
     for j in ${!tagdefref_writepolicies[@]}
@@ -156,7 +157,7 @@ lines=$(mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%
 
 #mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
 
-tagtest()
+tagtest_serial()
 {
     local code=$1
     local tag=$2
@@ -175,7 +176,31 @@ tagtest()
 
 }
 
-tagdeltest()
+tagtest()
+{
+    if [[ $1 != 204 ]]
+    then
+	tagtest_serial "$@"
+	return
+    fi
+
+    local code=$1
+    local tag=$2
+    shift 2
+
+    for s in $@
+    do
+	local subj="test${testno}-${s}"
+	local obj="value$s"
+	echo "${subj},${obj}"
+	
+    done > $tempfile
+
+    status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
+    [[ "$status" = $code ]] || tagtest_serial "$code" "$tag" "$@"
+}
+
+tagdeltest_serial()
 {
     local code=$1
     local tag=$2
@@ -192,7 +217,40 @@ tagdeltest()
     done
 }
 
-tagreftest()
+tagdeltest()
+{
+    if [[ $1 != 204 ]]
+    then
+	tagdeltest_serial "$@"
+	return
+    fi
+
+    local code=$1
+    local tag=$2
+    local prefix=$3
+    shift 3
+
+    local subjs=''
+    local objs=''
+
+    local sep=''
+
+    for s in $@
+    do
+	local subj="test${testno}-${s}"
+	local obj="${prefix}$s"
+	
+	subjs+="${sep}${subj}"
+	objs+="${sep}${obj}"
+
+	sep=","
+    done
+
+    status=$(mycurl "/tags/name=${subjs}(${tag}=${objs})" -X DELETE -o $logfile)
+    [[ "$status" = $code ]] || tagdeltest_serial "$code" "$tag" "$prefix" "$@"
+}
+
+tagreftest_serial()
 {
     local code=$1
     local tagref=$2
@@ -225,29 +283,42 @@ tagreftest()
 		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 		[[ "$status" = $code ]] || error got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
 
+		local url2="/query/name=${subj};${tag}=${o}(id;name;${tag})"
+		local url3="/tags/name=${subj}(${tag}=${o})"
+
 		if [[ "$status" = 204 ]]
 		then
-		    local url2="/query/name=${subj};${tag}=${o}(name;${tag})"
+		    truncate -s 0 $tempfile2
 		    status=$(mycurl "$url2" -H "Accept: text/csv" -o $tempfile2)
 		    [[ "$status" = 200 ]] || error got "$status" instead of 200 while querying "$url2"
-		    count=$(grep "test${testno}-${s}" "$tempfile" | wc -l)
+		    count=$(grep "test${testno}-${s}" "$tempfile2" | wc -l)
 		    [[ "$count" -eq 1 ]] || {
 			cat $tempfile2
 			mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
-			error got $count results instead of 1 while querying "/query/name=${subj}(${tag}=${o})"
+			error got $count results instead of 1 while querying "$url2"
 		    }
-		    
-		    local url3="/tags/name=${subj}(${tag}=${o})"
-		    status=$(mycurl "$url3" -X DELETE -o $logfile)
-		    [[ "$status" = 204 ]] || error got "$status" instead of 204 while deleting "$url3"
+		    if [[ $i = 3 ]]
+		    then
+			:
+			# do not delete tagrefs to foo1 so we can test those triples later...
+		    else
+			status=$(mycurl "$url3" -X DELETE -o $logfile)
+			[[ "$status" = 204 ]] || error got "$status" instead of 204 while deleting "$url3"
+		    fi
 		fi
 	    done
 	done
     done
 }
 
-getreftest()
+tagreftest()
 {
+    if [[ $1 != 204 ]]
+    then
+	tagreftest_serial "$@"
+	return
+    fi
+
     local code=$1
     local tagref=$2
     shift 2
@@ -266,30 +337,64 @@ getreftest()
 	shift
     done
 
-    for i in ${!tagdef_writepolicies[@]}
+    for o in "${objects[@]}"
     do
-	local tag=foo${i}_${tagref}
-	for s in "${subjects[@]}"
+	url1="/tags/name("
+	url2="/query/name;"
+	url3="/tags/("
+	sep=""
+
+	truncate -s 0 $tempfile
+
+	for sn in "${!subjects[@]}"
 	do
-	    for o in "${objects[@]}"
+	    local subj="test${testno}-${subjects[$sn]}"
+	    printf "${subj}" >> $tempfile
+
+	    for i in ${!tagdef_writepolicies[@]}
 	    do
-		local subj="test${testno}-${s}"
-		url="/query/name=${subj};${tag}=${o}(name;${tag})"
-		status=$(mycurl "$url" -H "Accept: text/csv" -o $tempfile)
-		[[ "$status" -eq $code ]] || {
-		    error got "$status" instead of $code while getting "$url" 
-		    mycurl "/query/name=${subj}(name;${tag})" -H "Accept: application/json" 
-		    }
-		count=$(wc -l < $tempfile)
-		[[ $count -eq 1 ]] || {
-		    error got "$count" results while querying "$url" 
-		    mycurl "/query/name=${subj}(name;${tag})" -H "Accept: application/json" 
-		}
+		local tag=foo${i}_${tagref}
+
+		if [[ $sn -eq 0 ]]
+		then
+		    url1+="${sep}${tag}"
+		    url2+="${sep}${tag}=${o}"
+		    [[ $i -eq 3 ]] || url3+="${sep}${tag}=${o}"
+		    sep=";"
+		fi
+
+		printf ",${o}" >> $tempfile
 	    done
+
+	    printf "\n" >> $tempfile
 	done
+
+	url1+=")"
+	url2+="(id;name)"
+	url3+=")"
+
+	status=$(mycurl "$url1" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
+	[[ "$status" = $code ]] && {
+
+	    truncate -s 0 $tempfile2
+	    status=$(mycurl "$url2" -H "Accept: text/csv" -o $tempfile2)
+	    [[ "$status" = 200 ]] || error got "$status" instead of 200 while querying "$url2"
+	    
+	    count=$(wc -l < $tempfile2)
+	    [[ "$count" -eq ${#subjects[@]} ]] || {
+		mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+		error got $count results instead of ${#subjects[@]} while querying "$url2"
+	    }
+
+	    status=$(mycurl "$url3" -X DELETE -o $logfile)
+	    [[ "$status" = 204 ]] || error got "$status" instead of 204 while deleting "$url3"
+
+	    true
+
+	} || tagreftest_serial "$code" "$tagref" "${subjects[@]}" -- "${o}"
+
     done
 }
-
 
 # test writepolicy=subject
 tagdeltest 403 foo1 ''             6B    8B # subjects where writeok=False
@@ -314,10 +419,10 @@ tagtest 409 foo1             7   # subject which is not visible
 # e.g. the tagpolicy of the referenced tag is irrelevant when authorizing writes
 # to referencing tags
 
-# test writepolicy=object
-tagreftest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B          # objects where writeok=True
-getreftest 200 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B 
 
+# test writepolicy=object
+tagreftest 409 0 1 2 3 4 5 6  8 -- 1C 2C 3C 4C 5C          # tagref key constraint fails
+tagreftest 204 0 1 2 3 4 5 6  8 -- 1B 2B 3B 4B 5B          # objects where writeok=True
 tagreftest 403 0 1 2 3 4 5 6  8 --                6B    8B # object where writeok=False
 tagreftest 409 0 1 2 3 4 5 6  8 --                   7B    # object which is not visible
 
@@ -341,7 +446,7 @@ tagtest 403 foo4           6  8 # writepolicy=tagandsubject and subject writeok=
 tagtest 204 foo5 1 2 3 4 5 6 # writepolicy=tagorowner and ACL is True
 tagtest 204 foo6 1 2 3       # writepolicy=tagandowner and ACL is True and owner=username
 tagtest 403 foo6 4 5 6       # writepolicy=tagandowner and owner=otherrole
-tagreftest 204 3 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagorsubjectandobject and ACL is True
+tagreftest 204 3 1 2 3 4 5 6 -- 1B 2B    4B 5B 6B 3B # writepolicy=tagorsubjectandobject and ACL is True (3B is last for deletion tests below)
 tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectandobject and ACL is True and subject writeok=True and object writeok=True
 tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
 tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
@@ -374,7 +479,7 @@ then
     tagtest 204 foo5 1 2 3       # writepolicy=tagorowner and owner=username
     tagtest 403 foo5 4 5 6       # writepolicy=tagorowner and owner=otherrole and ACL is False
     tagtest 403 foo6 1 2 3 4 5 6 # writepolicy=tagandowner and ACL is False
-    tagreftest 204 3 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagorsubjectandobject and subject writeok=True and object writeok=True
+    tagreftest 204 3 1 2 3 4 5   -- 1B 2B    4B 5B    3B # writepolicy=tagorsubjectandobject and subject writeok=True and object writeok=True (3B is last for deletion tests below)
     tagreftest 403 3           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagorsubjectandobject and subject writeok=False
     tagreftest 403 3 1 2 3 4 5   --                6B # writepolicy=tagorsubjectandobject and object writeok=False
     tagreftest 403 4 1 2 3 4 5 6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject and ACL is False
@@ -383,9 +488,29 @@ fi
 
 tagdeltest 204 foo0 '' 1B 2B 3B 4B 5B
 tagdeltest 403 foo0 ''                6B    8B
-tagdeltest 409 foo0 ''                   7B
+tagdeltest 404 foo0 ''                   7B
 
-deletetest()
+# test change to referenced tag foo1, for which we already deleted references above
+tagtest 204 foo1 1B 2B 3B
+
+# test implicit delete path via change to referenced tag foo3, for which we preserved references above
+# this depends on 3B being the final object tested above for tagreftest 204 3 ...
+truncate -s 0 $tempfile2
+status=$(mycurl "/query/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+[[ "$status" = 200 ]] || error got status $status querying "foo3_3"
+count=$(wc -l < $tempfile2)
+[[ $count -gt 0 ]] || error failed to find existing references foo3_3 to tag foo3
+
+tagtest 204 foo3 1B 2B 3B 4B 5B
+
+truncate -s 0 $tempfile2
+status=$(mycurl "/query/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+[[ "$status" = 200 ]] || error got status $status querying "foo3_3"
+count=$(wc -l < $tempfile2)
+[[ $count -eq 0 ]] || error found $count existing references foo3_3 to tag foo3 after they should have disappeared: "$(cat $tempfile2)"
+
+
+deletetest_serial()
 {
     local code=$1
     shift
@@ -395,6 +520,29 @@ deletetest()
 	status=$(mycurl "/subject/name=test${testno}-${n}" -X DELETE -o $logfile)
 	[[ "$status" = ${code} ]] || error got "$status" instead of "$code" removing "name=test${testno}-${n}"
     done
+}
+
+deletetest()
+{
+    if [[ $1 != 204 ]]
+    then
+	deletetest_serial "$@"
+	return
+    fi
+
+    local code=$1
+    shift
+
+    url="/subject/name="
+    sep=""
+
+    for n in $@
+    do
+	url+="${sep}test${testno}-${n}"
+	sep=","
+    done
+    status=$(mycurl "$url" -X DELETE -o $logfile)
+    [[ "$status" = ${code} ]] || deletetest_serial "$code" "$@"
 }
 
 deletetest 403           6   8           # subjects not writeable
