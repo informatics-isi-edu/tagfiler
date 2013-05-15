@@ -91,8 +91,10 @@ reset()
     do
 	for j in ${!tagdefref_writepolicies[@]}
 	do
+	    mycurl "/tagdef/fooread${i}_${j}" -X DELETE > /dev/null
 	    mycurl "/tagdef/foo${i}_${j}" -X DELETE > /dev/null
 	done
+	mycurl "/tagdef/fooread${i}" -X DELETE > /dev/null
 	mycurl "/tagdef/foo${i}" -X DELETE > /dev/null
     done
 
@@ -112,22 +114,44 @@ EOF
 status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
 [[ "$status" = 201 ]] || error got "$status" during login
 
+#mycurl "/query/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
+
+querytest()
+{
+    local code=$1
+    local count=$2
+    local url=$3
+
+    shift 2
+
+    truncate -s 0 $tempfile2
+    status=$(mycurl "${url}?limit=none" -H "Accept: text/csv" -o $tempfile2)
+    [[ "$status" = $code ]] || error got "$status" querying "$url"
+
+    lines=$(wc -l < $tempfile2)
+    [[ "$lines" -eq $count ]] || error got $lines results querying "$url" when $count should be visible: "$(cat $tempfile2)"
+}
+
 # setup the test schema
 for i in ${!tagdef_writepolicies[@]}
 do
+    status=$(mycurl "/tagdef/fooread${i}?dbtype=text&unique=true&multivalue=false&readpolicy=${tagdef_writepolicies[$i]}&writepolicy=subject" -X PUT -o $logfile)
+    [[ "$status" = 201 ]] || error got "$status" creating tagdef fooread${i}
+
     status=$(mycurl "/tagdef/foo${i}?dbtype=text&unique=true&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
     [[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}
 
     for j in ${!tagdefref_writepolicies[@]}
     do
+	status=$(mycurl "/tagdef/fooread${i}_${j}?dbtype=text&multivalue=false&readpolicy=${tagdefref_writepolicies[$j]}&writepolicy=subject&tagref=fooread${i}" -X PUT -o $logfile)
+	[[ "$status" = 201 ]] || error got "$status" creating tagdef fooread${i}_${j}
+
 	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o $logfile)
 	[[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}_${j}
     done
-
 done
 
-#mycurl "/query/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
-
+# test subjects for later write-authz tests
 cat > $tempfile <<EOF
 test${testno}-1,${username},{*},{*},,,,,,,
 test${testno}-2,${username},{${username}},{${username}},,,,,,,
@@ -147,15 +171,92 @@ test${testno}-7B,${otherrole},{${otherrole}},{${otherrole}},7B,7B,7B,7B,7B,7B,7B
 test${testno}-8B,${otherrole},{*},{${otherrole}},8B,8B,8B,8B,8B,8B,8B
 EOF
 
-NUMVIS=14
-
 status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 [[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects 
 
-lines=$(mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users)" -H "Accept: text/csv" | wc -l)
-[[ "$lines" -eq $(( $NUMVIS + 1 )) ]] || error got $(( $lines - 1 )) results querying when $NUMVIS should be visible
+querytest 200 14 "/query/name:regexp:test${testno}-(name)"
+
+# start with ownership of all so we can construct all the tag values
+# drop ownership of 4..7 before testing read authz
+cat > $tempfile <<EOF
+test${testno}-1-R,${username},{*},val1,val1,val1,val1,val1,val1,val1
+test${testno}-2-R,${username},{${username}},val2,val2,val2,val2,val2,val2,val2
+test${testno}-3-R,${username},{},val3,val3,val3,val3,val3,val3,val3
+test${testno}-4-R,${username},{*},val4,val4,val4,val4,val4,val4,val4
+test${testno}-5-R,${username},{${username}},val5,val5,val5,val5,val5,val5,val5
+test${testno}-6-R,${username},{${otherrole}},val6,val6,val6,val6,val6,val6,val6
+test${testno}-7-R,${username},{},val7,val7,val7,val7,val7,val7,val7
+EOF
+
+status=$(mycurl "/subject/name(name;owner;read%20users;fooread0;fooread1;fooread2;fooread3;fooread4;fooread5;fooread6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
+[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects test${testno}-x-R
+
+querytest 200 7 "/query/fooread0(name)"
+
+# construct referencing subjects using the above 7 as referenced objects
+for o in {1..7}
+do
+
+    for j in ${!tagdefref_writepolicies[@]}
+    do
+
+	# start with ownership of all so we can construct all the tag values
+	# drop ownership of 4..6 before testing read authz
+	cat > $tempfile <<EOF
+test${testno}-1.${o}.${j}-R,${username},{*},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+test${testno}-2.${o}.${j}-R,${username},{${username}},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+test${testno}-3.${o}.${j}-R,${username},{},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+test${testno}-4.${o}.${j}-R,${username},{*},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+test${testno}-5.${o}.${j}-R,${username},{${username}},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+test${testno}-6.${o}.${j}-R,${username},{},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
+EOF
+
+	status=$(mycurl "/subject/name(name;owner;read%20users;fooread0_${j};fooread1_${j};fooread2_${j};fooread3_${j};fooread4_${j};fooread5_${j};fooread6_${j})" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
+	[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects test${testno}-x.${o}.${j}-R
+
+	querytest 200 6 "/query/fooread0_${j}=val${o}(name)"
+
+	status=$(mycurl "/tags/name:regexp:test${testno}-%5B456%5D.${o}.${j}-R(owner=${otherrole})" -X PUT -o logfile)
+	[[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}.${o}.${j}-R
+
+    done
+done
+
+# shed ownership of refenced objects as per above
+status=$(mycurl "/tags/name:regexp:test${testno}-%5B4567%5D-R(owner=${otherrole})" -X PUT -o logfile)
+[[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}-R
 
 #mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
+
+# begin read-authz tests of pre-defined test data
+
+querytest 200 5 "/query/fooread0(name)"  # subject readable
+querytest 200 3 "/query/fooread1(name)"  # subjectowner
+querytest 200 5 "/query/fooread2(name)"  # subject readable and tag ACL
+querytest 200 5 "/query/fooread3(name)"  # subject readable and tag ACL
+querytest 200 5 "/query/fooread4(name)"  # subject readable and tag ACL
+querytest 200 5 "/query/fooread5(name)"  # tag ACL
+querytest 200 3 "/query/fooread6(name)"  # subjectowner and tag ACL
+
+for i in 0 2 3 4 5 # objects where referenced tag readpolicy is visible for all subjects
+do
+    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_0(name)"
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
+    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_2(name)"
+    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_3(name)"
+    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_4(name)"
+done
+
+for i in 1 6 # objects where referenced tag readpolicy is visible for owners
+do
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_0(name)"
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" 
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_2(name)"
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_3(name)"
+    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_4(name)"
+done
+
+# helper functions for write-authz tests
 
 tagtest_serial()
 {
@@ -173,7 +274,6 @@ tagtest_serial()
 	[[ "$status" = $code ]] || error "/tags/name=$subj(${tag}=$obj)" got "$status" instead of $code while bulk putting tag
 
     done > $tempfile
-
 }
 
 tagtest()
@@ -396,6 +496,8 @@ tagreftest()
     done
 }
 
+# begin write-authz tests
+
 # test writepolicy=subject
 tagdeltest 403 foo1 ''             6B    8B # subjects where writeok=False
 
@@ -470,8 +572,44 @@ then
     # change owner of tagdefs to mutablerole
     status=$(mycurl "/tags/tagdef:regexp:foo;owner=${username}(owner=${mutablerole})" -X PUT -o $logfile)
     [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
+
+    # do read-tests again w/o tag ACL permissions...
+    querytest 200 5 "/query/fooread0(name)"  # subject readable
+    querytest 200 3 "/query/fooread1(name)"  # subjectowner
+    querytest 200 0 "/query/fooread2(name)"  # no ACL
+    querytest 200 5 "/query/fooread3(name)"  # subject readable
+    querytest 200 0 "/query/fooread4(name)"  # no ACL
+    querytest 200 3 "/query/fooread5(name)"  # owner
+    querytest 200 0 "/query/fooread6(name)"  # no ACL
+
+    for i in 0 3 # objects where referenced tag readpolicy is visible for all objects
+    do
+	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
+	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)" # no ACL
+    done
     
-    # test without us in tag ACLs...
+    for i in 2 4 6 # objects where referenced tag readpolicy is not visible
+    do
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_1(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)"
+    done
+    
+    for i in 1 5 # objects where referenced tag readpolicy is visible for owners
+    do
+	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" 
+	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)" # no ACL
+    done
+
+    # do write-tests again...
     tagtest 403 foo2 1 2 3 4 5 6 # writepolicy=tag and tag ACL is False
     tagtest 204 foo3 1 2 3 4 5   # writepolicy=tagorsubject and subject writeok=True
     tagtest 403 foo3           6 # writepolicy=tagorsubject and subject writeok=True
