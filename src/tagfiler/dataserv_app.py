@@ -1796,7 +1796,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if referenced_tagdef == None:
                     raise Conflict(self, 'Referenced tag "%s" not found.' % tagref)
 
-                if referenced_tagdef.unique and referenced_tagdef.dbtype != '' and referenced_tagdef.tagname not in ['id']:
+                if not referenced_tagdef.unique:
+                    raise Conflict(self, 'Referenced tag "%s" is not unique.' % tagref)
+
+                if referenced_tagdef.dbtype != tagdef.dbtype:
+                    raise Conflict(self, 'Referenced tag "%s" must have identical dbtype.' % tagref)
+
+                if referenced_tagdef.tagname == 'id':
+                    tabledef += ' REFERENCES resources (subject) ON DELETE CASCADE'
+                else:
                     tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
             if not tagdef.multivalue:
