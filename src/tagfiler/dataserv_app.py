@@ -2369,34 +2369,36 @@ class Application (webauthn2_handler_factory.RestHandler):
             if tagdef.dbtype != '':
                 reftags = self.tagdef_reftags_closure(tagdef)
 
-                mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
-                self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8)" % dict(mtable=mtable))
+                if reftags:
+                    mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
+                    self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8)" % dict(mtable=mtable))
 
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
                     reftagdef = self.globals['tagdefsdict'][reftag]
                     reftable = self.wraptag(reftag)
-
+                    
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
-                    self.dbquery(("WITH deletions AS ("
-                                  + " DELETE FROM %(reftable)s r"
-                                  + " USING "
-                                  + "   (SELECT %(idcol)s AS subject, %(valcol)s AS value"
-                                  + "    FROM %(intable)s AS i"
-                                  + "    WHERE %(wheres)s) AS i,"
-                                  + "   %(table)s AS t"
-                                  + " WHERE %(updwheres)s AND r.value = t.value"
-                                  + " RETURNING r.subject"
-                                  + ")"
-                                  + "INSERT INTO %(mtable)s"
-                                  + " SELECT DISTINCT subject FROM deletions"
-                                  + " EXCEPT"
-                                  + " SELECT id FROM %(mtable)s")
-                                 % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
-                                        idcol=idcol, valcol=valcol,
-                                        wheres=' AND '.join(wheres),
-                                        updwheres=' AND '.join(updwheres)))
+                    query = (("WITH deletions AS ("
+                              + " DELETE FROM %(reftable)s r"
+                              + " USING "
+                              + "   (SELECT %(idcol)s AS subject, %(valcol)s AS value"
+                              + "    FROM %(intable)s AS i"
+                              + "    WHERE %(wheres)s) AS i,"
+                              + "   %(table)s AS t"
+                              + " WHERE %(updwheres)s AND r.value = t.value"
+                              + " RETURNING r.subject"
+                              + ")"
+                              + "INSERT INTO %(mtable)s"
+                              + " SELECT DISTINCT subject FROM deletions"
+                              + " EXCEPT"
+                              + " SELECT id FROM %(mtable)s") % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
+                                                                    idcol=idcol, valcol=valcol,
+                                                                    wheres=' AND '.join(wheres),
+                                                                    updwheres=' AND '.join(updwheres)))
+                    #web.debug(reftag, query)
+                    self.dbquery(query)
 
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
@@ -2431,7 +2433,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                              wokcol=None, isowncol=None,
                                              enforce_tag_authz=False, set_mode='merge', depth=depth+1)
 
-                self.dbquery('DROP TABLE %s' % mtable)
+                    self.dbquery('DROP TABLE %s' % mtable)
 
 
         if count > 0:
