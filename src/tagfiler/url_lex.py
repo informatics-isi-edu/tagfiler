@@ -48,6 +48,7 @@ keywords = {
     'regexp' : 'REGEXP',
     'ciregexp' : 'CIREGEXP',
     'absent' : 'ABSENT',
+    'word' : 'WORD',
     'asc' : 'ASC',
     'desc' : 'DESC'
 }

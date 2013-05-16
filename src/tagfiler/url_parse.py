@@ -260,6 +260,14 @@ def p_compare_ineq(p):
                | ':' SIMTO ':'"""
     p[0] = ineqmap[ p[2].lower() ]
 
+def p_compare_tsv(p):
+    """compare : ':' WORD ':'"""
+    p[0] = ':' + p[2].lower() + ':'
+
+def p_compare_ntsv(p):
+    """compare : ':' '!' WORD ':'"""
+    p[0] = ':!' + p[3].lower() + ':'
+
 def p_stringset(p):
     """stringset : string ',' string"""
     p[0] = set([p[1], p[3]])
