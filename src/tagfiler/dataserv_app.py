@@ -3416,6 +3416,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                 preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
 
             for pred in preds:
+                if tagdef.dbtype in self.opsExcludeTypes.get(pred.op and pred.op or '', []):
+                    raise Conflict(self, 'Operator %s not allowed on tag "%s"' % (pred.op, tagdef.tagname))
+
                 if pred.op == ':absent:':
                     used_not_op = True
                 else:
@@ -3567,6 +3570,9 @@ class Application (webauthn2_handler_factory.RestHandler):
             spreds = self.mergepreds(spreds, tagdefs)
             lpreds = self.mergepreds(lpreds, tagdefs)
             
+            if 'subject text' in spreds:
+                self.update_subject_text_tsv()
+
             subject_wheres = []
             
             for tag, preds in lpreds.items():
@@ -3827,6 +3833,38 @@ class Application (webauthn2_handler_factory.RestHandler):
         result = self.dbquery(query, values)
         #self.txlog('TRACE', value='select_files_by_predlist_path exiting')
         return result
+
+    def update_subject_text_tsv(self):
+        """Find stale subjects and update their "subject text" tsv value to latest graph content.
+        """
+        stalequery = "SELECT subject FROM %s WHERE value > coalesce(tsv_txid, 0)" % self.wraptag('subject last tagged txid')
+
+        if len(self.dbquery('SELECT True AS value FROM (%s) s LIMIT 1' % stalequery)) == 0:
+            # skip expensive work below if nothing is stale... this query is directly supported by a partial value index
+            return
+
+        # we only index text tags that are effectively the same read authz as the subjects themselves
+        text_tags = [ td.tagname for td in self.globals['tagdefsdict'].values() if td.dbtype == 'text' and td.readpolicy in ['anonymous', 'subject', 'tagorsubject'] ]
+        
+        parts = [ "SELECT subject, tsv FROM %s" % self.wraptag(tagname) for tagname in text_tags ]
+
+        self.dbquery( "WITH stale AS (%s) " % stalequery
+                      + " DELETE FROM %s AS st" % self.wraptag('subject text')
+                      + " USING stale"
+                      + " WHERE st.subject = stale.subject" )
+
+        self.dbquery( "INSERT INTO %s (subject, tsv)" % self.wraptag('subject text')
+                      + " SELECT subject, tsv_agg(tsv) AS tsv"
+                      + " FROM (%s) documents" % ' UNION ALL '.join(parts)
+                      + " JOIN (%s) stale USING (subject)" % stalequery
+                      + " GROUP BY SUBJECT" )
+
+        self.dbquery( "UPDATE %s slt" % self.wraptag('subject last tagged txid')
+                      + " SET tsv_txid = txid_current()"
+                      + " FROM (%s) stale" % stalequery
+                      + " WHERE slt.subject = stale.subject" )
+
+        self.set_tag_lastmodified(None, self.globals['tagdefsdict']['subject text'])
 
     def select_predlist_path_txid(self, path=None, limit=None, enforce_read_authz=True):
         """Determine last-modified txid for query path dataset, optionally testing previous txid as shortcut.
