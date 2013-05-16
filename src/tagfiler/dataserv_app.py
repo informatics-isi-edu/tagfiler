@@ -233,10 +233,14 @@ def downcast_value(dbtype, value, range_extensions=False):
             return value
         raise ValueError('Value %s of type %s cannot be coerced to boolean' % (str(value), type(value)))
     
-    elif dbtype == 'text':
+    elif dbtype in [ 'text', 'tsword' ]:
         value = '%s' % value
         if value.find('\00') >= 0:
             raise ValueError('Null bytes not allowed in text value "%s"' % value)
+        if dbtype == 'tsword':
+            for c in [ '|', '&', '!', '(', ')', ':' ]:
+                if value.find(c) >= 0:
+                    raise ValueError('Character "%s" not allowed in text search words' % c)
         
     elif dbtype in [ 'int8', 'float8', 'date', 'timestamptz', 'interval' ] and range_extensions and type(value) in [ str, unicode ]:
         m = re.match(' *[(](?P<lower>[^,()]+) *, *(?P<upper>[^,()]+)[)] *', value)
@@ -809,22 +813,26 @@ class Application (webauthn2_handler_factory.RestHandler):
             (':regexp:', 'Regular expression (case sensitive)'),
             (':!regexp:', 'Negated regular expression (case sensitive)'),
             (':ciregexp:', 'Regular expression (case insensitive)'),
-            (':!ciregexp:', 'Negated regular expression (case insensitive)')]
+            (':!ciregexp:', 'Negated regular expression (case insensitive)'),
+            (':word:', 'Word present in text search'),
+            (':!word:', 'Word not present in text search') ]
 
-    opsExcludeTypes = dict([ ('', []),
-                             (':absent:', []),
-                             ('=', ['']),
-                             ('!=', ['']),
-                             (':lt:', ['', 'boolean']),
-                             (':leq:', ['', 'boolean']),
-                             (':gt:', ['', 'boolean']),
-                             (':geq:', ['', 'boolean']),
-                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
+    opsExcludeTypes = dict([ ('', ['tsvector']),
+                             (':absent:', ['tsvector']),
+                             ('=', ['','tsvector']),
+                             ('!=', ['','tsvector']),
+                             (':lt:', ['', 'boolean','tsvector']),
+                             (':leq:', ['', 'boolean','tsvector']),
+                             (':gt:', ['', 'boolean','tsvector']),
+                             (':geq:', ['', 'boolean','tsvector']),
+                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector']),
+                             (':word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
+                             (':!word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
 
     opsDB = dict([ ('=', '='),
                    ('!=', '!='),
@@ -837,7 +845,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                    (':regexp:', '~'),
                    (':!regexp:', '!~'),
                    (':ciregexp:', '~*'),
-                   (':!ciregexp:', '!~*') ])
+                   (':!ciregexp:', '!~*'),
+                   (':word:', '@@'),
+                   (':!word:', '@@') ])
     
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
@@ -865,6 +875,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('modified', 'timestamptz', None, False, 'system', False),
                        ('subject last tagged', 'timestamptz', None, False, 'system', False),
                        ('subject last tagged txid', 'int8', None, False, 'system', False),
+                       ('subject text', 'tsvector', None, False, 'system', False),
                        ('tag last modified', 'timestamptz', None, False, 'system', False),
                        ('name', 'text', None, False, 'subjectowner', True),
                        ('view', 'text', None, False, 'subject', True),
@@ -1807,6 +1818,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
+            if dbtype == 'text':
+                tabledef += ', tsv tsvector'
+
             if not tagdef.multivalue:
                 tabledef += ", UNIQUE(subject)"
             else:
@@ -1823,6 +1837,13 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.dbquery(tabledef)
         if indexdef:
             self.dbquery(indexdef)
+        if dbtype == 'text':
+            self.dbquery('CREATE TRIGGER tsvupdate BEFORE INSERT OR UPDATE ON %s' % self.wraptag(tagdef.tagname)
+                         + " FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(tsv, 'pg_catalog.english', value)")
+            self.dbquery('CREATE INDEX %s ON %s USING gin(tsv)' % (
+                    self.wraptag(tagdef.tagname, '_tsv_idx'),
+                    self.wraptag(tagdef.tagname)
+                    ))
 
         if not tagdef.multivalue:
             clusterindex = self.get_index_name('_' + tagdef.tagname, ['subject'])
@@ -3340,7 +3361,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             # make a copy so we can mutate it safely
             preds = list(preds)
 
-            valcol = '%s.value'  % wraptag(tagdef.tagname)
+            valcol = '%s.value' % wraptag(tagdef.tagname)
+            tsvcol = '%s.tsv' % wraptag(tagdef.tagname)
             if tagdef.tagname == 'id':
                 m['table'] = 'resources'
                 m['value'] = ', subject AS value'
@@ -3364,7 +3386,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                     m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
                     m['group'] = 'GROUP BY subject'
             elif tagdef.dbtype != '':
-                m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
+                if tagdef.dbtype == 'tsvector':
+                    m['value'] = ', %s.tsv AS value' % wraptag(tagdef.tagname)
+                else:
+                    m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
 
             used_not_op = False
             used_other_op = False
@@ -3421,18 +3446,41 @@ class Application (webauthn2_handler_factory.RestHandler):
                         return 'SELECT %s FROM (%s) AS sq' % (wraptag(projtag, prefix=''), vq)
                         
                     try:
-                        vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) for v in pred.vals if not hasattr(v, 'is_subquery') ]
+                        vals = [ wrapval(v, tagdef.dbtype, range_extensions=True) 
+                                 for v in pred.vals 
+                                 if not hasattr(v, 'is_subquery') ]
+
                     except ValueError, e:
                         raise Conflict(self, data=str(e))
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
-                    constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
                     bounds = [ '(%s::%s, %s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vals if type(v) == tuple ]
+
+                    if pred.op in [ ':word:', '!:word:' ]:
+                        if vqueries:
+                            raise Conflict(self, 'Sub-queries are not allowed with operator %s.' % pred.op)
+                        if bounds:
+                            raise Conflict(self, 'Value ranges are not allowed with operator %s.' % pred.op)
+
+                        # collapse word alternatives into a single tsquery with '|' syntax rather than using normal query disjunction
+                        try:
+                            vals = [ downcast_value('tsword', v) for v in pred.vals ]
+                        except ValueError, e:
+                            raise Conflict(self, data=str(e))
+                        if pred.op == ':!word:':
+                            # add tsquery negation syntax '!'
+                            vals = [ '!%s' % v for v in vals ]
+                        constants = [ 'to_tsquery(%s)' % wrapval('|'.join(vals), 'text') ]
+                    else:
+                        constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
 
                     clauses = []
                     if constants:
-                        constants = ', '.join(constants)
-                        clauses.append( '%s %s ANY (ARRAY[%s]::%s[])'
-                                        %  (valcol, Application.opsDB[pred.op], constants, tagdef.dbtype) )
+                        if len(constants) > 1:
+                            constants = ', '.join(constants)
+                            rhs = 'ANY (ARRAY[%s]::%s[])' % (constants, tagdef.dbtype)
+                        else:
+                            rhs = constants[0]
+                        clauses.append( '%s %s %s' % (pred.op in [':word:', ':!word:' ] and tsvcol or valcol, Application.opsDB[pred.op], rhs) )
 
                     if bounds:
                         bounds = ', '.join(bounds)
@@ -3547,6 +3595,10 @@ class Application (webauthn2_handler_factory.RestHandler):
             otagexprs = dict()
             for tag, preds in lpreds.items():
                 td = tagdefs[tag]
+
+                if td.dbtype == 'tsvector':
+                    raise Conflict(self, 'Tag "%s" can only be used in subject predicates, not in list predicates.' % td.tagname)
+
                 if rangemode and final:
                     if len([ p for p in preds if p.op]) > 0:
                         raise BadRequest(self, 'Operators not supported in rangemode list predicates.')
