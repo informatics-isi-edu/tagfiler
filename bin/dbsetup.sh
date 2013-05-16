@@ -123,6 +123,17 @@ CREATE FUNCTION jsonobj(text[]) RETURNS text AS \$\$
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
 CREATE SEQUENCE transmitnumber;
 CREATE SEQUENCE keygenerator;
+
+CREATE FUNCTION tsv_accum(tsvector, tsvector) RETURNS tsvector AS \$\$
+  SELECT CASE WHEN \$1 IS NOT NULL THEN \$1 || \$2 ELSE \$2 END ;
+\$\$ LANGUAGE SQL;
+
+CREATE AGGREGATE tsv_agg(tsvector) (
+  sfunc = tsv_accum,
+  stype = tsvector,
+  initcond = ''
+);
+
 EOF
 
 resources_index=$(get_index_name 'resources' 'subject')
@@ -365,14 +376,17 @@ tagdef_phase1()
    local fk
    local default
    local uniqueval
+   local tsvector
 
    if [[ -n "$2" ]]
    then
       opclass=''
+      tsvector=''
       if [[ "$2" = "text" ]]
       then
          default="DEFAULT ''"
 	 opclass="text_pattern_ops"
+	 tsvector="tsv tsvector,"
       elif [[ "$2" = "boolean" ]]
       then
 	 default="DEFAULT False"
@@ -405,11 +419,40 @@ tagdef_phase1()
       # UNIQUE(subject, value) implies index _$1_subject_key on (subject, value)
       # UNIQUE(subject) implies index _$1_subject_key on (subject)
 
-      cat >&${COPROC[1]} <<EOF
+      if [[ "$2" = "text" ]]
+      then
+	  # text gets an extra tsvector column in addition to text value column and a trigger to keep the tsvector updated
+	  cat >&${COPROC[1]} <<EOF
 CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
-                       value $2 ${default} NOT NULL ${fk}, ${uniqueval} );
+                       value text ${default} NOT NULL ${fk}, tsv tsvector, ${uniqueval} );
 CREATE INDEX "_$1_value_idx" ON "_$1" (value ${opclass}) ;
+
+CREATE TRIGGER tsvupdate BEFORE INSERT OR UPDATE ON "_$1"
+FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(tsv, 'pg_catalog.english', value);
+
+CREATE INDEX "_$1_tsv_idx" ON "_$1" USING gin(tsv);
+
 EOF
+      elif [[ "$2" = "tsvector" ]]
+      then
+	  # tsvector gets a special tsvector column instead of a value column (just for "subject text" system tag)
+	  cat >&${COPROC[1]} <<EOF
+CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
+                       tsv tsvector, ${uniqueval} );
+
+CREATE INDEX "_$1_tsv_idx" ON "_$1" USING gin(tsv);
+
+EOF
+      else
+	  # other types just get a normal typed value column
+	  cat >&${COPROC[1]} <<EOF
+CREATE TABLE "_$1" ( subject bigint NOT NULL REFERENCES resources (subject) ON DELETE CASCADE, 
+                       value $2 ${default} NOT NULL ${fk}, ${tsvector}${uniqueval} );
+CREATE INDEX "_$1_value_idx" ON "_$1" (value ${opclass}) ;
+
+EOF
+      fi
+
       if [[ "$6" = "true" ]]
       then
 	  indexspec="subject, value"
@@ -490,6 +533,7 @@ tagdef "write users"         text        ""         anonymous   subjectowner tru
 tagdef "modified by"         text        ""         anonymous   system       false
 tagdef modified              timestamptz ""         anonymous   system       false
 tagdef "subject last tagged" timestamptz ""         anonymous   system       false
+tagdef "subject text"        tsvector    ""         subject     system       false
 tagdef "tag last modified"   timestamptz ""         anonymous   system       false
 tagdef "subject last tagged txid" int8   ""         anonymous   system       false
 tagdef "tag last modified txid" int8     ""         anonymous   system       false
@@ -508,6 +552,16 @@ tagdef 'config binding'      int8        ""         subject     subject      tru
 tagdef 'config parameter'    text        ""         subject     subject      false
 tagdef 'config value'        text        ""         subject     subject      true
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
+
+# add special column for tracking subject text tsv freshness
+cat >&${COPROC[1]} <<EOF
+ALTER TABLE "_subject last tagged txid" ADD COLUMN tsv_txid int8 ;
+
+CREATE INDEX "_subject last tagged txid_tsv_idx" ON "_subject last tagged txid" ( 
+  (value > coalesce(tsv_txid, 0))
+) WHERE value > coalesce(tsv_txid, 0);
+
+EOF
 
 # complete split-phase definitions and redefine as combined phase
 tagdefs_complete
