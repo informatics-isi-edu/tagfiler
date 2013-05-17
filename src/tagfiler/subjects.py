@@ -29,7 +29,7 @@ import time
 import datetime
 import pytz
 
-from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter, getParamEnv, make_temporary_file
+from dataserv_app import Application, NotFound, BadRequest, Conflict, RuntimeError, Forbidden, urlquote, urlunquote, parseBoolString, predlist_linearize, path_linearize, wraptag, jsonFileReader, jsonArrayFileReader, JSONArrayError, jsonWriter, getParamEnv, make_temporary_file, yieldBytes
 
 myrand = random.Random()
 myrand.seed(os.getpid())
