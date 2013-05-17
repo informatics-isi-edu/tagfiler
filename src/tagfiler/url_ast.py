@@ -141,8 +141,7 @@ with the service.
                         'tagdef',
                         'subject',
                         'file',
-                        'tags',
-                        'query'
+                        'tags'
                         ]
                     # TODO: add introspection on supported operators?
                     # TODO: add introspection on supported dbtypes?
@@ -167,7 +166,6 @@ class FileId(FileIO):
 class Subject(subjects.Subject):
     def __init__(self, parser, appname, path, queryopts={}, storage=None):
         subjects.Subject.__init__(self, parser, appname, path, queryopts)
-        self.path = [ ( e[0], e[1], [] ) for e in path ]
         if storage:
             self.storage = storage
 
@@ -526,124 +524,4 @@ class FileTags (Node):
         # RESTful delete of exactly one tag on 1 or more files...
         return self.dbtransact(self.delete_body, self.delete_postCommit)
 
-
-class Query (Node):
-    def __init__(self, parser, appname, queryopts={}, path=[]):
-        Node.__init__(self, parser, appname, queryopts)
-        self.path = path
-        if len(self.path) == 0:
-            self.path = [ ( [], [], [] ) ]
-        self.subjpreds = self.path[-1][0]
-        #self.log('TRACE', 'Query() constructor exiting')
-
-    def GET(self, uri):
-        #self.log('TRACE', value='Query::GET() entered')
-        # this interface has both REST and form-based functions
-        
-        contentType = 'application/json'
-
-        for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType in [ 'text/uri-list', 'application/json', 'text/csv' ]:
-                contentType = acceptType
-                break
-
-        if contentType == 'text/csv':
-            temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
-            temporary_file.close()
-
-        def body():
-            #self.txlog('TRACE', value='Query::body entered')
-            self.http_vary.add('Accept')
-
-            path, self.listtags, writetags, self.limit, self.offset = \
-                  self.prepare_path_query(self.path,
-                                          list_priority=['path', 'list', 'view', 'default'],
-                                          extra_tags=[ ])
-
-            #self.txlog('TRACE', value='Query::body query prepared')
-            self.set_http_etag(txid=self.select_predlist_path_txid(path, limit=self.limit))
-            #self.txlog('TRACE', value='Query::body txid computed')
-            cached = self.http_is_cached()
-
-            if cached:
-                web.ctx.status = '304 Not Modified'
-                return None
-            elif contentType == 'application/json':
-                self.txlog('QUERY', dataset=path_linearize(self.path))
-                self.queryopts['range'] = self.query_range
-                files = self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset, json=True)
-                self.queryopts['range'] = None
-                #self.txlog('TRACE', value='Query::body query returned')
-                return files      
-            elif contentType == 'text/csv':
-                self.txlog('QUERY', dataset=path_linearize(self.path))
-                self.queryopts['range'] = self.query_range
-                temporary_file = open(self.temporary_filename, 'wb')
-                self.copyto_csv_files_by_predlist_path(temporary_file, path, limit=self.limit, offset=self.offset)
-                self.queryopts['range'] = None
-                temporary_file.close()
-                return False
-            else:
-                self.txlog('QUERY', dataset=path_linearize(self.path))
-
-                self.queryopts['range'] = self.query_range
-                files = [file for file in  self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset) ]
-                self.queryopts['range'] = None
-                #self.txlog('TRACE', value='Query::body query returned')
-
-                self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
-                self.globals['filelisttagswrite'] = writetags
-
-                return files
-
-        def postCommit(files):
-            self.emit_headers()
-            if files == None:
-                # caching short cut
-                return
-            
-            #self.log('TRACE', value='Query::body postCommit dispatching on content type')
-
-            if contentType == 'text/uri-list':
-                # return raw results for REST client
-                if self.query_range:
-                    raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
-                self.header('Content-Type', 'text/uri-list')
-                yield "\n".join([ "%s/file/%s" % (self.config.home + web.ctx.homepath, self.subject2identifiers(file)[0]) for file in files])
-                return
-            elif contentType == 'text/csv':
-                try:
-                    f = open(self.temporary_filename, 'rb')
-
-                    try:
-                        f.seek(0, 2)
-                        length = f.tell()
-
-                        self.header('Content-Type', 'text/csv')
-                        self.header('Content-Length', str(length))
-
-                        for buf in yieldBytes(f, 0, length-1, self.config['chunk bytes']):
-                            yield buf
-
-                    finally:
-                        f.close()
-
-                finally:
-                    os.remove(self.temporary_filename)
-
-                return
-            else:
-                self.header('Content-Type', 'application/json')
-                yield '['
-                pref=''
-                for res in files:
-                    yield pref + res.json + '\n'
-                    pref = ','
-                yield ']\n'
-                return
-
-        for res in self.dbtransact(body, postCommit):
-            yield res
-
-        #self.log('TRACE', value='Query::GET exiting')
 

@@ -38,7 +38,6 @@ def p_start(p):
              | subject
              | tagdef
              | tags
-             | query
              | querypathroot
 """
     p[0] = p[1]
@@ -60,11 +59,15 @@ def p_toplevel_opts2(p):
     """toplevel : slash string slash queryopts"""
     p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[4])
 
-def p_subject(p):
+def p_subject0(p):
+    """subject : slash string slash SUBJECT"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=[])
+
+def p_subject1(p):
     """subject : slash string slash SUBJECT slash querypath"""
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6])
 
-def p_subject_opts(p):
+def p_subject1_opts(p):
     """subject : slash string slash SUBJECT slash querypath queryopts"""
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
@@ -112,27 +115,6 @@ def p_tags(p):
 def p_tags_opts(p):
     """tags : slash string slash TAGS slash querypath queryopts"""
     p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
-
-def p_query1(p):
-    """query : slash string slash QUERY
-             | slash string slash QUERY slash"""
-    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=web.storage())
-
-def p_query2a(p):
-    """query : slash string slash QUERY queryopts"""
-    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=p[5])
-
-def p_query2b(p):
-    """query : slash string slash QUERY slash queryopts"""
-    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=[([], [], [])], queryopts=p[6])
-
-def p_query3(p):
-    """query : slash string slash QUERY slash querypath"""
-    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=p[6], queryopts=web.storage())
-
-def p_query4(p):
-    """query : slash string slash QUERY slash querypath queryopts"""
-    p[0] = url_ast.Query(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
 def p_querypath_elem_general(p):
     """querypath_elem : predlist '(' predlist ')' ordertags"""

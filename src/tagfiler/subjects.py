@@ -122,10 +122,12 @@ class Subject (Node):
         self.update = False
         self.subject = None
         self.mergeSubjpredsTags = False
-
-    def populate_subject_cached(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False):
+        self.path = path
         if len(self.path) == 0:
             self.path = [ ( [], [], [] ) ]
+        
+
+    def populate_subject_cached(self, enforce_read_authz=True, allow_blank=False, allow_multiple=False, enforce_parent=False):
 
         def searchfunc():
             self.populate_subject(enforce_read_authz, allow_blank, allow_multiple, enforce_parent)
@@ -213,7 +215,116 @@ class Subject (Node):
         return None
 
     def GET(self, uri, sendBody=True):
-        raise web.NoMethod()
+        #self.log('TRACE', value='Query::GET() entered')
+        # this interface has both REST and form-based functions
+        
+        contentType = 'application/json'
+
+        for acceptType in self.acceptTypesPreferedOrder():
+            if acceptType in [ 'text/uri-list', 'application/json', 'text/csv' ]:
+                contentType = acceptType
+                break
+
+        if contentType == 'text/csv':
+            temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
+            temporary_file.close()
+
+        def body():
+            #self.txlog('TRACE', value='Query::body entered')
+            self.http_vary.add('Accept')
+
+            path, self.listtags, writetags, self.limit, self.offset = \
+                  self.prepare_path_query(self.path,
+                                          list_priority=['path', 'list', 'view', 'default'],
+                                          extra_tags=[ ])
+
+            #self.txlog('TRACE', value='Query::body query prepared')
+            self.set_http_etag(txid=self.select_predlist_path_txid(path, limit=self.limit))
+            #self.txlog('TRACE', value='Query::body txid computed')
+            cached = self.http_is_cached()
+
+            if cached:
+                web.ctx.status = '304 Not Modified'
+                return None
+            elif contentType == 'application/json':
+                self.txlog('QUERY', dataset=path_linearize(self.path))
+                self.queryopts['range'] = self.query_range
+                files = self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset, json=True)
+                self.queryopts['range'] = None
+                #self.txlog('TRACE', value='Query::body query returned')
+                return files      
+            elif contentType == 'text/csv':
+                self.txlog('QUERY', dataset=path_linearize(self.path))
+                self.queryopts['range'] = self.query_range
+                temporary_file = open(self.temporary_filename, 'wb')
+                self.copyto_csv_files_by_predlist_path(temporary_file, path, limit=self.limit, offset=self.offset)
+                self.queryopts['range'] = None
+                temporary_file.close()
+                return False
+            else:
+                self.txlog('QUERY', dataset=path_linearize(self.path))
+
+                self.queryopts['range'] = self.query_range
+                files = [file for file in  self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset) ]
+                self.queryopts['range'] = None
+                #self.txlog('TRACE', value='Query::body query returned')
+
+                self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
+                self.globals['filelisttagswrite'] = writetags
+
+                return files
+
+        def postCommit(files):
+            self.emit_headers()
+            if files == None:
+                # caching short cut
+                return
+            
+            #self.log('TRACE', value='Query::body postCommit dispatching on content type')
+
+            if contentType == 'text/uri-list':
+                # return raw results for REST client
+                if self.query_range:
+                    raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
+                self.header('Content-Type', 'text/uri-list')
+                response = "\n".join([ "%s/file/%s" % (self.config.home + web.ctx.homepath, self.subject2identifiers(file)[0]) for file in files]) + '\n'
+                self.header('Content-Length', str(len(response)))
+                yield response
+                return
+            elif contentType == 'text/csv':
+                try:
+                    f = open(self.temporary_filename, 'rb')
+
+                    try:
+                        f.seek(0, 2)
+                        length = f.tell()
+
+                        self.header('Content-Type', 'text/csv')
+                        self.header('Content-Length', str(length))
+
+                        for buf in yieldBytes(f, 0, length-1, self.config['chunk bytes']):
+                            yield buf
+
+                    finally:
+                        f.close()
+
+                finally:
+                    os.remove(self.temporary_filename)
+
+                return
+            else:
+                self.header('Content-Type', 'application/json')
+                yield '['
+                pref=''
+                for res in files:
+                    yield pref + res.json + '\n'
+                    pref = ','
+                yield ']\n'
+                return
+
+        if sendBody:
+            for res in self.dbtransact(body, postCommit):
+                yield res
 
     def HEAD(self, uri):
         return self.GET(uri, sendBody=False)
