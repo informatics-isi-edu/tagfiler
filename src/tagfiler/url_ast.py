@@ -131,11 +131,7 @@ class Toplevel (Node):
             descriptor = jsonWriter({
                     'service': 'tagfiler',
                     # TODO: add some API version info?
-                    'help': """
-This is the top-level of a Tagfiler metadata catalog service. The set
-of API URLs described here can be used by RESTful clients to interact
-with the service.
-""",
+                    'help': """This is the top-level of a Tagfiler metadata catalog service. The set of API URLs described here can be used by RESTful clients to interact with the service.""",
                     'apis': [
                         # TODO: make these full URLs?
                         'tagdef',
@@ -146,8 +142,10 @@ with the service.
                     # TODO: add introspection on supported operators?
                     # TODO: add introspection on supported dbtypes?
                     # TODO: add introspection on configured security/how to authn/authz?
-                    })
-            return descriptor + '\n'
+                    },
+                                    indent=2) + '\n'
+            self.header('Content-Length', str(len(descriptor)))
+            return descriptor
 
         return self.dbtransact(body, postCommit)
 
