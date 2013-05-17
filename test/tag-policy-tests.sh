@@ -553,6 +553,10 @@ tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectand
 tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
 tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
 
+status=$(mycurl "/query/subject%20text:word:${username}(name)" -H "Accept: text/csv" -o $logfile)
+[[ $status = 200 ]] || error got "$status" during free-text query test
+count=$(wc -l < $logfile)
+[[ $count -gt 5 ]] || error found too few results during free-text query test for ${username}
 
 if [[ -n "$mutablerole" ]]
 then
