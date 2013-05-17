@@ -730,13 +730,3 @@ EOF
 : {COPROC[1]}>&-
 wait ${COPROC_PID}
 
-cmddir=$(dirname "$0")
-#. ./dbsetup-nei-demo.sh
-
-#. ${cmddir}/dbsetup-psoc-demo.sh
-
-while [ "$1" ]
-do
-	. ${cmddir}/dbsetup-$1-demo.sh
-	shift 1
-done
