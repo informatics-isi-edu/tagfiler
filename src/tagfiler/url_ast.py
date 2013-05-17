@@ -272,9 +272,8 @@ class Tagdef (Node):
             results = self.select_tagdef(self.tag_id, enforce_read_authz=False)
             if len(results) > 0:
                 raise Conflict(self, data="Tag %s is already defined." % self.tag_id)
-            self.insert_tagdef()
-            results = self.select_tagdef(self.tag_id, enforce_read_authz=True)
-            return results
+            result = self.insert_tagdef()
+            return result
 
         def postCommit(results):
             web.ctx.status = '201 Created'

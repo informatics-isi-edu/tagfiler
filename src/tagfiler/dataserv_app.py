@@ -1714,7 +1714,8 @@ class Application (webauthn2_handler_factory.RestHandler):
         tagdef.multivalue = self.multivalue
         
         self.deploy_tagdef(tagdef)
-
+        return tagdef
+        
     def get_index_name(self, tablename, indexcols):
         sql = ('SELECT indexname FROM pg_catalog.pg_indexes' 
                + " WHERE tablename = %s" % wrapval(tablename)
