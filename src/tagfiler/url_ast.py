@@ -110,10 +110,10 @@ class Subquery (object):
     def __repr__(self):
         return "@(%s)" % path_linearize(self.path)
 
-class FileList (Node):
-    """Represents a bare FILE/ URI
+class Toplevel (Node):
+    """Represents a bare / URI at the top of catalog
 
-       GET  FILE  or FILE/         -- gives a listing
+       GET   -- gives a listing
     """
 
     def __init__(self, parser, appname, queryopts={}):
@@ -122,78 +122,35 @@ class FileList (Node):
 
     def GET(self, uri):
         
-        self.globals['referer'] = self.config['home'] + uri
-        self.storage = web.input()
-
         def body():
-            tagdefs = self.globals['tagdefsdict'].items()
-
-            listtags = self.queryopts.get('list', None)
-            writetags = None
-            if not listtags:
-                view = self.select_view(self.globals['view'])
-                if view:
-                    listtags = view['view tags']
-                    writetags = view['view tags']
-                else:
-                    listtags = []
-                    writetags = []
-
-            builtinlist = [ 'id' ]
-            self.globals['filelisttags'] = builtinlist + [ tag for tag in listtags if tag not in builtinlist ]
-            self.globals['filelisttagswrite'] = writetags
-            
-            if self.globals['tagdefsdict'].has_key('list on homepage'):
-                subjpreds = [ web.Storage(tag='list on homepage', op=None, vals=[]) ]
-                self.homepage = True
-            else:
-                subjpreds=[]
-                self.homepage = False
-
-            listpreds = [ web.Storage(tag=t, op=None, vals=[]) for t in set(self.globals['filelisttags']).union(set(['id',
-                                                                                                                     'name', 
-                                                                                                                     'tagdef',
-                                                                                                                     'config', 'view', 'url'])) ]
-
-            if self.globals['tagdefsdict'].has_key('homepage order') and self.homepage:
-                ordertags = [('homepage order', ':asc:')]
-            else:
-                ordertags = []
-
-            querypath = [ ( subjpreds, listpreds, ordertags ) ]
-            self.set_http_etag(self.select_predlist_path_txid(querypath))
-            if self.http_is_cached():
-                return None
-            else:
-                return self.select_files_by_predlist_path(querypath)
+            # TODO: is there any db introspection to do here?
+            return None
         
-        def postCommit(files):
-            target = self.config['home'] + web.ctx.homepath
-            if files == None:
-                web.ctx.status = '304 Not Modified'
-            self.emit_headers()
-            if files == None:
-                return ''
-            elif self.homepage:
-                self.header('Content-Type', 'text/html')
-                return self.renderui(['home'])
-            else:
-                self.header('Content-Type', 'text/html')
-                return self.renderui(['home'])
-                
-        try:
-            self.globals['view'] = urlunquote(self.storage.view)
-        except:
-            pass
-        return self.dbtransact(body, postCommit)
+        def postCommit(bodyresults):
+            self.header('Content-Type', 'application/json')
+            descriptor = jsonWriter({
+                    'service': 'tagfiler',
+                    # TODO: add some API version info?
+                    'help': """
+This is the top-level of a Tagfiler metadata catalog service. The set
+of API URLs described here can be used by RESTful clients to interact
+with the service.
+""",
+                    'apis': [
+                        # TODO: make these full URLs?
+                        'tagdef',
+                        'subject',
+                        'file',
+                        'tags',
+                        'query'
+                        ]
+                    # TODO: add introspection on supported operators?
+                    # TODO: add introspection on supported dbtypes?
+                    # TODO: add introspection on configured security/how to authn/authz?
+                    })
+            return descriptor + '\n'
 
-    def POST(self, uri):
-        ast = FileId(parser=self.url_parse_func,
-                     appname=self.appname,
-                     path=[],
-                     queryopts=self.queryopts)
-        ast.preDispatchFake(uri, self)
-        return ast.POST(uri)
+        return self.dbtransact(body, postCommit)
 
 class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI
@@ -231,54 +188,16 @@ class Tagdef (Node):
 
     def GET(self, uri):
 
-        if self.tag_id != None:
-            if len(self.queryopts) > 0:
-                raise BadRequest(self, data="Query options are not supported on this interface.")
-            else:
-                return self.GETone(uri)
-        else:
-            return self.GETall(uri)
-
-    def GETall(self, uri):
-
-        def body():
-            predefined = [ tagdef for tagdef in self.select_tagdef(subjpreds=[web.Storage(tag='owner', op=':absent:', vals=[])], order='tagdef') ]
-            userdefined = [ tagdef for tagdef in self.select_tagdef(subjpreds=[web.Storage(tag='owner', op=None, vals=[])], order='tagdef') ]
-            types = self.get_type()
-            
-            return (predefined, userdefined, types)
-
-        def postCommit(defs):
-            self.emit_headers()
-            self.header('Content-Type', 'text/html')
-            predefined, userdefined, types = defs
-            test_tagdef_authz = lambda mode, tag: self.test_tagdef_authz(mode, tag)
-            return 'Tag definitions'
-
-        if len(self.queryopts) > 0:
-            raise BadRequest(self, data="Query options are not supported on this interface.")
-
-        return self.renderui(['tagdef'], self.queryopts)
-
-    def GETone(self,uri):
-
         def body():
             results = self.select_tagdef(self.tag_id)
             if len(results) == 0:
                 raise NotFound(self, data='tag definition %s' % (self.tag_id))
-            return results[0]
+            return results
 
-        def postCommit(tagdef):
-            try:
-                self.emit_headers()
-                self.header('Content-Type', 'application/x-www-form-urlencoded')
-                return ('dbtype=' + urlquote(tagdef.dbtype) 
-                        + '&readpolicy=' + urlquote(tagdef.readpolicy)
-                        + '&writepolicy=' + urlquote(tagdef.writepolicy)
-                        + '&multivalue=' + urlquote(tagdef.multivalue)
-                        + '&owner=' + urlquote(tagdef.owner))
-            except:
-                raise NotFound(self, data='tag definition %s' % (self.tag_id))
+        def postCommit(tagdefs):
+            self.emit_headers()
+            self.header('Content-Type', 'application/json')
+            return jsonWriter(tagdefs) + '\n'
 
         if len(self.queryopts) > 0:
             raise BadRequest(self, data="Query options are not supported on this interface.")
@@ -397,9 +316,6 @@ class FileTags (Node):
         all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
-        if self.acceptType == 'text/html':
-            # don't evaluate query if we're just rendering AJAX app
-            files = []
         if self.acceptType == 'application/json':
             files = self.select_files_by_predlist_path(self.path_modified, limit=self.limit, json=True)
         elif self.acceptType == 'text/csv':
@@ -476,7 +392,7 @@ class FileTags (Node):
                 os.remove(self.temporary_filename)
 
             return
-        elif self.acceptType == 'application/json':
+        else:
             self.header('Content-Type', 'application/json')
             yield '['
             pref=''
@@ -484,13 +400,6 @@ class FileTags (Node):
                 yield pref + f.json + '\n'
                 pref=','
             yield ']\n'
-        else:
-            self.header('Content-Type', 'text/html')
-            url = 'tags' + path_linearize(self.path)
-            opts = '&'.join([ '%s=%s' % (urlquote(k), urlquote(v)) for k, v in self.queryopts.items() ])
-            if opts:
-                url += '?' + opts
-            yield self.renderui(['tags'], {'url': url})
 
                 
     def GET(self, uri=None):
@@ -506,13 +415,12 @@ class FileTags (Node):
             if acceptType in ['text/uri-list',
                               'application/x-www-form-urlencoded',
                               'text/csv',
-                              'application/json',
-                              'text/html']:
+                              'application/json']:
                 self.acceptType = acceptType
                 break
 
         if self.acceptType == None:
-            self.acceptType = 'text/html'
+            self.acceptType = 'application/json'
 
         if self.acceptType == 'text/csv':
             temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
@@ -632,10 +540,10 @@ class Query (Node):
         #self.log('TRACE', value='Query::GET() entered')
         # this interface has both REST and form-based functions
         
-        contentType = 'text/html'
+        contentType = 'application/json'
 
         for acceptType in self.acceptTypesPreferedOrder():
-            if acceptType in [ 'text/uri-list', 'text/html', 'application/json', 'text/csv' ]:
+            if acceptType in [ 'text/uri-list', 'application/json', 'text/csv' ]:
                 contentType = acceptType
                 break
 
@@ -675,7 +583,7 @@ class Query (Node):
                 self.queryopts['range'] = None
                 temporary_file.close()
                 return False
-            elif contentType != 'text/html':
+            else:
                 self.txlog('QUERY', dataset=path_linearize(self.path))
 
                 self.queryopts['range'] = self.query_range
@@ -687,15 +595,6 @@ class Query (Node):
                 self.globals['filelisttagswrite'] = writetags
 
                 return files
-            else:
-                self.globals['basepath'] = path_linearize(path[0:-1])
-                self.globals['querypath'] = [ dict(spreds=[dict(s) for s in spreds],
-                                                   lpreds=[dict(l) for l in lpreds],
-                                                   otags=otags)
-                                              for spreds, lpreds, otags in path ]
-                self.globals['ops'] = Application.ops
-                self.globals['opsExcludeTypes'] = Application.opsExcludeTypes
-                return []
 
         def postCommit(files):
             self.emit_headers()
@@ -733,7 +632,7 @@ class Query (Node):
                     os.remove(self.temporary_filename)
 
                 return
-            elif contentType == 'application/json':
+            else:
                 self.header('Content-Type', 'application/json')
                 yield '['
                 pref=''
@@ -741,12 +640,6 @@ class Query (Node):
                     yield pref + res.json + '\n'
                     pref = ','
                 yield ']\n'
-                return
-            else:
-                if self.query_range:
-                    raise BadRequest(self, 'Query option "range" not supported for text/html result format.')
-                self.header('Content-Type', 'text/html')
-                yield self.renderui(['query'], self.globals['querypath'], self.globals['basepath'])
                 return
 
         for res in self.dbtransact(body, postCommit):

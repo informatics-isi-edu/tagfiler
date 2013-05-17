@@ -122,10 +122,7 @@ class Dispatcher:
             try:
                 #web.debug((uri,astmethod))
                 #web.debug(('env',web.ctx.env))
-                if ast.login_required:
-                	result = ast.renderui(['login'])
-                else:
-                	result = astmethod(uri)
+                result = astmethod(uri)
 
                 if hasattr(result, 'next'):
                     try:

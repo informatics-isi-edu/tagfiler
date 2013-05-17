@@ -212,11 +212,11 @@ class Subject (Node):
         # read authz implied by finding subject
         return None
 
+    def GET(self, uri, sendBody=True):
+        raise web.NoMethod()
+
     def HEAD(self, uri):
-        if hasattr(self, 'GET'):
-            return self.GET(uri, sendBody=False)
-        else:
-            raise web.NoMethod()
+        return self.GET(uri, sendBody=False)
 
     def delete_body(self):
         spreds, lpreds, otags = self.path[-1]
@@ -569,15 +569,13 @@ class Subject (Node):
             if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
-            if acceptType in ['text/html', '*/*']:
-                url = '/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view)
-                return self.renderui(['tags'], {'url': url})
-            elif acceptType == 'application/json':
+            url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
+            self.header('Location', url)
+            if acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
-                self.header('Location', url)
+                self.header('Content-Type', 'text/uri-list')
                 web.ctx.status = '201 Created'
                 return '%s\n' % url
 

@@ -33,7 +33,7 @@ url_parse_func = None
 start = 'start'
 
 def p_start(p):
-    """start : filelist
+    """start : toplevel
              | file
              | subject
              | tagdef
@@ -47,20 +47,18 @@ def p_querypathroot(p):
     """querypathroot : querypath"""
     p[0] = url_ast.Subquery(path=p[1])
 
-def p_filelist(p):
-    """filelist : slash string
-                | slash string slash
-                | slash string slash FILE
-                | slash string slash FILE slash"""
-    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2])
-    
-def p_filelist_opts1(p):
-    """filelist : slash string queryopts"""
-    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[3])
-    
-def p_filelist_opts2(p):
-    """filelist : slash string slash FILE queryopts"""
-    p[0] = url_ast.FileList(parser=url_parse_func, appname=p[2], queryopts=p[5])
+def p_toplevel(p):
+    """toplevel : slash string
+                | slash string slash"""
+    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2])
+
+def p_toplevel_opts1(p):
+    """toplevel : slash string queryopts"""
+    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[3])
+
+def p_toplevel_opts2(p):
+    """toplevel : slash string slash queryopts"""
+    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[4])
 
 def p_subject(p):
     """subject : slash string slash SUBJECT slash querypath"""

@@ -131,7 +131,6 @@ class FileIO (Subject):
             if self.subject.dtype == 'file':
                 filename = self.config['store path'] + '/' + self.subject.file
                 f = None
-                render = None
                 # use the file as raw bytes
                 self.set_http_etag(max(txids))
                 if self.http_is_cached():
@@ -142,12 +141,12 @@ class FileIO (Subject):
                     p = subprocess.Popen(['/usr/bin/file', '-i', '-b', filename], stdout=subprocess.PIPE)
                     line = p.stdout.readline()
                     self.subject['content-type'] = line.strip().split(' ', 1)[0]
-                return f, render, False
+                return f, False
             else:
                 raise Conflict(self, data='The resource "%s" does not support file IO.' % path_linearize(self.path))
 
         def postCommit(results):
-            f, render, cached = results
+            f, cached = results
             if cached:
                 web.ctx.status = '304 Not Modified'
                 self.emit_headers()
@@ -155,7 +154,7 @@ class FileIO (Subject):
             else:
                 return results
 
-        f, render, cached = self.dbtransact(body, postCommit)
+        f, cached = self.dbtransact(body, postCommit)
 
         if cached:
             # short out here
@@ -500,17 +499,15 @@ class FileIO (Subject):
             if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
-            if acceptType in ['text/html', '*/*']:
-                url = '/tags/%s%s' % (self.subject2identifiers(self.subject)[0], view)
-                return self.renderui(['tags'], {'url': url})
-            elif acceptType == 'application/json':
+            url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
+            self.header('Location', url)
+            if acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
-                self.header('Location', uri)
+                self.header('Content-Type', 'text/uri-list')
                 web.ctx.status = '204 No Content'
-                return ''
+                return '%s\n' % url
 
         contentType = web.ctx.env.get('CONTENT_TYPE', "").lower()
         if contentType[0:19] == 'multipart/form-data':

@@ -71,12 +71,9 @@ FILEBASES=dataserv_app.py rest_fileio.py subjects.py \
 BINFILEBASES=tagfiler-webauthn2-deploy.py \
 	tagfiler-webauthn2-manage.py
 
-TEMPLATEBASES=UI.html
-
 FILES=$(FILEBASES:%=src/tagfiler/%)
 BINFILES=$(BINFILEBASES:%=scripts/%)
 SCRIPTFILES=$(SCRIPTFILEBASES:%=static/%)
-TEMPLATES=$(TEMPLATEBASES:%=src/tagfiler/templates/%)
 WSGI=$(WSGIFILE:%=wsgi/%)
 IMAGEFILES=$(IMAGEBASES:%=images/%)
 
@@ -91,14 +88,12 @@ deploy: $(HOME)/.tagfiler.predeploy install
 	./bin/deploy.sh $(INSTALLSVC)
 	./bin/register-software-version.sh $(INSTALLSVC)
 
-install: $(FILES) $(TEMPLATES) $(WSGI)
+install: $(FILES) $(WSGI)
 	mkdir -p /usr/local/sbin
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/images
-	mkdir -p $(INSTALLDIR)/templates
 	mkdir -p $(INSTALLDIR)/wsgi
 	mkdir -p /var/www/html/$(INSTALLSVC)/static/
 	rsync -av $(FILES) $(INSTALLDIR)/.
-	rsync -av $(TEMPLATES) $(INSTALLDIR)/templates/.
 	rsync -av $(WSGI) $(INSTALLDIR)/wsgi/.
 	rsync -av $(SCRIPTFILES) /var/www/html/$(INSTALLSVC)/static/.
 	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.

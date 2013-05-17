@@ -217,8 +217,6 @@ webauthn2_config.update(dict(web_cookie_path='/tagfiler'))
 webauthn2_manager = Manager(overrides=webauthn2_config)
 webauthn2_handler_factory = RestHandlerFactory(manager=webauthn2_manager)
 
-render = None
-
 cluster_threshold = 1000
 
 def downcast_value(dbtype, value, range_extensions=False):
@@ -633,11 +631,7 @@ class WebException (web.HTTPError):
         logger.info(myutf8(u'%ss %s%s req=%s -- %s' % (elapsed,
                                                        web.ctx.ip, ast and ast.context and ast.context.client and u' user=%s' % urllib.quote(ast.context.client) or u'',
                                                        ast and ast.request_guid or u'', desc % data)))
-        data = ('%s\n%s' % (status, desc)) % data
-        m = re.match('.*MSIE.*',
-                     web.ctx.env.get('HTTP_USER_AGENT', 'unknown'))
-        if m and False:
-            status = '200 OK'
+        data = ('%s\n%s\n' % (status, desc)) % data
         headers['Content-Type'] = 'text/plain'
         web.HTTPError.__init__(self, status, headers=headers, data=data)
 
@@ -749,8 +743,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     ('query', None),
                                     ('store path', '/var/www/%s-data' % daemonuser),
                                     ('subtitle', ''),
-                                    ('tagdef write users', []),
-                                    ('template path', '%s/tagfiler/templates' % distutils.sysconfig.get_python_lib()) ]
+                                    ('tagdef write users', []) ]
 
         path = [ 
             ( [pred], [web.Storage(tag='config binding', op=None, vals=[])], [] ),
@@ -956,7 +949,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     def __init__(self, parser=None, queryopts=None):
         "store common configuration data for all service classes"
-        global render
         global db_cache
 
         webauthn2_handler_factory.RestHandler.__init__(self)
@@ -1022,11 +1014,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         #self.log('TRACE', 'Application() self.config loaded')
         del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
         
-        self.render = web.template.render(self.config['template path'], globals=self.globals)
-        render = self.render # HACK: make this available to exception classes too
-
-        # 'globals' are local to this Application instance and also used by its templates
-        self.globals['render'] = self.render # HACK: make render available to templates too
+        # 'globals' are local to this Application instance
         self.globals['urlquote'] = urlquote
         self.globals['idquote'] = idquote
         self.globals['webdebug'] = web.debug
@@ -1035,19 +1023,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.globals['home'] = self.config.home + web.ctx.homepath
         self.globals['homepath'] = web.ctx.homepath
 
-        # copy many config values to globals map for templates
-        self.globals['config'] = self.config
-        self.globals['help'] = self.config.help
-        self.globals['bugs'] = self.config.bugs
-        if self.config.query:
-            self.globals['query'] = self.config.query
-        else:
-            self.globals['query'] = self.globals['home'] + '/query'
-        self.globals['subtitle'] = self.config.subtitle
-        self.globals['logo'] = self.config.logo
-        self.globals['enabledGUIFeatures'] = self.config['enabled GUI features']
-        self.globals['browsersImmutableTags'] = [ 'check point offset', 'key', 'sha256sum' ]
-        
         # END: get runtime parameters from database
         #self.log('TRACE', 'Application() config unpacked')
 
@@ -1263,32 +1238,6 @@ class Application (webauthn2_handler_factory.RestHandler):
     def txlog2(self, action, parts):
         self.logmsgs.append(self.logfmt(action, parts=parts))
 
-    def renderlist(self, title, renderlist, refresh=True):
-        if refresh:
-            self.globals['pollmins'] = 1
-        else:
-            self.globals['pollmins'] = None
-
-        self.globals['title'] = title
-
-        yield self.render.Top()
-
-        for r in renderlist:
-            yield r
-
-        yield self.render.Bottom()
- 
-    def renderui(self, api, queryopts={}, path=[]):
-        self.header('Content-Type', 'text/html')
-        self.globals['uiopts'] = {}
-        self.globals['uiopts']['api'] = api
-        self.globals['uiopts']['queryopts'] = queryopts
-        self.globals['uiopts']['path'] = path
-        self.globals['uiopts']['help'] = self.globals['help']
-        self.globals['uiopts']['bugs'] = self.globals['bugs']
-        self.globals['uiopts']['pollmins'] = 1
-        return self.render.UI('client')
-
     def preDispatchFake(self, uri, app):
         self.db = app.db
         self.context = app.context
@@ -1300,13 +1249,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.context = self.manager.get_request_context()
         except (ValueError, IndexError):
             # client is unauthenticated but require_client and/or require_attributes is enabled
-            acceptType = self.preferredType()
-            if acceptType in ['text/html', '*/*']:
-                # render a page allowing AJAX login?
-                self.login_required = True
-            else:
-                # give a simple error for non-HTML clients
-                raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
         
         self.middispatchtime = datetime.datetime.now()
 
@@ -1423,7 +1366,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         acceptTypes = self.acceptTypesPreferedOrder()
         if acceptTypes:
             for acceptType in acceptTypes:
-                if acceptType in [ 'text/html', '*/*', 'text/uri-list', 'application/x-www-form-urlencoded', 'text/csv', 'application/json', 'text/plain' ]:
+                if acceptType in [ 'text/uri-list', 'application/x-www-form-urlencoded', 'text/csv', 'application/json', 'text/plain' ]:
                     return acceptType
         return None
                            
