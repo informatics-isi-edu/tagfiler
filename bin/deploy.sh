@@ -30,13 +30,6 @@ downloader="${downloader:-downloader}"
 curator="${curator:-coordinator}"
 grader="${grader:-grader}"
 
-# alternates
-#admin=MISD
-#uploader=PSOC
-#downloader=PSOC
-#curator=PSOC
-#grader=PSOC
-
 TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()'`/tagfiler
 
 # this is the URL base path of the service

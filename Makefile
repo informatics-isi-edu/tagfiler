@@ -109,15 +109,6 @@ install: $(FILES) $(TEMPLATES) $(WSGI)
 restart: force install
 	service httpd restart
 
-deployPSOC: $(HOME)/.tagfiler.predeploy installPSOC
-	./bin/deploy.sh $(INSTALLSVC) psoc-pilot
-
-installPSOC: install
-	make --no-print-directory -f psoc/Makefile install
-
-restartPSOC: force installPSOC
-	service httpd restart
-
 clean: force
 	rm -rf $(INSTALLDIR)
 	rm -f $(HOME)/.tagfiler.predeploy
