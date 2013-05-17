@@ -208,7 +208,7 @@ class Tagdef (Node):
                 raise NotFound(self, data='tag definition %s' % (self.tag_id))
             self.enforce_tagdef_authz('write', tagdef)
             self.delete_tagdef(tagdef)
-            return ''
+            return None
 
         def postCommit(results):
             self.emit_headers()
@@ -273,11 +273,15 @@ class Tagdef (Node):
             if len(results) > 0:
                 raise Conflict(self, data="Tag %s is already defined." % self.tag_id)
             self.insert_tagdef()
-            return None
+            results = self.select_tagdef(self.tag_id, enforce_read_authz=True)
+            return results
 
         def postCommit(results):
             web.ctx.status = '201 Created'
-            return ''
+            web.header('Content-Type', 'application/json')
+            response = jsonWriter(results) + '\n'
+            web.header('Content-Length', str(len(response)))
+            return response
 
         return self.dbtransact(body, postCommit)
 
