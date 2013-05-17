@@ -1637,12 +1637,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             ordertags = []
 
-        if tagname:
-            subjpreds = subjpreds + [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
-        else:
-            subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
+        subjpreds = subjpreds + [ web.Storage(tag='tagdef', op=None, vals=[]) ]
 
         results = list(self.select_files_by_predlist(subjpreds, listtags, ordertags, listas=Application.tagdef_listas, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz))
+
         tagdefs = dict([ (tagdef.tagname, tagdef) for tagdef in results ])
 
         for tagdef in results:
@@ -1656,7 +1654,13 @@ class Application (webauthn2_handler_factory.RestHandler):
                 tagdefs[tagdef.tagref].reftags.add(tagdef.tagname)
 
         #web.debug(results)
-        return results
+        if tagname:
+            if tagname in tagdefs:
+                return [ tagdefs[tagname] ]
+            else:
+                return []
+        else:
+            return results
 
     def insert_tagdef(self):
         results = self.select_tagdef(self.tag_id)
