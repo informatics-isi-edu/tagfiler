@@ -214,23 +214,10 @@ then
     sharedscripts
     postrotate
 	/sbin/service $SYSLOGSVC restart 2> /dev/null 2> /dev/null || true
-	/usr/bin/rsync --delete-after -a -e /usr/local/sbin/runuser-rsh /var/log/${SVCPREFIX}-* ${SVCUSER}@localhost:/var/www/${SVCPREFIX}-logs/ 2>/dev/null || true
     endscript
 }
 EOF
 fi
-
-# clean up old logging hacks
-[[ -f /etc/sysconfig/${SVCPREFIX}-log ]] && rm -f /etc/sysconfig/${SVCPREFIX}-log
-[[ -f /usr/sbin/runuser-rsh ]] && rm -f /usr/sbin/runuser-rsh
-[[ -f /usr/sbin/${SVCPREFIX}-log ]] && rm -f /usr/sbin/${SVCPREFIX}-log 
-[[ -f /etc/rc.d/init.d/${SVCPREFIX}-log ]] && {
-
-    service ${SVCPREFIX}-log stop
-    chkconfig ${SVCPREFIX}-log off
-    rm /etc/rc.d/init.d/${SVCPREFIX}-log
-
-}
 
 if grep -q "local1\..*|/var/log/${SVCPREFIX}" /etc/${SYSLOGSVC}.conf
 then

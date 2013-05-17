@@ -68,8 +68,6 @@ FILEBASES=dataserv_app.py rest_fileio.py subjects.py \
 	url_ast.py url_lex.py url_parse.py \
 	__init__.py
 
-SBINFILES=sbin/runuser-rsh
-
 BINFILEBASES=tagfiler-webauthn2-deploy.py \
 	tagfiler-webauthn2-manage.py
 
