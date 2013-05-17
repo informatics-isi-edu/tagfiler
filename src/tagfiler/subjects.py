@@ -247,14 +247,12 @@ class Subject (Node):
                 web.ctx.status = '304 Not Modified'
                 return None
             elif contentType == 'application/json':
-                self.txlog('QUERY', dataset=path_linearize(self.path))
                 self.queryopts['range'] = self.query_range
                 files = self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset, json=True)
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
                 return files      
             elif contentType == 'text/csv':
-                self.txlog('QUERY', dataset=path_linearize(self.path))
                 self.queryopts['range'] = self.query_range
                 temporary_file = open(self.temporary_filename, 'wb')
                 self.copyto_csv_files_by_predlist_path(temporary_file, path, limit=self.limit, offset=self.offset)
@@ -262,8 +260,6 @@ class Subject (Node):
                 temporary_file.close()
                 return False
             else:
-                self.txlog('QUERY', dataset=path_linearize(self.path))
-
                 self.queryopts['range'] = self.query_range
                 files = [file for file in  self.select_files_by_predlist_path(path=path, limit=self.limit, offset=self.offset) ]
                 self.queryopts['range'] = None
