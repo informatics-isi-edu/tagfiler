@@ -114,7 +114,7 @@ EOF
 status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
 [[ "$status" = 201 ]] || error got "$status" during login
 
-#mycurl "/query/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
+#mycurl "/subject/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
 
 querytest()
 {
@@ -174,7 +174,7 @@ EOF
 status=$(mycurl "/subject/name(name;owner;read%20users;write%20users;foo0;foo1;foo2;foo3;foo4;foo5;foo6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 [[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects 
 
-querytest 200 14 "/query/name:regexp:test${testno}-(name)"
+querytest 200 14 "/subject/name:regexp:test${testno}-(name)"
 
 # start with ownership of all so we can construct all the tag values
 # drop ownership of 4..7 before testing read authz
@@ -191,7 +191,7 @@ EOF
 status=$(mycurl "/subject/name(name;owner;read%20users;fooread0;fooread1;fooread2;fooread3;fooread4;fooread5;fooread6)" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 [[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects test${testno}-x-R
 
-querytest 200 7 "/query/fooread0(name)"
+querytest 200 7 "/subject/fooread0(name)"
 
 # construct referencing subjects using the above 7 as referenced objects
 for o in {1..7}
@@ -214,7 +214,7 @@ EOF
 	status=$(mycurl "/subject/name(name;owner;read%20users;fooread0_${j};fooread1_${j};fooread2_${j};fooread3_${j};fooread4_${j};fooread5_${j};fooread6_${j})" -H "Content-Type: text/csv" -T ${tempfile} -o $logfile)
 	[[ "$status" -eq 204 ]] || error got "$status" bulk putting named test subjects test${testno}-x.${o}.${j}-R
 
-	querytest 200 6 "/query/fooread0_${j}=val${o}(name)"
+	querytest 200 6 "/subject/fooread0_${j}=val${o}(name)"
 
 	status=$(mycurl "/tags/name:regexp:test${testno}-%5B456%5D.${o}.${j}-R(owner=${otherrole})" -X PUT -o logfile)
 	[[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}.${o}.${j}-R
@@ -226,34 +226,34 @@ done
 status=$(mycurl "/tags/name:regexp:test${testno}-%5B4567%5D-R(owner=${otherrole})" -X PUT -o logfile)
 [[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}-R
 
-#mycurl "/query/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
+#mycurl "/subject/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
 
 # begin read-authz tests of pre-defined test data
 
-querytest 200 5 "/query/fooread0(name)"  # subject readable
-querytest 200 3 "/query/fooread1(name)"  # subjectowner
-querytest 200 5 "/query/fooread2(name)"  # subject readable and tag ACL
-querytest 200 5 "/query/fooread3(name)"  # subject readable and tag ACL
-querytest 200 5 "/query/fooread4(name)"  # subject readable and tag ACL
-querytest 200 5 "/query/fooread5(name)"  # tag ACL
-querytest 200 3 "/query/fooread6(name)"  # subjectowner and tag ACL
+querytest 200 5 "/subject/fooread0(name)"  # subject readable
+querytest 200 3 "/subject/fooread1(name)"  # subjectowner
+querytest 200 5 "/subject/fooread2(name)"  # subject readable and tag ACL
+querytest 200 5 "/subject/fooread3(name)"  # subject readable and tag ACL
+querytest 200 5 "/subject/fooread4(name)"  # subject readable and tag ACL
+querytest 200 5 "/subject/fooread5(name)"  # tag ACL
+querytest 200 3 "/subject/fooread6(name)"  # subjectowner and tag ACL
 
 for i in 0 2 3 4 5 # objects where referenced tag readpolicy is visible for all subjects
 do
-    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_0(name)"
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
-    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_2(name)"
-    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_3(name)"
-    querytest 200 $(( 5 * 5 )) "/query/fooread${i}_4(name)"
+    querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_0(name)"
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
+    querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_2(name)"
+    querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_3(name)"
+    querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_4(name)"
 done
 
 for i in 1 6 # objects where referenced tag readpolicy is visible for owners
 do
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_0(name)"
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" 
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_2(name)"
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_3(name)"
-    querytest 200 $(( 5 * 3 )) "/query/fooread${i}_4(name)"
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_0(name)"
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_1(name)" 
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_2(name)"
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_3(name)"
+    querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_4(name)"
 done
 
 # helper functions for write-authz tests
@@ -383,7 +383,7 @@ tagreftest_serial()
 		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 		[[ "$status" = $code ]] || error got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
 
-		local url2="/query/name=${subj};${tag}=${o}(id;name;${tag})"
+		local url2="/subject/name=${subj};${tag}=${o}(id;name;${tag})"
 		local url3="/tags/name=${subj}(${tag}=${o})"
 
 		if [[ "$status" = 204 ]]
@@ -394,7 +394,7 @@ tagreftest_serial()
 		    count=$(grep "test${testno}-${s}" "$tempfile2" | wc -l)
 		    [[ "$count" -eq 1 ]] || {
 			cat $tempfile2
-			mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+			mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
 			error got $count results instead of 1 while querying "$url2"
 		    }
 		    if [[ $i = 3 ]]
@@ -440,7 +440,7 @@ tagreftest()
     for o in "${objects[@]}"
     do
 	url1="/tags/name("
-	url2="/query/name;"
+	url2="/subject/name;"
 	url3="/tags/("
 	sep=""
 
@@ -482,7 +482,7 @@ tagreftest()
 	    
 	    count=$(wc -l < $tempfile2)
 	    [[ "$count" -eq ${#subjects[@]} ]] || {
-		mycurl "/query/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+		mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
 		error got $count results instead of ${#subjects[@]} while querying "$url2"
 	    }
 
@@ -553,7 +553,7 @@ tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectand
 tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
 tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
 
-status=$(mycurl "/query/subject%20text:word:${username}(name)" -H "Accept: text/csv" -o $logfile)
+status=$(mycurl "/subject/subject%20text:word:${username}(name)" -H "Accept: text/csv" -o $logfile)
 [[ $status = 200 ]] || error got "$status" during free-text query test
 count=$(wc -l < $logfile)
 [[ $count -gt 5 ]] || error found too few results during free-text query test for ${username}
@@ -578,39 +578,39 @@ then
     [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
 
     # do read-tests again w/o tag ACL permissions...
-    querytest 200 5 "/query/fooread0(name)"  # subject readable
-    querytest 200 3 "/query/fooread1(name)"  # subjectowner
-    querytest 200 0 "/query/fooread2(name)"  # no ACL
-    querytest 200 5 "/query/fooread3(name)"  # subject readable
-    querytest 200 0 "/query/fooread4(name)"  # no ACL
-    querytest 200 3 "/query/fooread5(name)"  # owner
-    querytest 200 0 "/query/fooread6(name)"  # no ACL
+    querytest 200 5 "/subject/fooread0(name)"  # subject readable
+    querytest 200 3 "/subject/fooread1(name)"  # subjectowner
+    querytest 200 0 "/subject/fooread2(name)"  # no ACL
+    querytest 200 5 "/subject/fooread3(name)"  # subject readable
+    querytest 200 0 "/subject/fooread4(name)"  # no ACL
+    querytest 200 3 "/subject/fooread5(name)"  # owner
+    querytest 200 0 "/subject/fooread6(name)"  # no ACL
 
     for i in 0 3 # objects where referenced tag readpolicy is visible for all objects
     do
-	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_0(name)"
-	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
-	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_2(name)"
-	querytest 200 $(( 5 * 5 )) "/query/fooread${i}_3(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)" # no ACL
+	querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_1(name)" # only three of the 5 objects satisfy objectowner
+	querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 5 )) "/subject/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_4(name)" # no ACL
     done
     
     for i in 2 4 6 # objects where referenced tag readpolicy is not visible
     do
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_0(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_1(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_2(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_3(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_1(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_4(name)"
     done
     
     for i in 1 5 # objects where referenced tag readpolicy is visible for owners
     do
-	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_0(name)"
-	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_1(name)" 
-	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_2(name)"
-	querytest 200 $(( 5 * 3 )) "/query/fooread${i}_3(name)"
-	querytest 200 $(( 5 * 0 )) "/query/fooread${i}_4(name)" # no ACL
+	querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_0(name)"
+	querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_1(name)" 
+	querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_2(name)"
+	querytest 200 $(( 5 * 3 )) "/subject/fooread${i}_3(name)"
+	querytest 200 $(( 5 * 0 )) "/subject/fooread${i}_4(name)" # no ACL
     done
 
     # do write-tests again...
@@ -638,7 +638,7 @@ tagtest 204 foo1 1B 2B 3B
 # test implicit delete path via change to referenced tag foo3, for which we preserved references above
 # this depends on 3B being the final object tested above for tagreftest 204 3 ...
 truncate -s 0 $tempfile2
-status=$(mycurl "/query/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
 [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
 count=$(wc -l < $tempfile2)
 [[ $count -gt 0 ]] || error failed to find existing references foo3_3 to tag foo3
@@ -646,7 +646,7 @@ count=$(wc -l < $tempfile2)
 tagtest 204 foo3 1B 2B 3B 4B 5B
 
 truncate -s 0 $tempfile2
-status=$(mycurl "/query/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
 [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
 count=$(wc -l < $tempfile2)
 [[ $count -eq 0 ]] || error found $count existing references foo3_3 to tag foo3 after they should have disappeared: "$(cat $tempfile2)"
