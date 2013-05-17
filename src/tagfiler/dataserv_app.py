@@ -238,7 +238,7 @@ def downcast_value(dbtype, value, range_extensions=False):
         if value.find('\00') >= 0:
             raise ValueError('Null bytes not allowed in text value "%s"' % value)
         if dbtype == 'tsword':
-            for c in [ '|', '&', '!', '(', ')', ':' ]:
+            for c in [ '|', '&', '!', '(', ')', ':', ' ' ]:
                 if value.find(c) >= 0:
                     raise ValueError('Character "%s" not allowed in text search words' % c)
         
@@ -815,7 +815,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             (':ciregexp:', 'Regular expression (case insensitive)'),
             (':!ciregexp:', 'Negated regular expression (case insensitive)'),
             (':word:', 'Word present in text search'),
-            (':!word:', 'Word not present in text search') ]
+            (':!word:', 'Word not present in text search'),
+            (':tsquery:', 'Text search query') ]
 
     opsExcludeTypes = dict([ ('', ['tsvector']),
                              (':absent:', ['tsvector']),
@@ -847,7 +848,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                    (':ciregexp:', '~*'),
                    (':!ciregexp:', '!~*'),
                    (':word:', '@@'),
-                   (':!word:', '@@') ])
+                   (':!word:', '@@'),
+                   (':tsquery:', '@@') ])
     
     static_tagdefs = []
     # -- the system tagdefs needed by the select_files_by_predlist call we make below and by Subject.populate_subject
@@ -2530,6 +2532,28 @@ class Application (webauthn2_handler_factory.RestHandler):
             pl.append(pred)
 
         for tag, preds in pd.items():
+            # merge all free-text query strings into a single compound query for better indexed query performance
+            ts_queries = []
+            for p in list(preds):
+                if p.op in [ ':word:', ':!word:' ]:
+                    preds.remove(p)
+
+                    if len([ v for v in p.vals if hasattr(v, 'is_subquery') ]):
+                        raise Conflict(self, 'Sub-queries are not allowed with operator %s.' % pred.op)
+
+                    try:
+                        vals = [ '(%s)' % downcast_value('tsword', v) for v in p.vals ]
+                    except ValueError, e:
+                        raise Conflict(self, data=str(e))
+
+                    if p.op == ':!word:':
+                        vals = [ '!%s' % v for v in vals ]
+
+                    ts_queries.append( '(%s)' % '|'.join(vals) )
+
+            if ts_queries:
+                preds.append( web.Storage(tag=tag, op=':tsquery:', vals=[ '&'.join(ts_queries) ]) )
+
             preds.sort(key=lambda p: (p.op, p.vals))
 
         return pd
@@ -3458,21 +3482,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                     vqueries = [ vq_compile(vq) for vq in pred.vals if hasattr(vq, 'is_subquery') ]
                     bounds = [ '(%s::%s, %s::%s)' % (v[0], tagdef.dbtype, v[1], tagdef.dbtype) for v in vals if type(v) == tuple ]
 
-                    if pred.op in [ ':word:', '!:word:' ]:
-                        if vqueries:
-                            raise Conflict(self, 'Sub-queries are not allowed with operator %s.' % pred.op)
-                        if bounds:
-                            raise Conflict(self, 'Value ranges are not allowed with operator %s.' % pred.op)
-
-                        # collapse word alternatives into a single tsquery with '|' syntax rather than using normal query disjunction
-                        try:
-                            vals = [ downcast_value('tsword', v) for v in pred.vals ]
-                        except ValueError, e:
-                            raise Conflict(self, data=str(e))
-                        if pred.op == ':!word:':
-                            # add tsquery negation syntax '!'
-                            vals = [ '!%s' % v for v in vals ]
-                        constants = [ 'to_tsquery(%s)' % wrapval('|'.join(vals), 'text') ]
+                    if pred.op == ':tsquery:':
+                        # mergepreds already downcasted and reduced all free-text queries to a single query
+                        constants = [ 'to_tsquery(%s)' % wrapval(pred.vals[0]) ]
                     else:
                         constants = [ '(%s::%s)' % (v, tagdef.dbtype) for v in vals if type(v) != tuple ]
 
@@ -3483,7 +3495,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                             rhs = 'ANY (ARRAY[%s]::%s[])' % (constants, tagdef.dbtype)
                         else:
                             rhs = constants[0]
-                        clauses.append( '%s %s %s' % (pred.op in [':word:', ':!word:' ] and tsvcol or valcol, Application.opsDB[pred.op], rhs) )
+                        clauses.append( '%s %s %s' % (pred.op == ':tsquery:' and tsvcol or valcol, Application.opsDB[pred.op], rhs) )
 
                     if bounds:
                         bounds = ', '.join(bounds)
