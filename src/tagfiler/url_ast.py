@@ -180,6 +180,7 @@ class Tagdef (Node):
         self.action = None
         self.dbtype = None
         self.tagref = None
+        self.softtagref = None
         self.tagdefs = {}
 
     def GET(self, uri):
@@ -233,11 +234,17 @@ class Tagdef (Node):
             except:
                 pass
 
-        if self.tagref == None:
+        if self.tagref is None:
             try:
                 self.tagref = self.queryopts['tagref']
             except:
                 pass
+
+        if self.softtagref is None:
+            try:
+                self.softtagref = downcast_value('boolean', self.queryopts['soft'])
+            except:
+                self.softtagref = False
 
         if self.readpolicy == None:
             try:

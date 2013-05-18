@@ -732,17 +732,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             pred = web.Storage(tag='config', op='=', vals=['tagfiler'])
 
         if params_and_defaults == None:
-            params_and_defaults = [ ('bugs', None),
-                                    ('chunk bytes', 64 * 1024),
-                                    ('enabled GUI features', []),
+            params_and_defaults = [ ('chunk bytes', 64 * 1024),
                                     ('file write users', []),
-                                    ('help', None),
                                     ('home', 'https://%s' % self.hostname),
-                                    ('logo', ''),
                                     ('policy remappings', []),
-                                    ('query', None),
                                     ('store path', '/var/www/%s-data' % daemonuser),
-                                    ('subtitle', ''),
                                     ('tagdef write users', []) ]
 
         path = [ 
@@ -856,6 +850,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        ('tagdef', 'text', None, False, 'system', True),
                        ('tagdef dbtype', 'text', None, False, 'system', False),
                        ('tagdef tagref', 'text', 'tagdef', False, 'system', False),
+                       ('tagdef tagref soft', 'boolean', None, False, 'system', False),
                        ('tagdef multivalue', 'boolean', None, False, 'system', False),
                        ('tagdef active', 'boolean', None, False, 'system', False),
                        ('tagdef readpolicy', 'text', None, False, 'system', False),
@@ -887,7 +882,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           unique=unique,
                                           tagreaders=[],
                                           tagwriters=[],
-                                          tagref=tagref))
+                                          tagref=tagref,
+                                          softtagref=False))
 
     static_tagdefs = dict( [ (tagdef.tagname, tagdef) for tagdef in static_tagdefs ] )
 
@@ -1465,7 +1461,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         obj_ok = None
         obj_owner = None
 
-        if tagdef.tagref:
+        if tagdef.tagref and (not tagdef.softtagref):
             reftagdef = tagdefs[tagdef.tagref]
 
             if value is not None and obj_ok is None:
@@ -1616,6 +1612,7 @@ class Application (webauthn2_handler_factory.RestHandler):
     tagdef_listas =  { 'tagdef': 'tagname', 
                        'tagdef dbtype': 'dbtype',
                        'tagdef tagref': 'tagref',
+                       'tagdef tagref soft': 'softtagref',
                        'tagdef multivalue': 'multivalue',
                        'tagdef active': 'active',
                        'tagdef readpolicy': 'readpolicy',
@@ -1650,7 +1647,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             tagdef['reftags'] = set()
 
         for tagdef in results:
-            if tagdef.tagref:
+            if tagdef.tagref and not tagdef.softtagref:
                 tagdefs[tagdef.tagref].reftags.add(tagdef.tagname)
 
         #web.debug(results)
@@ -1685,6 +1682,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             tags.append( ('owner', owner) )
         if self.tagref:
             tags.append( ('tagdef tagref', self.tagref) )
+            if self.softtagref:
+                tags.append( ('tagdef tagref soft', True) )
+        if not self.tagref or self.softtagref:
+            if self.readpolicy.find('object') >= 0 or self.writepolicy.find('object') >= 0:
+                raise Conflict(self, 'Owner-based access policies only allowed in combination with hard tagrefs.')
         if self.multivalue:
             try:
                 self.multivalue = downcast_value('boolean', self.multivalue)
@@ -1702,18 +1704,23 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             tags.append( ('tagdef unique', False) )
 
-        for tag, value in tags:
-            self.set_tag(subject, self.globals['tagdefsdict'][tag], value)
-
         tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
         tagdef.id = newid
         if owner is None:
             tagdef.owner = None
         if self.tagref is None:
             tagdef.tagref = None
+        if self.tagref and self.softtagref:
+            tagdef.softtagref = True
+        else:
+            tagdef.softtagref = False
         tagdef.multivalue = self.multivalue
         
         self.deploy_tagdef(tagdef)
+
+        for tag, value in tags:
+            self.set_tag(subject, self.globals['tagdefsdict'][tag], value)
+
         return tagdef
         
     def get_index_name(self, tablename, indexcols):
@@ -1763,10 +1770,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if referenced_tagdef.dbtype != tagdef.dbtype:
                     raise Conflict(self, 'Referenced tag "%s" must have identical dbtype.' % tagref)
 
-                if referenced_tagdef.tagname == 'id':
-                    tabledef += ' REFERENCES resources (subject) ON DELETE CASCADE'
-                else:
-                    tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
+                if not tagdef.softtagref:
+                    if referenced_tagdef.tagname == 'id':
+                        tabledef += ' REFERENCES resources (subject) ON DELETE CASCADE'
+                    else:
+                        tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
             if dbtype == 'text':
                 tabledef += ', tsv tsvector'
@@ -1803,6 +1811,18 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.dbquery(clustercmd)
 
     def delete_tagdef(self, tagdef):
+        path = [ ([ web.Storage(tag='tagdef tagref', op='=', vals=[tagdef.tagname]) ],
+                  [ web.Storage(tag='tagdef', op=None, vals=[]) ],
+                  []) ]
+
+        # TODO: change this from a Conflict to a cascading delete of all referencing tagdefs?
+        results = self.select_files_by_predlist_path(path, enforce_read_authz=False)
+        if len(results) > 0:
+            raise Conflict(self, 'Tagdef "%s" cannot be removed while it is referenced by one or more other tagdefs: %s.' % (
+                    tagdef.tagname,
+                    ', '.join([ '"%s"' % td.tagdef for td in results ])
+                    ))
+
         self.undeploy_tagdef(tagdef)
         tagdef.name = None
         self.delete_file( tagdef, allow_tagdef=True)
@@ -1992,7 +2012,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     raise Conflict(self, 'Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
 
-        if tagdef.tagref and value is not None:
+        if tagdef.tagref and (not tagdef.softtagref) and value is not None:
             reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
             results = self.select_tag_noauthn(None, reftagdef, value)
             if len(results) == 0:
@@ -2092,7 +2112,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # we require a non-empty list for SQL constructs below...
             wheres = [ 'True' ]
         
-        if tagdef.tagref:
+        if tagdef.tagref and (not tagdef.softtagref):
             # tagdef write policy may depend on per-object information
             reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
             refval = valcol
@@ -2158,7 +2178,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         table = wraptag(tagdef.tagname)
         count = 0
 
-        if tagdef.tagref:
+        if tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
             query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
                       + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
@@ -2592,7 +2612,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                          % dict(mtable=mtable, dtable=dtable, dtquery=dtquery, reftag=self.wraptag(reftag), tagname=self.wraptag(tagdef.tagname, '', '')),
                          vars=dvalues)
 
-            if tagdef.tagref:
+            if tagdef.tagref and (not tagdef.softtagref):
                 otagdef = self.globals['tagdefsdict'][tagdef.tagref]
                 oquery, ovalues = self.build_files_by_predlist_path([(
                             [ web.Storage(tag=tagdef.tagref, op=None, vals=[]) ],
@@ -3366,7 +3386,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             used_not_op = False
             used_other_op = False
 
-            if tagdef.tagref and enforce_read_authz:
+            if tagdef.tagref and (not tagdef.softtagref) and enforce_read_authz:
                 # add a constraint so that we can only see tags referencing another entry we can see
                 reftagdef = tagdefs[tagdef.tagref]
                 refvalcol = wraptag(tagdef.tagref, prefix='')

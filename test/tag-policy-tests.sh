@@ -87,6 +87,7 @@ reset()
 	mycurl "/session" -d username="$username" -d password="$password" > /dev/null
     fi
 
+    mycurl "/tagdef/fooread0softref" -X DELETE > /dev/null
     for i in ${!tagdef_writepolicies[@]}
     do
 	for j in ${!tagdefref_writepolicies[@]}
@@ -150,6 +151,31 @@ do
 	[[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}_${j}
     done
 done
+
+# quick test of soft tagref feature...
+status=$(mycurl "/tagdef/fooread0softref?dbtype=text&multivalue=false&readpolicy=subject&writepolicy=subject&tagref=fooread0&soft=true" -X PUT -o $logfile)
+[[ "$status" = 201 ]] || error got "$status" creating tagdef fooread0softref
+
+status=$(mycurl "/subject/name=softtest${testno}?fooread0softref=softfoo0" -X PUT -o $logfile)
+[[ "$status" -eq 201 ]] || error got "$status" putting named soft reference
+
+querytest 200 1 "/subject/fooread0softref=softfoo0(id;name)"
+querytest 200 1 "/subject/name=softtest${testno}(id;name)"
+querytest 200 0 "/subject/name=softtest${testno}(fooread0softref)/id(id;name)"
+
+status=$(mycurl "/subject/name=softtest${testno}-referant?fooread0=softfoo0" -X PUT -o $logfile)
+[[ "$status" -eq 201 ]] || error got "$status" putting named soft referant
+
+querytest 200 1 "/subject/fooread0softref=softfoo0(id;name)"
+querytest 200 1 "/subject/name=softtest${testno}(fooread0softref)/id(id;name)"
+
+status=$(mycurl "/subject/name=softtest${testno}-referant" -X DELETE -o $logfile)
+[[ "$status" -eq 204 ]] || error got "$status" deleting named soft referant
+
+querytest 200 1 "/subject/fooread0softref=softfoo0(id;name)"
+querytest 200 1 "/subject/name=softtest${testno}(id;name)"
+querytest 200 0 "/subject/name=softtest${testno}(fooread0softref)/id(id;name)"
+
 
 # test subjects for later write-authz tests
 cat > $tempfile <<EOF

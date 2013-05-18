@@ -403,9 +403,14 @@ tagdef_phase1()
 
       tagref="$8"
 
-      if [[ -n "$tagref" ]] && [[ "$tagref" != 'id' ]]
+      if [[ -n "$tagref" ]]
       then
-	  fk="${fk} REFERENCES \"_${tagref}\" (value) ON DELETE CASCADE"
+	  if [[ "$tagref" != 'id' ]]
+	  then
+	      fk="${fk} REFERENCES \"_${tagref}\" (value) ON DELETE CASCADE"
+	  else
+	      fk="${fk} REFERENCES resources (subject) ON DELETE CASCADE"
+	  fi
       fi
 
       if [[ "$6" = "true" ]]
@@ -512,6 +517,7 @@ tagdefs_complete()
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
 tagdef 'tagdef'              text        ""         anonymous   system       false      true  
 tagdef 'tagdef tagref'       text        ""         anonymous   system       false      false    tagdef
+tagdef 'tagdef tagref soft'  boolean     ""         anonymous   system       false
 tagdef 'tagdef dbtype'       text        ""         anonymous   system       false      false
 tagdef 'tagdef unique'       boolean     ""         anonymous   system       false
 tagdef 'tagdef multivalue'   boolean     ""         anonymous   system       false
@@ -540,14 +546,9 @@ tagdef "tag last modified txid" int8     ""         anonymous   system       fal
 tagdef bytes                 int8        ""         anonymous   system       false
 tagdef name                  text        ""         anonymous   subjectowner false      true
 tagdef file                  text        ""         system      system       false      true
-tagdef url                   text        ""         subject     subject      false
-tagdef onclick               text        ""         anonymous   system       false
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
-tagdef key                   text        ""         anonymous   subject      false      true
 tagdef "incomplete"          ""          ""         anonymous   subject      false
-tagdef "list on homepage"    ""          "${admin}" anonymous   tag          false
-tagdef "homepage order"      int8        "${admin}" anonymous   tag          false
 tagdef 'config binding'      int8        ""         subject     subject      true       false    id
 tagdef 'config parameter'    text        ""         subject     subject      false
 tagdef 'config value'        text        ""         subject     subject      true
@@ -586,47 +587,13 @@ DROP TABLE "_readok";
 DROP TABLE "_writeok";
 EOF
 
-tagacl "list on homepage" read "*"
-tagacl "list on homepage" write "${admin}"
-
 tagacl "owner" write "${admin}"
-
-tagacl "homepage order" read "*"
-tagacl "homepage order" write "${admin}"
 
 
 homepath="https://${HOME_HOST}/${SVCPREFIX}"
 
-homelink_pos=0
-homelink()
-{
-    dataset "$@"
-    tag ${last_subject} "list on homepage"
-    tag ${last_subject} "homepage order" int8 "$(( ${homelink_pos} + 100 ))"
-    homelink_pos=$(( ${homelink_pos} + 1 ))
-}
-
-homelink "Query by tags"                        onclick "${homepath}/query"                           "${admin}" "${curator}" "${downloader}"
-#homelink "Create catalog entries (expert mode)" url "${homepath}/file?action=define"              "${admin}"
-homelink "View tag definitions"                 onclick "${homepath}/query/tagdef?view=tagdef"        "${admin}" "*"
-homelink "View view definitions"                onclick "${homepath}/query/view?view=view"            "${admin}" "*"
-#homelink "Manage tag definitions (expert mode)" onclick "${homepath}/tagdef"                          "${admin}"
-homelink "Manage catalog configuration"         onclick "${homepath}/query/config=tagfiler(config%20binding)/?view=config"            "${admin}"
-
-#homelink "Query by tags"                        onclick "javascript:queryByTags()"                           "${admin}" "${curator}" "${downloader}"
-homelink "Create catalog entries (expert mode)" onclick "javascript:createCustomDataset()"              "${admin}" "*"
-#homelink "View tag definitions"                 onclick "javascript:viewLink(\"tagdef?view=tagdef\")"        "${admin}" "*"
-#homelink "View view definitions"                onclick "javascript:viewLink(\"view?view=view\")"            "${admin}" "*"
-homelink "Manage tag definitions (expert mode)" onclick "javascript:manageAvailableTagDefinitions()"                          "${admin}"
-#homelink "Manage catalog configuration"         onclick "javascript:getTagDefinition(\"tags/config=tagfiler\", null)"            "${admin}"
-
-#dataset "Manage roles"                         url "https://${HOME_HOST}/webauthn/role"          "${admin}"
-
 dataset "tagfiler" config "${admin}" "*"
 tagfilercfg=${last_subject}
-
-
-#tag "file list tags write" text 'read users' 'write users' 'owner'
 
 cfgtag()
 {
@@ -641,41 +608,6 @@ cfgtag()
     shift
     tag "$binding" "config value" "$@"
 }
-
-cfgtag "chunk bytes" text '1048576'
-cfgtag "file write users" text "*" "admin"
-cfgtag "tagdef write users" text "*" "admin"
-cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${readok};${writeok}"
-cfgtag "subtitle" text "Tagfiler (trunk) on ${HOME_HOST}"
-cfgtag "logo" text '<img alt="tagfiler" title="Tagfiler (trunk)" src="/'"${SVCPREFIX}"'/static/logo.png" width="245" height="167" />'
-cfgtag "help" text 'https://confluence.misd.isi.edu:8443/display/~karlcz/Tagfiler'
-cfgtag "bugs" text 'https://jira.misd.isi.edu/browse/PSOC'
-cfgtag "enabled GUI features" text 'bulk_value_edit' 'bulk_subject_delete' 'cell_value_edit' 'file_download' 'subject_delete' 'view_tags' 'view_URL'
-
-viewdef()
-{
-    local viewname="$1"
-    shift
-
-    dataset "$viewname" view "${admin}" "*"
-    local viewsubj
-    viewsubj=${last_subject}
-
-    [[ "$#" -gt 0 ]] && tag "$viewsubj" "view tags" tagdef "$@"
-}
-
-viewdef default 'id' 'name' bytes owner 'read users' 'write users' "subject last tagged"
-viewdef config 'config parameter' 'config value'
-viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
-viewdef view 'view' "view tags" "read users" "write users" "owner"
-viewdef alltags
-
-# remapping rules:
-#  srcrole ; dstrole ; reader, ... ; writer, ...
-# semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
-
-# these are actual (not logical) role names just like other ACLs and metadata
-# only the python code itself uses logical roles for built-in policies
 
 writers=
 readers=
@@ -699,6 +631,36 @@ else
     # also give read access to all downloaders
     readers="${downloader}"
 fi
+
+cfgtag "chunk bytes" text '1048576'
+cfgtag "file write users" text "*" "admin"
+cfgtag "tagdef write users" text "*" "admin"
+cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${readok};${writeok}"
+cfgtag "subtitle" text "Tagfiler (trunk) on ${HOME_HOST}"
+
+viewdef()
+{
+    local viewname="$1"
+    shift
+
+    dataset "$viewname" view "${admin}" "*"
+    local viewsubj
+    viewsubj=${last_subject}
+
+    [[ "$#" -gt 0 ]] && tag "$viewsubj" "view tags" tagdef "$@"
+}
+
+viewdef default 'id' 'name' bytes owner 'read users' 'write users' "subject last tagged"
+viewdef config 'config parameter' 'config value'
+viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef tagref soft" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
+viewdef view 'view' "view tags" "read users" "write users" "owner"
+
+# remapping rules:
+#  srcrole ; dstrole ; reader, ... ; writer, ...
+# semi-colons required but readers and writers optional, e.g. srcrole;dstrole;;
+
+# these are actual (not logical) role names just like other ACLs and metadata
+# only the python code itself uses logical roles for built-in policies
 
 
 cat >&${COPROC[1]} <<EOF
