@@ -585,35 +585,6 @@ def make_filter(allowed):
 
 idquote = make_filter(string.letters + string.digits + '_-:.' )
 
-def buildPolicyRules(rules, fatal=False):
-    remap = dict()
-    for rule in rules:
-        srcrole, dstrole, readers, writers, readok, writeok = rule.split(';', 6)
-        srcrole = urlunquote(srcrole.strip())
-        dstrole = urlunquote(dstrole.strip())
-        readers = readers.strip()
-        writers = writers.strip()
-        readok = readok.strip().lower() in [ 'true', 'yes' ]
-        writeok = writeok.strip().lower() in [ 'true', 'yes' ]
-        if remap.has_key(srcrole):
-            web.debug('Policy rule "%s" duplicates already-mapped source role.' % rule)
-            if fatal:
-                raise KeyError()
-            else:
-                continue
-        if readers != '':
-            readers = [ urlunquote(reader.strip()) for reader in readers.split(',') ]
-            readers = [ reader for reader in readers if reader != '' ]
-        else:
-            readers = []
-        if writers != '':
-            writers = [ urlunquote(writer.strip()) for writer in writers.split(',') ]
-            writers = [ writer for writer in writers if writer != '' ]
-        else:
-            writers = []
-        remap[srcrole] = (dstrole, readers, writers, readok, writeok)
-    return remap
-
 def traceInChunks(seq):
     length = 5000
     chunks = [seq[i:i+length] for i in range(0, len(seq), length)]
@@ -1051,18 +1022,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         if role in [ '*' ]:
             return
         return self.validateRole(role)
-
-    def validatePolicyRule(self, rule, tagdef=None, subject=None):
-        tagname = ''
-        if tagdef:
-            tagname = tagdef.tagname
-        try:
-            remap = buildPolicyRules([rule], fatal=True)
-        except (ValueError, KeyError):
-            raise BadRequest(self, 'Supplied rule "%s" is invalid for tag "%s".' % (rule, tagname))
-        srcrole, mapping = remap.items()[0]
-        if self.config['policy remappings'].has_key(srcrole):
-            raise BadRequest(self, 'Supplied rule "%s" duplicates already mapped source role "%s".' % (rule, srcrole))
 
     def getPolicyRule(self):
         srcroles = set(self.config['policy remappings'].keys()).intersection(self.context.attributes)

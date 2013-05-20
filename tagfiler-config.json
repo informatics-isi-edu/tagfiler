@@ -11,9 +11,13 @@
      "db" : "The name of the database (default 'svcuser')",
      "dbnstr" : "The type of RDBMS (default 'postgres')",
      "dbmaxconnections" : "Limit the number of SQL connections when pooling",
-     "admin" : "The administrative user role as known by the attribute provider",
+     "chunk bytes": "The number of bytes to use in file read/write buffers",
+     "admin" : "The administrative user role as known by the configured webauthn2 providers",
+     "file write users": ["The list of roles allowed to create subjects"],
+     "tagdef write users": ["The list of roles allowed to create tagdefs"],
+     "policy remappings": {"source role": ("remap role", ["read role", "..."], ["write role", "..."], "boolean readok", "boolean writeok")},
      "webauthn2" : "{... The webauthn2 config stanza ...}",
-     "log bulk details" : "whether to generate detailed auditing from bulk operations",
+     "log bulk details" : "whether to generate detailed audit logging from bulk operations",
      "bulk tmp index" : "whether to index temporary tables used for bulk operations",
      "bulk tmp cluster" : "whether to cluster temporary data used for bulk operations",
      "bulk tmp analyze" : "whether to analyze temporary data used for bulk operations",
@@ -27,9 +31,14 @@
 
    "_dbnstr" : "postgres",
 
-   "_dbmaxconnections" : "8",
+   "_dbmaxconnections" : 8,
+
+   "chunk bytes": 1048576,
 
    "admin" : "adminrole",
+   "file write users": ["adminrole", "*"],
+   "tagdef write users": ["adminrole", "*"],
+   "policy remappings": {},
 
    "log bulk details" : false,
    "bulk tmp index" : false,
@@ -40,10 +49,10 @@
 
    "webauthn2" : {
       "require_attributes": true, 
-      "listusers_permit": [], 
-      "listattributes_permit": [], 
-      "manageusers_permit": [], 
-      "manageattributes_permit": [], 
+      "listusers_permit": ["adminrole"], 
+      "listattributes_permit": ["adminrole"], 
+      "manageusers_permit": ["adminrole"], 
+      "manageattributes_permit": ["adminrole"], 
             
       "session_expiration_minutes": 30, 
       "def_passwd_len": 10, 

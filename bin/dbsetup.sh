@@ -160,7 +160,6 @@ dataset_complete()
    # args: <subjectid> <name> url <url> <owner> [<readuser>]...
    # args: <subjectid> <name> blank <owner> [<readuser>]...
    # args: <subjectid> <name> tagdef <owner> [<readuser>]...
-   # args: <subjectid> <name> config <owner> [<readuser>]...
    # args: <subjectid> <name> view <owner> [<readuser>]...
 
    local subject="$1"
@@ -186,7 +185,7 @@ dataset_complete()
               ;;
          esac
          ;;
-      blank|dbtype|tagdef|config|view)
+      blank|dbtype|tagdef|view)
          :
          ;;
       onclick)
@@ -226,7 +225,7 @@ dataset_complete()
 		 ;;
 	 esac
 	 ;;
-      config|view)
+      view)
 	 tag "$subject" "$type" text "$file" >&2
 	 ;;
    esac
@@ -528,7 +527,6 @@ tagdef 'id'                  int8        ""         anonymous   system       fal
 tagdef 'readok'              boolean     ""         anonymous   system       false
 tagdef 'writeok'             boolean     ""         anonymous   system       false
 tagdef 'tags present'        text        ""         anonymous   system       true       false     tagdef
-tagdef 'config'              text        ""         anonymous   subject      false      true
 tagdef 'view'                text        ""         anonymous   subject      false      true
 tagdef 'tag read users'      text        ""         anonymous   subjectowner true
 tagdef 'tag write users'     text        ""         anonymous   subjectowner true
@@ -549,9 +547,6 @@ tagdef file                  text        ""         system      system       fal
 tagdef content-type          text        ""         anonymous   subject      false
 tagdef sha256sum             text        ""         anonymous   subject      false
 tagdef "incomplete"          ""          ""         anonymous   subject      false
-tagdef 'config binding'      int8        ""         subject     subject      true       false    id
-tagdef 'config parameter'    text        ""         subject     subject      false
-tagdef 'config value'        text        ""         subject     subject      true
 #      TAGNAME               TYPE        OWNER      READPOL     WRITEPOL     MULTIVAL   PKEY     TAGREF
 
 # add special column for tracking subject text tsv freshness
@@ -590,54 +585,6 @@ EOF
 tagacl "owner" write "${admin}"
 
 
-homepath="https://${HOME_HOST}/${SVCPREFIX}"
-
-dataset "tagfiler" config "${admin}" "*"
-tagfilercfg=${last_subject}
-
-cfgtag()
-{
-    local binding
-
-    dataset "" blank "${admin}" "*"
-    binding=${last_subject}
-
-    tag "$tagfilercfg" "config binding" int8 "$binding"
-
-    tag "$binding" "config parameter" text "$1"
-    shift
-    tag "$binding" "config value" "$@"
-}
-
-writers=
-readers=
-readok=
-writeok=
-if [[ "${uploader}" = "${curator}" ]]
-then
-    # all uploaders are curators, so they retain access
-    :
-else
-    # allow non-curator uploaders to retain access, without sharing with other non-curator uploaders
-    readok=true
-    writeok=true
-fi
-
-if [[ "${downloader}" = "${curator}" ]]
-then
-    # all downloaders are curators, so they retain access
-    :
-else
-    # also give read access to all downloaders
-    readers="${downloader}"
-fi
-
-cfgtag "chunk bytes" text '1048576'
-cfgtag "file write users" text "*" "admin"
-cfgtag "tagdef write users" text "*" "admin"
-cfgtag "policy remappings" text "${uploader};${curator};${readers};${writers};${readok};${writeok}"
-cfgtag "subtitle" text "Tagfiler (trunk) on ${HOME_HOST}"
-
 viewdef()
 {
     local viewname="$1"
@@ -651,7 +598,6 @@ viewdef()
 }
 
 viewdef default 'id' 'name' bytes owner 'read users' 'write users' "subject last tagged"
-viewdef config 'config parameter' 'config value'
 viewdef tagdef 'tagdef' "tagdef dbtype" "tagdef tagref" "tagdef tagref soft" "tagdef multivalue" "tagdef unique" "tagdef readpolicy" "tagdef writepolicy" "tag read users" "tag write users" "read users" "write users" "owner"
 viewdef view 'view' "view tags" "read users" "write users" "owner"
 
