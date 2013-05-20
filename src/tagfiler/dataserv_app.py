@@ -3705,11 +3705,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                       + " JOIN (%s) stale USING (subject)" % stalequery
                       + " GROUP BY SUBJECT" )
 
-        self.dbquery( "UPDATE %s slt" % self.wraptag('subject last tagged txid')
-                      + " SET tsv_txid = txid_current()"
-                      + " FROM (%s) stale" % stalequery
-                      + " WHERE slt.subject = stale.subject" )
-
         self.set_tag_lastmodified(None, self.tagdefsdict['subject text'])
 
     def select_predlist_path_txid(self, path=None, limit=None, enforce_read_authz=True):
