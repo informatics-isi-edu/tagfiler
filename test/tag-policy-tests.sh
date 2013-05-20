@@ -451,6 +451,7 @@ tagreftest()
 
     local subjects=()
     local objects=()
+    local subjslist
     while [[ $1 != '--' ]]
     do
 	subjects+=( "$1" )
@@ -467,8 +468,10 @@ tagreftest()
     do
 	url1="/tags/name("
 	url2="/subject/name;"
-	url3="/tags/("
+	subjslist=""
+	url3=""
 	sep=""
+	lsep=""
 
 	truncate -s 0 $tempfile
 
@@ -492,12 +495,14 @@ tagreftest()
 		printf ",${o}" >> $tempfile
 	    done
 
+	    subjslist+="${lsep}${subj}"
+	    lsep=","
 	    printf "\n" >> $tempfile
 	done
 
 	url1+=")"
 	url2+="(id;name)"
-	url3+=")"
+	url3="/tags/name=${subjslist}(${url3})"
 
 	status=$(mycurl "$url1" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 	[[ "$status" = $code ]] && {
