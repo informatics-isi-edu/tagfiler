@@ -15,7 +15,7 @@
      "admin" : "The administrative user role as known by the configured webauthn2 providers",
      "file write users": ["The list of roles allowed to create subjects"],
      "tagdef write users": ["The list of roles allowed to create tagdefs"],
-     "policy remappings": {"source role": ("remap role", ["read role", "..."], ["write role", "..."], "boolean readok", "boolean writeok")},
+     "policy remappings": {"source role": ["remap role", ["read role", "..."], ["write role", "..."], "boolean readok", "boolean writeok"]},
      "webauthn2" : "{... The webauthn2 config stanza ...}",
      "log bulk details" : "whether to generate detailed audit logging from bulk operations",
      "bulk tmp index" : "whether to index temporary tables used for bulk operations",
