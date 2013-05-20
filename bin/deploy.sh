@@ -115,16 +115,16 @@ sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > $
 chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
 chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 
-cp bin/dbsetup.sh ${SVCHOME}/dbsetup.sh
-chown ${SVCUSER}: ${SVCHOME}/dbsetup.sh
-chmod a+x ${SVCHOME}/dbsetup.sh
+cp bin/dbsetup-template.sh ${SVCHOME}/dbsetup-template.sh
+chown ${SVCUSER}: ${SVCHOME}/dbsetup-template.sh
+chmod a+x ${SVCHOME}/dbsetup-template.sh
 
 cp bin/dbsetup-*-demo.sh ${SVCHOME}/
 chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
 chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
 
 # setup db tables
-runuser -c "${SVCHOME}/dbsetup.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
+runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF

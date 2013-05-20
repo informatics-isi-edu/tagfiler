@@ -51,10 +51,10 @@ Create postgres user and db for tagfiler:
 
 Populate with initial tag model:
 
-    sudo cp dbsetup.sh /home/tagfiler
-    sudo chown tagfiler.tagfiler /home/tagfiler/dbsetup.sh
-    sudo chmod +x /home/tagfiler/dbsetup.sh
-    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup.sh $(hostname) tagfiler admin uploader download curator grader)"
+    sudo cp dbsetup-template.sh /home/tagfiler
+    sudo chown tagfiler.tagfiler /home/tagfiler/dbsetup-template.sh
+    sudo chmod +x /home/tagfiler/dbsetup-template.sh
+    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup-template.sh $(hostname) tagfiler admin uploader download curator grader)"
 
 WSGI Application
 ================
