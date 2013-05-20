@@ -35,6 +35,9 @@ TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get
 # this is the URL base path of the service
 SVCPREFIX=${1:-tagfiler}
 
+# the database name
+TEMPLATE=${SVCPREFIX}
+
 DEMO=${2}
 
 # you can set this to override...
@@ -95,9 +98,9 @@ else
 	runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
 fi
 
-runuser -c "dropdb ${SVCUSER}" - ${PGADMIN}
-runuser -c "createdb -O ${SVCUSER} ${SVCUSER}" - ${PGADMIN}
-
+# create database
+runuser -c "dropdb ${TEMPLATE}" - ${PGADMIN}
+runuser -c "createdb -O ${SVCUSER} ${TEMPLATE}" - ${PGADMIN}
 
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
@@ -124,7 +127,7 @@ chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
 chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
 
 # setup db tables
-runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
+runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} ${TEMPLATE} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF

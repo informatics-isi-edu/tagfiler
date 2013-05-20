@@ -20,15 +20,16 @@
 
 HOME_HOST="$1"
 SVCPREFIX="$2"
-admin="$3"
-uploader="$4"
-downloader="$5"
-curator="$6"
-grader="$7"
+DBNAME="$3"
+admin="$4"
+uploader="$5"
+downloader="$6"
+curator="$7"
+grader="$8"
 
 echo args: "$@"
 
-shift 7
+shift 8
 
 # this script will recreate all tables, but only on a clean database
 
@@ -36,9 +37,9 @@ shift 7
 tagfiler-webauthn2-deploy.py
 
 # start a coprocess so we can coroutine with a single transaction
-coproc { psql -q -t -A  ; } 
+coproc { psql -q -t -A ${DBNAME} ; } 
 
-echo "create core tables..."
+echo "create catalog tables..."
 
 json_native_func()
 {
