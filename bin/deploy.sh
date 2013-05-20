@@ -35,8 +35,9 @@ TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get
 # this is the URL base path of the service
 SVCPREFIX=${1:-tagfiler}
 
-# the database name
-TEMPLATE=${SVCPREFIX}
+# the core and template database names
+DBNAME=${SVCPREFIX}	#TODO(schuler): this will become the core db name
+TEMPLATE=${SVCPREFIX}	#TODO(schuler): this will be suffixed with _template
 
 DEMO=${2}
 
@@ -98,7 +99,10 @@ else
 	runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
 fi
 
-# create database
+# create catalog and template databases
+#TODO(schuler): uncomment next 2 lines when cat-o-cats ready
+#runuser -c "dropdb ${DBNAME}" - ${PGADMIN}
+#runuser -c "createdb -O ${SVCUSER} ${DBNAME}" - ${PGADMIN}
 runuser -c "dropdb ${TEMPLATE}" - ${PGADMIN}
 runuser -c "createdb -O ${SVCUSER} ${TEMPLATE}" - ${PGADMIN}
 
@@ -118,6 +122,11 @@ sed -e "s/svcuser/$SVCUSER/g" -e "s/adminrole/$admin/g" tagfiler-config.json > $
 chown ${SVCUSER}: ${SVCHOME}/tagfiler-config.json
 chmod ug=r,o= ${SVCHOME}/tagfiler-config.json
 
+# copy database setup scripts to service user home
+cp bin/dbsetup.sh ${SVCHOME}/dbsetup.sh
+chown ${SVCUSER}: ${SVCHOME}/dbsetup.sh
+chmod a+x ${SVCHOME}/dbsetup.sh
+
 cp bin/dbsetup-template.sh ${SVCHOME}/dbsetup-template.sh
 chown ${SVCUSER}: ${SVCHOME}/dbsetup-template.sh
 chmod a+x ${SVCHOME}/dbsetup-template.sh
@@ -126,7 +135,9 @@ cp bin/dbsetup-*-demo.sh ${SVCHOME}/
 chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
 chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
 
-# setup db tables
+# setup core and template databases
+#TODO(schuler): uncomment next line when cat-o-cats ready
+#runuser -c "${SVCHOME}/dbsetup.sh ${DBNAME}" - ${SVCUSER}
 runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} ${TEMPLATE} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
 
 # register our service code
