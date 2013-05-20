@@ -118,7 +118,6 @@ class Toplevel (Node):
 
     def __init__(self, parser, appname, queryopts={}):
         Node.__init__(self, parser, appname, queryopts)
-        self.globals['view'] = None
 
     def GET(self, uri):
         
@@ -204,7 +203,7 @@ class Tagdef (Node):
     def DELETE(self, uri):
         
         def body():
-            tagdef = self.globals['tagdefsdict'].get(self.tag_id, None)
+            tagdef = self.tagdefsdict.get(self.tag_id, None)
             if tagdef == None:
                 raise NotFound(self, data='tag definition %s' % (self.tag_id))
             self.enforce_tagdef_authz('write', tagdef)
@@ -300,7 +299,6 @@ class FileTags (Node):
             self.path = path
         else:
             self.path = [ ([], [], []) ]
-        self.referer = None
 
     def get_body(self):
         self.path_modified, self.listtags, writetags, self.limit, self.offset = \
@@ -309,7 +307,7 @@ class FileTags (Node):
                                       extra_tags=
                                       [ 'id', 'file', 'name', 
                                         'write users', 'modified' ] 
-                                      + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ])
+                                      + [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.unique ])
 
         self.http_vary.add('Accept')
         self.set_http_etag(self.select_predlist_path_txid(self.path_modified))
@@ -319,7 +317,7 @@ class FileTags (Node):
         
         self.txlog('GET TAGS', dataset=path_linearize(self.path_modified))
 
-        all = [ tagdef for tagdef in self.globals['tagdefsdict'].values() if tagdef.tagname in self.listtags ]
+        all = [ tagdef for tagdef in self.tagdefsdict.values() if tagdef.tagname in self.listtags ]
         all.sort(key=lambda tagdef: tagdef.tagname)
 
         if self.acceptType == 'application/json':
@@ -349,7 +347,7 @@ class FileTags (Node):
             def render_file(file):
               subject = self.subject2identifiers(file)[0]
               def render_tagvals(tagdef):
-                 home = self.config.home + web.ctx.homepath
+                 home = self.config.homepath
                  if tagdef.dbtype == '':
                     return home + "/tags/" + subject + "(" + urlquote(tagdef.tagname) + ")\n"
                  elif tagdef.multivalue and file[tagdef.tagname]:
@@ -361,7 +359,6 @@ class FileTags (Node):
               return ''.join([ render_tagvals(tagdef) for tagdef in all or [] ])
             
             self.header('Content-Type', 'text/uri-list')
-            self.globals['str'] = str 
             yield ''.join([ render_file(file) for file in files or [] ])
         elif self.acceptType == 'application/x-www-form-urlencoded':
             self.header('Content-Type', 'application/x-www-form-urlencoded')
@@ -410,7 +407,6 @@ class FileTags (Node):
                 
     def GET(self, uri=None):
         # dispatch variants, browsing and REST
-        self.globals['referer'] = self.config['home'] + uri
         try:
             self.view_type = urlunquote(self.storage.view)
         except:

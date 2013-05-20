@@ -205,10 +205,14 @@ def jsonArrayFileReader(f):
 # see rules = [ ... ] for real matching rules
 
 global_env = merge_config(jsonFileName='tagfiler-config.json', 
-                          built_ins=dict(db="tagfiler", 
-                                        dbn="postgres", 
-                                        dbmaxconnections="8"
-                                        )
+                          built_ins={"db": "tagfiler", 
+                                     "dbn": "postgres", 
+                                     "dbmaxconnections": 8,
+                                     "chunk bytes": 1048576,
+                                     'file write users': [],
+                                     'policy remappings': [],
+                                     'tagdef write users': []
+                                     }
                           )
 
 webauthn2_config = global_env.get('webauthn2', dict(web_cookie_name='tagfiler'))
@@ -471,7 +475,6 @@ class PerUserDbCache (object):
         self.purge()
         return results
 
-config_cache = PerUserDbCache('config')
 tagdef_cache = PerUserDbCache('tagdef', 'tagname')
 view_cache = PerUserDbCache('view')
 
@@ -687,8 +690,6 @@ class RuntimeError (WebException):
 def getParamEnv(suffix, default=None):
     return global_env.get(suffix, default)
 
-daemonuser = getParamEnv('user', 'tagfiler')
-
 """
 # We want to share one global DB instance when pooling is enabled
 shared_db = web.database(dbn=getParamEnv('dbnstr', 'postgres'),
@@ -710,67 +711,6 @@ def get_db():
 
 class Application (webauthn2_handler_factory.RestHandler):
     "common parent class of all service handler classes to use db etc."
-
-    def config_filler(self, db):
-        self.db = db
-        def helper(config):
-            config['policy remappings'] = buildPolicyRules(config['policy remappings'])
-            return config
-        return lambda : [ helper(self.select_config(pred=web.Storage(tag='config', op=None, vals=['tagfiler']))) ]
-
-    def select_config_cached(self, db, configname=None):
-        if configname == None:
-            configname = 'tagfiler'
-        config = config_cache.select(self.db, self.config_filler(db), None, configname)
-        if config == None:
-            config = config_cache.select(self.db, self.config_filler(db), None, 'tagfiler')
-        return config
-
-    def select_config(self, pred=None, params_and_defaults=None, fake_missing=True):
-        
-        if pred == None:
-            pred = web.Storage(tag='config', op='=', vals=['tagfiler'])
-
-        if params_and_defaults == None:
-            params_and_defaults = [ ('chunk bytes', 64 * 1024),
-                                    ('file write users', []),
-                                    ('home', 'https://%s' % self.hostname),
-                                    ('policy remappings', []),
-                                    ('store path', '/var/www/%s-data' % daemonuser),
-                                    ('tagdef write users', []) ]
-
-        path = [ 
-            ( [pred], [web.Storage(tag='config binding', op=None, vals=[])], [] ),
-            ( [], [web.Storage(tag=tagname, op=None, vals=[]) for tagname in ['config parameter', 'config value', 'subject last tagged', 'subject last tagged txid']], [] ) 
-            ]
-        
-        query, values = self.build_files_by_predlist_path(path=path,
-                                                          tagdefs=Application.static_tagdefs)
-
-        config = web.Storage()
-        mtimes = []
-        txids = []
-
-        for result in self.dbquery(query, values):
-            mtimes.append(result['subject last tagged'])
-            txids.append(result['subject last tagged txid'])
-            config[ result['config parameter'] ] = result['config value']
-
-        config['config'] = 'tagfiler' # BUG: we cannot support config lookup for anything but tagfiler!
-        config['subject last tagged'] = max(mtimes)
-        config['subject last tagged txid'] = max(txids)
-
-        for key, default in params_and_defaults:
-            if type(default) == list:
-                config[key] = config.get(key, default)
-            else:
-                vals = config.get(key, [])
-                if len(vals) == 1:
-                    config[key] = vals[0]
-                else:
-                    config[key] = default
-
-        return config
 
     def select_view_all(self):
         return self.select_files_by_predlist(subjpreds=[ web.Storage(tag='view', op=None, vals=[]) ],
@@ -971,8 +911,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.skip_preDispatch = False
 
         self.subjpreds = []
-        self.globals = dict()
-        self.globals['context'] = self.context
 
         if queryopts == None:
             self.queryopts = dict()
@@ -986,12 +924,15 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             self.query_range = None
 
-        # this ordered list can be pruned to optimize transactions
-        self.needed_db_globals = [ 'tagdefsdict' ]
-
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
         self.hostname = web.ctx.host
+
+        # TODO: get per-catalog config overrides from somewhere for multitenancy?
+        self.config = web.Storage(global_env.items())
+        self.config['home'] = self.config.get('home', 'https://%s' % self.hostname)
+        self.config['homepath'] = self.config.get('home', self.config.home + web.ctx.homepath)
+        self.config['store path'] = self.config.get('store path', '/var/www/%s-data' % self.config.get('user', 'tagfiler'))
 
         self.table_changes = {}
         
@@ -999,25 +940,8 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.middispatchtime = None
 
         # BEGIN: get runtime parameters from database
-        self.globals['adminrole'] = getParamEnv('admin', 'root')
-        self.globals['tagdefsdict'] = Application.static_tagdefs # need these for select_config() below
 
         #self.log('TRACE', 'Application() constructor after static defaults')
-
-        # get full config
-        self.config = self._db_wrapper(lambda db: config_cache.select(db, self.config_filler(db), None, 'tagfiler'))
-
-        #self.log('TRACE', 'Application() self.config loaded')
-        del self.globals['tagdefsdict'] # clear this so it will be rebuilt properly during transaction
-        
-        # 'globals' are local to this Application instance
-        self.globals['urlquote'] = urlquote
-        self.globals['idquote'] = idquote
-        self.globals['webdebug'] = web.debug
-        self.globals['jsonWriter'] = jsonWriter
-        self.globals['subject2identifiers'] = lambda subject: self.subject2identifiers(subject)
-        self.globals['home'] = self.config.home + web.ctx.homepath
-        self.globals['homepath'] = web.ctx.homepath
 
         # END: get runtime parameters from database
         #self.log('TRACE', 'Application() config unpacked')
@@ -1148,7 +1072,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # anonymous user, who we represent with empty string key in policy mappings
                 # and use a safe default mapping if there is none 
                 dstrole, readusers, writeusers, readok, writeok = self.config['policy remappings'].get('', 
-                                                                                                       (self.globals['adminrole'], [], [], False, False))
+                                                                                                       (self.config.admin, [], [], False, False))
             else:
                 # authenticated user who we can map unambiguously
                 srcrole = srcroles.pop()
@@ -1173,17 +1097,17 @@ class Application (webauthn2_handler_factory.RestHandler):
         try:
             t = self.db.transaction()
             if readusers != None:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['read users'])
+                self.delete_tag(newfile, self.tagdefsdict['read users'])
                 for readuser in readusers:
-                    self.set_tag(newfile, self.globals['tagdefsdict']['read users'], readuser)
+                    self.set_tag(newfile, self.tagdefsdict['read users'], readuser)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='read users', value=','.join(readusers))
             if writeusers != None:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['write users'])
+                self.delete_tag(newfile, self.tagdefsdict['write users'])
                 for writeuser in writeusers:
-                    self.set_tag(newfile, self.globals['tagdefsdict']['write users'], writeuser)
+                    self.set_tag(newfile, self.tagdefsdict['write users'], writeuser)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='write users', value=','.join(writeusers))
             if dstrole:
-                self.set_tag(newfile, self.globals['tagdefsdict']['owner'], dstrole)
+                self.set_tag(newfile, self.tagdefsdict['owner'], dstrole)
                 self.txlog('REMAP', dataset=self.subject2identifiers(newfile)[0], tag='owner', value=dstrole)
             t.commit()
         except:
@@ -1296,25 +1220,8 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # build up globals useful to almost all classes, to avoid redundant coding
             # this is fragile to make things fast and simple
-            db_globals_dict = dict(tagdefsdict=lambda : dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ]) )
 
-            #self.log('TRACE', value='preparing needed_db_globals')
-            for key in self.needed_db_globals:
-                if not self.globals.has_key(key):
-                    self.globals[key] = db_globals_dict[key]()
-                    #self.log('TRACE', value='prepared %s' % key)
-
-            #self.log('TRACE', 'needed_db_globals loaded')
-            
-            for globalname, default in [ ('view', None),
-                                         ('referer', web.ctx.env.get('HTTP_REFERER', None)),
-                                         ('tagspace', 'tags'),
-                                         ('datapred', self.datapred),
-                                         ('dataname', self.dataname),
-                                         ('dataid', self.dataid) ]:
-                current = self.globals.get(globalname, None)
-                if not current:
-                    self.globals[globalname] = default
+            self.tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ])
 
             return body()
 
@@ -1391,7 +1298,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             subjpreds = self.subjpreds
         unique = None
         for pred in subjpreds:
-            tagdef = self.globals['tagdefsdict'].get(pred.tag, None)
+            tagdef = self.tagdefsdict.get(pred.tag, None)
             if tagdef == None:
                 raise Conflict(self, 'Tag "%s" referenced in subject predicate list is not defined on this server.' % pred.tag)
 
@@ -1442,7 +1349,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                  or subject is None and subject is needed to make determination
                  or value is None and value is needed to make determination"""
         if tagdefs is None:
-            tagdefs = self.globals['tagdefsdict']
+            tagdefs = self.tagdefsdict
 
         policy = tagdef['%spolicy' % mode]
 
@@ -1545,7 +1452,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     def classify_subject(self, subject):
         for dtype in [ 'tagdef', 'config', 'view', 'file' ] \
-                + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique and tagdef.tagname if tagdef.tagname != 'id' ] \
+                + [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.unique and tagdef.tagname if tagdef.tagname != 'id' ] \
                 + [ 'id' ] :
             keyv = subject.get(dtype, None)
             if keyv:
@@ -1567,7 +1474,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             keyv = None
 
         if keyv:
-            if self.globals['tagdefsdict'][dtype].multivalue:
+            if self.tagdefsdict[dtype].multivalue:
                 keyv = keyv[0]
             datapred = '%s=%s' % (urlquote(dtype), urlquote(keyv))
             dataid = datapred
@@ -1588,10 +1495,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         newid = self.dbquery("INSERT INTO resources DEFAULT VALUES RETURNING subject")[0].subject
         subject = web.Storage(id=newid)
         
-        self.set_tag_lastmodified(subject, self.globals['tagdefsdict']['id'])
+        self.set_tag_lastmodified(subject, self.tagdefsdict['id'])
 
         if file:
-            self.set_tag(subject, self.globals['tagdefsdict']['file'], file)
+            self.set_tag(subject, self.tagdefsdict['file'], file)
 
         return newid
 
@@ -1603,8 +1510,8 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         results = self.dbquery('SELECT * FROM "_tags present" WHERE subject = $subject', vars=dict(subject=subject.id))
         for result in results:
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][result.value])
-        self.set_tag_lastmodified(None, self.globals['tagdefsdict']['id'])
+            self.set_tag_lastmodified(None, self.tagdefsdict[result.value])
+        self.set_tag_lastmodified(None, self.tagdefsdict['id'])
         
         query = 'DELETE FROM resources WHERE subject = $id'
         self.dbquery(query, vars=dict(id=subject.id))
@@ -1719,7 +1626,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.deploy_tagdef(tagdef)
 
         for tag, value in tags:
-            self.set_tag(subject, self.globals['tagdefsdict'][tag], value)
+            self.set_tag(subject, self.tagdefsdict[tag], value)
 
         return tagdef
         
@@ -1759,7 +1666,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 tabledef += ' UNIQUE'
 
             if tagref:
-                referenced_tagdef = self.globals['tagdefsdict'].get(tagref, None)
+                referenced_tagdef = self.tagdefsdict.get(tagref, None)
 
                 if referenced_tagdef == None:
                     raise Conflict(self, 'Referenced tag "%s" not found.' % tagref)
@@ -1932,10 +1839,10 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         # update virtual tags based on their source tags
         if tagdef.tagname in ['read users', 'owner']:
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict']['readok'])
+            self.set_tag_lastmodified(None, self.tagdefsdict['readok'])
             
         if tagdef.tagname in ['write users', 'owner']:
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict']['writeok'])
+            self.set_tag_lastmodified(None, self.tagdefsdict['writeok'])
             
 
     def delete_tag(self, subject, tagdef, value=None):
@@ -1962,7 +1869,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             results = self.select_tag_noauthn(subject, tagdef)
             if len(results) == 0 and tagdef.tagname != 'tags present':
-                self.delete_tag(subject, self.globals['tagdefsdict']['tags present'], tagdef.tagname)
+                self.delete_tag(subject, self.tagdefsdict['tags present'], tagdef.tagname)
 
             # update in-memory representation too for caller's sake
             if tagdef.multivalue:
@@ -2013,7 +1920,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     raise Conflict(self, 'Tag "%s" is defined as unique is already bound to another subject.' % (tagdef.tagname))
 
         if tagdef.tagref and (not tagdef.softtagref) and value is not None:
-            reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
+            reftagdef = self.tagdefsdict[tagdef.tagref]
             results = self.select_tag_noauthn(None, reftagdef, value)
             if len(results) == 0:
                 raise Conflict(self, 'Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
@@ -2074,7 +1981,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         if tagdef.tagname != 'tags present':
             results = self.select_filetags_noauthn(subject, tagdef.tagname)
             if len(results) == 0:
-                self.set_tag(subject, self.globals['tagdefsdict']['tags present'], tagdef.tagname)
+                self.set_tag(subject, self.tagdefsdict['tags present'], tagdef.tagname)
 
         self.set_tag_lastmodified(subject, tagdef)
         
@@ -2114,7 +2021,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         
         if tagdef.tagref and (not tagdef.softtagref):
             # tagdef write policy may depend on per-object information
-            reftagdef = self.globals['tagdefsdict'][tagdef.tagref]
+            reftagdef = self.tagdefsdict[tagdef.tagref]
             refval = valcol
             refcol = wraptag(tagdef.tagref, prefix='')
             if reftagdef.multivalue:
@@ -2366,7 +2273,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
-                    reftagdef = self.globals['tagdefsdict'][reftag]
+                    reftagdef = self.tagdefsdict[reftag]
                     reftable = self.wraptag(reftag)
                     
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
@@ -2405,12 +2312,12 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 for reftag in reftags:
                     # update per-referenced tag metadata and subject-tags mappings
-                    reftagdef = self.globals['tagdefsdict'][reftag]
+                    reftagdef = self.tagdefsdict[reftag]
                     reftable = self.wraptag(reftag)
 
                     self.set_tag_lastmodified(None, reftagdef)
 
-                    self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+                    self.delete_tag_intable(self.tagdefsdict['tags present'], 
                                             '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(reftagdef.tagname),)
                                             + ' EXCEPT SELECT subject FROM %s) s' % reftable, 
                                             idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', unnest=False)
@@ -2419,7 +2326,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if reftags:
                     for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                                       ('subject last tagged txid', 'txid_current()') ]:
-                        self.set_tag_intable(self.globals['tagdefsdict'][tag], mtable,
+                        self.set_tag_intable(self.tagdefsdict[tag], mtable,
                                              idcol='id', valcol=val, flagcol=None,
                                              wokcol=None, isowncol=None,
                                              enforce_tag_authz=False, set_mode='merge', depth=depth+1)
@@ -2438,12 +2345,12 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # update subject-tags mappings
             if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
-                self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+                self.delete_tag_intable(self.tagdefsdict['tags present'], 
                                         '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(tagdef.tagname),)
                                         + ' EXCEPT SELECT subject FROM %s) s' % table, 
                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False)
 
-                self.set_tag_intable(self.globals['tagdefsdict']['tags present'], '(SELECT DISTINCT subject FROM %s)' % table,
+                self.set_tag_intable(self.tagdefsdict['tags present'], '(SELECT DISTINCT subject FROM %s)' % table,
                                      idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                      flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
@@ -2479,7 +2386,7 @@ class Application (webauthn2_handler_factory.RestHandler):
            that tag.
         """
         if tagdefs == None:
-            tagdefs = self.globals['tagdefsdict']
+            tagdefs = self.tagdefsdict
 
         pd = dict()
         for pred in predlist:
@@ -2530,7 +2437,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         refs = set()
         def helper(tagname):
             refs.add(tagname)
-            td = self.globals['tagdefsdict'][tagname]
+            td = self.tagdefsdict[tagname]
             for ref in td.reftags:
                 helper(ref)
         for ref in tagdef.reftags:
@@ -2548,7 +2455,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         # screen early for statically forbidden requests or not-found tagdefs
         for tag in dtags:
             try:
-                td = self.globals['tagdefsdict'][tag]
+                td = self.tagdefsdict[tag]
                 dtagdefs.append(td)
             except KeyError:
                 raise Conflict(self, 'Tag "%s" not defined on this server.' % tag)
@@ -2602,7 +2509,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # track subjects we'll modify implicitly
             for reftag in reftags:
-                reftagdef = self.globals['tagdefsdict'][reftag]
+                reftagdef = self.tagdefsdict[reftag]
                 self.dbquery(("INSERT INTO %(mtable)s (id)"
                               + " SELECT DISTINCT r.subject"
                               + " FROM %(dtable)s s"
@@ -2613,7 +2520,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                          vars=dvalues)
 
             if tagdef.tagref and (not tagdef.softtagref):
-                otagdef = self.globals['tagdefsdict'][tagdef.tagref]
+                otagdef = self.tagdefsdict[tagdef.tagref]
                 oquery, ovalues = self.build_files_by_predlist_path([(
                             [ web.Storage(tag=tagdef.tagref, op=None, vals=[]) ],
                             [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok', tagdef.tagref] ],
@@ -2671,7 +2578,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             
         # third pass: update per-tag metadata based on explicit and implicit changes
         for dtag in dtags:
-            self.delete_tag_intable(self.globals['tagdefsdict']['tags present'], 
+            self.delete_tag_intable(self.tagdefsdict['tags present'], 
                                     ('(SELECT subject, value'
                                      + ' FROM "_tags present" p'
                                      + ' WHERE p.value = %(tagname)s'
@@ -2679,12 +2586,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     % dict(tagname=wrapval(dtag), tagtable=wraptag(dtag)),
                                     idcol='subject', 
                                     valcol=wrapval(dtag) + '::text', unnest=False)
-            self.set_tag_lastmodified(None, self.globals['tagdefsdict'][dtag])
+            self.set_tag_lastmodified(None, self.tagdefsdict[dtag])
 
         # finally: update subject metadata for all modified subjects
         for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                           ('subject last tagged txid', 'txid_current()') ]:
-            self.set_tag_intable(self.globals['tagdefsdict'][tag], mtable,
+            self.set_tag_intable(self.tagdefsdict[tag], mtable,
                                  idcol='id', valcol=val, flagcol=None,
                                  wokcol=None, isowncol=None,
                                  enforce_tag_authz=False, set_mode='merge')
@@ -2743,7 +2650,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         # update per-tag metadata and track all subjects whose tags are modified due to cascading tagref deletion
         for tagname in subject_tags:
-            tagdef = self.globals['tagdefsdict'][tagname]
+            tagdef = self.tagdefsdict[tagname]
             self.set_tag_lastmodified(None, tagdef)
 
             stquery, stvalues = self.build_files_by_predlist_path([ (spreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', tagname]], [])],
@@ -2774,7 +2681,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         # finally: update subject metadata for all modified subjects
         for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                           ('subject last tagged txid', 'txid_current()') ]:
-            self.set_tag_intable(self.globals['tagdefsdict'][tag], mtable,
+            self.set_tag_intable(self.tagdefsdict[tag], mtable,
                                  idcol='id', valcol=val, flagcol=None,
                                  wokcol=None, isowncol=None,
                                  enforce_tag_authz=False, set_mode='merge')
@@ -2840,7 +2747,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # tag write authz will be handled by set_tag_intable calls in body3
             got_unique_spred = False
             for tag in self.spreds.keys():
-                td = self.globals['tagdefsdict'].get(tag)
+                td = self.tagdefsdict.get(tag)
                 if td.unique:
                     got_unique_spred = True
 
@@ -2855,7 +2762,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # -- unique table name in case multiple calls are happening
             self.input_tablename = "input_%s" % self.request_guid
 
-            self.input_column_tds = [ self.globals['tagdefsdict'].get(t)
+            self.input_column_tds = [ self.tagdefsdict.get(t)
                                       for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() ]) ]
 
             # remap empty type to boolean type
@@ -3060,7 +2967,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # we're joining subjects against input already loaded from client
                 # join the subjects table to the input table on all spred tags which are unique 
                 wheres = [ '%s = e.%s' % (wraptag(td.tagname, '', "in_"), wraptag(td.tagname, '', ''))
-                           for td in [ self.globals['tagdefsdict'][tag] for tag in self.spreds.keys() ]
+                           for td in [ self.tagdefsdict[tag] for tag in self.spreds.keys() ]
                            if td.unique ]
                 wheres = ' AND '.join(wheres)
                 assigns = ', '.join([ '%s = %s' % (lhs, rhs) for lhs, rhs in assigns])
@@ -3177,7 +3084,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   ('read users', readusers_val),
                                   ('write users', writeusers_val),
                                   ('tags present', 'ARRAY[%s]::text[]' % ','.join([wrapval(t) for t in 'id', 'readok', 'writeok', 'tags present'])) ]:
-                    self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
+                    self.set_tag_intable(self.tagdefsdict[tag], intable,
                                          idcol='id', valcol=val, flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          enforce_tag_authz=False, set_mode='merge',
@@ -3216,7 +3123,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # update subject metadata based on updated flag in each input row
             for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                               ('subject last tagged txid', 'txid_current()') ]:
-                self.set_tag_intable(self.globals['tagdefsdict'][tag], intable,
+                self.set_tag_intable(self.tagdefsdict[tag], intable,
                                      idcol='id', valcol=val, flagcol=None,
                                      wokcol='writeok', isowncol='is_owner',
                                      enforce_tag_authz=False, set_mode='merge',
@@ -3281,7 +3188,7 @@ class Application (webauthn2_handler_factory.RestHandler):
            'path[0:-1]'   contextually constraints set of subjects which can be matched by path[-1]
 
            'path'         defaults to self.path if not supplied
-           'tagdefs'      defaults to self.globals['tagdefsdict'] if not supplied
+           'tagdefs'      defaults to self.tagdefsdict if not supplied
            'listas'       provides an optional relabeling of list tags (projected result attributes)
 
            Optional args 'values'used for recursive calls, not client calls.
@@ -3293,7 +3200,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             path = [ ( [], [], [] ) ]
 
         if tagdefs == None:
-            tagdefs = self.globals['tagdefsdict']
+            tagdefs = self.tagdefsdict
 
         if listas == None:
             listas = dict()
@@ -3759,7 +3666,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if listpreds == None:
             if listtags == None:
-                listtags = [ x for x in self.globals['filelisttags'] ]
+                listtags = [ x for x in self.select_view()[0]["view tags"] ]
             else:
                 listtags = [ x for x in listtags ]
 
@@ -3824,7 +3731,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             return
 
         # we only index text tags that are effectively the same read authz as the subjects themselves
-        text_tags = [ td.tagname for td in self.globals['tagdefsdict'].values() if td.dbtype == 'text' and td.readpolicy in ['anonymous', 'subject', 'tagorsubject'] ]
+        text_tags = [ td.tagname for td in self.tagdefsdict.values() if td.dbtype == 'text' and td.readpolicy in ['anonymous', 'subject', 'tagorsubject'] ]
         
         parts = [ "SELECT subject, tsv FROM %s" % self.wraptag(tagname) for tagname in text_tags ]
 
@@ -3844,7 +3751,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                       + " FROM (%s) stale" % stalequery
                       + " WHERE slt.subject = stale.subject" )
 
-        self.set_tag_lastmodified(None, self.globals['tagdefsdict']['subject text'])
+        self.set_tag_lastmodified(None, self.tagdefsdict['subject text'])
 
     def select_predlist_path_txid(self, path=None, limit=None, enforce_read_authz=True):
         """Determine last-modified txid for query path dataset, optionally testing previous txid as shortcut.
@@ -3899,7 +3806,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        [] ) ]
             query, values = self.build_files_by_predlist_path(path)
             query = 'SELECT max("tag last modified txid") AS txid FROM (%s) AS sq' % query
-            return max(self.dbquery(query, vars=values)[0].txid, self.config['subject last tagged txid'])
+            return self.dbquery(query, vars=values)[0].txid
 
         return relevant_tags_txid(path)
 
@@ -3933,7 +3840,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 have_tags = set([ p.tag for p in listpreds ])
             else:
                 if not listtags:
-                    listtags = [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() ]
+                    listtags = [ tagdef.tagname for tagdef in self.tagdefsdict.values() ]
                 listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
                 have_tags = set(listtags)
 

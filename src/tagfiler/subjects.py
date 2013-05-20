@@ -161,7 +161,7 @@ class Subject (Node):
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
                       for tag in ['id', 'content-type', 'bytes', 'modified', 'modified by', 'incomplete']
-                      + [ tagdef.tagname for tagdef in self.globals['tagdefsdict'].values() if tagdef.unique ] ]
+                      + [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
 
@@ -196,7 +196,7 @@ class Subject (Node):
 
         for s in range(0, len(self.subjects)):
             # get file tag which is 'system' authz model so not included already
-            results = self.select_tag_noauthn(self.subjects[s], self.globals['tagdefsdict']['file'])
+            results = self.select_tag_noauthn(self.subjects[s], self.tagdefsdict['file'])
             if len(results) > 0:
                 self.subjects[s].file = results[0].value
             else:
@@ -265,9 +265,6 @@ class Subject (Node):
                 self.queryopts['range'] = None
                 #self.txlog('TRACE', value='Query::body query returned')
 
-                self.globals['filelisttags'] = [ 'id' ] + [x for x in self.listtags if x !='id']
-                self.globals['filelisttagswrite'] = writetags
-
                 return files
 
         def postCommit(files):
@@ -283,7 +280,7 @@ class Subject (Node):
                 if self.query_range:
                     raise BadRequest(self, 'Query option "range" not meaningful for text/uri-list result format.')
                 self.header('Content-Type', 'text/uri-list')
-                response = "\n".join([ "%s/file/%s" % (self.config.home + web.ctx.homepath, self.subject2identifiers(file)[0]) for file in files]) + '\n'
+                response = "\n".join([ "%s/file/%s" % (self.config.homepath, self.subject2identifiers(file)[0]) for file in files]) + '\n'
                 self.header('Content-Length', str(len(response)))
                 yield response
                 return
@@ -404,9 +401,9 @@ class Subject (Node):
             if self.subject.file:
                 junk_files.append(self.subject.file)
             if newfile.file:
-                self.set_tag(self.subject, self.globals['tagdefsdict']['file'], newfile.file)
+                self.set_tag(self.subject, self.tagdefsdict['file'], newfile.file)
             elif self.subject.file:
-                self.delete_tag(self.subject, self.globals['tagdefsdict']['file'])
+                self.delete_tag(self.subject, self.tagdefsdict['file'])
         else:
             # anybody is free to insert new file
             self.txlog('CREATE', dataset=path_linearize(self.path))
@@ -428,36 +425,36 @@ class Subject (Node):
     def updateFileTags(self, newfile, basefile):
         if not basefile:
             # set initial tags on all new, independent objects
-            self.set_tag(newfile, self.globals['tagdefsdict']['owner'], newfile.owner)
-            self.set_tag(newfile, self.globals['tagdefsdict']['created'], 'now')
+            self.set_tag(newfile, self.tagdefsdict['owner'], newfile.owner)
+            self.set_tag(newfile, self.tagdefsdict['created'], 'now')
 
         if not basefile or self.context.client != basefile['modified by'] or basefile.id != newfile.id:
-            self.set_tag(newfile, self.globals['tagdefsdict']['modified by'], self.context.client)
+            self.set_tag(newfile, self.tagdefsdict['modified by'], self.context.client)
 
         # show virtual tags in inverse mapping too
-        self.set_tag(newfile, self.globals['tagdefsdict']['tags present'], ['id', 'readok', 'writeok', 'tags present'])
+        self.set_tag(newfile, self.tagdefsdict['tags present'], ['id', 'readok', 'writeok', 'tags present'])
 
         now = datetime.datetime.now(pytz.timezone('UTC'))
         maxage = myrand.uniform(3, 8)
 
         if not basefile or not basefile['modified'] or (now - basefile.modified).seconds > maxage or basefile.id != newfile.id:
-            self.set_tag(newfile, self.globals['tagdefsdict']['modified'], 'now')
+            self.set_tag(newfile, self.tagdefsdict['modified'], 'now')
 
         if newfile.dtype == 'file':
             if newfile.bytes != None and (not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id):
-                self.set_tag(newfile, self.globals['tagdefsdict']['bytes'], newfile.bytes)
+                self.set_tag(newfile, self.tagdefsdict['bytes'], newfile.bytes)
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.id != newfile.id):
-                self.set_tag(newfile, self.globals['tagdefsdict']['content-type'], newfile['content-type'])
+                self.set_tag(newfile, self.tagdefsdict['content-type'], newfile['content-type'])
         elif newfile.dtype in [ None ]:
             if basefile and basefile.bytes != None and basefile.id == newfile.id:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['bytes'])
+                self.delete_tag(newfile, self.tagdefsdict['bytes'])
             if basefile and basefile['content-type'] != None and basefile.id == newfile.id:
-                self.delete_tag(newfile, self.globals['tagdefsdict']['content-type'])
+                self.delete_tag(newfile, self.tagdefsdict['content-type'])
             if self.key:
                 if basefile:
-                    self.delete_tag(basefile, self.globals['tagdefsdict']['key'], self.key)
-                self.set_tag(newfile, self.globals['tagdefsdict']['key'], self.key)
+                    self.delete_tag(basefile, self.tagdefsdict['key'], self.key)
+                self.set_tag(newfile, self.tagdefsdict['key'], self.key)
 
         # try to apply tags provided by user as PUT/POST queryopts in URL
         #    and tags constrained in subjpreds (only if creating new independent object)
@@ -468,7 +465,7 @@ class Subject (Node):
             tagvals = tagvals + [ (pred.tag, pred.vals) for pred in self.path[-1][0] if pred.op in [ '=', None ] ]
 
         for tagname, values in tagvals:
-            tagdef = self.globals['tagdefsdict'].get(tagname, None)
+            tagdef = self.tagdefsdict.get(tagname, None)
             if tagdef == None:
                 raise NotFound(self, 'tagdef="%s"' % tagname)
             self.enforce_tag_authz('write', newfile, tagdef)
@@ -600,7 +597,7 @@ class Subject (Node):
     def put_postWritePostCommit(self, junk_files):
         if not self.partial_content and junk_files:
             self.deletePrevious(junk_files)
-        uri = self.config['home'] + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
+        uri = self.config.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
         self.header('Location', uri)
         if self.subject_prewrite == None or self.subject.id != self.subject_prewrite.id:
             web.ctx.status = '201 Created'
@@ -676,7 +673,7 @@ class Subject (Node):
             if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
-            url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
+            url = self.config.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
             self.header('Location', url)
             if acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')

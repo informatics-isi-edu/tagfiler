@@ -499,7 +499,7 @@ class FileIO (Subject):
             if view == '' and self.subject.dtype:
                 view = '?view=%s' % urlquote('%s' % self.subject.dtype)
             acceptType = self.preferredType()
-            url = self.config.home + web.ctx.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
+            url = self.config.homepath + '/' + self.api + '/' + self.subject2identifiers(self.subject)[0]
             self.header('Location', url)
             if acceptType == 'application/json':
                 self.header('Content-Type', 'application/json')
