@@ -10022,3 +10022,7 @@ function postManageAllUsersAttributes(data, textStatus, jqXHR, param) {
 	});
 }
 
+function init() {
+	renderLogin();
+}
+

@@ -40,6 +40,7 @@ IMAGEBASES= \
 
 SCRIPTFILEBASES=logo.png \
 				functions.js \
+				index.html \
 				jquery.js \
 				jquery-ui.js \
 				jquery-ui-timepicker-addon.js \
