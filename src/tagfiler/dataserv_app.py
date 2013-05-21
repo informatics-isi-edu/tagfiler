@@ -416,7 +416,7 @@ class DbCache (object):
             results = db_dbquery(db, 'SELECT max(txid) AS txid FROM ('
                               + 'SELECT max(value) AS txid FROM %s' % wraptag('subject last tagged txid')
                               + ' WHERE subject IN (SELECT subject FROM "_tags present" WHERE value = $idtag)'
-                              + ' UNION '
+                              + ' UNION ALL '
                               + 'SELECT value AS txid FROM %s' % wraptag('tag last modified txid')
                               + ' WHERE subject IN (SELECT subject FROM %s WHERE value = $idtag)) AS a' % wraptag('tagdef'),
                               vars=dict(idtag=self.idtagname))
@@ -2061,34 +2061,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             
             if set_mode == 'replace':
                 # clear graph triples not present in input
-                if flagcol:
-                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                                  + ' WHERE i.%(idcol)s'
-                                  + '       IN'
-                                  + '       (SELECT DISTINCT subject'
-                                  + '        FROM (SELECT subject, value FROM %(table)s WHERE %(wheres)s'
-                                  + '              EXCEPT'
-                                  + '              SELECT %(idcol)s AS subject,'
-                                  + '                     %(valcol)s AS value'
-                                  + '              FROM %(intable)s) AS t)')
-                                 % dict(table=table, intable=intable, idcol=idcol, valcol=valcol, flagcol=flagcol,
-                                        wheres=' AND '.join(wheres)))
-
-                count += self.dbquery(('DELETE FROM %(table)s AS t'
-                                       + ' WHERE ROW(t.subject, t.value)'
-                                       + '       NOT IN'
-                                       + '       (SELECT %(idcol)s AS subject,'
-                                       + '               %(valcol)s AS value'
-                                       + '        FROM %(intable)s WHERE %(wheres)s)')
-                                      % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
-                                             wheres=' AND '.join(wheres)))
+                raise NotImplementedError()
 
             if test and tagdef.unique:
                 # test for uniqueness violations
                 if self.dbquery(('SELECT max(count) AS max'
-                                 + ' FROM (SELECT count(subject) AS count'
+                                 + ' FROM (SELECT count(DISTINCT subject) AS count'
                                  + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                                 + '             UNION'
+                                 + '             UNION ALL '
                                  + '             SELECT subject, value FROM %(table)s) AS t'
                                  + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
                     raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
@@ -2104,23 +2084,24 @@ class Application (webauthn2_handler_factory.RestHandler):
                              wheres=' AND '.join(wheres))
 
                 query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                         + ' WHERE i.%(idcol)s'
-                         + '       IN'
-                         + '       (SELECT DISTINCT subject'
-                         + '        FROM (SELECT %(idcol)s AS subject,'
-                         + '                     %(valcol)s AS value'
-                         + '              FROM %(intable)s WHERE %(wheres)s'
-                         + '              EXCEPT'
-                         + '              SELECT subject, value FROM %(table)s) AS t)') % parts
+                         + ' FROM (SELECT subject'
+                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
+                         + '       LEFT OUTER JOIN %(table)s t USING (subject, value)'
+                         + '       WHERE t.subject IS NULL'
+                         + '       GROUP BY subject) t'
+                         + ' WHERE i.%(idcol)s = t.subject'
+                         ) % parts
+
                 #web.debug(query)
                 self.dbquery(query)
 
             query = ('INSERT INTO %(table)s (subject, value)'
-                     + ' SELECT %(idcol)s AS subject,'
-                     + '        %(valcol)s AS value'
-                     + ' FROM %(intable)s AS i WHERE %(wheres)s'
-                     + ' EXCEPT'
-                     + ' SELECT subject, value FROM %(table)s'
+                     + ' SELECT i.subject, i.value'
+                     + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                     + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                     + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                     + ' WHERE t2.subject IS NULL'
                      ) % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
                               wheres=' AND '.join(wheres))
             #web.debug(query)
@@ -2135,6 +2116,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             addwheres = [ '%(idcol)s NOT IN (SELECT subject FROM %(table)s)' % dict(idcol=idcol, table=table) ] + wheres
             updwheres = [ 't.subject = i.subject', '(i.value IS NOT NULL)' ]
             flagwheres = [ '((%s) IS NOT NULL)' % valcol ]
+            joinwheres = [ 'i2.%(idcol)s = t.subject' ]
 
             if tagdef.dbtype != '':
                 incols.append( '%(valcol)s AS value' % dict(valcol=valcol) )
@@ -2157,36 +2139,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                 where = '(%s) != True' % valcol
                 
             if set_mode == 'replace':
-                # remove triples where input lacks them
-                if flagcol:
-                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                                  + ' WHERE i.%(idcol)s'
-                                  + '       IN'
-                                  + '       (SELECT subject FROM %(table)s'
-                                  + '        EXCEPT'
-                                  + '        SELECT %(idcol)s AS subject'
-                                  + '        FROM %(intable)s'
-                                  + '        WHERE %(wheres)s)')
-                                 % dict(table=table, intable=intable,
-                                        idcol=idcol, valcol=valcol, flagcol=flagcol,
-                                        wheres=' AND '.join(wheres + [ where ])))
-
-                count += self.dbquery(('DELETE FROM %(table)s AS t'
-                                       + ' WHERE t.subject'
-                                       + '       NOT IN'
-                                       + '       (SELECT %(idcol)s AS subject'
-                                       + '        FROM %(intable)s'
-                                       + '        WHERE %(wheres)s)')
-                                      % dict(table=table, intable=intable,
-                                             idcol=idcol, valcol=valcol,
-                                             wheres=' AND '.join(wheres + [ where ])))
+                raise NotImplementedError()
                 
             if test and tagdef.unique and tagdef.dbtype != '':
                 # test for uniqueness violations
                 query = ('SELECT max(count) AS max'
-                         + ' FROM (SELECT count(subject) AS count'
+                         + ' FROM (SELECT count(DISTINCT subject) AS count'
                          + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                         + '             UNION'
+                         + '             UNION ALL '
                          + '             SELECT subject, value FROM %(table)s) AS t'
                          + '       GROUP BY value) AS t') % dict(intable=intable, table=table,
                                                                  idcol=idcol, valcol=valcol,
@@ -2199,17 +2159,15 @@ class Application (webauthn2_handler_factory.RestHandler):
         
             # track add/update of graph for inequal input triples
             if flagcol:
-                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                         + ' WHERE i.%(idcol)s'
-                         + '       IN'
-                         + '       (SELECT DISTINCT subject'
-                         + '        FROM (SELECT %(incols)s'
-                         + '              FROM %(intable)s WHERE %(wheres)s'
-                         + '              EXCEPT'
-                         + '              SELECT %(excols)s FROM %(table)s) AS t)') % dict(table=table, intable=intable,
-                                                                                           idcol=idcol, flagcol=flagcol,
-                                                                                           incols=incols, excols=excols,
-                                                                                           wheres=' AND '.join(wheres + flagwheres))
+                query = ('UPDATE %(intable)s AS d SET %(flagcol)s = True'
+                         + ' FROM (SELECT i.subject, t.subject AS existing'
+                         + '       FROM (SELECT %(incols)s FROM %(intable)s WHERE %(wheres)s) i'
+                         + '       LEFT OUTER JOIN %(table)s t USING (%(excols)s)) t'
+                         + ' WHERE d.%(idcol)s = t.subject AND t.existing IS NULL'
+                         ) % dict(table=table, intable=intable,
+                                  idcol=idcol, flagcol=flagcol,
+                                  incols=incols, excols=excols,
+                                  wheres=' AND '.join(wheres + flagwheres))
                 #web.debug(query)
                 self.dbquery(query)
                 
@@ -2228,7 +2186,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if reftags:
                     mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
-                    self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8)" % dict(mtable=mtable))
+                    self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
 
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
@@ -2247,13 +2205,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                               + " WHERE %(updwheres)s AND r.value = t.value"
                               + " RETURNING r.subject"
                               + ")"
-                              + "INSERT INTO %(mtable)s"
-                              + " SELECT DISTINCT subject FROM deletions"
-                              + " EXCEPT"
-                              + " SELECT id FROM %(mtable)s") % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
-                                                                    idcol=idcol, valcol=valcol,
-                                                                    wheres=' AND '.join(wheres),
-                                                                    updwheres=' AND '.join(updwheres)))
+                              + " INSERT INTO %(mtable)s"
+                              + " SELECT DISTINCT subject FROM deletions d"
+                              + " LEFT OUTER JOIN %(mtable)s m ON (d.subject = m.id)"
+                              + " WHERE m.id IS NULL"
+                              ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
+                                       idcol=idcol, valcol=valcol,
+                                       wheres=' AND '.join(wheres),
+                                       updwheres=' AND '.join(updwheres)))
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
@@ -2277,8 +2236,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                     self.set_tag_lastmodified(None, reftagdef)
 
                     self.delete_tag_intable(self.tagdefsdict['tags present'], 
-                                            '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(reftagdef.tagname),)
-                                            + ' EXCEPT SELECT subject FROM %s) s' % reftable, 
+                                            '(SELECT DISTINCT p.subject FROM "_tags present" p'
+                                            + ' LEFT OUTER JOIN %s r ON (p.subject = r.subject)' % reftable
+                                            + ' WHERE p.value = %s' % (wrapval(reftagdef.tagname),)
+                                            + '   AND r.subject IS NULL) s',
                                             idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', unnest=False)
                     
                 # update subject metadata for all implicitly modified subjects
@@ -2305,8 +2266,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             # update subject-tags mappings
             if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                 self.delete_tag_intable(self.tagdefsdict['tags present'], 
-                                        '(SELECT DISTINCT subject FROM "_tags present" WHERE value = %s' % (wrapval(tagdef.tagname),)
-                                        + ' EXCEPT SELECT subject FROM %s) s' % table, 
+                                        '(SELECT DISTINCT p.subject'
+                                        + ' FROM "_tags present" p'
+                                        + ' LEFT OUTER JOIN %s r ON (p.subject = r.subject)' % table
+                                        + ' WHERE p.value = %s' % (wrapval(tagdef.tagname),)
+                                        + '   AND r.subject IS NULL) s',
                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False)
 
                 self.set_tag_intable(self.tagdefsdict['tags present'], '(SELECT DISTINCT subject FROM %s)' % table,
@@ -2317,20 +2281,19 @@ class Application (webauthn2_handler_factory.RestHandler):
 
     def delete_tag_intable(self, tagdef, intable, idcol, valcol, unnest=True):
         table = wraptag(tagdef.tagname)
-        dcols = [ 'd.subject' ]
-        icols = [ idcol ]
+        icols = [ idcol + ' AS subject' ]
+        dwheres = [ 'd.subject = i.subject' ]
 
         if tagdef.dbtype != '' and valcol:
             if tagdef.multivalue and unnest:
                 valcol = 'unnest(%s)' % valcol
-            dcols.append( 'd.value' )
-            icols.append( valcol )
+            icols.append( valcol + ' AS value' )
+            dwheres.append( 'd.value = i.value' )
 
-        sql = (('DELETE FROM %(table)s AS d'
-                + ' WHERE ROW( %(dcols)s )'
-                + '       IN'
-                + '       (SELECT %(icols)s FROM %(intable)s)')
-               % dict(table=table, intable=intable, dcols=','.join(dcols), icols=','.join(icols)))
+        sql = ('DELETE FROM %(table)s AS d'
+               + ' USING (SELECT %(icols)s FROM %(intable)s) i'
+               + ' WHERE %(dwheres)s'
+               ) % dict(table=table, intable=intable, icols=','.join(icols), dwheres=' AND '.join(dwheres))
 
         #web.debug(tagdef)
         #traceInChunks(sql)
@@ -2429,18 +2392,24 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.path[-1] = (subjpreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok'] ], [])
         dquery, dvalues = self.build_files_by_predlist_path(self.path)
         
-        self.dbquery("CREATE TEMPORARY TABLE %(dtable)s AS %(dquery)s" 
+        self.dbquery("CREATE TEMPORARY TABLE %s ( id int8 PRIMARY KEY, owner text, writeok boolean )" % dtable)
+
+        self.dbquery("INSERT INTO %(dtable)s (id, owner, writeok) SELECT id, owner, writeok FROM (%(dquery)s) s" 
                      % dict(dtable=dtable, dquery=dquery), vars=dvalues)
+
+        if bool(getParamEnv('bulk tmp analyze', False)):
+            self.dbquery('ANALYZE %s' % dtable)
 
         if self.dbquery('SELECT count(*) AS count FROM %s' % dtable)[0].count == 0:
             raise NotFound(self, 'subjects matching subject constraints')
 
-        self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8)" % dict(mtable=mtable))
+        self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
 
         # first pass: do fine-grained authz and compute affected subjects and tags
         for tagdef in dtagdefs:
             dtquery, dtvalues = self.build_files_by_predlist_path([(
-                        [ web.Storage(tag=tagdef.tagname, op=None, vals=[]) ],
+                        [ web.Storage(tag=tagdef.tagname, op=None, vals=[]),
+                          web.Storage(tag='id', op='IN', vals='SELECT id FROM %s' % dtable) ],
                         lpreds[tagdef.tagname] + [ web.Storage(tag='id', op=None, vals=[]) ],
                         []
                         )],
@@ -2457,10 +2426,14 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # track subjects we'll modify explicitly
             self.dbquery(("INSERT INTO %(mtable)s (id)"
-                          + " SELECT DISTINCT id FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)"
-                          + " EXCEPT SELECT id FROM %(mtable)s")
-                         % dict(mtable=mtable, dtable=dtable, dtquery=dtquery),
+                          + " SELECT t.id FROM (%(dtquery)s) t"
+                          + " LEFT OUTER JOIN %(mtable)s m USING (id)"
+                          + " WHERE m.id IS NULL")
+                         % dict(mtable=mtable, dtquery=dtquery),
                          vars=dvalues)
+
+            if bool(getParamEnv('bulk tmp analyze', False)):
+                self.dbquery('ANALYZE %s' % mtable)
 
             # find all implicitly mutable tagnames
             reftags = self.tagdef_reftags_closure(tagdef)
@@ -2471,12 +2444,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                 reftagdef = self.tagdefsdict[reftag]
                 self.dbquery(("INSERT INTO %(mtable)s (id)"
                               + " SELECT DISTINCT r.subject"
-                              + " FROM %(dtable)s s"
-                              + " JOIN (%(dtquery)s) d USING (id)"
-                              + " JOIN %(reftag)s r ON (d.id = r.subject AND d.%(tagname)s = r.value)"
-                              + " EXCEPT SELECT id FROM %(mtable)s")
-                         % dict(mtable=mtable, dtable=dtable, dtquery=dtquery, reftag=self.wraptag(reftag), tagname=self.wraptag(tagdef.tagname, '', '')),
-                         vars=dvalues)
+                              + " FROM %(reftag)s r"
+                              + " JOIN (%(dtquery)s) d ON (d.%(tagname)s = r.value)"
+                              + " LEFT OUTER JOIN %(mtable)s m ON (r.subject = m.id)"
+                              + " WHERE m.id IS NULL"
+                              ) % dict(mtable=mtable, dtquery=dtquery, reftag=self.wraptag(reftag), tagname=self.wraptag(tagdef.tagname, '', '')),
+                             vars=dvalues)
+
+                if bool(getParamEnv('bulk tmp analyze', False)):
+                    self.dbquery('ANALYZE %s' % mtable)
 
             if tagdef.tagref and (not tagdef.softtagref):
                 otagdef = self.tagdefsdict[tagdef.tagref]
@@ -2490,20 +2466,20 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if tagdef.writeok is None:
                     # may need to test permissions on per-object basis for this tag before deleting triples
                     if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                        count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                        count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
                                               + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
                                               + ' WHERE NOT coalesce(o.writeok, False)')
-                                             % dict(dtable=dtable, dtquery=dtquery, oquery=oquery, 
+                                             % dict(dtquery=dtquery, oquery=oquery, 
                                                     tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', '')),
                                              vars=dvalues)[0].count
                         if count > 0:
                             raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
 
                     if tagdef.writepolicy in [ 'objectowner' ]:
-                        count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
+                        count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
                                               + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
                                               + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)')
-                                             % dict(dtable=dtable, dtquery=dtquery, oquery=oquery, 
+                                             % dict(dtquery=dtquery, oquery=oquery, 
                                                     tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', ''),
                                                     roles=','.join([ wrapval(r) for r in self.context.attributes ])),
                                              vars=dvalues)[0].count
@@ -2513,16 +2489,16 @@ class Application (webauthn2_handler_factory.RestHandler):
             if td.writeok is None:
                 # may need to test permissions on per-subject basis for this tag before deleting triples
                 if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
-                                          + ' WHERE NOT coalesce(s.writeok, False)')
+                    count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
+                                          + ' WHERE NOT coalesce(d.writeok, False)')
                                          % dict(dtable=dtable, dtquery=dtquery), 
                                          vars=dvalues)[0].count
                     if count > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tagdef.tagname)
 
                 if td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
-                    count = self.dbquery(('SELECT count(*) AS count FROM %(dtable)s s JOIN (%(dtquery)s) d USING (id)'
-                                          + ' WHERE NOT coalesce(s.owner = ANY (ARRAY[%(roles)s]), False)')
+                    count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
+                                          + ' WHERE NOT coalesce(d.owner = ANY (ARRAY[%(roles)s]), False)')
                                          % dict(dtable=dtable, dtquery=dtquery, roles=','.join([ wrapval(r) for r in self.context.attributes ])),
                                          vars=dvalues)[0].count
                     if count > 0:
@@ -2541,7 +2517,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     ('(SELECT subject, value'
                                      + ' FROM "_tags present" p'
                                      + ' WHERE p.value = %(tagname)s'
-                                     + ' EXCEPT SELECT subject, %(tagname)s FROM %(tagtable)s) s')
+                                     + '   AND (SELECT True FROM %(tagtable)s d WHERE d.subject = p.subject AND %(tagname)s = p.value) IS NULL) s')
                                     % dict(tagname=wrapval(dtag), tagtable=wraptag(dtag)),
                                     idcol='subject', 
                                     valcol=wrapval(dtag) + '::text', unnest=False)
@@ -2575,10 +2551,10 @@ class Application (webauthn2_handler_factory.RestHandler):
         mtags = set()
 
         # save subject-selection results, i.e. subjects we are deleting
-        self.dbquery('CREATE TEMPORARY TABLE %(etable)s ( id int8, file text, writeok boolean )'
+        self.dbquery('CREATE TEMPORARY TABLE %(etable)s ( id int8 PRIMARY KEY, file text, writeok boolean )'
                      % dict(etable=etable))
         
-        self.dbquery('CREATE TEMPORARY TABLE %(mtable)s ( id int8 )'
+        self.dbquery('CREATE TEMPORARY TABLE %(mtable)s ( id int8 PRIMARY KEY )'
                      % dict(mtable=mtable))
         
         self.dbquery(('INSERT INTO %(etable)s (id, writeok)'
@@ -2589,10 +2565,6 @@ class Application (webauthn2_handler_factory.RestHandler):
         if self.dbquery('SELECT count(*) AS count FROM %s' % etable)[0].count == 0:
             raise NotFound(self, 'bulk-delete subjects')
 
-        if bool(getParamEnv('bulk tmp index', False)):
-            self.dbquery('CREATE INDEX %(index)s ON %(etable)s (id)'
-                         % dict(etable=etable, index=wraptag('tmp_e_%s_id_idx' % self.request_guid, '', '')))
-        
         if bool(getParamEnv('bulk tmp analyze', False)):
             self.dbquery('ANALYZE %s' % etable)
 
@@ -2621,8 +2593,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             for reftag in reftags:
                 self.dbquery(('INSERT INTO %(mtable)s (id)'
                               + ' SELECT DISTINCT r.subject FROM (%(stquery)s) s JOIN %(reftable)s r ON (s.%(tagname)s = r.value)'
-                              + ' EXCEPT SELECT id FROM %(mtable)s'
-                              + ' EXCEPT SELECT id FROM %(etable)s')
+                              + ' WHERE (SELECT id FROM %(mtable)s m WHERE r.subject = m.id LIMIT 1) IS NULL'
+                              + '   AND (SELECT id FROM %(etable)s e WHERE r.subject = e.id LIMIT 1) IS NULL')
                              % dict(mtable=mtable, etable=etable, stquery=stquery, reftable=self.wraptag(reftag), tagname=self.wraptag(tagname, '', '')),
                              vars=evalues)
 
