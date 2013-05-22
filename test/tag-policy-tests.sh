@@ -44,6 +44,8 @@ cookie=$(mktemp)
 
 logfile=$(mktemp)
 
+ACCEPT="${ACCEPT:-text/csv}"
+
 cleanup()
 {
     rm -f "$tempfile" "$logfile" "$tempfile2" "$cookie"
@@ -115,7 +117,7 @@ EOF
 status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
 [[ "$status" = 201 ]] || error got "$status" during login
 
-#mycurl "/subject/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: text/csv"
+#mycurl "/subject/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: ${ACCEPT}"
 
 querytest()
 {
@@ -126,10 +128,10 @@ querytest()
     shift 2
 
     truncate -s 0 $tempfile2
-    status=$(mycurl "${url}?limit=none" -H "Accept: text/csv" -o $tempfile2)
+    status=$(mycurl "${url}?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
     [[ "$status" = $code ]] || error got "$status" querying "$url"
 
-    lines=$(wc -l < $tempfile2)
+    lines=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
     [[ "$lines" -eq $count ]] || error got $lines results querying "$url" when $count should be visible: "$(cat $tempfile2)"
 }
 
@@ -252,7 +254,7 @@ done
 status=$(mycurl "/tags/name:regexp:test${testno}-%5B4567%5D-R(owner=${otherrole})" -X PUT -o logfile)
 [[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}-R
 
-#mycurl "/subject/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: text/csv"
+#mycurl "/subject/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: ${ACCEPT}"
 
 # begin read-authz tests of pre-defined test data
 
@@ -415,12 +417,12 @@ tagreftest_serial()
 		if [[ "$status" = 204 ]]
 		then
 		    truncate -s 0 $tempfile2
-		    status=$(mycurl "$url2" -H "Accept: text/csv" -o $tempfile2)
+		    status=$(mycurl "$url2" -H "Accept: ${ACCEPT}" -o $tempfile2)
 		    [[ "$status" = 200 ]] || error got "$status" instead of 200 while querying "$url2"
 		    count=$(grep "test${testno}-${s}" "$tempfile2" | wc -l)
 		    [[ "$count" -eq 1 ]] || {
 			cat $tempfile2
-			mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+			mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: ${ACCEPT}"
 			error got $count results instead of 1 while querying "$url2"
 		    }
 		    if [[ $i = 3 ]]
@@ -508,12 +510,12 @@ tagreftest()
 	[[ "$status" = $code ]] && {
 
 	    truncate -s 0 $tempfile2
-	    status=$(mycurl "$url2" -H "Accept: text/csv" -o $tempfile2)
+	    status=$(mycurl "$url2" -H "Accept: ${ACCEPT}" -o $tempfile2)
 	    [[ "$status" = 200 ]] || error got "$status" instead of 200 while querying "$url2"
 	    
-	    count=$(wc -l < $tempfile2)
+	    count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
 	    [[ "$count" -eq ${#subjects[@]} ]] || {
-		mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: text/csv"
+		mycurl "/subject/name=${subj}(id;name;${tag})" -H "Accept: ${ACCEPT}"
 		error got $count results instead of ${#subjects[@]} while querying "$url2"
 	    }
 
@@ -584,9 +586,9 @@ tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectand
 tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
 tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
 
-status=$(mycurl "/subject/subject%20text:word:${username}(name)" -H "Accept: text/csv" -o $logfile)
+status=$(mycurl "/subject/subject%20text:word:${username}(name)" -H "Accept: ${ACCEPT}" -o $logfile)
 [[ $status = 200 ]] || error got "$status" during free-text query test
-count=$(wc -l < $logfile)
+count=$(grep -v '^[][]*$' < $logfile | wc -l)
 [[ $count -gt 5 ]] || error found too few results during free-text query test for ${username}
 
 if [[ -n "$mutablerole" ]]
@@ -669,17 +671,17 @@ tagtest 204 foo1 1B 2B 3B
 # test implicit delete path via change to referenced tag foo3, for which we preserved references above
 # this depends on 3B being the final object tested above for tagreftest 204 3 ...
 truncate -s 0 $tempfile2
-status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
 [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
-count=$(wc -l < $tempfile2)
+count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
 [[ $count -gt 0 ]] || error failed to find existing references foo3_3 to tag foo3
 
 tagtest 204 foo3 1B 2B 3B 4B 5B
 
 truncate -s 0 $tempfile2
-status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: text/csv" -o $tempfile2)
+status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
 [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
-count=$(wc -l < $tempfile2)
+count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
 [[ $count -eq 0 ]] || error found $count existing references foo3_3 to tag foo3 after they should have disappeared: "$(cat $tempfile2)"
 
 
