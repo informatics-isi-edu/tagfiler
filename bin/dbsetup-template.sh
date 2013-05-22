@@ -22,14 +22,10 @@ HOME_HOST="$1"
 SVCPREFIX="$2"
 DBNAME="$3"
 admin="$4"
-uploader="$5"
-downloader="$6"
-curator="$7"
-grader="$8"
 
 echo args: "$@"
 
-shift 8
+shift 4
 
 # this script will recreate all tables, but only on a clean database
 

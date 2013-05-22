@@ -22,13 +22,7 @@
 ######
 
 # role mapping used in default data and ACLs
-
-# default for trial-data demo
 admin="${admin:-admin}"
-uploader="${uploader:-uploader}"
-downloader="${downloader:-downloader}"
-curator="${curator:-coordinator}"
-grader="${grader:-grader}"
 
 TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get_python_lib()'`/tagfiler
 
@@ -38,8 +32,6 @@ SVCPREFIX=${1:-tagfiler}
 # the core and template database names
 DBNAME=${SVCPREFIX}	#TODO(schuler): this will become the core db name
 TEMPLATE=${SVCPREFIX}	#TODO(schuler): this will be suffixed with _template
-
-DEMO=${2}
 
 # you can set this to override...
 HOME_HOST=
@@ -103,8 +95,8 @@ fi
 #TODO(schuler): uncomment next 2 lines when cat-o-cats ready
 #runuser -c "dropdb ${DBNAME}" - ${PGADMIN}
 #runuser -c "createdb -O ${SVCUSER} ${DBNAME}" - ${PGADMIN}
-runuser -c "dropdb ${TEMPLATE}" - ${PGADMIN}
-runuser -c "createdb -O ${SVCUSER} ${TEMPLATE}" - ${PGADMIN}
+runuser -c "dropdb \"${TEMPLATE}\"" - ${PGADMIN}
+runuser -c "createdb -O ${SVCUSER} \"${TEMPLATE}\"" - ${PGADMIN}
 
 # create local helper scripts
 mkdir -p /etc/httpd/passwd
@@ -131,14 +123,10 @@ cp bin/dbsetup-template.sh ${SVCHOME}/dbsetup-template.sh
 chown ${SVCUSER}: ${SVCHOME}/dbsetup-template.sh
 chmod a+x ${SVCHOME}/dbsetup-template.sh
 
-cp bin/dbsetup-*-demo.sh ${SVCHOME}/
-chown ${SVCUSER}: ${SVCHOME}/dbsetup-*-demo.sh
-chmod a+x ${SVCHOME}/dbsetup-*-demo.sh
-
 # setup core and template databases
 #TODO(schuler): uncomment next line when cat-o-cats ready
 #runuser -c "${SVCHOME}/dbsetup.sh ${DBNAME}" - ${SVCUSER}
-runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} ${TEMPLATE} \"${admin}\" \"${uploader}\" \"${downloader}\" \"${curator}\" \"${grader}\" \"${DEMO}\"" - ${SVCUSER}
+runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} \"${TEMPLATE}\" \"${admin}\"" - ${SVCUSER}
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
