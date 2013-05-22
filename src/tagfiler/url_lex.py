@@ -50,7 +50,8 @@ keywords = {
     'absent' : 'ABSENT',
     'word' : 'WORD',
     'asc' : 'ASC',
-    'desc' : 'DESC'
+    'desc' : 'DESC',
+    'maintenance': 'MAINTENANCE'
 }
 
 tokens = [ 'ESCAPESTRING', 'STRING', 'NUMSTRING' ] + list(keywords.values())

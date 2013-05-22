@@ -26,6 +26,9 @@ import subjects
 from subjects import Node
 import datetime
 import StringIO
+import psycopg2
+import psycopg2.extensions
+
 
 jsonMungeTypes = set([ datetime.datetime, datetime.date ])
 
@@ -147,6 +150,38 @@ class Toplevel (Node):
             return descriptor
 
         return self.dbtransact(body, postCommit)
+
+class Maintenance(Node):
+    def __init__(self, parser, appname, queryopts={}):
+        Node.__init__(self, parser, appname, queryopts)
+
+    def PUT(self, uri):
+        if self.config.admin not in self.context.attributes:
+            raise Forbidden(self, 'maintenance')
+
+        def db_body(db):
+            self.db = db
+            return None
+
+        # don't use normal dbtransact because vacuum isn't allowed there
+        self._db_wrapper(db_body)
+
+        self.db._db_cursor().connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+        if downcast_value('boolean', self.queryopts.get('cluster', False)):
+            self.dbquery('CLUSTER')
+        if downcast_value('boolean', self.queryopts.get('vacuum', False)):
+            if downcast_value('boolean', self.queryopts.get('analyze', False)):
+                self.dbquery('VACUUM ANALYZE')
+            else:
+                self.dbquery('VACUUM')
+        elif downcast_value('boolean', self.queryopts.get('analyze', False)):
+            self.dbquery('ANALYZE')
+
+        self.db._db_cursor().connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+
+        web.ctx.status = '204 No Content'
+        return ''
 
 class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI

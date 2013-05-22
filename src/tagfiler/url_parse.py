@@ -34,6 +34,7 @@ start = 'start'
 
 def p_start(p):
     """start : toplevel
+             | maintenance
              | file
              | subject
              | tagdef
@@ -50,6 +51,10 @@ def p_toplevel(p):
     """toplevel : slash string
                 | slash string slash"""
     p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2])
+
+def p_maintenance(p):
+    """maintenance : slash string slash MAINTENANCE queryopts"""
+    p[0] = url_ast.Maintenance(parser=url_parse_func, appname=p[2], queryopts=p[5])
 
 def p_toplevel_opts1(p):
     """toplevel : slash string queryopts"""
