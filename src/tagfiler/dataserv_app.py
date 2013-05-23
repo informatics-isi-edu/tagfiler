@@ -2123,7 +2123,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2149,7 +2149,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
-                                          + ' WHERE t2.subject IS NULL) s'
+                                          + ' WHERE t2.subject IS NULL)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2312,7 +2312,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2338,7 +2338,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL) s'
+                                          + ' WHERE t2.subject IS NULL)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2388,7 +2388,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
@@ -2413,7 +2413,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' FROM (SELECT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL) s'
+                                          + ' WHERE t2.subject IS NULL)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
