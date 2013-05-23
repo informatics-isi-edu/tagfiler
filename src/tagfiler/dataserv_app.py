@@ -2879,7 +2879,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.dbquery('CREATE %s TABLE %s ( %s )' % ((subject_iter == False or subject_iter_rewindable or type(subject_iter) == list) and 'TEMPORARY' or '',
                                                         wraptag(self.input_tablename, '', ''), 
                                                         ','.join(input_column_defs)))
-            self.dbquery('CREATE INDEX %s ON %s ( created, updated )' % (self.input_created_idxname, self.input_tablename))
+            self.dbquery('CREATE INDEX %s ON %s ( created, updated )' % (wraptag(self.input_created_idxname), self.input_tablename))
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body1() complete' % (self.input_tablename))
 
