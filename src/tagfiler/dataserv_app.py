@@ -1998,6 +1998,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             refcol = None
             refval = None
 
+        rolekeys = ','.join([ wrapval(r, 'text') for r in set(self.context.attributes).union(set(['*'])) ])
+        
         if enforce_tag_authz:
             # do the write-authz tests for the active set of intable rows
             if tagdef.writeok == False:
@@ -2034,7 +2036,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if tagdef.writepolicy in [ 'objectowner' ]:
                     # None means we need object is_owner for this user
-                    rolekeys = ','.join([ wrapval(r, 'text') for r in set(self.context.attributes).union(set(['*'])) ])
                     query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
                               + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                               + ' WHERE coalesce(r.owner NOT IN (%(rolekeys)s), True)'
@@ -2079,9 +2080,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                      idcol=idcol,
                      valcol=tagdef.multivalue and unnest and 'unnest(%s)' % valcol or valcol,
                      flagcol=flagcol,
+                     isowncol=isowncol,
                      newcol=newcol,
                      tagname=wrapval(tagdef.tagname),
                      tagspresent=wraptag('tags present'),
+                     rolekeys=rolekeys,
                      wheres=' AND '.join(wheres))
 
         if tagdef.multivalue:
@@ -2215,7 +2218,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             reftags = self.tagdef_reftags_closure(tagdef)
             mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
 
-            if reftags:
+            if reftags and (not flagcol or not isowncol):
                 self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
 
             if newcol:
@@ -2224,23 +2227,45 @@ class Application (webauthn2_handler_factory.RestHandler):
                     reftagdef = self.tagdefsdict[reftag]
                     reftable = self.wraptag(reftag)
 
-                    # TODO: if flagcol then track changes in intable flagcol instead of mtable
-                    
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
-                    query = ("WITH deletions AS ("
-                             + " DELETE FROM %s r" % reftable
-                             + " USING "
-                             + "   (SELECT subject, i2.value" + oldsubj_updtrips_query_frag + ') AS i,'
-                             + "   %(table)s AS t"
-                             + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
-                             + " RETURNING r.subject"
-                             + ")"
-                             + " INSERT INTO %s" % mtable
-                             + " SELECT DISTINCT subject FROM deletions d"
-                             + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
-                             + " WHERE m.id IS NULL"
-                             ) % parts
+                    if flagcol and isowncol:
+                        # propogate modified subjects to caller via intable.flagcol
+                        query = ("WITH deletions AS ("
+                                 + " DELETE FROM %s r" % reftable
+                                 + " USING "
+                                 + "   (SELECT subject, i2.value" + oldsubj_updtrips_query_frag + ') AS i,'
+                                 + "   %(table)s AS t"
+                                 + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                                 + " RETURNING r.subject"
+                                 + "),"
+                                 + " updates AS ("
+                                 + " UPDATE %(intable)s i SET %(flagcol)s = True"
+                                 + " FROM (SELECT DISTINCT subject FROM deletions) d"
+                                 + " WHERE i.%(idcol)s = d.subject AND NOT i.%(flagcol)s"
+                                 + ")"
+                                 + " INSERT INTO %(intable)s (%(idcol)s, %(flagcol)s, %(isowncol)s)"
+                                 + " SELECT DISTINCT d.subject, True, coalesce(o.value IN (%(rolekeys)s), False)"
+                                 + " FROM deletions d"
+                                 + " LEFT OUTER JOIN %(intable)s i ON (d.subject = i.%(idcol)s)"
+                                 + " LEFT OUTER JOIN _owner o ON (d.subject = o.subject)"
+                                 + " WHERE i.%(idcol)s IS NULL"
+                                  ) % parts
+                    else:
+                        # track modified subjects in mtable
+                        query = ("WITH deletions AS ("
+                                 + " DELETE FROM %s r" % reftable
+                                 + " USING "
+                                 + "   (SELECT subject, i2.value" + oldsubj_updtrips_query_frag + ') AS i,'
+                                 + "   %(table)s AS t"
+                                 + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                                 + " RETURNING r.subject"
+                                 + ")"
+                                 + " INSERT INTO %s" % mtable
+                                 + " SELECT DISTINCT d.subject FROM deletions d"
+                                 + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
+                                 + " WHERE m.id IS NULL"
+                                 ) % parts
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
@@ -2260,19 +2285,43 @@ class Application (webauthn2_handler_factory.RestHandler):
                     
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
-                    query = ("WITH deletions AS ("
-                             + " DELETE FROM %s r" % reftable
-                             + " USING "
-                             + "   (SELECT subject, i2.value" + allsubj_updtrips_query_frag + ') AS i,'
-                             + "   %(table)s AS t"
-                             + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
-                             + " RETURNING r.subject"
-                             + ")"
-                             + " INSERT INTO %s" % mtable
-                             + " SELECT DISTINCT subject FROM deletions d"
-                             + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
-                             + " WHERE m.id IS NULL"
-                             ) % parts
+                    if flagcol and isowncol:
+                        # propogate modified subjects to caller via intable.flagcol
+                        query = ("WITH deletions AS ("
+                                 + " DELETE FROM %s r" % reftable
+                                 + " USING "
+                                 + "   (SELECT subject, i2.value" + allsubj_updtrips_query_frag + ') AS i,'
+                                 + "   %(table)s AS t"
+                                 + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                                 + " RETURNING r.subject"
+                                 + "),"
+                                 + " updates AS ("
+                                 + " UPDATE %(intable)s AS i SET %(flagcol)s = True"
+                                 + " FROM (SELECT DISTINCT subject FROM deletions) d"
+                                 + " WHERE i.%(idcol)s = d.subject AND NOT i.%(flagcol)s"
+                                 + ")"
+                                 + " INSERT INTO %(intable)s (%(idcol)s, %(flagcol)s, %(isowncol)s)"
+                                 + " SELECT DISTINCT d.subject, True, coalesce(o.value IN (%(rolekeys)s), False)"
+                                 + " FROM deletions d"
+                                 + " LEFT OUTER JOIN %(intable)s i ON (d.subject = i.%(idcol)s)"
+                                 + " LEFT OUTER JOIN _owner o ON (d.subject = o.subject)"
+                                 + " WHERE i.%(idcol)s IS NULL"
+                                 ) % parts
+                    else:
+                        # track modified subjects in mtable
+                        query = ("WITH deletions AS ("
+                                 + " DELETE FROM %s r" % reftable
+                                 + " USING "
+                                 + "   (SELECT subject, i2.value" + allsubj_updtrips_query_frag + ') AS i,'
+                                 + "   %(table)s AS t"
+                                 + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                                 + " RETURNING r.subject"
+                                 + ")"
+                                 + " INSERT INTO %s" % mtable
+                                 + " SELECT DISTINCT d.subject FROM deletions d"
+                                 + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
+                                 + " WHERE m.id IS NULL"
+                                 ) % parts
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
@@ -2285,15 +2334,20 @@ class Application (webauthn2_handler_factory.RestHandler):
                 count += self.dbquery(query) # only run update for old subjects
 
             if reftags:
-                # update subject metadata for all implicitly modified subjects
-                for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
-                                  ('subject last tagged txid', 'txid_current()') ]:
-                    self.set_tag_intable(self.tagdefsdict[tag], mtable,
-                                         idcol='id', valcol=val, flagcol=None,
-                                         wokcol=None, isowncol=None,
-                                         enforce_tag_authz=False, set_mode='merge', depth=depth+1)
+                if not flagcol or not isowncol:
+                    # update subject metadata for all implicitly modified subjects
+                    for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                                      ('subject last tagged txid', 'txid_current()') ]:
+                        self.set_tag_intable(self.tagdefsdict[tag], mtable,
+                                             idcol='id', valcol=val, flagcol=None,
+                                             wokcol=None, isowncol=None,
+                                             enforce_tag_authz=False, set_mode='merge', depth=depth+1)
 
-                self.dbquery('DROP TABLE %s' % mtable)
+                    self.dbquery('DROP TABLE %s' % mtable)
+                else:
+                    # we passed modified subject info to caller via intable.flagcol...
+                    pass
+                
 
                 for reftag in reftags:
                     # update per-referenced tag metadata and subject-tags mappings
