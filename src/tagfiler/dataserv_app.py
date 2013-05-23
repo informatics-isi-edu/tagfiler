@@ -2120,7 +2120,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT DISTINCT %(idcol)s AS subject'
@@ -2149,7 +2149,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
                                           + ' WHERE t2.subject IS NULL)'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
