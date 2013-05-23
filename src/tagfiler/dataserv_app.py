@@ -3209,10 +3209,10 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 # set regular subject ID tags for newly created rows, enforcing write authz
                 for td in self.input_column_tds:
-                    if self.spreds.has_key(td.tagname):
+                    if self.spreds.has_key(td.tagname) and not self.lpreds.has_key(td.tagname) and td.tagname not in ['owner', 'read users', 'write users']:
                         self.set_tag_intable(td, intable,
                                              idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
-                                             wokcol='writeok', isowncol='is_owner', set_mode='merge')
+                                             wokcol='writeok', isowncol='is_owner', set_mode='merge', wheres=['created = True'])
 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject skeys initialized' % (self.input_tablename))
 
