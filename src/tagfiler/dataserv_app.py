@@ -2052,7 +2052,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
-            query = (('SELECT True AS unauthorized'
+            query = (('SELECT True AS notfound'
                       + ' FROM (SELECT %(refval)s AS val FROM %(intable)s s) s'
                       + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                       + ' WHERE r.%(refcol)s IS NULL'
