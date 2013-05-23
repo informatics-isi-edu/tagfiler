@@ -2116,14 +2116,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             if newcol:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2145,11 +2145,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
-                                          + ' WHERE t2.subject IS NULL'
+                                          + ' WHERE t2.subject IS NULL) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2305,14 +2305,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             if newcol:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2334,11 +2334,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL'
+                                          + ' WHERE t2.subject IS NULL) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
@@ -2381,14 +2381,14 @@ class Application (webauthn2_handler_factory.RestHandler):
             if newcol:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
                                           + ' WHERE t2.subject IS NULL'
                                           + ' UNION ALL'
                                           + ' SELECT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
@@ -2409,11 +2409,11 @@ class Application (webauthn2_handler_factory.RestHandler):
             else:
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('SELECT i.subject'
+                                         ('(SELECT i.subject'
                                           + ' FROM (SELECT %(idcol)s AS subject'
                                           + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
                                           + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL'
+                                          + ' WHERE t2.subject IS NULL) s'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
