@@ -2872,7 +2872,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # special columns initialized during JOIN with query result
             # rows resulting in creation of new subjects will get default writeok and is_owner True values
-            input_column_defs += [ 'id int8 PRIMARY KEY',
+            input_column_defs += [ 'id int8 UNIQUE',
                                    'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True',
                                    'updated boolean DEFAULT False', 'created boolean DEFAULT False' ]
 
