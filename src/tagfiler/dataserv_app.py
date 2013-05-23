@@ -2135,20 +2135,20 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                         ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag
                                           + ' UNION ALL '
-                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
+                                          ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
-                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, newcol='created')
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT subject, value' + oldsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject, value' + oldsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT subject, value' + newsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject, value' + newsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query) 
             else:
@@ -2391,20 +2391,20 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                         ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag
                                           + ' UNION ALL '
-                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
+                                          ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
-                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, newcol='created')
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT subject, i2.value' + oldsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject, i2.value' + oldsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT subject, i2.value' + newsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject, i2.value' + newsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query) 
             else:
@@ -2472,19 +2472,19 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                         ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag
                                           + ' UNION ALL '
-                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
+                                          ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, newcol='created')
 
                 query = ('INSERT INTO %(table)s (subject)'
-                         + ' SELECT subject' + oldsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject' + oldsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject)'
-                         + ' SELECT subject' + newsubj_newtrips_query_frag + ') t'
+                         + ' SELECT subject' + newsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
 
@@ -2502,7 +2502,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
                  query = ('INSERT INTO %(table)s (subject)'
-                          + ' SELECT subject' + allsubj_newtrips_query_frag + ') t'
+                          + ' SELECT subject' + allsubj_newtrips_query_frag
                           ) % parts
                  count += self.dbquery(query)
 
@@ -3212,7 +3212,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if self.spreds.has_key(td.tagname) and not self.lpreds.has_key(td.tagname) and td.tagname not in ['owner', 'read users', 'write users']:
                         self.set_tag_intable(td, intable,
                                              idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
-                                             wokcol='writeok', isowncol='is_owner', set_mode='merge', wheres=['created = True'])
+                                             wokcol='writeok', isowncol='is_owner', set_mode='merge', wheres=['created = True'], newcol='created')
 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject skeys initialized' % (self.input_tablename))
 
@@ -3259,7 +3259,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          idcol='id', valcol=val, flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          enforce_tag_authz=False, set_mode='merge',
-                                         wheres=[ 'created = True' ])
+                                         wheres=[ 'created = True' ],
+                                         newcol='created')
                 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject metadata initialized' % (self.input_tablename))
 
@@ -3298,7 +3299,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                      idcol='id', valcol=val, flagcol=None,
                                      wokcol='writeok', isowncol='is_owner',
                                      enforce_tag_authz=False, set_mode='merge',
-                                     wheres=[ 'updated = True' ])
+                                     wheres=[ 'updated = True' ],
+                                     newcol='created')
 
             def decode_name(s):
                 if s[0:3] == 'in_':
