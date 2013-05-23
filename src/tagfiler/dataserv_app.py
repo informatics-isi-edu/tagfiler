@@ -1945,7 +1945,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.set_tag_lastmodified(subject, tagdef)
         
 
-    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[], test=True, depth=0):
+    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[], test=True, depth=0, newcol=None):
         """Perform bulk-setting of tags from an input table.
 
            tagdef:  the tag to update
@@ -2053,6 +2053,27 @@ class Application (webauthn2_handler_factory.RestHandler):
             if self.dbquery(query, vars=refvalues)[0].count > 0:
                 raise Conflict(self, data='Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
 
+        if test and tagdef.unique:
+            # test for uniqueness violations
+            if self.dbquery(('SELECT max(count) AS max'
+                             + ' FROM (SELECT count(DISTINCT subject) AS count'
+                             + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
+                             + '             UNION ALL '
+                             + '             SELECT subject, value FROM %(table)s) AS t'
+                             + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
+                raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
+            #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
+                
+        parts = dict(table=table,
+                     intable=intable,
+                     idcol=idcol,
+                     valcol=valcol,
+                     flagcol=flagcol,
+                     newcol=newcol,
+                     tagname=wrapval(tagdef.tagname),
+                     tagspresent=wraptag('tags present'),
+                     wheres=' AND '.join(wheres))
+
         if tagdef.multivalue:
             # multi-valued tags are straightforward set-algebra on triples
             
@@ -2063,26 +2084,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # clear graph triples not present in input
                 raise NotImplementedError()
 
-            if test and tagdef.unique:
-                # test for uniqueness violations
-                if self.dbquery(('SELECT max(count) AS max'
-                                 + ' FROM (SELECT count(DISTINCT subject) AS count'
-                                 + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                                 + '             UNION ALL '
-                                 + '             SELECT subject, value FROM %(table)s) AS t'
-                                 + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
-                    raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
-                #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
-                
-            # add input triples not present in graph
             if flagcol:
-                parts = dict(table=table,
-                             intable=intable,
-                             idcol=idcol,
-                             valcol=valcol,
-                             flagcol=flagcol,
-                             wheres=' AND '.join(wheres))
-
                 query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                          + ' FROM (SELECT subject'
                          + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
@@ -2092,101 +2094,100 @@ class Application (webauthn2_handler_factory.RestHandler):
                          + '       GROUP BY subject) t'
                          + ' WHERE i.%(idcol)s = t.subject'
                          ) % parts
-
-                #web.debug(query)
-                self.dbquery(query)
-
-            query = ('INSERT INTO %(table)s (subject, value)'
-                     + ' SELECT i.subject, i.value'
-                     + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                     + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                     + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
-                     + ' WHERE t2.subject IS NULL'
-                     ) % dict(table=table, intable=intable, idcol=idcol, valcol=valcol,
-                              wheres=' AND '.join(wheres))
-            #web.debug(query)
-            count += self.dbquery(query)
-
-        else:
-            # single-valued tags require insert-or-update due to cardinality constraint
-
-            incols = [ '%(idcol)s AS subject' % dict(idcol=idcol) ]
-            excols = [ 'subject' ]
-            
-            addwheres = [ '%(idcol)s NOT IN (SELECT subject FROM %(table)s)' % dict(idcol=idcol, table=table) ] + wheres
-            updwheres = [ 't.subject = i.subject', '(i.value IS NOT NULL)' ]
-            flagwheres = [ '((%s) IS NOT NULL)' % valcol ]
-            joinwheres = [ 'i2.%(idcol)s = t.subject' ]
-
-            if tagdef.dbtype != '':
-                incols.append( '%(valcol)s AS value' % dict(valcol=valcol) )
-                excols.append( 'value' )
-                addwheres.append( '((%(valcol)s) IS NOT NULL)' % dict(valcol=valcol) )
-                updwheres.append( 'i.value != t.value' )
-            else:
-                addwheres.append( '((%(valcol)s) = True)' % dict(valcol=valcol) )
-                flagwheres.append( '((%(valcol)s) = True)' % dict(valcol=valcol) )
-
-            incols = ', '.join(incols)
-            excols = ', '.join(excols)
-            addwheres = ' AND '.join(addwheres)
-
-            if tagdef.dbtype != '':
-                # input null value represents absence of triples w/ values
-                where = '(%s) IS NULL' % valcol
-            else:
-                # input true value represents presence of pair (predicate typed w/ no object)
-                where = '(%s) != True' % valcol
                 
+                #web.debug(query)
+                if newcol:
+                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
+                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
+                else:
+                    self.dbquery(query) # do expensive update for all subjects
+
+            # add input triples not present in graph
+
+            if newcol:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          + ' UNION ALL'
+                                          + ' SELECT DISTINCT %(idcol)s AS subject'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT i.subject, i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # only intersect for old subjects
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         ) % parts
+                count += self.dbquery(query) # blindly insert tags for new subjects
+            else:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT i.subject, i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # intersect for all subjects
+
+
+        elif tagdef.dbtype != '':
+            # single-valued tags require insert-or-update due to cardinality constraint
+            
             if set_mode == 'replace':
                 raise NotImplementedError()
-                
-            if test and tagdef.unique and tagdef.dbtype != '':
-                # test for uniqueness violations
-                query = ('SELECT max(count) AS max'
-                         + ' FROM (SELECT count(DISTINCT subject) AS count'
-                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                         + '             UNION ALL '
-                         + '             SELECT subject, value FROM %(table)s) AS t'
-                         + '       GROUP BY value) AS t') % dict(intable=intable, table=table,
-                                                                 idcol=idcol, valcol=valcol,
-                                                                 wheres='NOT (%s)' % where)
-                #web.debug('bulk set unique single-valued tag "%s"' % tagdef.tagname)
-                #web.debug(query)
-                if self.dbquery(query)[0].max > 1:
-                    raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
-                #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
-        
-            # track add/update of graph for inequal input triples
+
             if flagcol:
-                query = ('UPDATE %(intable)s AS d SET %(flagcol)s = True'
-                         + ' FROM (SELECT i.subject, t.subject AS existing'
-                         + '       FROM (SELECT %(incols)s FROM %(intable)s WHERE %(wheres)s) i'
-                         + '       LEFT OUTER JOIN %(table)s t USING (%(excols)s)) t'
-                         + ' WHERE d.%(idcol)s = t.subject AND t.existing IS NULL'
-                         ) % dict(table=table, intable=intable,
-                                  idcol=idcol, flagcol=flagcol,
-                                  incols=incols, excols=excols,
-                                  wheres=' AND '.join(wheres + flagwheres))
+                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                         + ' FROM (SELECT subject'
+                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
+                         + '       LEFT OUTER JOIN %(table)s t USING (subject)'
+                         + '       WHERE t.subject IS NULL OR t.value != i2.value) t'
+                         + ' WHERE i.%(idcol)s = t.subject'
+                         ) % parts
+
                 #web.debug(query)
-                self.dbquery(query)
-                
-            # add triples where graph lacked them
-            query = ('INSERT INTO %(table)s ( %(excols)s )'
-                     + ' SELECT %(incols)s'
-                     + ' FROM %(intable)s AS i'
-                     + ' WHERE %(addwheres)s') % dict(table=table, intable=intable,
-                                                      idcol=idcol, incols=incols, excols=excols,
-                                                      addwheres=addwheres)
-            #web.debug(query)
-            count += self.dbquery(query)
+                if newcol:
+                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
+                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
+                else:
+                    self.dbquery(query) # do expensive update for all subjects
 
-            if tagdef.dbtype != '':
-                reftags = self.tagdef_reftags_closure(tagdef)
+            # update old triples with wrong value
 
-                if reftags:
-                    mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
-                    self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
+            reftags = self.tagdef_reftags_closure(tagdef)
+            mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
+
+            if reftags:
+                self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
+
+            if newcol:
+                pass
 
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
@@ -2220,13 +2221,61 @@ class Application (webauthn2_handler_factory.RestHandler):
                 query = ('UPDATE %(table)s AS t SET value = i.value'
                          + ' FROM (SELECT %(idcol)s AS subject,'
                          + '              %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s) AS i'
-                         + ' WHERE %(updwheres)s') % dict(table=table, intable=intable,
-                                                          idcol=idcol, valcol=valcol,
-                                                          wheres=' AND '.join(wheres),
-                                                          updwheres=' AND '.join(updwheres))
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) AS i'
+                         + ' WHERE t.subject = i.subject AND t.value != i.value'
+                    ) % parts
                 #web.debug(query)
-                count += self.dbquery(query)
+                count += self.dbquery(query) # only run update for old subjects
+
+            else:
+                # replacement of existing values causes implicit delete of referencing tags
+                for reftag in reftags:
+                    reftagdef = self.tagdefsdict[reftag]
+                    reftable = self.wraptag(reftag)
+                    
+                    # ON UPDATE CASCADE would not do what we want, so manually delete stale references
+                    # also track the modified subjects
+                    query = (("WITH deletions AS ("
+                              + " DELETE FROM %(reftable)s r"
+                              + " USING "
+                              + "   (SELECT %(idcol)s AS subject, %(valcol)s AS value"
+                              + "    FROM %(intable)s AS i"
+                              + "    WHERE %(wheres)s) AS i,"
+                              + "   %(table)s AS t"
+                              + " WHERE %(updwheres)s AND r.value = t.value"
+                              + " RETURNING r.subject"
+                              + ")"
+                              + " INSERT INTO %(mtable)s"
+                              + " SELECT DISTINCT subject FROM deletions d"
+                              + " LEFT OUTER JOIN %(mtable)s m ON (d.subject = m.id)"
+                              + " WHERE m.id IS NULL"
+                              ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
+                                       idcol=idcol, valcol=valcol,
+                                       wheres=' AND '.join(wheres),
+                                       updwheres=' AND '.join(updwheres)))
+                    #web.debug(reftag, query)
+                    self.dbquery(query)
+
+                # update triples where graph had a different value than non-null input
+                query = ('UPDATE %(table)s AS t SET value = i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject,'
+                         + '              %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s) AS i'
+                         + ' WHERE t.subject = i.subject AND t.value != i.value'
+                    ) % parts
+                #web.debug(query)
+                count += self.dbquery(query) # run update for all subjects
+
+            if reftags:
+                # update subject metadata for all implicitly modified subjects
+                for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                                  ('subject last tagged txid', 'txid_current()') ]:
+                    self.set_tag_intable(self.tagdefsdict[tag], mtable,
+                                         idcol='id', valcol=val, flagcol=None,
+                                         wokcol=None, isowncol=None,
+                                         enforce_tag_authz=False, set_mode='merge', depth=depth+1)
+
+                self.dbquery('DROP TABLE %s' % mtable)
 
                 for reftag in reftags:
                     # update per-referenced tag metadata and subject-tags mappings
@@ -2241,18 +2290,132 @@ class Application (webauthn2_handler_factory.RestHandler):
                                             + ' WHERE p.value = %s' % (wrapval(reftagdef.tagname),)
                                             + '   AND r.subject IS NULL) s',
                                             idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', unnest=False)
+
+            # add input triples not present in graph
+
+            if newcol:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          + ' UNION ALL'
+                                          + ' SELECT DISTINCT %(idcol)s AS subject'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT i.subject, i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # only intersect for old subjects
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         ) % parts
+                count += self.dbquery(query) # blindly insert tags for new subjects
+            else:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject, value)'
+                         + ' SELECT i.subject, i.value'
+                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # intersect for all subjects
+
                     
-                # update subject metadata for all implicitly modified subjects
-                if reftags:
-                    for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
-                                      ('subject last tagged txid', 'txid_current()') ]:
-                        self.set_tag_intable(self.tagdefsdict[tag], mtable,
-                                             idcol='id', valcol=val, flagcol=None,
-                                             wokcol=None, isowncol=None,
-                                             enforce_tag_authz=False, set_mode='merge', depth=depth+1)
+        else:
+            # empty tags require insert on missing
+            
+            if set_mode == 'replace':
+                raise NotImplementedError()
 
-                    self.dbquery('DROP TABLE %s' % mtable)
+            if flagcol:
+                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                         + ' FROM (SELECT subject'
+                         + '       FROM (SELECT %(idcol)s AS subject'
+                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
+                         + '       LEFT OUTER JOIN %(table)s t USING (subject)'
+                         + '       WHERE t.subject IS NULL) t'
+                         + ' WHERE i.%(idcol)s = t.subject'
+                         ) % parts
 
+                #web.debug(query)
+                if newcol:
+                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
+                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
+                else:
+                    self.dbquery(query) # do expensive update for all subjects
+
+            # add input triples not present in graph
+
+            if newcol:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          + ' UNION ALL'
+                                          + ' SELECT %(idcol)s AS subject'
+                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject)'
+                         + ' SELECT i.subject'
+                         + ' FROM (SELECT %(idcol)s AS subject'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # only intersect for old subjects
+
+                query = ('INSERT INTO %(table)s (subject)'
+                         + ' SELECT %(idcol)s AS subject'
+                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         ) % parts
+                count += self.dbquery(query) # blindly insert tags for new subjects
+            else:
+                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('SELECT i.subject'
+                                          + ' FROM (SELECT %(idcol)s AS subject'
+                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                                          + ' WHERE t2.subject IS NULL'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+
+                query = ('INSERT INTO %(table)s (subject)'
+                         + ' SELECT i.subject'
+                         + ' FROM (SELECT %(idcol)s AS subject'
+                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
+                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
+                         + ' WHERE t2.subject IS NULL'
+                         ) % parts
+                count += self.dbquery(query) # intersect for all subjects
 
         if count > 0:
             #web.debug('updating "%s" metadata after %d modified rows' % (tagdef.tagname, count))
@@ -2262,20 +2425,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.accum_table_changes(table, count)
 
             count = 0
-
-            # update subject-tags mappings
-            if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
-                self.delete_tag_intable(self.tagdefsdict['tags present'], 
-                                        '(SELECT DISTINCT p.subject'
-                                        + ' FROM "_tags present" p'
-                                        + ' LEFT OUTER JOIN %s r ON (p.subject = r.subject)' % table
-                                        + ' WHERE p.value = %s' % (wrapval(tagdef.tagname),)
-                                        + '   AND r.subject IS NULL) s',
-                                        idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False)
-
-                self.set_tag_intable(self.tagdefsdict['tags present'], '(SELECT DISTINCT subject FROM %s)' % table,
-                                     idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
-                                     flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
         #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) complete' % (tagdef.tagname, idcol, valcol, wheres))
 
@@ -2692,6 +2841,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             # create a transaction-local temporary table of the right shape for input data
             # -- unique table name in case multiple calls are happening
             self.input_tablename = "input_%s" % self.request_guid
+            self.input_created_idxname = "input_%s_created_idx" % self.request_guid
 
             self.input_column_tds = [ self.tagdefsdict.get(t)
                                       for t in set([ t for t in self.spreds.keys() + self.lpreds.keys() ]) ]
@@ -2699,20 +2849,22 @@ class Application (webauthn2_handler_factory.RestHandler):
             # remap empty type to boolean type
             # remap multivalue tags to value array
             # 1 column per tag: in_tag
-            input_column_defs = [ '%s %s%s' % (wraptag(td.tagname, '', 'in_'),
-                                               (lambda dbtype: {'': 'boolean'}.get(dbtype, dbtype))(td.dbtype),
-                                               (lambda multival: {True: '[]'}.get(multival, ''))(td.multivalue))
+            input_column_defs = [ '%s %s%s %s' % (wraptag(td.tagname, '', 'in_'),
+                                                  {'': 'boolean'}.get(td.dbtype, td.dbtype),
+                                                  {True: '[]'}.get(td.multivalue, ''),
+                                                  {True: 'UNIQUE'}.get(td.unique, ''))
                                   for td in self.input_column_tds ]
 
             # special columns initialized during JOIN with query result
             # rows resulting in creation of new subjects will get default writeok and is_owner True values
-            input_column_defs += [ 'id int8',
+            input_column_defs += [ 'id int8 PRIMARY KEY',
                                    'writeok boolean DEFAULT True', 'is_owner boolean DEFAULT True',
                                    'updated boolean DEFAULT False', 'created boolean DEFAULT False' ]
 
             self.dbquery('CREATE %s TABLE %s ( %s )' % ((subject_iter == False or subject_iter_rewindable or type(subject_iter) == list) and 'TEMPORARY' or '',
                                                         wraptag(self.input_tablename, '', ''), 
                                                         ','.join(input_column_defs)))
+            self.dbquery('CREATE INDEX %s ON %s ( created, updated )' % (self.input_created_idxname, self.input_tablename))
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body1() complete' % (self.input_tablename))
 
@@ -2817,9 +2969,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() input stored' % (self.input_tablename))
 
-            if bool(getParamEnv('bulk tmp index', False)):
-                self.dbquery('CREATE INDEX %(index)s ON %(intable)s ( id )' % dict(index=wraptag(self.input_tablename, '_id_idx', ''),
-                                                                                   intable=wraptag(self.input_tablename, '', '')))
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body2() ID index created' % (self.input_tablename))
 
             # TODO: test input data against input constraints, aborting on conflict (L)
@@ -2948,7 +3097,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 #web.debug(query)
                 self.dbquery(query)
 
-                if bool(getParamEnv('bulk tmp index', False)) and bool(getParamEnv('bulk tmp cluster', False)):
+                if bool(getParamEnv('bulk tmp cluster', False)):
                     clusterindex = self.get_index_name(self.input_tablename, ['id'])
                     self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
 
@@ -3028,7 +3177,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
                 raise Conflict(self, 'One or more bulk-update subject(s) not found.')
             else:
-                if bool(getParamEnv('bulk tmp index', False)) and bool(getParamEnv('bulk tmp cluster', False)):
+                if bool(getParamEnv('bulk tmp cluster', False)):
                     clusterindex = self.get_index_name(self.input_tablename, ['id'])
                     self.dbquery('CLUSTER %(intable)s USING %(index)s' % dict(intable=intable, index=wraptag(clusterindex, prefix='')))
 

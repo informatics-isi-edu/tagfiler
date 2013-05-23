@@ -41,7 +41,6 @@
    "policy remappings": {},
 
    "log bulk details" : false,
-   "bulk tmp index" : false,
    "bulk tmp cluster" : false,
    "bulk tmp analyze" : false,
    "transact cluster" : false,
