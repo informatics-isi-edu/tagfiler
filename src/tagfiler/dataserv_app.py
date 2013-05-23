@@ -2213,7 +2213,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                               + "    FROM %(intable)s AS i"
                               + "    WHERE %(wheres)s) AS i,"
                               + "   %(table)s AS t"
-                              + " WHERE %(updwheres)s AND r.value = t.value"
+                              + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
                               + " RETURNING r.subject"
                               + ")"
                               + " INSERT INTO %(mtable)s"
@@ -2222,8 +2222,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                               + " WHERE m.id IS NULL"
                               ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
                                        idcol=idcol, valcol=valcol,
-                                       wheres=' AND '.join(wheres),
-                                       updwheres=' AND '.join(updwheres)))
+                                       wheres=' AND '.join(wheres)))
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
@@ -2252,7 +2251,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                               + "    FROM %(intable)s AS i"
                               + "    WHERE %(wheres)s) AS i,"
                               + "   %(table)s AS t"
-                              + " WHERE %(updwheres)s AND r.value = t.value"
+                              + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
                               + " RETURNING r.subject"
                               + ")"
                               + " INSERT INTO %(mtable)s"
@@ -2261,8 +2260,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                               + " WHERE m.id IS NULL"
                               ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
                                        idcol=idcol, valcol=valcol,
-                                       wheres=' AND '.join(wheres),
-                                       updwheres=' AND '.join(updwheres)))
+                                       wheres=' AND '.join(wheres)))
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
