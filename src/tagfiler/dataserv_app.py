@@ -2068,7 +2068,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     + ' JOIN %(table)s AS t USING (value)'
                                     + ' WHERE i.subject != t.subject'
                                     + ' LIMIT 1'
-                                    ) % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))
+                                    ) % dict(intable=intable, table=table, idcol=idcol, valcol=valcol, wheres=' AND '.join(wheres)))
             if len(results) > 0:
                 raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
             #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
@@ -2076,7 +2076,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         parts = dict(table=table,
                      intable=intable,
                      idcol=idcol,
-                     valcol=valcol,
+                     valcol=tagdef.multivalue and unnest and 'unnest(%s)' % valcol or valcol,
                      flagcol=flagcol,
                      newcol=newcol,
                      tagname=wrapval(tagdef.tagname),
