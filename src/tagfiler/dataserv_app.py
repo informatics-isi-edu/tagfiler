@@ -2223,6 +2223,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 for reftag in reftags:
                     reftagdef = self.tagdefsdict[reftag]
                     reftable = self.wraptag(reftag)
+
+                    # TODO: if flagcol then track changes in intable flagcol instead of mtable
                     
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
@@ -2317,6 +2319,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   ) % parts)
 
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + oldsubj_updtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + newsubj_newtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
@@ -2343,6 +2350,11 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + allsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + allsubj_updtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 

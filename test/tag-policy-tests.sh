@@ -610,6 +610,8 @@ then
     status=$(mycurl "/tags/tagdef:regexp:foo;owner=${username}(owner=${mutablerole})" -X PUT -o $logfile)
     [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
 
+    querytest 200 0 "/subject/tagdef:regexp:foo;owner=${username}(tagdef;owner;tagdef%20readpolicy;tag%20read%20users)"
+
     # do read-tests again w/o tag ACL permissions...
     querytest 200 5 "/subject/fooread0(name)"  # subject readable
     querytest 200 3 "/subject/fooread1(name)"  # subjectowner
