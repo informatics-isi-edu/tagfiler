@@ -2052,11 +2052,12 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
-            query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+            query = (('SELECT True AS unauthorized'
+                      + ' FROM (SELECT %(refval)s AS val FROM %(intable)s s) s'
                       + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                       + ' WHERE r.%(refcol)s IS NULL'
                       + ' LIMIT 1'
-                      ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
+                      ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval))
             results = self.dbquery(query, vars=refvalues)
             if len(results) > 0:
                 raise Conflict(self, data='Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
