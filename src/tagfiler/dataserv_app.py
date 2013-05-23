@@ -2094,75 +2094,78 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # clear graph triples not present in input
                 raise NotImplementedError()
 
-            if flagcol:
-                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                         + ' FROM (SELECT subject'
-                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
-                         + '       LEFT OUTER JOIN %(table)s t USING (subject, value)'
-                         + '       WHERE t.subject IS NULL'
-                         + '       GROUP BY subject) t'
-                         + ' WHERE i.%(idcol)s = t.subject'
-                         ) % parts
-                
-                #web.debug(query)
-                if newcol:
-                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
-                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
-                else:
-                    self.dbquery(query) # do expensive update for all subjects
-
             # add input triples not present in graph
 
+            # old subjects need presence test in existing graph data
+            oldsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND NOT %(newcol)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject, value)'
+                + '     WHERE t.subject IS NULL AND i2.value IS NOT NULL'
+                )
+            # new subjects have all new triples
+            newsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND %(newcol)s) i2'
+                + '     WHERE i2.value IS NOT NULL'
+                )
+
+            # mixed new and old subjects need presence test in existing graph data
+            allsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject, value)'
+                + '     WHERE t.subject IS NULL AND i2.value IS NOT NULL'
+                )
+
             if newcol:
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT DISTINCT subject' + oldsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL'
-                                          + ' UNION ALL'
-                                          + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
+                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                          + ' UNION ALL '
+                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT i.subject, i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
-                         + ' WHERE t2.subject IS NULL'
+                         + ' SELECT subject, value' + oldsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # only intersect for old subjects
+                count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         + ' SELECT subject, value' + newsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # blindly insert tags for new subjects
+                count += self.dbquery(query) 
             else:
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL)'
+                                         ('(SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT i.subject, i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject, value)'
-                         + ' WHERE t2.subject IS NULL'
+                         + ' SELECT subject, value' + allsubj_newtrips_query_frag
                          ) % parts
-                count += self.dbquery(query) # intersect for all subjects
+                count += self.dbquery(query)
 
 
         elif tagdef.dbtype != '':
@@ -2171,24 +2174,43 @@ class Application (webauthn2_handler_factory.RestHandler):
             if set_mode == 'replace':
                 raise NotImplementedError()
 
-            if flagcol:
-                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                         + ' FROM (SELECT subject'
-                         + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
-                         + '       LEFT OUTER JOIN %(table)s t USING (subject)'
-                         + '       WHERE t.subject IS NULL OR t.value != i2.value) t'
-                         + ' WHERE i.%(idcol)s = t.subject'
-                         ) % parts
-
-                #web.debug(query)
-                if newcol:
-                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
-                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
-                else:
-                    self.dbquery(query) # do expensive update for all subjects
-
             # update old triples with wrong value
+
+            # old subjects need presence test in existing graph data
+            oldsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND NOT %(newcol)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NULL AND i2.value IS NOT NULL'
+                )
+            # old subjects need presence test in existing graph data
+            oldsubj_updtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND NOT %(newcol)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NOT NULL AND i2.value != t.value'
+                )
+            # new subjects have all new triples
+            newsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND %(newcol)s) i2'
+                + '     WHERE i2.value IS NOT NULL'
+                )
+
+            # mixed new and old subjects need presence test in existing graph data
+            allsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NULL AND i2.value IS NOT NULL'
+                )
+            # mixed new and old subjects need presence test in existing graph data
+            allsubj_updtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NOT NULL AND i2.value != t.value'
+                )
 
             reftags = self.tagdef_reftags_closure(tagdef)
             mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
@@ -2197,8 +2219,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                 self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
 
             if newcol:
-                pass
-
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
                     reftagdef = self.tagdefsdict[reftag]
@@ -2206,31 +2226,25 @@ class Application (webauthn2_handler_factory.RestHandler):
                     
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
-                    query = (("WITH deletions AS ("
-                              + " DELETE FROM %(reftable)s r"
-                              + " USING "
-                              + "   (SELECT %(idcol)s AS subject, %(valcol)s AS value"
-                              + "    FROM %(intable)s AS i"
-                              + "    WHERE %(wheres)s) AS i,"
-                              + "   %(table)s AS t"
-                              + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
-                              + " RETURNING r.subject"
-                              + ")"
-                              + " INSERT INTO %(mtable)s"
-                              + " SELECT DISTINCT subject FROM deletions d"
-                              + " LEFT OUTER JOIN %(mtable)s m ON (d.subject = m.id)"
-                              + " WHERE m.id IS NULL"
-                              ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
-                                       idcol=idcol, valcol=valcol,
-                                       wheres=' AND '.join(wheres)))
+                    query = ("WITH deletions AS ("
+                             + " DELETE FROM %s r" % reftable
+                             + " USING "
+                             + "   (SELECT subject, i2.value" + oldsubj_updtrips_query_frag + ') AS i,'
+                             + "   %(table)s AS t"
+                             + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                             + " RETURNING r.subject"
+                             + ")"
+                             + " INSERT INTO %s" % mtable
+                             + " SELECT DISTINCT subject FROM deletions d"
+                             + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
+                             + " WHERE m.id IS NULL"
+                             ) % parts
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject,'
-                         + '              %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) AS i'
+                         + ' FROM (SELECT i2.subject, i2.value' + oldsubj_updtrips_query_frag + ') AS i'
                          + ' WHERE t.subject = i.subject AND t.value != i.value'
                     ) % parts
                 #web.debug(query)
@@ -2244,35 +2258,29 @@ class Application (webauthn2_handler_factory.RestHandler):
                     
                     # ON UPDATE CASCADE would not do what we want, so manually delete stale references
                     # also track the modified subjects
-                    query = (("WITH deletions AS ("
-                              + " DELETE FROM %(reftable)s r"
-                              + " USING "
-                              + "   (SELECT %(idcol)s AS subject, %(valcol)s AS value"
-                              + "    FROM %(intable)s AS i"
-                              + "    WHERE %(wheres)s) AS i,"
-                              + "   %(table)s AS t"
-                              + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
-                              + " RETURNING r.subject"
-                              + ")"
-                              + " INSERT INTO %(mtable)s"
-                              + " SELECT DISTINCT subject FROM deletions d"
-                              + " LEFT OUTER JOIN %(mtable)s m ON (d.subject = m.id)"
-                              + " WHERE m.id IS NULL"
-                              ) % dict(mtable=mtable, table=table, intable=intable, reftable=reftable,
-                                       idcol=idcol, valcol=valcol,
-                                       wheres=' AND '.join(wheres)))
+                    query = ("WITH deletions AS ("
+                             + " DELETE FROM %s r" % reftable
+                             + " USING "
+                             + "   (SELECT subject, i2.value" + allsubj_updtrips_query_frag + ') AS i,'
+                             + "   %(table)s AS t"
+                             + " WHERE r.value = t.value AND i.subject = t.subject AND i.value != t.value"
+                             + " RETURNING r.subject"
+                             + ")"
+                             + " INSERT INTO %s" % mtable
+                             + " SELECT DISTINCT subject FROM deletions d"
+                             + " LEFT OUTER JOIN %s m ON (d.subject = m.id)" % mtable
+                             + " WHERE m.id IS NULL"
+                             ) % parts
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject,'
-                         + '              %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s) AS i'
+                         + ' FROM (SELECT i2.subject, i2.value' + allsubj_updtrips_query_frag + ') AS i'
                          + ' WHERE t.subject = i.subject AND t.value != i.value'
                     ) % parts
                 #web.debug(query)
-                count += self.dbquery(query) # run update for all subjects
+                count += self.dbquery(query) # only run update for old subjects
 
             if reftags:
                 # update subject metadata for all implicitly modified subjects
@@ -2302,55 +2310,53 @@ class Application (webauthn2_handler_factory.RestHandler):
             # add input triples not present in graph
 
             if newcol:
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + oldsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + newsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL'
-                                          + ' UNION ALL'
-                                          + ' SELECT DISTINCT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
+                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                          + ' UNION ALL '
+                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT i.subject, i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                         + ' WHERE t2.subject IS NULL'
+                         + ' SELECT subject, i2.value' + oldsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # only intersect for old subjects
+                count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         + ' SELECT subject, i2.value' + newsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # blindly insert tags for new subjects
+                count += self.dbquery(query) 
             else:
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + allsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT DISTINCT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL)'
+                                         ('(SELECT subject' + allsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
 
                 query = ('INSERT INTO %(table)s (subject, value)'
-                         + ' SELECT i.subject, i.value'
-                         + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                         + ' WHERE t2.subject IS NULL'
+                         + ' SELECT subject, i2.value' + allsubj_newtrips_query_frag
                          ) % parts
-                count += self.dbquery(query) # intersect for all subjects
-
+                count += self.dbquery(query)
                     
         else:
             # empty tags require insert on missing
@@ -2358,72 +2364,79 @@ class Application (webauthn2_handler_factory.RestHandler):
             if set_mode == 'replace':
                 raise NotImplementedError()
 
-            if flagcol:
-                query = ('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                         + ' FROM (SELECT subject'
-                         + '       FROM (SELECT %(idcol)s AS subject'
-                         + '             FROM %(intable)s i WHERE %(wheres)s) i2'
-                         + '       LEFT OUTER JOIN %(table)s t USING (subject)'
-                         + '       WHERE t.subject IS NULL) t'
-                         + ' WHERE i.%(idcol)s = t.subject'
-                         ) % parts
-
-                #web.debug(query)
-                if newcol:
-                    self.dbquery(query + ' AND NOT i.%s' % newcol) # only do expensive update for old subjects
-                    self.dbquery('UPDATE %(intable)s SET %(flagcol)s = True WHERE %(newcol)s AND NOT %(flagcol)s' % parts)
-                else:
-                    self.dbquery(query) # do expensive update for all subjects
-
             # add input triples not present in graph
 
+            # TODO: handle valcol = False by deleting existing tags?
+
+            # old subjects need presence test in existing graph data
+            oldsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND NOT %(newcol)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NULL AND i2.value'
+                )
+            # new subjects have all new triples
+            newsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s AND %(newcol)s) i2'
+                + '     WHERE i2.value'
+                )
+
+            # mixed new and old subjects need presence test in existing graph data
+            allsubj_newtrips_query_frag = (
+                ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value'
+                + '     FROM %(intable)s i WHERE %(wheres)s) i2'
+                + '     LEFT OUTER JOIN %(table)s t USING (subject)'
+                + '     WHERE t.subject IS NULL AND i2.value'
+                )
+
             if newcol:
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT DISTINCT subject' + oldsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL'
-                                          + ' UNION ALL'
-                                          + ' SELECT %(idcol)s AS subject'
-                                          + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s)'
+                                         ('(SELECT DISTINCT subject' + oldsubj_newtrips_query_frag
+                                          + ' UNION ALL '
+                                          ' SELECT DISTINCT subject' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
 
                 query = ('INSERT INTO %(table)s (subject)'
-                         + ' SELECT i.subject'
-                         + ' FROM (SELECT %(idcol)s AS subject'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s AND NOT %(newcol)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                         + ' WHERE t2.subject IS NULL'
+                         + ' SELECT subject' + oldsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # only intersect for old subjects
+                count += self.dbquery(query)
 
                 query = ('INSERT INTO %(table)s (subject)'
-                         + ' SELECT %(idcol)s AS subject'
-                         + ' FROM %(intable)s AS i WHERE %(wheres)s AND %(newcol)s'
+                         + ' SELECT subject' + newsubj_newtrips_query_frag + ') t'
                          ) % parts
-                count += self.dbquery(query) # blindly insert tags for new subjects
+                count += self.dbquery(query)
+
             else:
-                if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
-                    self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT i.subject'
-                                          + ' FROM (SELECT %(idcol)s AS subject'
-                                          + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                                          + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                                          + ' WHERE t2.subject IS NULL)'
-                                          ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+                 if flagcol:
+                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                   + ' FROM (SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ') t'
+                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                   ) % parts)
 
-                query = ('INSERT INTO %(table)s (subject)'
-                         + ' SELECT i.subject'
-                         + ' FROM (SELECT %(idcol)s AS subject'
-                         + '       FROM %(intable)s AS i WHERE %(wheres)s) i'
-                         + ' LEFT OUTER JOIN %(table)s t2 USING (subject)'
-                         + ' WHERE t2.subject IS NULL'
-                         ) % parts
-                count += self.dbquery(query) # intersect for all subjects
+                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
+                     self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                          ('(SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ')'
+                                           ) % parts,
+                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+
+                 query = ('INSERT INTO %(table)s (subject)'
+                          + ' SELECT subject' + allsubj_newtrips_query_frag + ') t'
+                          ) % parts
+                 count += self.dbquery(query)
 
         if count > 0:
             #web.debug('updating "%s" metadata after %d modified rows' % (tagdef.tagname, count))
