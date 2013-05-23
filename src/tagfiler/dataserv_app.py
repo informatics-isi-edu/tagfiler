@@ -2269,6 +2269,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + oldsubj_updtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
                          + ' FROM (SELECT i2.subject, i2.value' + oldsubj_updtrips_query_frag + ') AS i'
@@ -2325,6 +2331,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
+                if flagcol:
+                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
+                                  + ' FROM (SELECT subject' + allsubj_updtrips_query_frag + ') t'
+                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
+                                  ) % parts)
+
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
                          + ' FROM (SELECT i2.subject, i2.value' + allsubj_updtrips_query_frag + ') AS i'
@@ -2373,11 +2385,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   ) % parts)
 
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                                  + ' FROM (SELECT subject' + oldsubj_updtrips_query_frag + ') t'
-                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
-                                  ) % parts)
-
-                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + newsubj_newtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
@@ -2404,11 +2411,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + allsubj_newtrips_query_frag + ') t'
-                                  + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
-                                  ) % parts)
-
-                    self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
-                                  + ' FROM (SELECT subject' + allsubj_updtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 
