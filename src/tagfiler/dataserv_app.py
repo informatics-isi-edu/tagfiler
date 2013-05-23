@@ -2007,35 +2007,41 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # tagdef write policy depends on per-row information
                 if tagdef.writepolicy in [ 'subject', 'tagorsubject', 'tagandsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                     # None means we need subject writeok for this user
-                    if self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s'
-                                    % dict(intable=intable,
-                                           wheres=' AND '.join([ 'coalesce(NOT %s, True)' % wokcol ] + wheres)))[0].count > 0:
+                    results = self.dbquery('SELECT True AS unauthorized FROM %(intable)s WHERE %(wheres)s LIMIT 1'
+                                           % dict(intable=intable,
+                                                  wheres=' AND '.join([ 'coalesce(NOT %s, True)' % wokcol ] + wheres)))
+                    if len(results) > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
                     
                 if tagdef.writepolicy in [ 'subjectowner', 'tagorowner', 'tagandowner' ]:
                     # None means we need subject is_owner for this user
-                    query = 'SELECT count(*) AS count FROM %(intable)s WHERE %(wheres)s' % dict(intable=intable,
-                                                                                                wheres=' AND '.join([ '%s = False' % isowncol ] + wheres))
-                    if self.dbquery(query)[0].count > 0:
+                    query = 'SELECT True AS unauthorized FROM %(intable)s WHERE %(wheres)s LIMIT 1' % dict(intable=intable,
+                                                                                                           wheres=' AND '.join([ '%s = False' % isowncol ] + wheres))
+                    results = self.dbquery(query)
+                    if len(results) > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching subjects' % tagdef.tagname)
 
                 if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                     # None means we need object writeok for this user
-                    query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+                    query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
                               + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                               + ' WHERE coalesce(NOT r.writeok, True)'
+                              + ' LIMIT 1'
                               ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
-                    if self.dbquery(query, vars=refvalues)[0].count > 0:
+                    results = self.dbquery(query, vars=refvalues)
+                    if len(results) > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching objects' % tagdef.tagname)
 
                 if tagdef.writepolicy in [ 'objectowner' ]:
                     # None means we need object is_owner for this user
                     rolekeys = ','.join([ wrapval(r, 'text') for r in set(self.context.attributes).union(set(['*'])) ])
-                    query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+                    query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
                               + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                               + ' WHERE coalesce(r.owner NOT IN (%(rolekeys)s), True)'
+                              + ' LIMIT 1'
                               ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres), rolekeys=rolekeys))
-                    if self.dbquery(query, vars=refvalues)[0].count > 0:
+                    results = self.dbquery(query, vars=refvalues)
+                    if len(results) > 0:
                         raise Forbidden(self, data='write on tag "%s" for one or more matching objects' % tagdef.tagname)
             else:
                 # tagdef write policy accepts statically for this user and tag
@@ -2046,21 +2052,24 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
-            query = (('SELECT count(*) AS count FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
+            query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
                       + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
                       + ' WHERE r.%(refcol)s IS NULL'
+                      + ' LIMIT 1'
                       ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
-            if self.dbquery(query, vars=refvalues)[0].count > 0:
+            results = self.dbquery(query, vars=refvalues)
+            if len(results) > 0:
                 raise Conflict(self, data='Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
 
         if test and tagdef.unique:
-            # test for uniqueness violations
-            if self.dbquery(('SELECT max(count) AS max'
-                             + ' FROM (SELECT count(DISTINCT subject) AS count'
-                             + '       FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s'
-                             + '             UNION ALL '
-                             + '             SELECT subject, value FROM %(table)s) AS t'
-                             + '       GROUP BY value) AS t') % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))[0].max > 1:
+            # test for uniqueness violations... already enforced uniqueness in table and intable via table constraints
+            results = self.dbquery(('SELECT True AS inconsistent'
+                                    + ' FROM (SELECT %(idcol)s AS subject, %(valcol)s AS value FROM %(intable)s WHERE %(wheres)s) AS i'
+                                    + ' JOIN %(table)s AS t USING (value)'
+                                    + ' WHERE i.subject != t.subject'
+                                    + ' LIMIT 1'
+                                    ) % dict(intable=intable, table=table, idcol=idcol, valcol=valcol))
+            if len(results) > 0:
                 raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
             #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
                 
@@ -2549,7 +2558,8 @@ class Application (webauthn2_handler_factory.RestHandler):
         if bool(getParamEnv('bulk tmp analyze', False)):
             self.dbquery('ANALYZE %s' % dtable)
 
-        if self.dbquery('SELECT count(*) AS count FROM %s' % dtable)[0].count == 0:
+        results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % dtable)
+        if len(results) == 0:
             raise NotFound(self, 'subjects matching subject constraints')
 
         self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
@@ -2615,45 +2625,49 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if tagdef.writeok is None:
                     # may need to test permissions on per-object basis for this tag before deleting triples
                     if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                        count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
-                                              + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
-                                              + ' WHERE NOT coalesce(o.writeok, False)')
-                                             % dict(dtquery=dtquery, oquery=oquery, 
-                                                    tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', '')),
-                                             vars=dvalues)[0].count
-                        if count > 0:
+                        results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
+                                                + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
+                                                + ' WHERE NOT coalesce(o.writeok, False)'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtquery=dtquery, oquery=oquery, 
+                                                         tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', '')),
+                                               vars=dvalues)
+                        if len(results) > 0:
                             raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
 
                     if tagdef.writepolicy in [ 'objectowner' ]:
-                        count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
-                                              + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
-                                              + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)')
-                                             % dict(dtquery=dtquery, oquery=oquery, 
-                                                    tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', ''),
-                                                    roles=','.join([ wrapval(r) for r in self.context.attributes ])),
-                                             vars=dvalues)[0].count
-                        if count > 0:
+                        results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
+                                                + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
+                                                + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtquery=dtquery, oquery=oquery, 
+                                                         tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', ''),
+                                                         roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                               vars=dvalues)
+                        if len(results) > 0:
                             raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
                                                                   
             if td.writeok is None:
                 # may need to test permissions on per-subject basis for this tag before deleting triples
                 if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
-                                          + ' WHERE NOT coalesce(d.writeok, False)')
-                                         % dict(dtable=dtable, dtquery=dtquery), 
-                                         vars=dvalues)[0].count
-                    if count > 0:
+                    results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
+                                            + ' WHERE NOT coalesce(d.writeok, False)'
+                                            + ' LIMIT 1'
+                                            ) % dict(dtable=dtable, dtquery=dtquery), 
+                                           vars=dvalues)
+                    if len(results) > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tagdef.tagname)
 
                 if td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
-                    count = self.dbquery(('SELECT count(*) AS count FROM (%(dtquery)s) d'
-                                          + ' WHERE NOT coalesce(d.owner = ANY (ARRAY[%(roles)s]), False)')
-                                         % dict(dtable=dtable, dtquery=dtquery, roles=','.join([ wrapval(r) for r in self.context.attributes ])),
-                                         vars=dvalues)[0].count
-                    if count > 0:
+                    count = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
+                                          + ' WHERE NOT coalesce(d.owner = ANY (ARRAY[%(roles)s]), False)'
+                                          + ' LIMIT 1') % dict(dtable=dtable, dtquery=dtquery, roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                         vars=dvalues)
+                    if len(results) > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
             
-        if self.dbquery('SELECT count(*) AS count FROM %s' % mtable)[0].count == 0:
+        results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % mtable)
+        if len(results) == 0:
             raise NotFound(self, "tags matching constraints")
 
         # second pass: remove triples
@@ -2711,7 +2725,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                       + ' FROM ( %(equery)s ) AS e') % dict(equery=equery, etable=etable),
                      vars=evalues)
 
-        if self.dbquery('SELECT count(*) AS count FROM %s' % etable)[0].count == 0:
+        results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % etable)
+        if len(results) == 0:
             raise NotFound(self, 'bulk-delete subjects')
 
         if bool(getParamEnv('bulk tmp analyze', False)):
@@ -3104,10 +3119,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if bool(getParamEnv('bulk tmp analyze', False)):
                     self.dbquery('ANALYZE %s ( id )' % intable)
 
-                # do this test after cluster/analyze so it is faster
-                if self.dbquery('SELECT max(count) AS max FROM (SELECT count(*) AS count FROM %s GROUP BY id) AS t' % intable)[0].max > 1:
-                    raise Conflict(self, 'Duplicate input rows violate unique subject key constraint.')
-
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() input uniqueness tested' % (self.input_tablename))
 
                 # insert newly allocated subject IDs into subject table
@@ -3174,7 +3185,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             elif on_missing == 'ignore':
                 self.dbquery('DELETE FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))
-            elif self.dbquery('SELECT count(*) AS count FROM %(intable)s WHERE id IS NULL' % dict(intable=intable))[0].count > 0:
+            elif len(self.dbquery('SELECT True AS notfound FROM %(intable)s WHERE id IS NULL LIMIT 1' % dict(intable=intable))) > 0:
                 raise Conflict(self, 'One or more bulk-update subject(s) not found.')
             else:
                 if bool(getParamEnv('bulk tmp cluster', False)):
