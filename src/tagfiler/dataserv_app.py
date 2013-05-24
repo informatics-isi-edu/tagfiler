@@ -2638,62 +2638,66 @@ class Application (webauthn2_handler_factory.RestHandler):
             if td.writeok == False:
                 raise Forbidden(self, 'write to tag "%s"' % tag)
 
-        dtable = wraptag(self.request_guid, '', 'tmp_d_')   # all subjects for explicit deletion
-        mtable = wraptag(self.request_guid, '', 'tmp_m_')   # modified subjects for metadata tracking
+        dtable = wraptag(self.request_guid, '', 'tmp_d_')   # all subjects for triple deletion
 
-        # find the path-matching subjects and save in temporary table dtable
-        self.path[-1] = (subjpreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok'] ], [])
+        # find the path-matching triples and save in temporary table dtable
+        dtable_columns = [
+            'id int8 PRIMARY KEY',
+            'owner text',
+            'writeok boolean',
+            'modified boolean DEFAULT False'
+            ]
+
+        for tagdef in dtagdefs:
+            col = '%s %s%s %s' % (wraptag(tagdef.tagname, prefix='d_'), 
+                                  {'': 'bool'}.get(tagdef.dbtype, tagdef.dbtype), 
+                                  {True:'[]'}.get(tagdef.multivalue, ''),
+                                  {True:'UNIQUE'}.get(tagdef.unique, ''))
+            dtable_columns.append(col)
+            
+
+        self.path[-1] = (subjpreds, origlistpreds + [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok'] ], [])
         dquery, dvalues = self.build_files_by_predlist_path(self.path)
         
-        self.log('TRACE', 'Application.bulk_delete_tags() before create dtable')
-        self.dbquery("CREATE TEMPORARY TABLE %s ( id int8 PRIMARY KEY, owner text, writeok boolean )" % dtable)
-        self.log('TRACE', 'Application.bulk_delete_tags() after create dtable')
-        self.dbquery("INSERT INTO %(dtable)s (id, owner, writeok) SELECT id, owner, writeok FROM (%(dquery)s) s" 
-                     % dict(dtable=dtable, dquery=dquery), vars=dvalues)
-        self.log('TRACE', 'Application.bulk_delete_tags() after fill dtable')
+        self.dbquery("CREATE TEMPORARY TABLE %s ( %s )" % (dtable, ', '.join(dtable_columns)))
+                     
+        self.log('TRACE', 'Application.bulk_delete_tags() after dtable create')
+
+        self.dbquery("INSERT INTO %(dtable)s (%(d_cols)s) SELECT %(cols)s FROM (%(dquery)s) s" 
+                     % dict(dtable=dtable, dquery=dquery, 
+                            d_cols=', '.join([ 'id', 'owner', 'writeok' ] + [ wraptag(td.tagname, prefix='d_') for td in dtagdefs ]),
+                            cols=', '.join([ 'id', 'owner', 'writeok' ] + [ wraptag(td.tagname, prefix='') for td in dtagdefs ]),
+                            ), 
+                     vars=dvalues)
+
+        self.log('TRACE', 'Application.bulk_delete_tags() after dtable fill')
 
         if bool(getParamEnv('bulk tmp analyze', False)):
             self.dbquery('ANALYZE %s' % dtable)
-
-        self.log('TRACE', 'Application.bulk_delete_tags() after analyze temp table')
 
         results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % dtable)
         if len(results) == 0:
             raise NotFound(self, 'subjects matching subject constraints')
 
-        self.log('TRACE', 'Application.bulk_delete_tags() after notfound test')
-        self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
-        self.log('TRACE', 'Application.bulk_delete_tags() after create mtable')
-
         # first pass: do fine-grained authz and compute affected subjects and tags
         for tagdef in dtagdefs:
-            dtquery, dtvalues = self.build_files_by_predlist_path([(
-                        [ web.Storage(tag=tagdef.tagname, op=None, vals=[]),
-                          web.Storage(tag='id', op='IN', vals='SELECT id FROM %s' % dtable) ],
-                        lpreds[tagdef.tagname] + [ web.Storage(tag='id', op=None, vals=[]) ],
-                        []
-                        )],
-                                                                  values=dvalues,
-                                                                  unnest=tagdef.tagname)
-            if tagdef.dbtype != '':
-                valtest = ' IS NOT NULL'
-            else:
-                valtest = '' # boolean False represents NULL empty tag
-
-            dtquery = 'SELECT * FROM (%s) s WHERE %s%s' % (dtquery, self.wraptag(tagdef.tagname, '', ''), valtest)
-
-            dtqueries[tagdef.tagname] = dtquery
+            dvalcol = wraptag(tagdef.tagname, prefix='d_')
 
             # track subjects we'll modify explicitly
-            self.dbquery(("INSERT INTO %(mtable)s (id)"
-                          + " SELECT t.id FROM (%(dtquery)s) t"
-                          + " LEFT OUTER JOIN %(mtable)s m USING (id)"
-                          + " WHERE m.id IS NULL")
-                         % dict(mtable=mtable, dtquery=dtquery),
-                         vars=dvalues)
-
-            if bool(getParamEnv('bulk tmp analyze', False)):
-                self.dbquery('ANALYZE %s' % mtable)
+            if tagdef.multivalue:
+                self.dbquery(("UPDATE %(dtable)s d SET modified = True"
+                              + " FROM (SELECT DISTINCT id"
+                              + "       FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s)"
+                              + "       WHERE value IS NOT NULL) d2"
+                              + " WHERE d.id = d2.id AND NOT d.modified"
+                              ) % dict(dtable=dtable, dvalcol=dvalcol),
+                             vars=dvalues)
+            else:
+                self.dbquery(("UPDATE %(dtable)s d SET modified = True"
+                              + " FROM %(dtable)s d2"
+                              + " WHERE d.id = d2.id AND NOT d.modified AND d2.%(dvalcol)s IS NOT NULL"
+                              ) % dict(dtable=dtable, dvalcol=dvalcol),
+                             vars=dvalues)
 
             # find all implicitly mutable tagnames
             reftags = self.tagdef_reftags_closure(tagdef)
@@ -2702,17 +2706,42 @@ class Application (webauthn2_handler_factory.RestHandler):
             # track subjects we'll modify implicitly
             for reftag in reftags:
                 reftagdef = self.tagdefsdict[reftag]
-                self.dbquery(("INSERT INTO %(mtable)s (id)"
-                              + " SELECT DISTINCT r.subject"
-                              + " FROM %(reftag)s r"
-                              + " JOIN (%(dtquery)s) d ON (d.%(tagname)s = r.value)"
-                              + " LEFT OUTER JOIN %(mtable)s m ON (r.subject = m.id)"
-                              + " WHERE m.id IS NULL"
-                              ) % dict(mtable=mtable, dtquery=dtquery, reftag=self.wraptag(reftag), tagname=self.wraptag(tagdef.tagname, '', '')),
-                             vars=dvalues)
 
-                if bool(getParamEnv('bulk tmp analyze', False)):
-                    self.dbquery('ANALYZE %s' % mtable)
+                if tagdef.multivalue:
+                    self.dbquery(("UPDATE %(dtable)s d SET modified = True"
+                                  + " FROM (SELECT DISTINCT r.subject"
+                                  + "       FROM %(reftag)s r"
+                                  + "       JOIN (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d2 ON (r.value = d2.value)) r"
+                                  + " WHERE d.id = r.subject AND NOT d.modified"
+                                  ) % dict(dtable=dtable, dvalcol=dvalcol, reftag=wraptag(reftag)),
+                                 vars=dvalues)
+
+                    self.dbquery(("INSERT INTO %(dtable)s (id, modified)"
+                                  + " SELECT DISTINCT r.subject, True"
+                                  + " FROM %(reftag)s r"
+                                  + " JOIN (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d ON (r.value = d.value)"
+                                  + " LEFT OUTER JOIN %(dtable)s d2 ON (d2.id = r.subject)"
+                                  + " WHERE d2.id IS NULL"
+                                  ) % dict(dtable=dtable, dvalcol=dvalcol, reftag=wraptag(reftag)),
+                                 vars=dvalues)
+
+                else:
+                    self.dbquery(("UPDATE %(dtable)s d SET modified = True"
+                                  + " FROM (SELECT DISTINCT r.subject"
+                                  + "       FROM %(reftag)s r"
+                                  + "       JOIN %(dtable)s d2 ON (r.value = d2.%(dvalcol)s)) r"
+                                  + " WHERE d.id = r.subject AND NOT d.modified"
+                                  ) % dict(dtable=dtable, dvalcol=dvalcol, reftag=wraptag(reftag)),
+                                 vars=dvalues)
+
+                    self.dbquery(("INSERT INTO %(dtable)s (id, modified)"
+                                  + " SELECT DISTINCT r.subject, True"
+                                  + " FROM %(reftag)s r"
+                                  + " JOIN %(dtable)s d ON (r.value = d.%(dvalcol)s)"
+                                  + " LEFT OUTER JOIN %(dtable)s d2 ON (d2.id = r.subject)"
+                                  + " WHERE d2.id IS NULL"
+                                  ) % dict(dtable=dtable, dvalcol=dvalcol, reftag=wraptag(reftag)),
+                                 vars=dvalues)
 
             if tagdef.tagref and (not tagdef.softtagref):
                 otagdef = self.tagdefsdict[tagdef.tagref]
@@ -2726,59 +2755,97 @@ class Application (webauthn2_handler_factory.RestHandler):
                 if tagdef.writeok is None:
                     # may need to test permissions on per-object basis for this tag before deleting triples
                     if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                        results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
-                                                + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
-                                                + ' WHERE NOT coalesce(o.writeok, False)'
-                                                + ' LIMIT 1'
-                                                ) % dict(dtquery=dtquery, oquery=oquery, 
-                                                         tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', '')),
-                                               vars=dvalues)
+                        if tagdef.multivalue:
+                            results = self.dbquery(('SELECT d.id'
+                                                    + ' FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
+                                                    + ' JOIN (%(oquery)s) o ON (d.value = o.%(tagref)s)'
+                                                    + ' WHERE NOT coalesce(o.writeok, False)'
+                                                    + ' LIMIT 1'
+                                                    ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', '')),
+                                                   vars=dvalues)
+                        else:
+                            results = self.dbquery(('SELECT d.id'
+                                                    + ' FROM %(dtable)s d'
+                                                    + ' JOIN (%(oquery)s) o ON (d.%(dvalcol)s = o.%(tagref)s)'
+                                                    + ' WHERE NOT coalesce(o.writeok, False)'
+                                                    + ' LIMIT 1'
+                                                    ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', '')),
+                                                   vars=dvalues)
+
                         if len(results) > 0:
                             raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
 
                     if tagdef.writepolicy in [ 'objectowner' ]:
-                        results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
-                                                + ' JOIN (%(oquery)s) o ON (d.%(tagname)s = o.%(tagref)s)'
-                                                + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
-                                                + ' LIMIT 1'
-                                                ) % dict(dtquery=dtquery, oquery=oquery, 
-                                                         tagname=self.wraptag(tagdef.tagname, '', ''), tagref=self.wraptag(tagdef.tagref, '', ''),
-                                                         roles=','.join([ wrapval(r) for r in self.context.attributes ])),
-                                               vars=dvalues)
+                        if tagdef.multivalue:
+                            results = self.dbquery(('SELECT d.id'
+                                                    + ' FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
+                                                    + ' JOIN (%(oquery)s) o ON (d.value = o.%(tagref)s)'
+                                                    + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
+                                                    + ' LIMIT 1'
+                                                    ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', ''),
+                                                             roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                                   vars=dvalues)
+                        else:
+                            results = self.dbquery(('SELECT d.id'
+                                                    + ' FROM %(dtable)s d'
+                                                    + ' JOIN (%(oquery)s) o ON (d.%(dvalcol)s = o.%(tagref)s)'
+                                                    + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
+                                                    + ' LIMIT 1'
+                                                    ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', ''),
+                                                             roles=','.join([ wrapval(r) for r in self.context.attributes ])),
+                                                   vars=dvalues)
+
                         if len(results) > 0:
                             raise Forbidden(self, 'write to tag "%s" on one or more referenced objects' % tag)
                                                                   
             if td.writeok is None:
                 # may need to test permissions on per-subject basis for this tag before deleting triples
                 if td.writepolicy in ['subject', 'tagandsubject', 'tagorsubject', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
-                    results = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
-                                            + ' WHERE NOT coalesce(d.writeok, False)'
-                                            + ' LIMIT 1'
-                                            ) % dict(dtable=dtable, dtquery=dtquery), 
-                                           vars=dvalues)
+                    if td.multivalue:
+                        results = self.dbquery(('SELECT True AS unauthorized'
+                                                + ' FROM (SELECT id, writeok, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
+                                                + ' WHERE NOT coalesce(writeok, False) AND value IS NOT NULL'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtable=dtable, dvalcol=dvalcol), 
+                                               vars=dvalues)
+                    else:
+                        results = self.dbquery(('SELECT True AS unauthorized'
+                                                + ' FROM %(dtable)s d'
+                                                + ' WHERE NOT coalesce(writeok, False) AND %(dvalcol)s IS NOT NULL'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtable=dtable, dvalcol=dvalcol), 
+                                               vars=dvalues)
+                        
                     if len(results) > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tagdef.tagname)
 
                 if td.writepolicy in ['subjectowner', 'tagorowner', 'tagandowner' ]:
-                    count = self.dbquery(('SELECT True AS unauthorized FROM (%(dtquery)s) d'
-                                          + ' WHERE NOT coalesce(d.owner = ANY (ARRAY[%(roles)s]), False)'
-                                          + ' LIMIT 1') % dict(dtable=dtable, dtquery=dtquery, roles=','.join([ wrapval(r) for r in self.context.attributes ])),
-                                         vars=dvalues)
+                    if td.multivalue:
+                        results = self.dbquery(('SELECT True AS unauthorized'
+                                                + ' FROM (SELECT id, owner, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
+                                                + ' WHERE NOT coalesce(owner = ANY (ARRAY[%(roles)s]), False) AND value IS NOT NULL'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtable=dtable, dvalcol=dvalcol, roles=','.join([ wrapval(r) for r in self.context.attributes ])), 
+                                               vars=dvalues)
+                    else:
+                        results = self.dbquery(('SELECT True AS unauthorized'
+                                                + ' FROM %(dtable)s d'
+                                                + ' WHERE NOT coalesce(owner = ANY (ARRAY[%(roles)s]), False) AND %(dvalcol)s IS NOT NULL'
+                                                + ' LIMIT 1'
+                                                ) % dict(dtable=dtable, dvalcol=dvalcol, roles=','.join([ wrapval(r) for r in self.context.attributes ])), 
+                                               vars=dvalues)
+
                     if len(results) > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
             
-        self.log('TRACE', 'Application.bulk_delete_tags() after authz/modified loop')
-        results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % mtable)
+        results = self.dbquery('SELECT True AS found FROM %s WHERE modified LIMIT 1' % dtable)
         if len(results) == 0:
             raise NotFound(self, "tags matching constraints")
-        self.log('TRACE', 'Application.bulk_delete_tags() after 2nd notfound test')
-
+ 
         # second pass: remove triples
         for tagdef in dtagdefs:
-            self.delete_tag_intable(tagdef, '(%s) s' % dtqueries[tagdef.tagname], 'id', wraptag(tagdef.tagname, '', ''), unnest=False)
+            self.delete_tag_intable(tagdef, dtable, 'id', wraptag(tagdef.tagname, '', 'd_'))
             
-        self.log('TRACE', 'Application.bulk_delete_tags() after delete_tag_intable() loop')
-
         # third pass: update per-tag metadata based on explicit and implicit changes
         for dtag in dtags:
             self.delete_tag_intable(self.tagdefsdict['tags present'], 
@@ -2791,17 +2858,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     valcol=wrapval(dtag) + '::text', unnest=False)
             self.set_tag_lastmodified(None, self.tagdefsdict[dtag])
 
-        self.log('TRACE', 'Application.bulk_delete_tags() after tags present loop')
-
         # finally: update subject metadata for all modified subjects
         for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                           ('subject last tagged txid', 'txid_current()') ]:
-            self.set_tag_intable(self.tagdefsdict[tag], mtable,
+            self.set_tag_intable(self.tagdefsdict[tag], dtable,
                                  idcol='id', valcol=val, flagcol=None,
                                  wokcol=None, isowncol=None,
+                                 wheres=[ 'modified = True' ],
                                  enforce_tag_authz=False, set_mode='merge')
             
-        self.log('TRACE', 'Application.bulk_delete_tags() after mtable subject metadata update')
         
     def bulk_delete_subjects(self, path=None):
 
