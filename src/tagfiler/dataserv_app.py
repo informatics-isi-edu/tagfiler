@@ -3600,15 +3600,15 @@ class Application (webauthn2_handler_factory.RestHandler):
             elif tagdef.tagname == 'readok':
                 m['table'] = ('(SELECT subject, True AS value'
                               + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
-                              + ' FULL OUTER JOIN (SELECT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys
-                              + '  USING (subject)) s')
+                              + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys
+                              + '  USING (subject)) ro')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.tagname == 'writeok':
                 m['table'] = ('(SELECT subject, True AS value'
                               + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
-                              + ' FULL OUTER JOIN (SELECT subject FROM "_write users" WHERE value IN (%s)) w' % rolekeys
-                              + '  USING (subject)) s')
+                              + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_write users" WHERE value IN (%s)) w' % rolekeys
+                              + '  USING (subject)) wo')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.multivalue and final:
