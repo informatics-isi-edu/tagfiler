@@ -1526,6 +1526,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             return results
 
     def insert_tagdef(self):
+        self.log('TRACE', 'Application.insert_tagdef() entered')
         results = self.select_tagdef(self.tag_id)
         if len(results) > 0:
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
@@ -1582,7 +1583,9 @@ class Application (webauthn2_handler_factory.RestHandler):
             tagdef.softtagref = False
         tagdef.multivalue = self.multivalue
         
+        self.log('TRACE', 'Application.insert_tagdef() between insert and deploy')
         self.deploy_tagdef(tagdef)
+        self.log('TRACE', 'Application.insert_tagdef() after deploy')
 
         for tag, value in tags:
             self.set_tag(subject, self.tagdefsdict[tag], value)
@@ -2630,19 +2633,25 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.path[-1] = (subjpreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok'] ], [])
         dquery, dvalues = self.build_files_by_predlist_path(self.path)
         
+        self.log('TRACE', 'Application.bulk_delete_tags() before create dtable')
         self.dbquery("CREATE TEMPORARY TABLE %s ( id int8 PRIMARY KEY, owner text, writeok boolean )" % dtable)
-
+        self.log('TRACE', 'Application.bulk_delete_tags() after create dtable')
         self.dbquery("INSERT INTO %(dtable)s (id, owner, writeok) SELECT id, owner, writeok FROM (%(dquery)s) s" 
                      % dict(dtable=dtable, dquery=dquery), vars=dvalues)
+        self.log('TRACE', 'Application.bulk_delete_tags() after fill dtable')
 
         if bool(getParamEnv('bulk tmp analyze', False)):
             self.dbquery('ANALYZE %s' % dtable)
+
+        self.log('TRACE', 'Application.bulk_delete_tags() after analyze temp table')
 
         results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % dtable)
         if len(results) == 0:
             raise NotFound(self, 'subjects matching subject constraints')
 
+        self.log('TRACE', 'Application.bulk_delete_tags() after notfound test')
         self.dbquery("CREATE TEMPORARY TABLE %(mtable)s (id int8 PRIMARY KEY)" % dict(mtable=mtable))
+        self.log('TRACE', 'Application.bulk_delete_tags() after create mtable')
 
         # first pass: do fine-grained authz and compute affected subjects and tags
         for tagdef in dtagdefs:
@@ -2746,14 +2755,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if len(results) > 0:
                         raise Forbidden(self, 'write to tag "%s" on one or more subjects' % tag)
             
+        self.log('TRACE', 'Application.bulk_delete_tags() after authz/modified loop')
         results = self.dbquery('SELECT True AS found FROM %s LIMIT 1' % mtable)
         if len(results) == 0:
             raise NotFound(self, "tags matching constraints")
+        self.log('TRACE', 'Application.bulk_delete_tags() after 2nd notfound test')
 
         # second pass: remove triples
         for tagdef in dtagdefs:
             self.delete_tag_intable(tagdef, '(%s) s' % dtqueries[tagdef.tagname], 'id', wraptag(tagdef.tagname, '', ''), unnest=False)
             
+        self.log('TRACE', 'Application.bulk_delete_tags() after delete_tag_intable() loop')
+
         # third pass: update per-tag metadata based on explicit and implicit changes
         for dtag in dtags:
             self.delete_tag_intable(self.tagdefsdict['tags present'], 
@@ -2766,6 +2779,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     valcol=wrapval(dtag) + '::text', unnest=False)
             self.set_tag_lastmodified(None, self.tagdefsdict[dtag])
 
+        self.log('TRACE', 'Application.bulk_delete_tags() after tags present loop')
+
         # finally: update subject metadata for all modified subjects
         for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
                           ('subject last tagged txid', 'txid_current()') ]:
@@ -2774,6 +2789,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                  wokcol=None, isowncol=None,
                                  enforce_tag_authz=False, set_mode='merge')
             
+        self.log('TRACE', 'Application.bulk_delete_tags() after mtable subject metadata update')
         
     def bulk_delete_subjects(self, path=None):
 
