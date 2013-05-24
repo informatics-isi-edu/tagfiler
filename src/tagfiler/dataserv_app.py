@@ -1960,7 +1960,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.set_tag_lastmodified(subject, tagdef)
         
 
-    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[], test=True, depth=0, newcol=None):
+    def set_tag_intable(self, tagdef, intable, idcol, valcol, flagcol, wokcol, isowncol, enforce_tag_authz=True, set_mode='merge', unnest=True, wheres=[], test=True, depth=0, newcol=None, nowval='now'):
         """Perform bulk-setting of tags from an input table.
 
            tagdef:  the tag to update
@@ -1989,6 +1989,8 @@ class Application (webauthn2_handler_factory.RestHandler):
 
            depth      = internally-managed recursion tracking for unique temporary table names
         """
+        #self.log('TRACE', 'Application.set_tag_intable("%s",d=%d) entered' % (tagdef.tagname, depth))
+
         if len(wheres) == 0:
             # we require a non-empty list for SQL constructs below...
             wheres = [ 'True' ]
@@ -2063,10 +2065,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # tagdef write policy accepts statically for this user and tag
                 pass
             
+            #self.log('TRACE', 'Application.set_tag_intable("%s",d=%d) authz enforced' % (tagdef.tagname, depth))
+
         table = wraptag(tagdef.tagname)
         count = 0
 
-        if tagdef.tagref and (not tagdef.softtagref):
+        if test and tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
             query = (('SELECT True AS notfound'
                       + ' FROM (SELECT %(refval)s AS val FROM %(intable)s s) s'
@@ -2078,6 +2082,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             if len(results) > 0:
                 raise Conflict(self, data='Provided value or values for tag "%s" are not valid references to existing tags "%s"' % (tagdef.tagname, tagdef.tagref))
 
+            #self.log('TRACE', 'Application.set_tag_intable("%s",d=%d) tagref=%s integrity checked' % (tagdef.tagname, depth, tagdef.tagref))
+
         if test and tagdef.unique:
             # test for uniqueness violations... already enforced uniqueness in table and intable via table constraints
             results = self.dbquery(('SELECT True AS inconsistent'
@@ -2088,8 +2094,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                                     ) % dict(intable=intable, table=table, idcol=idcol, valcol=valcol, wheres=' AND '.join(wheres)))
             if len(results) > 0:
                 raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
-            #self.log('TRACE', 'Application.set_tag_intable("%s", %s, %s, %s) multival uniqueness tested' % (tagdef.tagname, idcol, valcol, wheres))
                 
+            #self.log('TRACE', 'Application.set_tag_intable("%s",d=%d) uniqueness checked' % (tagdef.tagname, depth))
+
         parts = dict(table=table,
                      intable=intable,
                      idcol=idcol,
@@ -2104,9 +2111,6 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         if tagdef.multivalue:
             # multi-valued tags are straightforward set-algebra on triples
-            
-            if unnest:
-                valcol = 'unnest(%s)' % valcol
             
             if set_mode == 'replace':
                 # clear graph triples not present in input
@@ -2136,8 +2140,10 @@ class Application (webauthn2_handler_factory.RestHandler):
                 + '     WHERE t.subject IS NULL AND i2.value IS NOT NULL'
                 )
 
+            #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update entered' % (tagdef.tagname, depth))
+
             if newcol:
-                if flagcol:
+                if flagcol and tagdef.tagname not in ['tags present']:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT DISTINCT subject' + oldsubj_newtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
@@ -2148,14 +2154,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update inserts flagged' % (tagdef.tagname, depth))
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
                                          ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag
                                           + ' UNION ALL '
                                           ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', test=False,
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, newcol='created')
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update presence updated' % (tagdef.tagname, depth))
 
                 query = ('INSERT INTO %(table)s (subject, value)'
                          + ' SELECT subject, value' + oldsubj_newtrips_query_frag
@@ -2166,25 +2176,32 @@ class Application (webauthn2_handler_factory.RestHandler):
                          + ' SELECT subject, value' + newsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query) 
+
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update inserts performed' % (tagdef.tagname, depth))
             else:
-                if flagcol:
+                if flagcol and tagdef.tagname not in ['tags present']:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update inserts flagged (B)' % (tagdef.tagname, depth))
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
                                          ('(SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', test=False,
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update presence updated (B)' % (tagdef.tagname, depth))
 
                 query = ('INSERT INTO %(table)s (subject, value)'
                          + ' SELECT subject, value' + allsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
 
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) multi-value update inserts performed(B)' % (tagdef.tagname, depth))
 
         elif tagdef.dbtype != '':
             # single-valued tags require insert-or-update due to cardinality constraint
@@ -2229,6 +2246,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                 + '     LEFT OUTER JOIN %(table)s t USING (subject)'
                 + '     WHERE t.subject IS NOT NULL AND i2.value != t.value'
                 )
+
+            #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update entered' % (tagdef.tagname, depth))
 
             reftags = self.tagdef_reftags_closure(tagdef)
             mtable = wraptag(self.request_guid, '', 'tmp_refmod_%d_' % depth)   # modified subjects for metadata tracking
@@ -2284,11 +2303,17 @@ class Application (webauthn2_handler_factory.RestHandler):
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
+                if reftags:
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update reftags chased' % (tagdef.tagname, depth))
+                    pass
+
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + oldsubj_updtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update mutations flagged' % (tagdef.tagname, depth))
 
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
@@ -2298,6 +2323,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                 #web.debug(query)
                 count += self.dbquery(query) # only run update for old subjects
 
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update mutations applied' % (tagdef.tagname, depth))
             else:
                 # replacement of existing values causes implicit delete of referencing tags
                 for reftag in reftags:
@@ -2346,11 +2372,17 @@ class Application (webauthn2_handler_factory.RestHandler):
                     #web.debug(reftag, query)
                     self.dbquery(query)
 
+                if reftags:
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update reftags chased (B)' % (tagdef.tagname, depth))
+                    pass
+
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
                                   + ' FROM (SELECT subject' + allsubj_updtrips_query_frag + ') t'
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update mutations flagged (B)' % (tagdef.tagname, depth))
 
                 # update triples where graph had a different value than non-null input
                 query = ('UPDATE %(table)s AS t SET value = i.value'
@@ -2358,16 +2390,18 @@ class Application (webauthn2_handler_factory.RestHandler):
                          + ' WHERE t.subject = i.subject AND t.value != i.value'
                     ) % parts
                 #web.debug(query)
-                count += self.dbquery(query) # only run update for old subjects
+                count += self.dbquery(query)
+
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update mutations applied (B)' % (tagdef.tagname, depth))
 
             if reftags:
                 if not flagcol or not isowncol:
                     # update subject metadata for all implicitly modified subjects
-                    for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+                    for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval(nowval)),
                                       ('subject last tagged txid', 'txid_current()') ]:
                         self.set_tag_intable(self.tagdefsdict[tag], mtable,
                                              idcol='id', valcol=val, flagcol=None,
-                                             wokcol=None, isowncol=None,
+                                             wokcol=None, isowncol=None, test=False,
                                              enforce_tag_authz=False, set_mode='merge', depth=depth+1)
 
                     self.dbquery('DROP TABLE %s' % mtable)
@@ -2390,6 +2424,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                                             + '   AND r.subject IS NULL) s',
                                             idcol='subject', valcol=wrapval(reftagdef.tagname) + '::text', unnest=False)
 
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update reftag subject metdata updated' % (tagdef.tagname, depth))
+
             # add input triples not present in graph
 
             if newcol:
@@ -2404,14 +2440,21 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update inserts flagged' % (tagdef.tagname, depth))
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
-                                         ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag
-                                          + ' UNION ALL '
-                                          ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
+                                         ('(SELECT DISTINCT subject, False AS created' + oldsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
-                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, newcol='created')
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', test=False,
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, wheres=['created = False'], newcol='created')
+                    self.set_tag_intable(self.tagdefsdict['tags present'], 
+                                         ('(SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
+                                          ) % parts,
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', test=False,
+                                         flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1, wheres=['created = True'], newcol='created')
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update presence updated' % (tagdef.tagname, depth))
 
                 query = ('INSERT INTO %(table)s (subject, value)'
                          + ' SELECT subject, i2.value' + oldsubj_newtrips_query_frag
@@ -2422,6 +2465,8 @@ class Application (webauthn2_handler_factory.RestHandler):
                          + ' SELECT subject, i2.value' + newsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query) 
+
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update inserts performed' % (tagdef.tagname, depth))
             else:
                 if flagcol:
                     self.dbquery(('UPDATE %(intable)s AS i SET %(flagcol)s = True'
@@ -2429,18 +2474,23 @@ class Application (webauthn2_handler_factory.RestHandler):
                                   + ' WHERE i.%(idcol)s = t.subject AND NOT i.%(flagcol)s'
                                   ) % parts)
 
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update inserts flagged(B)' % (tagdef.tagname, depth))
+
                 if tagdef.tagname not in ['tags present', 'id', 'readok', 'writeok']:
                     self.set_tag_intable(self.tagdefsdict['tags present'], 
                                          ('(SELECT subject' + allsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', test=False,
                                          flagcol=None, wokcol=None, isowncol=None, enforce_tag_authz=False, set_mode='merge', unnest=False, depth=depth+1)
+
+                    #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update presence updated (B)' % (tagdef.tagname, depth))
 
                 query = ('INSERT INTO %(table)s (subject, value)'
                          + ' SELECT subject, i2.value' + allsubj_newtrips_query_frag
                          ) % parts
                 count += self.dbquery(query)
                     
+                #self.log('TRACE', 'Application.set_tag_intable(%s,d=%d) single-value update inserts performed' % (tagdef.tagname, depth))
         else:
             # empty tags require insert on missing
             
@@ -2491,7 +2541,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                           + ' UNION ALL '
                                           ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, newcol='created')
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, newcol='created', test=False)
 
                 query = ('INSERT INTO %(table)s (subject)'
                          + ' SELECT subject' + oldsubj_newtrips_query_frag
@@ -2514,7 +2564,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                      self.set_tag_intable(self.tagdefsdict['tags present'], 
                                           ('(SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ')'
                                            ) % parts,
-                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1)
+                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, test=False)
 
                  query = ('INSERT INTO %(table)s (subject)'
                           + ' SELECT subject' + allsubj_newtrips_query_frag
@@ -2661,7 +2711,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         
         self.dbquery("CREATE TEMPORARY TABLE %s ( %s )" % (dtable, ', '.join(dtable_columns)))
                      
-        self.log('TRACE', 'Application.bulk_delete_tags() after dtable create')
+        #self.log('TRACE', 'Application.bulk_delete_tags() after dtable create')
 
         self.dbquery("INSERT INTO %(dtable)s (%(d_cols)s) SELECT %(cols)s FROM (%(dquery)s) s" 
                      % dict(dtable=dtable, dquery=dquery, 
@@ -2670,7 +2720,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                             ), 
                      vars=dvalues)
 
-        self.log('TRACE', 'Application.bulk_delete_tags() after dtable fill')
+        #self.log('TRACE', 'Application.bulk_delete_tags() after dtable fill')
 
         if bool(getParamEnv('bulk tmp analyze', False)):
             self.dbquery('ANALYZE %s' % dtable)
@@ -2865,7 +2915,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                                  idcol='id', valcol=val, flagcol=None,
                                  wokcol=None, isowncol=None,
                                  wheres=[ 'modified = True' ],
-                                 enforce_tag_authz=False, set_mode='merge')
+                                 enforce_tag_authz=False, set_mode='merge', test=False)
             
         
     def bulk_delete_subjects(self, path=None):
@@ -2952,7 +3002,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.set_tag_intable(self.tagdefsdict[tag], mtable,
                                  idcol='id', valcol=val, flagcol=None,
                                  wokcol=None, isowncol=None,
-                                 enforce_tag_authz=False, set_mode='merge')
+                                 enforce_tag_authz=False, set_mode='merge', test=False)
 
         return results
 
@@ -3053,6 +3103,13 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                         wraptag(self.input_tablename, '', ''), 
                                                         ','.join(input_column_defs)))
             self.dbquery('CREATE INDEX %s ON %s ( created, updated )' % (wraptag(self.input_created_idxname, '', ''), wraptag(self.input_tablename, '', '')))
+
+            for td in self.input_column_tds:
+                if not td.unique:
+                    self.dbquery('CREATE INDEX %s ON %s ( %s )'
+                                 % (wraptag(self.input_tablename, '_td%d_idx' % td.id, ''),
+                                    wraptag(self.input_tablename, '', ''),
+                                    wraptag(td.tagname, '', 'in_')))
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body1() complete' % (self.input_tablename))
 
@@ -3205,11 +3262,14 @@ class Application (webauthn2_handler_factory.RestHandler):
 
             # we will update the input table from the existing subjects result
             intable = wraptag(self.input_tablename, '', '')
+
+            # get a constant timetamp we can use repeatedly below...
+            nowval = downcast_value('timestamptz', datetime.datetime.now(pytz.timezone('UTC')))
             
             # copy subject id and writeok into special columns, and compute is_owner from owner tag
             assigns = [ ('writeok', 'e.writeok'),
                         ('id', 'e.id'),
-                        ('is_owner', 'coalesce(ARRAY[ %s ]::text[] @> ARRAY[ e.owner ]::text[], False)' % ','.join([ wrapval(r) for r in self.context.attributes ])) ]
+                        ('is_owner', 'coalesce(e.owner IN (%s), False)' % ','.join([ wrapval(r) for r in self.context.attributes ])) ]
 
             if subject_iter == False:
                 # we're loading subjects for a pattern-based bulk-tag, so need to set static psuedo-input values
@@ -3274,14 +3334,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 skeycmps = ' AND '.join([ 'i.%s = n.%s' % (wraptag(tag, '', 'in_'), wraptag(tag, '', 'in_'))
                                           for tag in self.spreds.keys() ])
 
-                inits = ', '.join(['id = n.id', 'created = True'])
-
                 # allocate unique subject IDs for all rows missing a subject and initialize special columns
-                query = ('UPDATE %(intable)s AS i SET %(inits)s'
+                query = ('UPDATE %(intable)s AS i SET id = n.id, created = True, updated = True'
                          + ' FROM (SELECT NEXTVAL(\'resources_subject_seq\') AS id, %(skeys)s'
                          + '       FROM %(intable)s AS i'
                          + '       WHERE i.id IS NULL) AS n'
-                         + ' WHERE %(skeycmps)s') % dict(intable=intable, skeys=skeys, skeycmps=skeycmps, inits=inits)
+                         + ' WHERE %(skeycmps)s') % dict(intable=intable, skeys=skeys, skeycmps=skeycmps)
                 #web.debug(query)
                 self.dbquery(query)
 
@@ -3291,6 +3349,7 @@ class Application (webauthn2_handler_factory.RestHandler):
 
                 if bool(getParamEnv('bulk tmp analyze', False)):
                     self.dbquery('ANALYZE %s ( id )' % intable)
+                self.dbquery('ANALYZE %s ( created, updated )' % intable)
 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() input uniqueness tested' % (self.input_tablename))
 
@@ -3305,7 +3364,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if self.spreds.has_key(td.tagname) and not self.lpreds.has_key(td.tagname) and td.tagname not in ['owner', 'read users', 'write users']:
                         self.set_tag_intable(td, intable,
                                              idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
-                                             wokcol='writeok', isowncol='is_owner', set_mode='merge', wheres=['created = True'], newcol='created')
+                                             wokcol='writeok', isowncol='is_owner', set_mode='merge', wheres=['created = True'], newcol='created', nowval=nowval)
 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject skeys initialized' % (self.input_tablename))
 
@@ -3342,18 +3401,20 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                                    
                 # set subject metadata for newly created subjects
                 for tag, val in [ ('owner', owner_val),
-                                  ('created', '%s::timestamptz' % wrapval('now')),
-                                  ('modified', '%s::timestamptz' % wrapval('now')),
+                                  ('created', '%s::timestamptz' % wrapval(nowval)),
+                                  ('modified', '%s::timestamptz' % wrapval(nowval)),
                                   ('modified by', mod_val),
                                   ('read users', readusers_val),
                                   ('write users', writeusers_val),
                                   ('tags present', 'ARRAY[%s]::text[]' % ','.join([wrapval(t) for t in 'id', 'readok', 'writeok', 'tags present'])) ]:
                     self.set_tag_intable(self.tagdefsdict[tag], intable,
                                          idcol='id', valcol=val, flagcol='updated',
-                                         wokcol='writeok', isowncol='is_owner',
+                                         wokcol=None, isowncol='is_owner',
                                          enforce_tag_authz=False, set_mode='merge',
                                          wheres=[ 'created = True' ],
-                                         newcol='created')
+                                         newcol='created',
+                                         nowval=nowval)
+                    #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject %s initialized' % (self.input_tablename, tag))
                 
                 #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() new subject metadata initialized' % (self.input_tablename))
 
@@ -3381,19 +3442,23 @@ class Application (webauthn2_handler_factory.RestHandler):
                                          idcol='id', valcol=wraptag(td.tagname, '', 'in_'), flagcol='updated',
                                          wokcol='writeok', isowncol='is_owner',
                                          set_mode=on_existing,
-                                         wheres=wheres)
+                                         wheres=wheres,
+                                         newcol='created',
+                                         nowval=nowval)
 
             #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() input tags applied' % (self.input_tablename))
                 
             # update subject metadata based on updated flag in each input row
-            for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval('now')),
+            for tag, val in [ ('subject last tagged', '%s::timestamptz' % wrapval(nowval)),
                               ('subject last tagged txid', 'txid_current()') ]:
                 self.set_tag_intable(self.tagdefsdict[tag], intable,
-                                     idcol='id', valcol=val, flagcol=None,
-                                     wokcol='writeok', isowncol='is_owner',
+                                     idcol='id', valcol=val, flagcol='updated',
+                                     wokcol=None, isowncol='is_owner',
                                      enforce_tag_authz=False, set_mode='merge',
                                      wheres=[ 'updated = True' ],
-                                     newcol='created')
+                                     newcol='created',
+                                     nowval=nowval)
+                #self.log('TRACE', 'Application.bulk_update_transact(%s).body3() subject %s updated' % (self.input_tablename, tag))
 
             def decode_name(s):
                 if s[0:3] == 'in_':
