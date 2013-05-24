@@ -1525,10 +1525,21 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             return results
 
+    def exists_tagdef(self, tagname, enforce_read_authz=True):
+        listtags = [ 'tagdef' ]
+
+        subjpreds = [ web.Storage(tag='tagdef', op='=', vals=[tagname]) ]
+
+        results = self.select_files_by_predlist(subjpreds, listtags, tagdefs=Application.static_tagdefs, enforce_read_authz=enforce_read_authz)
+
+        if len(results) == 0:
+            return False
+        else:
+            return True
+
     def insert_tagdef(self):
         self.log('TRACE', 'Application.insert_tagdef() entered')
-        results = self.select_tagdef(self.tag_id)
-        if len(results) > 0:
+        if self.exists_tagdef(self.tag_id, enforce_read_authz=False):
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
         if self.dbtype is None:
@@ -1583,7 +1594,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             tagdef.softtagref = False
         tagdef.multivalue = self.multivalue
         
-        self.log('TRACE', 'Application.insert_tagdef() between insert and deploy')
         self.deploy_tagdef(tagdef)
         self.log('TRACE', 'Application.insert_tagdef() after deploy')
 
@@ -1680,6 +1690,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.dbquery(clustercmd)
 
     def delete_tagdef(self, tagdef):
+        self.log('TRACE', 'Application.delete_tagdef() entered')
         path = [ ([ web.Storage(tag='tagdef tagref', op='=', vals=[tagdef.tagname]) ],
                   [ web.Storage(tag='tagdef', op=None, vals=[]) ],
                   []) ]
@@ -1693,6 +1704,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     ))
 
         self.undeploy_tagdef(tagdef)
+
         tagdef.name = None
         self.delete_file( tagdef, allow_tagdef=True)
 
