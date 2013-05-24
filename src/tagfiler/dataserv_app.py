@@ -1538,7 +1538,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             return True
 
     def insert_tagdef(self):
-        self.log('TRACE', 'Application.insert_tagdef() entered')
+        #self.log('TRACE', 'Application.insert_tagdef() entered')
         if self.exists_tagdef(self.tag_id, enforce_read_authz=False):
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
 
@@ -1595,7 +1595,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         tagdef.multivalue = self.multivalue
         
         self.deploy_tagdef(tagdef)
-        self.log('TRACE', 'Application.insert_tagdef() after deploy')
+        #self.log('TRACE', 'Application.insert_tagdef() after deploy')
 
         for tag, value in tags:
             self.set_tag(subject, self.tagdefsdict[tag], value)
@@ -1690,7 +1690,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         self.dbquery(clustercmd)
 
     def delete_tagdef(self, tagdef):
-        self.log('TRACE', 'Application.delete_tagdef() entered')
+        #self.log('TRACE', 'Application.delete_tagdef() entered')
         path = [ ([ web.Storage(tag='tagdef tagref', op='=', vals=[tagdef.tagname]) ],
                   [ web.Storage(tag='tagdef', op=None, vals=[]) ],
                   []) ]
@@ -3780,11 +3780,10 @@ class Application (webauthn2_handler_factory.RestHandler):
             if final and (not json) and builtins:
                 lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
                                     web.storage(tag='writeok', op=None, vals=[]),
-                                    web.storage(tag='owner', op=None, vals=[]) ]
-                if 'id' not in lpreds:
-                    lpreds.append( web.Storage(tag='id', op=None, vals=[]) )
+                                    web.storage(tag='owner', op=None, vals=[]),
+                                    web.Storage(tag='id', op=None, vals=[]) ]
 
-            if enforce_read_authz and final and not json:
+            if enforce_read_authz:
                 spreds = spreds + [ web.Storage(tag='readok', op='=', vals=[True]) ]
                 
             spreds = self.mergepreds(spreds, tagdefs)
@@ -3811,11 +3810,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                     subject_wheres.extend(swheres)
                 else:
                     inner.append(sq)
-
-            if enforce_read_authz and json or not final:
-                outer.append( '(SELECT subject FROM "_owner" WHERE value IN (%(rolekeys)s)) AS o' % dict(rolekeys=rolekeys) )
-                outer.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%(rolekeys)s)) AS ru' % dict(rolekeys=rolekeys) )
-                subject_wheres.append( 'o.subject IS NOT NULL OR ru.subject IS NOT NULL' )
 
             finals = []
             otagexprs = dict()
