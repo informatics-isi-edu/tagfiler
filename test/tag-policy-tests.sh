@@ -586,7 +586,7 @@ tagreftest 204 4 1 2 3 4 5   -- 1B 2B 3B 4B 5B    # writepolicy=tagandsubjectand
 tagreftest 403 4           6 -- 1B 2B 3B 4B 5B 6B # writepolicy=tagandsubjectandobject where writeok=False
 tagreftest 403 4 1 2 3 4 5   --                6B # writepolicy=tagandsubjectandobject where object writeok=False
 
-status=$(mycurl "/subject/subject%20text:word:${username}(name)" -H "Accept: ${ACCEPT}" -o $logfile)
+status=$(mycurl "/subject/subject%20text:word:${username};name(name)" -H "Accept: ${ACCEPT}" -o $logfile)
 [[ $status = 200 ]] || error got "$status" during free-text query test
 count=$(grep -v '^[][]*$' < $logfile | wc -l)
 [[ $count -gt 5 ]] || error found too few results during free-text query test for ${username}
@@ -611,6 +611,7 @@ then
     [[ "$status" = 204 ]] || error got "$status" setting tagdef foo tagdef owners to ${mutablerole}
 
     querytest 200 0 "/subject/tagdef:regexp:foo;owner=${username}(tagdef;owner;tagdef%20readpolicy;tag%20read%20users)"
+    querytest 200 1 "/subject/tagdef=fooread2(tagdef;owner;read%20users;tagdef%20readpolicy;tag%20read%20users)"
 
     # do read-tests again w/o tag ACL permissions...
     querytest 200 5 "/subject/fooread0(name)"  # subject readable
