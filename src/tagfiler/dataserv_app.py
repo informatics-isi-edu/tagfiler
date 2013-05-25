@@ -1489,7 +1489,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                        'tag last modified': 'modified' }
 
     def select_tagdef(self, tagname=None, subjpreds=[], order=None, enforce_read_authz=True):
-        listtags = [ 'owner' ]
+        listtags = [ 'owner', 'id' ]
         listtags = listtags + Application.tagdef_listas.keys()
 
         if order:
@@ -3255,8 +3255,8 @@ class Application (webauthn2_handler_factory.RestHandler):
             # and containing all spred and lpred columns, with array cells for multivalue
             equery, evalues = self.build_files_by_predlist_path([ (spreds,
                                                                    subject_iter != False 
-                                                                   and [web.Storage(tag=tag, op=None, vals=[]) for tag in set([ p.tag for p in spreds ])]
-                                                                   or [],
+                                                                   and [web.Storage(tag=tag, op=None, vals=[]) for tag in set([ p.tag for p in spreds ] + ['writeok', 'owner', 'id'])]
+                                                                   or [web.Storage(tag=tag, op=None, vals=[]) for tag in 'writeok', 'owner', 'id'],
                                                                    []) ],
                                                                 enforce_read_authz=enforce_read_authz)
 
@@ -3508,7 +3508,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     web.debug('got exception "%s" peforming body1compensation for %s' % (str(ev), self.input_tablename),
                               traceback.format_exception(et, ev, tb))
 
-    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=True, unnest=None):
+    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=False, unnest=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3777,11 +3777,15 @@ class Application (webauthn2_handler_factory.RestHandler):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            if final and (not json) and builtins:
-                lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
-                                    web.storage(tag='writeok', op=None, vals=[]),
-                                    web.storage(tag='owner', op=None, vals=[]),
-                                    web.Storage(tag='id', op=None, vals=[]) ]
+            if final and (not json):
+                if builtins:
+                    lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
+                                        web.Storage(tag='id', op=None, vals=[]),
+                                        web.storage(tag='writeok', op=None, vals=[]),
+                                        web.storage(tag='owner', op=None, vals=[])  ]
+
+            if not lpreds:
+                raise BadRequest(self, 'A query requires at least one list predicate.')
 
             if enforce_read_authz:
                 spreds = spreds + [ web.Storage(tag='readok', op='=', vals=[True]) ]
