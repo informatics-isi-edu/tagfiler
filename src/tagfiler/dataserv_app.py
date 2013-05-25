@@ -3105,7 +3105,7 @@ class Application (webauthn2_handler_factory.RestHandler):
             self.dbquery('CREATE INDEX %s ON %s ( created, updated )' % (wraptag(self.input_created_idxname, '', ''), wraptag(self.input_tablename, '', '')))
 
             for td in self.input_column_tds:
-                if not td.unique:
+                if not td.unique and False:
                     self.dbquery('CREATE INDEX %s ON %s ( %s )'
                                  % (wraptag(self.input_tablename, '_td%d_idx' % td.id, ''),
                                     wraptag(self.input_tablename, '', ''),
@@ -3402,8 +3402,6 @@ class Application (webauthn2_handler_factory.RestHandler):
                 # set subject metadata for newly created subjects
                 for tag, val in [ ('owner', owner_val),
                                   ('created', '%s::timestamptz' % wrapval(nowval)),
-                                  ('modified', '%s::timestamptz' % wrapval(nowval)),
-                                  ('modified by', mod_val),
                                   ('read users', readusers_val),
                                   ('write users', writeusers_val),
                                   ('tags present', 'ARRAY[%s]::text[]' % ','.join([wrapval(t) for t in 'id', 'readok', 'writeok', 'tags present'])) ]:
