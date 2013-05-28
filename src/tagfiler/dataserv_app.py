@@ -3732,7 +3732,7 @@ class Application (webauthn2_handler_factory.RestHandler):
                     # this tag is dynamically unreadable for this user, i.e. depends on subject or object status
                     if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
                         # need to add subject ownership test that is more strict than baseline subject readok enforcement
-                        wheres.append( 'is_owner.value = True' )
+                        wheres.append( 'o.subject IS NOT NULL' )
                     # other authz modes need no further tests here:
                     # -- subject readok status enforced by enclosing elem_query
                     # -- object status enforced by value IN subquery predicate injected before processing preds list
@@ -3803,12 +3803,6 @@ class Application (webauthn2_handler_factory.RestHandler):
             outer = []
 
             if enforce_read_authz:
-                if len([ tag for tag 
-                         in lpreds.keys() + spreds.keys()
-                         if tagdefs[tag].readok is None and tagdefs[tag].readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner'] ]) > 0:
-                    # make this a shared value for every tag_query() that needs it
-                    inner.append( '(SELECT subject, o.value IN (%s) AS value FROM resources LEFT OUTER JOIN _owner o USING (subject)) is_owner' % rolekeys )
-
                 # postgres can optimize this better than a direct readok=True spred
                 outer.append( '(SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys )
                 outer.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys )
