@@ -1526,6 +1526,13 @@ class Application (webauthn2_handler_factory.RestHandler):
             return results
 
     def insert_tagdef(self):
+        if self.tagref:
+           tagrefs = self.select_tagdef(self.tagref)
+           if len(tagrefs) == 0:
+               raise Conflict(self, 'Tagref "%s" does not exists.' % self.tagref)
+           tagrefs = tagrefs[0]
+           if tagrefs.unique == False:
+               raise Conflict(self, 'Tagref "%s" is not unique.' % self.tagref)
         results = self.select_tagdef(self.tag_id)
         if len(results) > 0:
             raise Conflict(self, 'Tagdef "%s" already exists. Delete it before redefining.' % self.tag_id)
@@ -1533,6 +1540,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         if self.dbtype is None:
             # force default empty type
             self.dbtype = ''
+            
+        if self.tagref and self.dbtype != tagrefs.dbtype:
+            raise Conflict(self, 'Tagdef dbtype "%s" does not match Tagref dbtype "%s".' % (self.dbtype, tagrefs.dbtype))
 
         owner = self.context.client
         newid = self.insert_file(None)
