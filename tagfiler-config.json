@@ -18,7 +18,6 @@
      "policy remappings": {"source role": ["remap role", ["read role", "..."], ["write role", "..."], "boolean readok", "boolean writeok"]},
      "webauthn2" : "{... The webauthn2 config stanza ...}",
      "log bulk details" : "whether to generate detailed audit logging from bulk operations",
-     "bulk tmp index" : "whether to index temporary tables used for bulk operations",
      "bulk tmp cluster" : "whether to cluster temporary data used for bulk operations",
      "bulk tmp analyze" : "whether to analyze temporary data used for bulk operations",
      "transact cluster" : "whether to adaptively re-cluster tag tables after transactions",
@@ -41,7 +40,6 @@
    "policy remappings": {},
 
    "log bulk details" : false,
-   "bulk tmp index" : false,
    "bulk tmp cluster" : false,
    "bulk tmp analyze" : false,
    "transact cluster" : false,
