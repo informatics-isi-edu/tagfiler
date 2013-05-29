@@ -142,7 +142,7 @@ function runSessionRequest() {
 	  ajax_request.abort();
       }
       log("runSessionRequest: starting GET " + expiration_check_url);
-      ajax_request.open("GET", expiration_check_url);
+      ajax_request.open("GET", HOME + expiration_check_url);
       ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
       ajax_request.onreadystatechange = processSessionRequest;
       ajax_request.send(null);
@@ -177,7 +177,7 @@ function runExtendRequest() {
 	if (ajax_request.readystate != 0) {
 	    ajax_request.abort();
 	}
-    ajax_request.open("PUT", expiration_check_url);
+    ajax_request.open("PUT", HOME + expiration_check_url);
 	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_request.onreadystatechange = processSessionRequest;
 	ajax_request.send(null);
@@ -805,7 +805,7 @@ var timer = 0;
 var timerset = 0;
 var expiration_poll_mins = 1;
 var expiration_warn_mins = 2;
-var expiration_check_url = "/tagfiler/session";
+var expiration_check_url = "/session";
 var ajax_request = null;
 var until = null;
 var width = 0;
@@ -1647,6 +1647,7 @@ function appendTypedefs(id) {
 var HOME;
 var USER;
 var WEBAUTHNHOME;
+var SEARCH_STRING;
 var ROW_COUNTER;
 var MULTI_VALUED_ROW_COUNTER;
 var VAL_COUNTER;
@@ -2641,7 +2642,7 @@ function postLoadTypedefs(data, textStatus, jqXHR, param) {
 
 function loadTags() {
 	var url = HOME + '/query/tagdef(tagdef;' + 
-				encodeSafeURIComponent('tagdef type') + ';' + 
+				encodeSafeURIComponent('tagdef dbtype') + ';' + 
 				encodeSafeURIComponent('tagdef multivalue') + ';' +
 				encodeSafeURIComponent('tagdef unique') + ')?limit=none';
 	tagfiler.GET(url, false, postLoadTags, null, null, 0);
@@ -2666,7 +2667,7 @@ function postLoadTags(data, textStatus, jqXHR, param) {
 	var results = ['bytes', 'url', 'id'];
 	$.each(data, function(i, object) {
 		availableTagdefs.push(object['tagdef']);
-		availableTags[object['tagdef']] = object['tagdef type'];
+		availableTags[object['tagdef']] = object['tagdef dbtype'];
 		allTagdefs[object['tagdef']] = object;
 		if (object['tagdef unique']) {
 			var encodeValue = encodeSafeURIComponent(object['tagdef']);
@@ -5834,15 +5835,20 @@ function resetColumnRange(event, tdRange) {
 	div2.css('display', 'none');
 }
 
-var policies = {'anonymous': 'anyone', 
-		'subject': 'only clients who can access subject', 
-		'subjectowner': 'only owner of subject', 
-		'tag': 'only clients in tagdef ACL', 
-		'tagorsubject': 'only clients who can access subject or who are in tagdef ACL', 
-		'tagandsubject': 'only clients who can access subject who is also in tagdef ACL', 
-		'tagorowner': 'only owner of subjects or who is in tagdef ACL', 
-		'tagandowner': 'only owner of subject who is also in tagdef ACL',
-		"system" : "no access"
+var policies = {'anonymous': 'Anonymous', 
+		'object': 'Object', 
+		'objectowner': 'Object Owner', 
+		'subject': 'Subject', 
+		'subjectandobject': 'Subject and Object', 
+		'subjectowner': 'Subject Owner', 
+		'tag': 'Tag', 
+		'tagandowner': 'Tag and Owner',
+		'tagandsubject': 'Tag and Subject',
+		'tagandsubjectandobject': 'Tag and Subject and Object',
+		'tagorowner': 'Tag or Owner',
+		'tagorsubject': 'Tag or Subject',
+		'tagorsubjectandobject': 'Tag or Subject and Object',
+		'system': 'No access'
 };
 
 var tagdefPolicies = {'anonymous': 'Any client may access', 
@@ -5856,14 +5862,49 @@ var tagdefPolicies = {'anonymous': 'Any client may access',
 		"system" : "No client can access"
 };
 
-var tagPolicies = ['anonymous', 'subject', 'subjectowner', 'tag', 'tagorsubject', 'tagandsubject'];
+var tagWritePolicies = [ 
+                        'anonymous',
+                        'object',
+                        'objectowner',
+                        'subject',
+                        'subjectandobject',
+                        'subjectowner',
+                        'tag',
+                        'tagandowner',
+                        'tagandsubject',
+                        'tagandsubjectandobject',
+                        'tagorowner',
+                        'tagorsubject',
+                        'tagorsubjectandobject'
+                        ];
+var tagReadPolicies = { 
+        'objectowner': 'Object Owner',
+        'subject': 'Anonymous',
+        'subjectowner': 'Subject Owner',
+        'tagandowner': 'Tag and Owner',
+        'tagandsubject': 'Tag',
+        'tagorowner': 'Tag or Owner'
+		};
 var tagdefsColumns = ['tagdef', 
-                      'tagdef type', 
+                      'tagdef dbtype', 
                       'tagdef multivalue', 
                       'tagdef unique', 
                       'owner',
                       'tagdef readpolicy',
-                      'tagdef writepolicy'];
+                      'tagdef writepolicy',
+                      'tagdef tagref'];
+
+var dbtypes = {
+	'No content': '',
+	'Boolean (true or false)': 'boolean',
+	'Integer': 'int8',
+	'Floating point': 'float8',
+	'Text': 'text',
+	'Date (yyyy-mm-dd)': 'date',
+	'Date and time with timezone': 'timestamptz'
+};
+
+var dbtypesDisplay = [];
 
 var browsersImmutableTags = [ 'check point offset', 'key', 'sha256sum' ];
 
@@ -6168,7 +6209,8 @@ function postSubmitLogin(data, textStatus, jqXHR, param) {
 		userLogout();
 	}
 	document.body.style.cursor = "default";
-	window.location = window.location;
+	//window.location = window.location;
+	getRoles();
 }
 
 function getRoles() {
@@ -6191,8 +6233,16 @@ function getRoles() {
 function postGetRoles(data, textStatus, jqXHR, param) {
 	USER_ROLES = data['attributes'];
 	USER = data['client'];
+	allowManageUsers = allowManageAttributes = USER_ROLES.contains('admin');
 	showAuthnInfo(data);
 	showTopMenu();
+	initIdleWarning();
+	runSessionPolling(1, 2);
+	startCookieTimer(1000);
+	$.each(dbtypes, function(name, val) {
+		dbtypesDisplay.push(name);
+	});
+	dbtypesDisplay.sort(compareIgnoreCase);
 	homePage();
 }
 
@@ -6305,12 +6355,7 @@ function showAuthnInfo(data) {
 function showTopMenu() {
 	var tr = $('#topmenu');
 	tr.html('');
-	var td = $('<td>');
-	tr.append(td);
-	var a = $('<a>');
-	td.append(a);
-	a.attr({'href': 'javascript:window.location="'+HOME+'"'});
-	a.html('Home');
+	var td = null;
 	if (allowManageUsers) {
 		td = $('<td>');
 		tr.append(td);
@@ -6337,14 +6382,14 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': HELP_URL});
-	a.html('Help');
+	a.attr({'href': 'javascript:createCustomDataset()'});
+	a.html('Create catalog entries');
 	td = $('<td>');
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': BUGS_URL});
-	a.html('Bugs');
+	a.attr({'href': 'javascript:manageAvailableTagDefinitions()'});
+	a.html('Manage tag definitions');
 }
 
 function manageTagDefinitions(roles) {
@@ -6375,6 +6420,10 @@ function manageTagDefinitions(roles) {
 	tr.append(th);
 	th.attr('name', 'typestr');
 	th.html('Tag type');
+	th = $('<th>');
+	tr.append(th);
+	th.attr('name', 'tagref');
+	th.html('Tag reference');
 	th = $('<th>');
 	tr.append(th);
 	th.attr('name', 'multivalue');
@@ -6412,12 +6461,23 @@ function manageTagDefinitions(roles) {
 	var select = $('<select>');
 	td.append(select);
 	select.attr({'name': 'type-1',
-		'id': 'type-1',
-		'onclick': "chooseTypedefs('"+HOME+"', 'type-1')"});
-	var option = $('<option>');
-	option.text('No content');
-	option.attr('value', 'empty');
-	select.append(option);
+		'id': 'type-1'});
+	loadDbTypes(select);
+	td = $('<td>');
+	tr.append(td);
+	select = $('<select>');
+	td.append(select);
+	select.attr({'name': 'referenceTags',
+		'id': 'referenceTags'});
+	loadReferenceTags();
+	var softCheckBox = $('<input>');
+	softCheckBox.attr({'type': 'checkbox',
+		'id': 'softCheckBox',
+		'value': 'Soft',
+		'name': 'Soft'
+	});
+	td.append(softCheckBox);
+	td.append('Soft&nbsp;&nbsp;');
 	td = $('<td>');
 	tr.append(td);
 	select = $('<select>');
@@ -6441,19 +6501,27 @@ function manageTagDefinitions(roles) {
 	td.append(select);
 	select.attr({'name': 'readpolicy-1',
 		'id': 'readpolicy-1'});
-	$.each(tagPolicies, function(i, key) {
+	var readDict = {};
+	var values = [];
+	$.each(tagReadPolicies, function(key, val) {
+		values.push(val);
+		readDict[val] = key;
+	});
+	values.sort(compareIgnoreCase);
+	$.each(values, function(i, val) {
 		option = $('<option>');
-		option.text(policies[key]);
-		option.attr('value', key);
+		option.text(val);
+		option.attr('value', readDict[val]);
 		select.append(option);
 	});
+	select.val('subject');
 	td = $('<td>');
 	tr.append(td);
 	select = $('<select>');
 	td.append(select);
 	select.attr({'name': 'writepolicy-1',
 		'id': 'writepolicy-1'});
-	$.each(tagPolicies, function(i, key) {
+	$.each(tagWritePolicies, function(i, key) {
 		option = $('<option>');
 		option.text(policies[key]);
 		option.attr('value', key);
@@ -6543,7 +6611,14 @@ function postManageTagDefinitions(data, textStatus, jqXHR, param) {
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
-		td.html(object['tagdef type']);
+		var typeVal = object['tagdef dbtype'];
+		if (typeVal == '') {
+			typeVal = 'empty';
+		}
+		td.html(typeVal);
+		td = $('<td>');
+		tr.append(td);
+		td.html(object['tagdef tagref'] ? object['tagdef tagref'] : '');
 		td = $('<td>');
 		tr.append(td);
 		td.html(object['tagdef multivalue'] ? '0 or more' : '0 or 1');
@@ -6637,7 +6712,7 @@ function postGetSystemTagdefs(data, textStatus, jqXHR, param) {
 		a.html(object['tagdef']);
 		td = $('<td>');
 		tr.append(td);
-		td.html(object['tagdef type']);
+		td.html(object['tagdef dbtype'] ? object['tagdef dbtype'] : 'empty');
 		td = $('<td>');
 		tr.append(td);
 		td.html(object['tagdef multivalue'] ? '0 or more' : '0 or 1');
@@ -6657,20 +6732,25 @@ function postGetSystemTagdefs(data, textStatus, jqXHR, param) {
 }
 
 function defineTag() {
-	var url = HOME + '/tagdef';
+	var tagref = '';
+	if ($('#referenceTags').val() != '') {
+		tagref = '&tagref=' + encodeSafeURIComponent($('#referenceTags').val());
+		if ($('#softCheckBox').attr('checked')) {
+			tagref += '&soft=true'
+		}
+	}
+	var url = HOME + '/tagdef/' + encodeSafeURIComponent($('#tag-1').val()) + '?' +
+		'dbtype=' + encodeSafeURIComponent($('#type-1').val()) +
+		'&multivalue=' + encodeSafeURIComponent($('#multivalue-1').val()) +
+		'&unique=' + encodeSafeURIComponent($('#unique-1').val()) +
+		'&readpolicy=' + encodeSafeURIComponent($('#readpolicy-1').val()) + tagref +
+		'&writepolicy=' + encodeSafeURIComponent($('#writepolicy-1').val());
 	var obj = new Object();
-	obj.action = 'add';
-	obj['tag-1'] = $('#tag-1').val();
-	obj['type-1'] = $('#type-1').val();
-	obj['multivalue-1'] = $('#multivalue-1').val();
-	obj['readpolicy-1'] = $('#readpolicy-1').val();
-	obj['writepolicy-1'] = $('#writepolicy-1').val();
-	obj['unique-1'] = $('#unique-1').val();
-	tagfiler.POST(url, obj, true, postDefineTagdefs, null, null, 0);
+	tagfiler.PUT(url, obj, true, postDefineTagdefs, null, null, 0);
 }
 
 function getTagdefsURL(title) {
-	var url = HOME + '/query/tagdef;owner' + ((title == 'system') ? ':absent:' : '');
+	var url = HOME + '/subject/tagdef;owner' + ((title == 'system') ? ':absent:' : '');
 	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
 	url += 'tagdef:asc:?limit=none';
 	return url;
@@ -6736,7 +6816,14 @@ function postDefineTagdefs(data, textStatus, jqXHR, param) {
 	a.html(value);
 	td = $('<td>');
 	tr.append(td);
-	td.html($('#type-1').val());
+	var typeVal = $('#type-1').val();
+	if (typeVal == '') {
+		typeVal = 'empty';
+	}
+	td.html(typeVal);
+	td = $('<td>');
+	tr.append(td);
+	td.html($('#referenceTags').val());
 	td = $('<td>');
 	tr.append(td);
 	td.html($('#multivalue-1').val() == 'true' ? '0 or more' : '0 or 1');
@@ -6745,7 +6832,7 @@ function postDefineTagdefs(data, textStatus, jqXHR, param) {
 	td.html(USER);
 	td = $('<td>');
 	tr.append(td);
-	td.html(policies[$('#readpolicy-1').val()]);
+	td.html(tagReadPolicies[$('#readpolicy-1').val()]);
 	td = $('<td>');
 	tr.append(td);
 	td.html(policies[$('#writepolicy-1').val()]);
@@ -6754,11 +6841,12 @@ function postDefineTagdefs(data, textStatus, jqXHR, param) {
 	td.html($('#unique-1').val() == 'true' ? 'True' : 'False');
 		
 	$('#tag-1').val('');
-	$('#type-1').val('empty');
+	$('#type-1').val('');
 	$('#multivalue-1').val('false');
-	$('#readpolicy-1').val('anonymous');
+	$('#readpolicy-1').val('subject');
 	$('#writepolicy-1').val('anonymous');
 	$('#unique-1').val('false');
+	loadReferenceTags();
 	
 	tr.insertAfter($('#tr_'+position));
 	
@@ -6805,12 +6893,13 @@ function postDeleteTagdefs(data, textStatus, jqXHR, param) {
 			$(tr).addClass('even');
 		}
 	});
+	loadReferenceTags();
 }
 
 function tagsUI(predicate, view, roles) {
 	var url = HOME + '/' + predicate;
 	if (view != null) {
-		url = HOME + '/query/' + predicate + '?limit=none&view=' + encodeSafeURIComponent(view);
+		url = HOME + '/subject/' + predicate + '?limit=none&view=' + encodeSafeURIComponent(view);
 	}
 	var param = {
 		'predicate': predicate,
@@ -6842,7 +6931,7 @@ function postGetTagdefs(data, textStatus, jqXHR, param) {
 		temp += key+'='+value+'\n';
 	});
 	// get all tags defitions
-	var url = HOME + '/query/tagdef';
+	var url = HOME + '/subject/tagdef';
 	url += '(' + encodeURIArray(tagdefsColumns, '').join(';') + ')';
 	url += 'tagdef:asc:?limit=none';
 	param.tags = tags;
@@ -6917,15 +7006,6 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 	var div = $('<div>');
 	uiDiv.append(div);
 	div.addClass('content');
-	if (view != null && view != 'alltags') {
-		var p = $('<p>');
-		div.append(p);
-		p.html('This is a limited tag view. ');
-		var a = $('<a>');
-		p.append(a);
-		a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate.indexOf('tags/') == 0 ? predicate.substr('tags/'.length) : predicate) + '","alltags")');
-		a.html('View all tags.');
-	}
 	var table = $('<table>');
 	div.append(table);
 	table.addClass('file-list');
@@ -6964,10 +7044,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 		valuesTable.addClass('file-tag-list');
 		if (tag == 'tagdef') {
 			if (tags[tag] != null) {
-				a = $('<a>');
-				td.append(a);
-				a.attr('href', 'javascript:getTagDefinition("tagdef=' + encodeSafeURIComponent(tags[tag]) + '","tagdef")');
-				a.html(tags[tag]);
+				td.html(tags[tag]);
 			} else {
 				td.html('');
 			}
@@ -7055,10 +7132,6 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					option.text('file (Named dataset for locally stored file)');
 					option.attr({'value': 'file',
 						'selected': 'selected'});
-					option = $('<option>');
-					select.append(option);
-					option.text('url (Named dataset for URL redirecting)');
-					option.attr({'value': 'url'});
 					input = $('<input>');
 					input.attr({'name': 'myfile'+tags['id'],
 						'type': 'file',
@@ -7110,12 +7183,9 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 				a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
 				a.html(predicate + ' (tags)');
 			}
-		} else if (tag == 'tagdef type') {
+		} else if (tag == 'tagdef dbtype') {
 			if (tags[tag] != null) {
-				a = $('<a>');
-				td.append(a);
-				a.attr('href', 'javascript:getTagDefinition("typedef=' + encodeSafeURIComponent(tags[tag]) + '","typedef")');
-				a.html('typedef=' + tags[tag]);
+				td.html(tags[tag]);
 			} else {
 				td.html('');
 			}
@@ -7153,9 +7223,9 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
 					}
 				});
-			} else if (allTags[tag]['tagdef type'] == 'boolean') {
+			} else if (allTags[tag]['tagdef dbtype'] == 'boolean') {
 				td.html(tags[tag] ? 'True' : 'False');
-			} else if (allTags[tag]['tagdef type'] == 'tagpolicy') {
+			} else if (allTags[tag]['tagdef dbtype'] == 'tagpolicy') {
 				td.html('' + tags[tag] + ' (' + tagdefPolicies[tags[tag]] + ')');
 			} else {
 				if (!writeOK) {
@@ -7168,7 +7238,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					valueTd.addClass('file-tag');
 					valueTd.addClass(tag);
 					valueTd.addClass('multivalue');
-					if (allTags[tag]['tagdef type'] == 'empty') {
+					if (allTags[tag]['tagdef dbtype'] == 'empty') {
 						valueTd.html(tags[tag] ? 'is set' : 'not set');
 					} else {
 						if (tag == 'url') {
@@ -7187,7 +7257,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 					valueTd.addClass('multivalue');
 					valueTd.addClass('delete');
 					var input = $('<input>');
-					if (allTags[tag]['tagdef type'] == 'empty') {
+					if (allTags[tag]['tagdef dbtype'] == 'empty') {
 						input.attr({'type': 'button',
 							'name': 'tag',
 							'value': tags[tag]
@@ -7214,7 +7284,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 				td.html('');
 			}
 		}
-		if (writeOK && allTags[tag]['tagdef type'] != 'empty') {
+		if (writeOK && allTags[tag]['tagdef dbtype'] != 'empty') {
 			var valueTr = $('<tr>');
 			valuesTable.append(valueTr);
 			var valueTd = $('<td>');
@@ -7222,7 +7292,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 			valueTd.addClass('file-tag');
 			valueTd.addClass(tag);
 			valueTd.addClass('multivalue');
-			var tagType = allTags[tag]['tagdef type'];
+			var tagType = allTags[tag]['tagdef dbtype'];
 			if (tagType == 'text' || tagType == 'int8' || tagType == 'date' || 
 					tagType == 'timestamptz' || tagType == 'id' || tagType == 'url') {
 				valueTd.addClass('input');
@@ -7576,7 +7646,7 @@ function userLogout() {
 function postUserLogout(data, textStatus, jqXHR, param) {
 	$('#topmenu').html('');
 	$('#authninfo').html('');
-	window.location = HOME;
+	window.location = HOME + '/static';
 }
 
 function userChangePassword() {
@@ -7753,8 +7823,9 @@ function postChangePassword(data, textStatus, jqXHR, param) {
 
 function homePage() {
 	// get the list on homepage files
-	var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
-	tagfiler.GET(url, true, postHomePage, null, null, 0);
+	//var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
+	//tagfiler.GET(url, true, postHomePage, null, null, 0);
+	manageAvailableTagDefinitions();
 }
 
 /**
@@ -8844,6 +8915,8 @@ function renderQueryHTML() {
 }
 
 function manageAvailableTagDefinitions() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
 	var url = HOME + '/session';
 	tagfiler.GET(url, true, postManageAvailableTagDefinitions, null, null, 0);
 }
@@ -8921,10 +8994,6 @@ function createCustomDataset() {
 	option.text('file (Named dataset for locally stored file)');
 	option.attr({'value': 'file',
 		'selected': 'selected'});
-	option = $('<option>');
-	select.append(option);
-	option.text('url (Named dataset for URL redirecting)');
-	option.attr({'value': 'url'});
 	input = $('<input>');
 	input.attr({'name': 'myfile',
 		'type': 'file',
@@ -8974,8 +9043,7 @@ function createCustomDataset() {
 	div.append(select);
 	select.attr({'name': 'defaultView',
 		'id': 'defaultView',
-		'typestr': 'view',
-		'onclick': "chooseOptions('" + HOME + "', '" + WEBAUTHNHOME + "', 'view', 'defaultView')"
+		'onclick': "chooseView()"
 	});
 	option = $('<option>');
 	select.append(option);
@@ -10024,5 +10092,64 @@ function postManageAllUsersAttributes(data, textStatus, jqXHR, param) {
 
 function init() {
 	renderLogin();
+	SEARCH_STRING = window.location.search;
+	if (SEARCH_STRING != null && SEARCH_STRING != '' && SEARCH_STRING[0] == '?') {
+		SEARCH_STRING = SEARCH_STRING.substring(1);
+	}
+	HOME = '' + window.location;
+	var index = HOME.indexOf('/static');
+	HOME = HOME.substring(0, index);
 }
 
+function loadDbTypes(select) {
+	$.each(dbtypesDisplay, function(i, name) {
+		var option = $('<option>');
+		option.text(name);
+		option.attr('value', dbtypes[name]);
+		select.append(option);
+	});
+	select.val('');
+}
+
+function chooseView() {
+	var select = $('#defaultView');
+	if (select.attr('clicked') != null) {
+		return;
+	} else {
+		select.attr('clicked', 'clicked');
+		var url = HOME + '/subject/view(view)view:asc:?limit=none';
+		tagfiler.GET(url, true, postGetViews, null, null, 0);
+	}
+	
+}
+
+function postGetViews(data, textStatus, jqXHR, param) {
+	var select = $('#defaultView');
+	$.each(data, function(i, obj) {
+		var option = $('<option>');
+		option.text(obj['view']);
+		option.attr('value', obj['view']);
+		select.append(option);
+	});
+}
+
+function loadReferenceTags() {
+	var url = HOME + '/subject/tagdef(tagdef)tagdef:asc:?limit=none';
+	tagfiler.GET(url, true, postLoadReferenceTags, null, null, 0);
+}
+
+function postLoadReferenceTags(data, textStatus, jqXHR, param) {
+	$('#softCheckBox').removeAttr('checked');
+	var select = $('#referenceTags');
+	select.html('');
+	var option = $('<option>');
+	option.text('Choose a tag');
+	option.attr('value', '');
+	select.append(option);
+	$.each(data, function(i, obj) {
+		var option = $('<option>');
+		option.text(obj['tagdef']);
+		option.attr('value', obj['tagdef']);
+		select.append(option);
+	});
+}
