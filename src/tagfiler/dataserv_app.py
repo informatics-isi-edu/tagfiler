@@ -1600,6 +1600,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         for tag, value in tags:
             self.set_tag(subject, self.tagdefsdict[tag], value)
 
+        self.dbquery('ANALYZE "_tagdef"')
+        self.dbquery('ANALYZE "_tagdef tagref"')
+
         return tagdef
         
     def get_index_name(self, tablename, indexcols):
@@ -3555,7 +3558,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         if rangemode not in [ 'values', 'count', 'values<', 'values>' ]:
             rangemode = None
 
-        def tag_query(tagdef, preds, values, final=True, tprefix='_', spred=False):
+        def tag_query(tagdef, preds, values, final=True, tprefix='_', spred=False, scalar_subj=None):
             """Compile preds for one tag into a query fetching all satisfactory triples.
 
                Returns (tagdef, querystring, subject_wheres)
@@ -3569,57 +3572,69 @@ class Application (webauthn2_handler_factory.RestHandler):
                final=False uses template: "q"
                final=True  uses template: "( q ) AS alias"  and array_agg of multivalue tags
 
-               normal query templates:
-                   SELECT subject FROM "_%(tagname)s"
-                   SELECT subject, subject AS value FROM resources [WHERE subject ...]
-                   SELECT subject, value FROM "_%(tagname)s" [WHERE value ...]
-                   SELECT subject, value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
-                   SELECT subject, value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
-                   SELECT subject, array_agg(value) AS value FROM "_%(tagname)s" [JOIN (SELECT subject FROM "_%(tagname)s" WHERE value ...) USING subject]...
-
+               scalar_subj:  if not None, must be an alias.column reference
+                  and the returned query will be in the form ( q WHERE subject = scalar_subj )
+                  to allow the query to be used in a SELECT list
+               
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
             subject_wheres = []
 
-            m = dict(value='', where='', group='', table=wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
+            m = dict(value='', where='', group='', table='%s t' % wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
             wheres = []
-            extra_tag_columns = set()
 
             # make a copy so we can mutate it safely
             preds = list(preds)
 
-            valcol = '%s.value' % wraptag(tagdef.tagname)
-            tsvcol = '%s.tsv' % wraptag(tagdef.tagname)
+            valcol = 't.value'
+            tsvcol = 't.tsv'
             if tagdef.tagname == 'id':
-                m['table'] = 'resources'
+                m['table'] = 'resources t'
                 m['value'] = ', subject AS value'
                 valcol = 'subject'
             elif tagdef.tagname == 'readok':
-                m['table'] = ('(SELECT subject, True AS value'
-                              + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
-                              + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys
-                              + '  USING (subject)) ro')
+                if enforce_read_authz:
+                    # subjects are already filtered by elem_query() and all visible subjects are readok=True...
+                    m['table'] = '(SELECT subject, True AS value FROM resources) t'
+                elif scalar_subj:
+                    m['table'] = ('(SELECT %s,' % scalar_subj
+                                  + ' (SELECT value IN (%s) FROM _owner WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' OR '
+                                  + ' (SELECT value IN (%s) FROM "_read users" WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' AS value) t')
+                else:
+                    m['table'] = ('(SELECT subject, True AS value'
+                                  + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
+                                  + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys
+                                  + '  USING (subject)) t')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.tagname == 'writeok':
-                m['table'] = ('(SELECT subject, True AS value'
-                              + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
-                              + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_write users" WHERE value IN (%s)) w' % rolekeys
-                              + '  USING (subject)) wo')
+                if scalar_subj:
+                    m['table'] = ('(SELECT %s,' % scalar_subj
+                                  + ' (SELECT value IN (%s) FROM _owner WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' OR '
+                                  + ' (SELECT value IN (%s) FROM "_write users" WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' AS value) t')
+                else:
+                    m['table'] = ('(SELECT subject, True AS value'
+                                  + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
+                                  + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_write users" WHERE value IN (%s)) w' % rolekeys
+                                  + '  USING (subject)) t')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.multivalue and final:
                 if unnest == tagdef.tagname:
-                    m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
+                    m['value'] = ', value'
                 else:
-                    m['value'] = ', array_agg(%s.value) AS value' % wraptag(tagdef.tagname)
+                    m['value'] = ', array_agg(value) AS value'
                     m['group'] = 'GROUP BY subject'
             elif tagdef.dbtype != '':
                 if tagdef.dbtype == 'tsvector':
-                    m['value'] = ', %s.tsv AS value' % wraptag(tagdef.tagname)
+                    m['value'] = ', tsv AS value'
                 else:
-                    m['value'] = ', %s.value AS value' % wraptag(tagdef.tagname)
+                    m['value'] = ', value'
 
             used_not_op = False
             used_other_op = False
@@ -3644,6 +3659,9 @@ class Application (webauthn2_handler_factory.RestHandler):
                                                       tagdefs=tagdefs)[0]
                     )
                 preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
+
+            if scalar_subj:
+                wheres.append( 'subject = %s' % scalar_subj )
 
             for pred in preds:
                 if tagdef.dbtype in self.opsExcludeTypes.get(pred.op and pred.op or '', []):
@@ -3732,37 +3750,48 @@ class Application (webauthn2_handler_factory.RestHandler):
                     # this tag is dynamically unreadable for this user, i.e. depends on subject or object status
                     if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
                         # need to add subject ownership test that is more strict than baseline subject readok enforcement
-                        wheres.append( 'o.subject IS NOT NULL' )
+                        if scalar_subj:
+                            wheres.append( 'r.is_owner' )
+                        else:
+                            wheres.append( '(SELECT value IN (%s) FROM _owner o WHERE o.subject = t.subject)' % rolekeys )
                     # other authz modes need no further tests here:
                     # -- subject readok status enforced by enclosing elem_query
                     # -- object status enforced by value IN subquery predicate injected before processing preds list
                     #    -- object readok enforced by default
                     #    -- object ownership enforced if necessary by extra owner predicate
 
-            for tag in extra_tag_columns:
-                m['table'] += ' LEFT OUTER JOIN %s USING (subject)' % wraptag(tag)
-
             w = ' AND '.join([ '(%s)' % w for w in wheres ])
             if w:
                 m['where'] = 'WHERE ' + w
 
-            if tagdef.dbtype != '':
-                if tagdef.multivalue and wheres and spred:
-                    # multivalue spred requires SUBJECT to match all preds, possibly using different triples for each match
-                    m['where'] = ''
-                    tables = [ m['table'] ]
-                    for i in range(0, len(wheres)):
-                        tables.append( 'JOIN (SELECT subject FROM %s WHERE %s GROUP BY subject) AS %s USING (subject)'
-                                       % (wraptag(tagdef.tagname), wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
-                    m['table'] = ' '.join(tables)
-
-                # single value or multivalue lpred requires VALUE to match all preds
-                q = 'SELECT subject%(value)s FROM %(table)s %(where)s %(group)s'
+            if scalar_subj and not spred:
+                if tagdef.dbtype != '':
+                    if tagdef.multivalue:
+                        q = '(SELECT %(value)s FROM %(table)s %(where)s %(group)s)'
+                    else:
+                        q = '(SELECT %(value)s FROM %(table)s %(where)s)'
+                    m['value'] = m['value'][1:] # strip off leading ',' char
+                else:
+                    q = '(SELECT subject IS NOT NULL AS value FROM %(table)s %(where)s)'
+                return (q % m, [])
             else:
-                q = 'SELECT subject FROM %(table)s %(where)s'
-            
-            if final:
-                q = '(' + q + ') AS %(alias)s'
+                if tagdef.dbtype != '':
+                    if tagdef.multivalue and wheres and spred:
+                        # multivalue spred requires SUBJECT to match all preds, possibly using different triples for each match
+                        m['where'] = ''
+                        tables = [ m['table'] ]
+                        for i in range(0, len(wheres)):
+                            tables.append( 'JOIN (SELECT subject FROM %s WHERE %s GROUP BY subject) AS %s USING (subject)'
+                                           % (wraptag(tagdef.tagname), wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
+                        m['table'] = ' '.join(tables)
+
+                    # single value or multivalue lpred requires VALUE to match all preds
+                    q = 'SELECT subject%(value)s FROM %(table)s %(where)s %(group)s'
+                else:
+                    q = 'SELECT subject FROM %(table)s %(where)s'
+
+                if final:
+                    q = '(' + q + ') AS %(alias)s'
 
             return (q % m, subject_wheres)
 
@@ -3798,16 +3827,31 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if len([ p for p in preds if p.op]) != 0:
                         raise BadRequest(self, 'Tag "%s" cannot be filtered in a list-predicate.' % tag)
 
+            if enforce_read_authz:
+                # remodel root resources with authz status in a way that postgres optimizes better
+                inner = [ 'resources r' ]
+                inner.append( '(SELECT subject FROM _owner WHERE value IN (%s)) is_owner USING (subject)' % rolekeys )
+                inner.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) is_reader USING (subject)' % rolekeys )
+
+                selects = [ 'r.subject AS subject', 
+                            'is_owner.subject IS NOT NULL AS is_owner', 
+                            'is_reader.subject IS NOT NULL AS is_reader' ]
+
+                inner = [ ('(SELECT '
+                           + ', '.join(selects)
+                           + ' FROM '
+                           + ' LEFT OUTER JOIN '.join(inner)
+                           + ') r') ]
+
+                if enforce_read_authz:
+                    subject_wheres.append('(r.is_owner OR r.is_reader)')
+
+            else:
+                inner = [ 'resources r' ]
+            
             selects = []
-            inner = []
             outer = []
 
-            if enforce_read_authz:
-                # postgres can optimize this better than a direct readok=True spred
-                outer.append( '(SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys )
-                outer.append( '(SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys )
-                subject_wheres.append( 'o.subject IS NOT NULL OR r.subject IS NOT NULL' )
-            
             for tag, preds in spreds.items():
                 sq, swheres = tag_query(tagdefs[tag], preds, values, tprefix='s_', spred=True)
                 if swheres:
@@ -3845,10 +3889,12 @@ class Application (webauthn2_handler_factory.RestHandler):
                 else:
                     if spreds.has_key(tag) and len([ p for p in preds if p.op != None]) == 0 and not tagdefs[tag].multivalue:
                         # this projection does not further filter triples relative to the spred so optimize it away
-                        td = tagdefs[tag]
                         lq = None
                     else:
-                        lq, swheres = tag_query(td, preds, values, final, tprefix='l_')
+                        if rangemode:  
+                            lq, swheres = tag_query(td, preds, values, final, tprefix='l_')
+                        else:
+                            lq, swheres = tag_query(td, preds, values, final, tprefix='l_', scalar_subj='r.subject')
                         if swheres:
                             raise BadRequest(self, 'Operator ":absent:" not supported in projection list predicates.')
 
@@ -3856,14 +3902,16 @@ class Application (webauthn2_handler_factory.RestHandler):
                     if rangemode == None:
                         # returning triple values per subject
                         if lq:
-                            outer.append(lq)
-                            tprefix = 'l_'
+                            tprefix = None
+                            expr = lq
+                            #outer.append(lq)
+                            #tprefix = 'l_'
                         else:
                             tprefix = 's_'
-                        if td.dbtype != '':
-                            expr = '%s.value' % wraptag(td.tagname, prefix=tprefix)
-                        else:
-                            expr = '%s.subject IS NOT NULL' % wraptag(td.tagname, prefix=tprefix)
+                            if td.dbtype != '':
+                                expr = '%s.value' % wraptag(td.tagname, prefix=tprefix)
+                            else:
+                                expr = '%s.subject IS NOT NULL' % wraptag(td.tagname, prefix=tprefix)
                     elif rangemode == 'values':
                         # returning distinct values across all subjects
                         expr = '(SELECT array_agg(DISTINCT %s) FROM %s)' % (range_column, range_table)
@@ -3900,18 +3948,14 @@ class Application (webauthn2_handler_factory.RestHandler):
                     finals.append(lq)
 
             if not final:
-                outer.append( '(%s) AS context' % ' UNION '.join([ sq for sq in finals ]) )
-                selects.append('context.value AS context')
+                selects.append( '(%s) AS context' % ' UNION '.join([ 'SELECT * FROM %s s' % sq for sq in finals ]) )
 
             if subject_wheres:
                 where = 'WHERE ' + ' AND '.join([ '(%s)' % w for w in subject_wheres ])
             else:
                 where = ''
 
-            if len(inner) == 0:
-                tables = [ 'resources AS r' ]
-            else:
-                tables = [ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
+            tables = [ ' JOIN '.join(inner[0:1] + [ '%s USING (subject)' % i for i in inner[1:] ]) ]
             tables += [ '%s USING (subject)' % o for o in outer ]
             tables = ' LEFT OUTER JOIN '.join(tables)
 
