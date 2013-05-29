@@ -1580,6 +1580,9 @@ class Application (webauthn2_handler_factory.RestHandler):
         else:
             tags.append( ('tagdef unique', False) )
 
+        if self.is_unique == True and self.dbtype == '':
+            raise Conflict(self, 'Tagdef with dbtype empty can not be unique.')
+        
         tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
         tagdef.id = newid
         if owner is None:
