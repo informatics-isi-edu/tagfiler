@@ -76,6 +76,10 @@ def p_subject1_opts(p):
     """subject : slash string slash SUBJECT slash querypath queryopts"""
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
 
+def p_subject_opts(p):
+    """subject : slash string slash SUBJECT queryopts"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=[], queryopts=p[5])
+
 def p_file(p):
     """file : slash string slash FILE slash querypath"""
     p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6])
