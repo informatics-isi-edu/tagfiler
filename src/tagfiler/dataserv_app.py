@@ -902,7 +902,7 @@ class Application (webauthn2_handler_factory.RestHandler):
         # TODO: get per-catalog config overrides from somewhere for multitenancy?
         self.config = web.Storage(global_env.items())
         self.config['home'] = self.config.get('home', 'https://%s' % self.hostname)
-        self.config['homepath'] = self.config.get('home', self.config.home + web.ctx.homepath)
+        self.config['homepath'] = self.config.get('homepath', self.config.home + web.ctx.homepath)
         self.config['store path'] = self.config.get('store path', '/var/www/%s-data' % self.config.get('user', 'tagfiler'))
 
         self.table_changes = {}
