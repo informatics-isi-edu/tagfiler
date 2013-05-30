@@ -734,6 +734,26 @@ function validateNameForm(op, suffix) {
 		}
 		fileInput = document.getElementById('fileName'+suffix);
 	}
+	
+	return true;
+}
+
+/**
+ * Validate and make html transformations for the NameForm
+ * Return True in case of success and False otherwise
+ */
+function validateNameFormOriginal(op, suffix) {
+	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName'+suffix, 'name of the dataset')) {
+		return false;
+	}
+	var type = document.getElementById('type'+suffix).value;
+	var fileInput = null;
+	if (type == 'file') {
+		if (!checkInput('fileName'+suffix, 'file to be uploaded')) {
+			return false;
+		}
+		fileInput = document.getElementById('fileName'+suffix);
+	}
 	var data_id = '';
 	if (op == 'create') {
 		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
@@ -6736,14 +6756,14 @@ function defineTag() {
 	if ($('#referenceTags').val() != '') {
 		tagref = '&tagref=' + encodeSafeURIComponent($('#referenceTags').val());
 		if ($('#softCheckBox').attr('checked')) {
-			tagref += '&soft=true'
+			tagref += '&soft=true';
 		}
 	}
 	var url = HOME + '/tagdef/' + encodeSafeURIComponent($('#tag-1').val()) + '?' +
-		'dbtype=' + encodeSafeURIComponent($('#type-1').val()) +
+		'dbtype=' + encodeSafeURIComponent($('#type-1').val()) + tagref +
 		'&multivalue=' + encodeSafeURIComponent($('#multivalue-1').val()) +
 		'&unique=' + encodeSafeURIComponent($('#unique-1').val()) +
-		'&readpolicy=' + encodeSafeURIComponent($('#readpolicy-1').val()) + tagref +
+		'&readpolicy=' + encodeSafeURIComponent($('#readpolicy-1').val()) +
 		'&writepolicy=' + encodeSafeURIComponent($('#writepolicy-1').val());
 	var obj = new Object();
 	tagfiler.PUT(url, obj, true, postDefineTagdefs, null, null, 0);
@@ -7168,7 +7188,7 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 						'value': 'Delete',
 						'name': 'Delete',
 						'id': 'Delete',
-						'onclick': "deleteDataset('" + predicate + "', '" + HOME + '/file/' + predicate + "')"
+						'onclick': "deleteDataset('" + predicate + "', '" + HOME + '/subject/' + predicate + "')"
 					});
 					valueTd.append(input);
 				} else {
@@ -8942,8 +8962,171 @@ function postManageAvailableTagDefinitions(data, textStatus, jqXHR, param) {
 function createCustomDataset() {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
+	/*
 	var form = $('<form>');
 	uiDiv.append(form);
+	alert(HOME);
+	form.attr({'id': 'NameForm',
+		'name': 'NameForm',
+		'enctype': 'application/x-www-form-urlencoded',
+		'action': HOME + '/file',
+		'method': 'post',
+		'onsubmit': "return validateNameForm('create', '')"
+	});
+	*/
+	div = $('<div>');
+	uiDiv.append(div);
+	div.attr({'id': 'NameForm_div'});
+	var h3 = $('<h3>');
+	div.append(h3);
+	h3.html('Choose Type of Data');
+	var namedDataset_div = $('<div>');
+	div.append(namedDataset_div);
+	namedDataset_div.attr({'id': 'namedDataset'});
+	namedDataset_div.css({'display': 'block'});
+	var label = $('<label>');
+	namedDataset_div.append(label);
+	label.html('Enter a name for the dataset:');
+	input = $('<input>');
+	input.attr({'name': 'name',
+		'type': 'text',
+		'id': 'datasetName'
+	});
+	namedDataset_div.append(input);
+	label = $('<label>');
+	div.append(label);
+	label.html('Select a type of dataset definition:');
+	var select = $('<select>');
+	select.attr({'name': 'type',
+		'id': 'type',
+		'onchange': "changeNameFormType('create', '');"
+	});
+	div.append(select);
+	var option = $('<option>');
+	select.append(option);
+	option.text('blank (Dataset node for metadata-only)');
+	option.attr('value', 'blank');
+	option = $('<option>');
+	select.append(option);
+	option.text('file (Named dataset for locally stored file)');
+	option.attr({'value': 'file',
+		'selected': 'selected'});
+	input = $('<input>');
+	input.attr({'name': 'myfile',
+		'type': 'file',
+		'id': 'fileName'
+	});
+	input.css({'display': 'inline'});
+	div.append(input);
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Select an initial read permission:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'read users',
+		'id': 'read_users'
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Only owner may read');
+	option.attr('value', 'owner');
+	option = $('<option>');
+	select.append(option);
+	option.text('Anybody may read');
+	option.attr({'value': '*'});
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Select an initial write permission:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'write users',
+		'id': 'write_users'
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Only owner may write');
+	option.attr('value', 'owner');
+	option = $('<option>');
+	select.append(option);
+	option.text('Anybody may write');
+	option.attr({'value': '*'});
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Default View:');
+	select = $('<select>');
+	div.append(select);
+	select.attr({'name': 'defaultView',
+		'id': 'defaultView',
+		'onclick': "chooseView()"
+	});
+	option = $('<option>');
+	select.append(option);
+	option.text('Choose a View name');
+	option.attr('value', '');
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Status of the dataset:  ');
+	input = $('<input>');
+	input.attr({'type': 'checkbox',
+		'id': 'incomplete',
+		'name': 'incomplete',
+		'value': 'incomplete',
+		'checked': 'checked'
+	});
+	div.append(input);
+	label = $('<label>');
+	div.append(label);
+	label.html('Incomplete');
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'id': 'submit',
+		'value': 'Submit',
+		'onclick': 'createSubject()'
+	});
+	uiDiv.append(input);
+	//div = $('<div>');
+	//uiDiv.append(div);
+	//div.attr({'id': 'Copy'});
+}
+
+function createSubject() {
+	if (validateNameForm('create', '')) {
+		var obj = {};
+		obj['action'] = 'post';
+		var url = HOME + '/subject';
+		url += '?' + encodeSafeURIComponent('read users') + '=' + encodeSafeURIComponent($('#read_users').val());
+		url += '&' + encodeSafeURIComponent('write users') + '=' + encodeSafeURIComponent($('#write_users').val());
+		if ($('#defaultView').val() != '') {
+			url += '&' + encodeSafeURIComponent('default view') + '=' + encodeSafeURIComponent($('#defaultView').val());
+		}
+		if ($('#incomplete').attr('checked') == 'checked') {
+			url += '&incomplete';
+		}
+		tagfiler.POST(url, obj, true, postCreateSubject, null, null, 0);
+	}
+}
+
+function postCreateSubject(data, textStatus, jqXHR, param) {
+	//alert(data);
+	var index = data.lastIndexOf('/') + 1;
+	var predicate = data.substring(index);
+	index = predicate.indexOf('\n');
+	if (index > 0) {
+		predicate = predicate.substring(0, index);
+	}
+	getTagDefinition(predicate, $('#defaultView').val());
+}
+
+function createCustomDatasetOriginal() {
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var form = $('<form>');
+	uiDiv.append(form);
+	alert(HOME);
 	form.attr({'id': 'NameForm',
 		'name': 'NameForm',
 		'enctype': 'application/x-www-form-urlencoded',
