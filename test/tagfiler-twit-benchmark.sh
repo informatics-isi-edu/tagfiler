@@ -226,8 +226,6 @@ runtest()
     [[ "$status" = 204 ]] || error could not perform initial maintenance
 
 
-    stride=${FIRST_STRIDE}
-
     # print CSV header
     printf "hostname,graphsize"
     for test_size in ${TEST_SIZES[@]}
@@ -236,10 +234,22 @@ runtest()
     done
     printf "\n"
 
+    stride=${FIRST_STRIDE}
+    first_byte=''
+
     while [[ $stride -lt ${stride_count} ]]
     do
 	# get stride data into a temp file
-	tail -n +$(( 1 + ${stride} * ${TEST_STRIDE} )) < ${LOAD_FILE} | head -n ${TEST_STRIDE} > $tempfile2
+	if [[ -n "${first_byte}" ]]
+	then
+	    # efficiently jump to offset found by last stride iteration
+	    tail -c +$(( 1 + ${first_byte} )) < ${LOAD_FILE} | tail -n +$(( 1 + ${TEST_STRIDE} )) | head -n ${TEST_STRIDE} > $tempfile2
+	    first_byte=$(( ${first_byte} + $(wc -c < $tempfile2) ))
+	else
+	    tail -n +$(( 1 + ${stride} * ${TEST_STRIDE} )) < ${LOAD_FILE} | head -n ${TEST_STRIDE} > $tempfile2
+	    first_byte=$(wc -c < $tempfile2)
+	fi
+
 	length=$(wc -l < $tempfile2)
 	[[ $length -eq ${TEST_STRIDE} ]] || error stride ${stride} file has ${length} rows instead of expected ${TEST_STRIDE}
 
