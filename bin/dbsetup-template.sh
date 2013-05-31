@@ -29,9 +29,6 @@ shift 4
 
 # this script will recreate all tables, but only on a clean database
 
-# this is installed to /usr/local/bin
-tagfiler-webauthn2-deploy.py
-
 # start a coprocess so we can coroutine with a single transaction
 coproc { psql -q -t -A ${DBNAME} ; } 
 

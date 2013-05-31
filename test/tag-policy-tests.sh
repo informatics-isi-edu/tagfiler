@@ -3,7 +3,7 @@
 if [[ $# -lt 4 ]]
 then
     cat >&2 <<EOF
-usage: $0 <user> <password> <non-user role> <mutable role>
+usage: $0 <user> <password> <non-user role> <mutable role> <catalog id>
 
 Test against a default tagfiler installation on localhost with default
 security behavior allowing username and password POST to the /session
@@ -20,6 +20,9 @@ test tagdefs can be purged.  For this feature to work, the
 tagfiler-config.json must also grant the user rights via the webauthn2
 manageusers and manageroles permissions.
 
+The <catalog id> identifies the catalog instance to be used in the tests.
+It must be created before the tests are run.
+
 This script runs tests of tag policy models by creating tagdefs and
 using them to create and retrieve graph content.  The non-user role is
 needed to allow content to be created that the user should not be able
@@ -35,6 +38,7 @@ username=$1
 password=$2
 otherrole=$3
 mutablerole=$4
+catalogid=$5
 
 testno=${RANDOM}
 
@@ -53,12 +57,21 @@ cleanup()
 
 trap cleanup 0
 
-mycurl()
+mycurl_base()
 {
     local url="$1"
     shift
     truncate -s 0 $logfile
     curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
+}
+
+mycurl()
+{
+    local url="$1"
+    local catalog="/catalog/${catalogid}"
+    shift
+    truncate -s 0 $logfile
+    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${catalog}${url}"
 }
 
 tagdef_writepolicies=(
@@ -84,9 +97,9 @@ reset()
     # blindly tear down everything we setup in this test
     if [[ -n "$mutablerole" ]]
     then
-	mycurl "/user/${username}/attribute/${mutablerole}" -X PUT > /dev/null
-	mycurl "/session" -X DELETE > /dev/null
-	mycurl "/session" -d username="$username" -d password="$password" > /dev/null
+	mycurl_base "/user/${username}/attribute/${mutablerole}" -X PUT > /dev/null
+	mycurl_base "/session" -X DELETE > /dev/null
+	mycurl_base "/session" -d username="$username" -d password="$password" > /dev/null
     fi
 
     mycurl "/tagdef/fooread0softref" -X DELETE > /dev/null
@@ -101,7 +114,7 @@ reset()
 	mycurl "/tagdef/foo${i}" -X DELETE > /dev/null
     done
 
-    mycurl "/session" -X DELETE > /dev/null
+    mycurl_base "/session" -X DELETE > /dev/null
 }
 
 error()
@@ -114,7 +127,7 @@ EOF
     exit 1
 }
 
-status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
+status=$(mycurl_base "/session" -d username="$username" -d password="$password" -o $logfile)
 [[ "$status" = 201 ]] || error got "$status" during login
 
 #mycurl "/subject/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: ${ACCEPT}"
@@ -596,14 +609,14 @@ then
     # can only test negative tag ACLs if we can rescind ownership while reacquiring it for cleanup later
 
     # make sure we're not in mutablerole
-    status=$(mycurl "/user/${username}/attribute/${mutablerole}" -X DELETE -o $logfile)
+    status=$(mycurl_base "/user/${username}/attribute/${mutablerole}" -X DELETE -o $logfile)
     [[ "$status" = 204 ]] || [[ "$status" = 404 ]] || error got "$status" removing ${username} from ${mutablerole}
 
     # restart session to ensure fresh attribute set
-    status=$(mycurl "/session" -X DELETE -o $logfile)
+    status=$(mycurl_base "/session" -X DELETE -o $logfile)
     [[ "$status" = 204 ]] || error got "$status" during logout
     
-    status=$(mycurl "/session" -d username="$username" -d password="$password" -o $logfile)
+    status=$(mycurl_base "/session" -d username="$username" -d password="$password" -o $logfile)
     [[ "$status" -eq 201 ]] || error got "$status" during login
 
     # change owner of tagdefs to mutablerole

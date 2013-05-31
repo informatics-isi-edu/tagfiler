@@ -97,9 +97,9 @@ class Node (Application):
 
     __slots__ = [ 'appname' ]
 
-    def __init__(self, parser, appname, queryopts=None):
+    def __init__(self, parser, appname, catalog_id, queryopts=None):
         self.appname = appname
-        Application.__init__(self, parser, queryopts)
+        Application.__init__(self, catalog_id, parser, queryopts)
 
     def uri2referer(self, uri):
         return self.config['home'] + uri
@@ -110,8 +110,8 @@ class Subject (Node):
     Handle subject CRUD operations including awareness of file bodies, excluding actual file I/O.
     """
 
-    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
-        Node.__init__(self, parser, appname, queryopts)
+    def __init__(self, parser=None, appname=None, catalog_id=None, path=None, queryopts=None):
+        Node.__init__(self, parser, appname, catalog_id, queryopts)
         self.api = 'subject'
         self.action = None
         self.key = None

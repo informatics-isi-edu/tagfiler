@@ -40,10 +40,15 @@ cat >&${COPROC[1]} <<EOF
 BEGIN;
 
 CREATE TABLE catalogs (
-	id UUID PRIMARY KEY,
-	owner TEXT NOT NULL,
-	name TEXT,
-	description text);
+	id bigserial PRIMARY KEY,
+	owner text NOT NULL,
+	admin_users text[] NOT NULL,
+	write_users text[] NOT NULL,
+	read_users text[] NOT NULL,
+        active boolean,
+	name text,
+	description text,
+        config json);
 
 COMMIT;
 

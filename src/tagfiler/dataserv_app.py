@@ -52,7 +52,7 @@ except:
     except:
         decodeError = ValueError
 
-from webauthn2 import jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context, Manager
+from webauthn2 import DatabaseConnection, jsonReader, jsonWriter, jsonFileReader, merge_config, RestHandlerFactory, Context, Manager
 
 json_whitespace = re.compile(r'[ \t\n\r]*')
 json_whitespace_str = ' \t\n\r['
@@ -680,7 +680,109 @@ def get_db():
         return web.database(dbn=getParamEnv('dbnstr', 'postgres'), db=getParamEnv('db', ''))
 """
 
-class Application (webauthn2_handler_factory.RestHandler):
+class CatalogRequest (webauthn2_handler_factory.RestHandler):
+    
+    def __init__(self, catalog_id, parser=None, queryopts=None):
+        webauthn2_handler_factory.RestHandler.__init__(self)
+        
+        if catalog_id:
+            self.catalog_id = int(catalog_id)
+        else:
+            self.catalog_id = None
+        
+        #TODO: refactor this logging state
+        self.content_range = None
+        self.last_log_time = 0
+        self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
+        self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
+        
+        #TODO: ideally, we refactor this out of here
+        self.emitted_headers = dict()
+        self.http_vary = set(['Cookie'])
+        self.http_etag = None
+        
+        self.config = web.Storage(global_env.items())
+        
+        self.context = Context()
+        try:
+            self.context = self.manager.get_request_context()
+        except (ValueError, IndexError):
+            # client is unauthenticated but require_client and/or require_attributes is enabled
+            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+        
+    def header(self, name, value):
+        #TODO: evaluate whether this function is necessary
+        web.header(name, value)
+        self.emitted_headers[name.lower()] = value
+    
+    def emit_headers(self):
+        """Emit any automatic headers prior to body beginning."""
+        #TODO: evaluate whether this function is necessary
+        if self.http_vary:
+            self.header('Vary', ', '.join(self.http_vary))
+        if self.http_etag:
+            self.header('ETag', '%s' % self.http_etag)
+        
+    def lograw(self, msg):
+        #TODO: ideally, refactor this logging stuff out of here
+        logger.info(myutf8(msg))
+
+    def preDispatchCore(self, uri, setcookie=True):
+        #TODO: should merge preDispatchCore with preDispatch
+        self.request_uri = uri
+
+        try:
+            self.context = self.manager.get_request_context()
+        except (ValueError, IndexError):
+            # client is unauthenticated but require_client and/or require_attributes is enabled
+            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+        
+        self.middispatchtime = datetime.datetime.now()
+
+    def preDispatch(self, uri):
+        self.preDispatchCore(uri)
+
+    def get_db_config(self):
+        #TODO: is self.manager.config the right choice here? so far seems to be correct
+        cfg = web.Storage(self.manager.config)
+        cfg.update({'database_name': 'tagfiler_%d' % self.catalog_id})
+        return cfg
+    
+    def get_context(self):
+        #TODO: Not sure we need a getter for a public member variable anyway
+        return self.context
+
+
+class CatalogManager (CatalogRequest):
+    """The Catalog Manager App."""
+    
+    def __init__(self, parser=None, catalog_id=None, queryopts=None):
+        CatalogRequest.__init__(self, parser, catalog_id, queryopts)
+
+    def dbquery(self, query, vars={}):
+        #TODO: see dbtransact() comment
+        return db_dbquery(self.db, query, vars=vars)
+    
+    def dbtransact(self, body, postCommit, limit=8):
+        #TODO: we may want to refactor the dbtransact/dbquery pattern in this
+        #      CatalogRequest
+
+        def db_body(db):
+            self.db = db
+            self.logmsgs = []
+            return body()
+
+        # run under transaction control implemented by our parent class
+        bodyval = self._db_wrapper(db_body)
+
+        for msg in self.logmsgs:
+            logger.info(myutf8(msg))
+
+        return postCommit(bodyval)
+
+
+#class Application (webauthn2_handler_factory.RestHandler):
+class Application (DatabaseConnection):
     "common parent class of all service handler classes to use db etc."
 
     def select_view_all(self):
@@ -854,12 +956,16 @@ class Application (webauthn2_handler_factory.RestHandler):
 
         return False
 
-    def __init__(self, parser=None, queryopts=None):
+    def __init__(self, catalog_id=None, parser=None, queryopts=None):
         "store common configuration data for all service classes"
         global db_cache
 
-        webauthn2_handler_factory.RestHandler.__init__(self)
-        self.context = Context()
+        #self.context = Context()
+        catalog_req = CatalogRequest(catalog_id)
+        db_config = catalog_req.get_db_config()
+        self.context = catalog_req.get_context()
+        
+        DatabaseConnection.__init__(self, db_config)
 
         def long2str(x):
             s = ''
@@ -1124,11 +1230,11 @@ class Application (webauthn2_handler_factory.RestHandler):
     def preDispatchCore(self, uri, setcookie=True):
         self.request_uri = uri
 
-        try:
-            self.context = self.manager.get_request_context()
-        except (ValueError, IndexError):
-            # client is unauthenticated but require_client and/or require_attributes is enabled
-            raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
+        #try:
+        #    self.context = self.manager.get_request_context()
+        #except (ValueError, IndexError):
+        #    # client is unauthenticated but require_client and/or require_attributes is enabled
+        #    raise Unauthorized(self, 'tagfiler API usage by unauthorized client')
         
         self.middispatchtime = datetime.datetime.now()
 

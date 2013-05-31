@@ -30,8 +30,8 @@ TAGFILERDIR=`python -c 'import distutils.sysconfig;print distutils.sysconfig.get
 SVCPREFIX=${1:-tagfiler}
 
 # the core and template database names
-DBNAME=${SVCPREFIX}	#TODO(schuler): this will become the core db name
-TEMPLATE=${SVCPREFIX}	#TODO(schuler): this will be suffixed with _template
+DBNAME=${SVCPREFIX}
+TEMPLATE=${SVCPREFIX}_template
 
 # you can set this to override...
 HOME_HOST=
@@ -88,13 +88,18 @@ if runuser -c "psql -c 'select * from pg_user' ${PGADMIN}" - ${PGADMIN} | grep $
 then
     :
 else
-	runuser -c "createuser -S -D -R ${SVCUSER}" - ${PGADMIN}
+	runuser -c "createuser -S -d -R ${SVCUSER}" - ${PGADMIN}
 fi
 
+# drop tagfiler_i databases
+catalog_ids=$(runuser -c "psql -A -t -c 'select id from catalogs'" - ${SVCUSER} 2> /dev/null)
+for id in $catalog_ids; do
+  runuser -c "dropdb ${SVCPREFIX}_${id}" - ${SVCUSER}
+done
+
 # create catalog and template databases
-#TODO(schuler): uncomment next 2 lines when cat-o-cats ready
-#runuser -c "dropdb ${DBNAME}" - ${PGADMIN}
-#runuser -c "createdb -O ${SVCUSER} ${DBNAME}" - ${PGADMIN}
+runuser -c "dropdb ${DBNAME}" - ${PGADMIN}
+runuser -c "createdb -O ${SVCUSER} ${DBNAME}" - ${PGADMIN}
 runuser -c "dropdb \"${TEMPLATE}\"" - ${PGADMIN}
 runuser -c "createdb -O ${SVCUSER} \"${TEMPLATE}\"" - ${PGADMIN}
 
@@ -124,8 +129,7 @@ chown ${SVCUSER}: ${SVCHOME}/dbsetup-template.sh
 chmod a+x ${SVCHOME}/dbsetup-template.sh
 
 # setup core and template databases
-#TODO(schuler): uncomment next line when cat-o-cats ready
-#runuser -c "${SVCHOME}/dbsetup.sh ${DBNAME}" - ${SVCUSER}
+runuser -c "${SVCHOME}/dbsetup.sh \"${DBNAME}\"" - ${SVCUSER}
 runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} \"${TEMPLATE}\" \"${admin}\"" - ${SVCUSER}
 
 # register our service code

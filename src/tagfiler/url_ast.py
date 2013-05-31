@@ -20,7 +20,7 @@ import sys
 import web
 import re
 import os
-from dataserv_app import Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes
+from dataserv_app import CatalogManager, Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, jsonReader, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes, wrapval
 from rest_fileio import FileIO
 import subjects
 from subjects import Node
@@ -28,7 +28,6 @@ import datetime
 import StringIO
 import psycopg2
 import psycopg2.extensions
-
 
 jsonMungeTypes = set([ datetime.datetime, datetime.date ])
 
@@ -102,6 +101,12 @@ def dictmerge(base, custom):
     custom.update(base)
     return custom
 
+def wraparray(iter):
+    """Wraps an iterable as for use as a postgres ARRAY."""
+    # TODO(rs): should take 'dbtype' param and pass to wrapval
+    #           should move this to dataserve_app with wrapval()
+    return ','.join([ wrapval(i) for i in iter])
+
 class Subquery (object):
     """Stub AST node holds a query path that is not wrapped in a full URI.
 
@@ -119,8 +124,8 @@ class Toplevel (Node):
        GET   -- gives a listing
     """
 
-    def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
+    def __init__(self, parser, appname, catalog_id, queryopts={}):
+        Node.__init__(self, parser, appname, catalog_id, queryopts)
 
     def GET(self, uri):
         
@@ -152,8 +157,8 @@ class Toplevel (Node):
         return self.dbtransact(body, postCommit)
 
 class Maintenance(Node):
-    def __init__(self, parser, appname, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
+    def __init__(self, parser, appname, catalog_id, queryopts={}):
+        Node.__init__(self, parser, appname, catalog_id, queryopts)
 
     def PUT(self, uri):
         if self.config.admin not in self.context.attributes:
@@ -183,29 +188,283 @@ class Maintenance(Node):
         web.ctx.status = '204 No Content'
         return ''
 
+class CNode (CatalogManager):
+    """Abstract AST node for all URI patterns"""
+
+    __slots__ = [ 'appname' ]
+
+    def __init__(self, parser, appname, catalog_id, queryopts=None):
+        self.appname = appname
+        CatalogManager.__init__(self, catalog_id, parser, queryopts)
+
+    def uri2referer(self, uri):
+        return self.config['home'] + uri
+
+class Catalog (CNode):
+    """Represents a catalog / URI
+
+       GET    -- returns a listing of catalogs
+       POST   -- creates a catalog
+       DELETE -- deletes a catalog
+       PUT    -- not yet implemented
+    """
+    
+    __EMPTY_STR = "''"
+    __STD_SELECT_COLUMNS = 'id, owner, admin_users, write_users, read_users, name, description'
+
+    def __init__(self, parser, appname, queryopts={}, catalog_id=None):
+        CNode.__init__(self, parser, appname, catalog_id, queryopts)
+        self.template = appname + "_template"
+        self.dbnprefix = appname + "_"
+        try:
+            if catalog_id:
+                self.catalog_id = int(catalog_id)
+            else:
+                self.catalog_id = None
+        except ValueError:
+            raise BadRequest(self, 'Bad catalog id.')
+
+
+    def _select_catalogs(self, cols=None, catalog_id=None, active=True,
+                              acl_list='read_users', attrs=[], admin=None):
+        """Select catalog(s) from the database.
+        
+        If 'catalog_id' is given it will return only one catalog. If 
+        'catalog_id' is not given it will return all of the catalogs that 
+        satisfy the role filter.
+        
+        By default only 'active' catalogs are returned. Set 'active' to False
+        to return only the inactive catalogs. TBD, since 'active' is trivalent
+        we ought to support searches where 'active = NULL' in the database.
+        
+        By default, the 'acl_list' is evaluated. The callers 'attr'ibutes must
+        be 'in' the catalogs 'acl_list'. However, if the system 'admin' role is
+        in the caller's 'attr' list, then the filter is not used.
+        """
+        
+        if not cols:
+            cols = Catalog.__STD_SELECT_COLUMNS
+            
+        # Base query, get active catalogs
+        qry = "SELECT %s FROM catalogs WHERE active = %s" % (cols, str(active))
+        
+        # Get only catalog specified by catalog_id
+        if catalog_id:
+            qry += " AND id = %d" % catalog_id
+        
+        # Filter by role, if not admin
+        if admin not in attrs:
+            qry += (" AND ARRAY[%s] && %s" % (wraparray(attrs), acl_list))
+            
+        return self.dbquery(qry)
+
+    
+    def _delete_catalog(self, catalog_id):
+        """Deletes a catalog.
+        
+        The catalog identified by 'catalog_id' is deleted from the system. At 
+        present, deletion sets the 'active' flag to false, thereby making the 
+        catalog invisible to future operations.
+        
+        TBD, we may implement a sweeper process that eventually cleans the 
+        database system of inactive catalogs, perhaps dumping and archiving
+        the contents.
+        """
+        
+        # Delete toggles the 'active' flag to false, to deactive this catalog
+        self.dbquery("UPDATE catalogs SET active = false WHERE id = %d" % catalog_id)
+
+
+    def _create_db(self, dbname):
+        """Creates a catalog database.
+        
+        The 'dbname' must be a non-existent database name. The new database
+        will be a clone of the tagfiler template database.
+        
+        This call will make a subprocess call to the PostgreSQL 'createdb'
+        utility.
+        """
+        # TODO(rs): really do not want to be in the business of subproc calls
+        #           maybe can refactor POST handler to do this in a dbquery(...) call
+        #           rather than a subprocess which is going to be fragile.
+        import subprocess
+        try:
+            subprocess.check_call(["createdb", "-T", self.template, dbname])
+        except subprocess.CalledProcessError:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception "%s" calling createdb subprocess' % str(ev),
+                      traceback.format_exception(et, ev, tb))
+            raise RuntimeError('createdb failed')
+
+
+    def _create_catalog(self, catalog):
+        """Creates a catalog.
+        
+        The parameters for the new catalog should be specified in a dictionary
+        given by 'catalog'.
+        
+        Returns the header metadata for the newly created catalog, which is
+        essentially the same as the input 'catalog' but with the acl lists
+        complete and the catalog_id set.
+        """
+        # Create a dictionary of 'wrapped' values (i.e., db safe)
+        wrapped = dict()
+
+        # Owner comes from the request context
+        if 'owner' in catalog:
+            raise BadRequest(self, 'Cannot specify "owner" field.')
+        
+        client = self.context.client
+        wrapped['owner'] = wrapval(client)
+
+        if 'name' in catalog:
+            wrapped['name'] = wrapval(catalog['name'])
+        else:
+            wrapped['name'] = Catalog.__EMPTY_STR
+
+        if 'description' in catalog:
+            wrapped['description'] = wrapval(catalog['description'])
+        else:
+            wrapped['description'] = Catalog.__EMPTY_STR
+        
+        # Wrap roles arrays, add client to them if not already in them
+        for key in ['admin_users', 'write_users', 'read_users']:
+            if key in catalog:
+                users = catalog[key]
+                if client not in users:
+                    users.append(client)
+            else:
+                users = [client]
+            wrapped[key] = wraparray(users)
+        
+        self.dbquery("INSERT INTO catalogs "
+                     + "(owner, admin_users, write_users, read_users, name, description) "
+                     + "VALUES (%(owner)s, ARRAY[%(admin_users)s], ARRAY[%(write_users)s], ARRAY[%(read_users)s], %(name)s, %(description)s)"
+                     % wrapped)
+        
+        # Now get the catalog_id of the last entered catalog
+        results = self.dbquery("SELECT max(id) as last_id FROM catalogs")
+        last_id = results[0]['last_id']
+        
+        # Now, clone the template to a new database.
+        self._create_db( self.dbnprefix + str(last_id) )
+
+        # Now mark the catalog as active
+        self.dbquery("UPDATE catalogs SET active = true WHERE id = %s" % last_id)
+        
+        # Return the newly created catalog
+        results = self.dbquery("SELECT %(cols)s FROM catalogs WHERE id=%(catalog_id)d" % 
+                               dict(cols=Catalog.__STD_SELECT_COLUMNS, catalog_id=last_id))
+        return results[0]
+
+
+    def GET(self, uri):
+        
+        def body():
+            catalogs = self._select_catalogs(catalog_id=self.catalog_id, 
+                        attrs=self.context.attributes, admin=self.config.admin)
+            
+            if self.catalog_id:
+                if len(catalogs) == 0:
+                    raise NotFound(self, 'catalog')
+                return catalogs[0]
+            else:
+                return catalogs
+        
+        def postCommit(bodyresults):
+            self.header('Content-Type', 'application/json')
+            catalogs = jsonWriter(bodyresults, indent=2) + '\n'
+            self.header('Content-Length', str(len(catalogs)))
+            return catalogs
+
+        return self.dbtransact(body, postCommit)
+
+
+    def POST(self, uri):
+        
+        # Cannot create a catalog unless user is in admin role
+        if self.config.admin not in self.context.attributes:
+            raise Forbidden(self, 'catalog')
+
+        # Only accept application/json
+        try:
+            content_type = web.ctx.env['CONTENT_TYPE'].lower()
+        except:
+            content_type = 'text/plain'
+
+        if content_type != 'application/json':
+            raise BadRequest(self, ('Content type (%s) not supported.' % content_type))
+
+        # Might be worth getting the data now, before we're in the dbtransact call
+        input = web.data()
+
+        def body():
+            try:
+                catalog = jsonReader(input)
+                return self._create_catalog(catalog)
+            
+            except ValueError:
+                raise BadRequest(self, 'Invalid json input to POST catalog: %s' % input)
+
+            return catalog
+
+        def postCommit(bodyresults):
+            self.header('Content-Type', 'application/json')
+            catalog = jsonWriter(bodyresults, indent=2) + '\n'
+            self.header('Content-Length', str(len(catalog)))
+            return catalog
+
+        return self.dbtransact(body, postCommit)
+
+
+    def DELETE(self, uri):
+        
+        if not self.catalog_id:
+            raise BadRequest(self, 'Catalog id must be specified')
+
+        def body():
+            # Use this selector for access control, only users in the
+            # catalog's 'admin_users' role list can delete a catalog.
+            catalogs = self._select_catalogs(catalog_id=self.catalog_id, 
+                                             acl_list='admin_users', 
+                                             attrs=self.context.attributes, 
+                                             admin=self.config.admin)
+            if len(catalogs) == 0:
+                raise NotFound(self, 'catalog')
+            
+            self._delete_catalog(self.catalog_id)
+        
+        def postCommit(results):
+            self.emit_headers()
+            web.ctx.status = '204 No Content'
+            return ''
+
+        return self.dbtransact(body, postCommit)
+
+
 class FileId(FileIO):
     """Represents a direct FILE/subjpreds URI
 
        Just creates filename and lets FileIO do the work.
 
     """
-    def __init__(self, parser, appname, path, queryopts={}, storage=None):
-        FileIO.__init__(self, parser, appname, path, queryopts)
+    def __init__(self, parser, appname, catalog_id, path, queryopts={}, storage=None):
+        FileIO.__init__(self, parser, appname, catalog_id, path, queryopts)
         self.path = [ ( e[0], e[1], [] ) for e in path ]
         if storage:
             self.storage = storage
 
 class Subject(subjects.Subject):
-    def __init__(self, parser, appname, path, queryopts={}, storage=None):
-        subjects.Subject.__init__(self, parser, appname, path, queryopts)
+    def __init__(self, parser, appname, catalog_id, path, queryopts={}, storage=None):
+        subjects.Subject.__init__(self, parser, appname, catalog_id, path, queryopts)
         if storage:
             self.storage = storage
 
 class Tagdef (Node):
     """Represents TAGDEF/ URIs"""
 
-    def __init__(self, parser, appname, tag_id=None, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
+    def __init__(self, parser, appname, catalog_id, tag_id=None, queryopts={}):
+        Node.__init__(self, parser, appname, catalog_id, queryopts)
         self.tag_id = tag_id
         self.writepolicy = None
         self.readpolicy = None
@@ -328,8 +587,8 @@ class Tagdef (Node):
 class FileTags (Node):
     """Represents TAGS/subjpreds and TAGS/subjpreds/tagvals URIs"""
 
-    def __init__(self, parser, appname, path=None, queryopts={}):
-        Node.__init__(self, parser, appname, queryopts)
+    def __init__(self, parser, appname, catalog_id, path=None, queryopts={}):
+        Node.__init__(self, parser, appname, catalog_id, queryopts)
         if path:
             self.path = path
         else:

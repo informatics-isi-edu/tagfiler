@@ -33,13 +33,13 @@ url_parse_func = None
 start = 'start'
 
 def p_start(p):
-    """start : toplevel
-             | maintenance
+    """start : maintenance
              | file
              | subject
              | tagdef
              | tags
              | querypathroot
+             | catalog
 """
     p[0] = p[1]
 
@@ -47,83 +47,94 @@ def p_querypathroot(p):
     """querypathroot : querypath"""
     p[0] = url_ast.Subquery(path=p[1])
 
-def p_toplevel(p):
-    """toplevel : slash string
-                | slash string slash"""
-    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2])
+#TODO: merge Toplevel representation into Catalog
+#def p_toplevel(p):
+#    """toplevel : slash string slash CATALOG slash NUMSTRING 
+#                | slash string slash CATALOG slash NUMSTRING  slash"""
+#    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], catalog_id=p[4])
 
 def p_maintenance(p):
-    """maintenance : slash string slash MAINTENANCE queryopts"""
-    p[0] = url_ast.Maintenance(parser=url_parse_func, appname=p[2], queryopts=p[5])
+    """maintenance : slash string slash CATALOG slash NUMSTRING slash MAINTENANCE queryopts"""
+    p[0] = url_ast.Maintenance(parser=url_parse_func, appname=p[2], catalog_id=p[6], queryopts=p[9])
 
-def p_toplevel_opts1(p):
-    """toplevel : slash string queryopts"""
-    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[3])
+#def p_toplevel_opts1(p):
+#    """toplevel : slash string queryopts"""
+#    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[3])
 
-def p_toplevel_opts2(p):
-    """toplevel : slash string slash queryopts"""
-    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[4])
+#def p_toplevel_opts2(p):
+#    """toplevel : slash string slash CATALOG slash NUMSTRING slash queryopts"""
+#    p[0] = url_ast.Toplevel(parser=url_parse_func, appname=p[2], queryopts=p[4])
+
+def p_catalogs(p):
+    """catalog : slash string slash CATALOG
+               | slash string slash CATALOG slash"""
+    p[0] = url_ast.Catalog(parser=url_parse_func, appname=p[2])
+
+def p_catalogs_id(p):
+    """catalog : slash string slash CATALOG slash NUMSTRING
+               | slash string slash CATALOG slash NUMSTRING slash"""
+    p[0] = url_ast.Catalog(parser=url_parse_func, appname=p[2], catalog_id=p[6])
 
 def p_subject0(p):
-    """subject : slash string slash SUBJECT"""
-    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=[])
+    """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=[])
 
 def p_subject1(p):
-    """subject : slash string slash SUBJECT slash querypath"""
-    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6])
+    """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT slash querypath"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10])
 
 def p_subject1_opts(p):
-    """subject : slash string slash SUBJECT slash querypath queryopts"""
-    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
+    """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT slash querypath queryopts"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10], queryopts=p[11])
 
 def p_subject_opts(p):
     """subject : slash string slash SUBJECT queryopts"""
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=[], queryopts=p[5])
 
 def p_file(p):
-    """file : slash string slash FILE slash querypath"""
-    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6])
+    """file : slash string slash CATALOG slash NUMSTRING slash FILE slash querypath"""
+    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10])
 
 def p_file_opts(p):
-    """file : slash string slash FILE slash querypath queryopts"""
-    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
+    """file : slash string slash CATALOG slash NUMSTRING slash FILE slash querypath queryopts"""
+    p[0] = url_ast.FileId(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10], queryopts=p[11])
 
 def p_tagdef(p):
-    """tagdef : slash string slash TAGDEF
-              | slash string slash TAGDEF slash"""
+    """tagdef : slash string slash CATALOG slash NUMSTRING slash TAGDEF
+              | slash string slash CATALOG slash NUMSTRING slash TAGDEF slash"""
     # GET all definitions and a creation form (HTML)
-    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], catalog_id=p[6])
 
 def p_tagdef_rest_get(p):
-    """tagdef : slash string slash TAGDEF slash string"""
+    """tagdef : slash string slash CATALOG slash NUMSTRING slash TAGDEF slash string"""
     # GET a single definition (URL encoded)
-    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], tag_id=p[6])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], catalog_id=p[6], tag_id=p[10])
 
 def p_tagdef_rest_put(p):
-    """tagdef : slash string slash TAGDEF slash string queryopts"""
+    """tagdef : slash string slash CATALOG slash NUMSTRING slash TAGDEF slash string queryopts"""
     # PUT queryopts supports dbtype=string&multivalue=boolean&readpolicy=pol&writepolicy=pol
-    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], tag_id=p[6], queryopts=p[7])
+    p[0] = url_ast.Tagdef(parser=url_parse_func, appname=p[2], catalog_id=p[6], tag_id=p[10], queryopts=p[11])
 
 def p_tags_all(p):
-    """tags : slash string slash TAGS
-            | slash string slash TAGS slash"""
-    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2])
+    """tags : slash string slash CATALOG slash NUMSTRING slash TAGS
+            | slash string slash CATALOG slash NUMSTRING slash TAGS slash"""
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], catalog_id=p[6])
 
 def p_tags_all_opts(p):
-    """tags : slash string slash TAGS queryopts"""
-    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], queryopts=p[5])
+    """tags : slash string slash CATALOG slash NUMSTRING slash TAGS queryopts"""
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], catalog_id=p[6], queryopts=p[9])
 
 def p_tags_all_slash_opts(p):
-    """tags : slash string slash TAGS slash queryopts"""
-    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], queryopts=p[6])
+    """tags : slash string slash CATALOG slash NUMSTRING slash TAGS slash queryopts"""
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], catalog_id=p[6], queryopts=p[10])
 
 def p_tags(p):
-    """tags : slash string slash TAGS slash querypath"""
-    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], path=p[6])
+    """tags : slash string slash CATALOG slash NUMSTRING slash TAGS slash querypath"""
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10])
 
 def p_tags_opts(p):
-    """tags : slash string slash TAGS slash querypath queryopts"""
-    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], path=p[6], queryopts=p[7])
+    """tags : slash string slash CATALOG slash NUMSTRING slash TAGS slash querypath queryopts"""
+    p[0] = url_ast.FileTags(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10], queryopts=p[11])
 
 def p_querypath_elem_general(p):
     """querypath_elem : predlist '(' predlist ')' ordertags"""
