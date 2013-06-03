@@ -465,13 +465,14 @@ class PerUserDbCache (object):
                 if (now - ctime).seconds > PerUserDbCache.max_cache_seconds:
                     self.caches.pop(key, None)
 
-    def select(self, db, fillfunc, user, idtagval=None):
-        ctime, cache = self.caches.get(user, (None, None))
+    def select(self, db, fillfunc, user, catalog_id, idtagval=None):
+        key = (user, catalog_id)
+        ctime, cache = self.caches.get(key, (None, None))
         now = datetime.datetime.now(pytz.timezone('UTC'))
         if not ctime:
             cache = DbCache(self.idtagname, self.idalias)
         results = cache.select(db, fillfunc, idtagval)
-        self.caches[user] = (now, cache)
+        self.caches[key] = (now, cache)
         self.purge()
         return results
 
@@ -803,7 +804,7 @@ class Application (DatabaseConnection):
     def select_view_prioritized(self, viewnames=['default']):
         for viewname in viewnames:
             if viewname:
-                view = view_cache.select(self.db, lambda : self.select_view_all(), self.context.client, viewname)
+                view = view_cache.select(self.db, lambda : self.select_view_all(), self.context.client, self.catalog_id, viewname)
                 if view != None:
                     return view
         return None
@@ -970,6 +971,7 @@ class Application (DatabaseConnection):
 
         # get the config and context from the CatalogRequest instance 
         # associated with this catalog id
+        self.catalog_id = catalog_id
         catalog_req = CatalogRequest(catalog_id)
         self.config = catalog_req.get_config()
         self.context = catalog_req.get_context()
@@ -1289,7 +1291,7 @@ class Application (DatabaseConnection):
             # build up globals useful to almost all classes, to avoid redundant coding
             # this is fragile to make things fast and simple
 
-            self.tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client) ])
+            self.tagdefsdict = dict([ (tagdef.tagname, tagdef) for tagdef in tagdef_cache.select(db, lambda: self.select_tagdef(), self.context.client, self.catalog_id) ])
 
             return body()
 
