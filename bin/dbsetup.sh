@@ -48,7 +48,7 @@ CREATE TABLE catalogs (
         active boolean,
 	name text,
 	description text,
-        config json);
+        config text);
 
 COMMIT;
 
