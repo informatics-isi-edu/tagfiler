@@ -742,10 +742,18 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
     def preDispatch(self, uri):
         self.preDispatchCore(uri)
 
-    def get_db_config(self):
-        #TODO: is self.manager.config the right choice here? so far seems to be correct
-        cfg = web.Storage(self.manager.config)
-        cfg.update({'database_name': 'tagfiler_%d' % self.catalog_id})
+    def get_config(self):
+        """Returns a catalog specific configuration."""
+        cfg = web.Storage(self.config)
+        # we may get config out of the core database
+        home = cfg.get('home', 'https://%s' % web.ctx.host)
+        cfg.update({
+            'database_name': 'tagfiler_%d' % self.catalog_id,
+            'home': home,
+            'homepath': cfg.get('homepath', 
+                        home + web.ctx.homepath + '/catalog/%d' % self.catalog_id),
+            'store path': cfg.get('store path', 
+                          '/var/www/%s-data' % cfg.get('user', 'tagfiler'))})
         return cfg
     
     def get_context(self):
@@ -960,12 +968,13 @@ class Application (DatabaseConnection):
         "store common configuration data for all service classes"
         global db_cache
 
-        #self.context = Context()
+        # get the config and context from the CatalogRequest instance 
+        # associated with this catalog id
         catalog_req = CatalogRequest(catalog_id)
-        db_config = catalog_req.get_db_config()
+        self.config = catalog_req.get_config()
         self.context = catalog_req.get_context()
         
-        DatabaseConnection.__init__(self, db_config)
+        DatabaseConnection.__init__(self, self.config)
 
         def long2str(x):
             s = ''
@@ -1004,12 +1013,6 @@ class Application (DatabaseConnection):
         myAppName = os.path.basename(web.ctx.env['SCRIPT_NAME'])
 
         self.hostname = web.ctx.host
-
-        # TODO: get per-catalog config overrides from somewhere for multitenancy?
-        self.config = web.Storage(global_env.items())
-        self.config['home'] = self.config.get('home', 'https://%s' % self.hostname)
-        self.config['homepath'] = self.config.get('homepath', self.config.home + web.ctx.homepath)
-        self.config['store path'] = self.config.get('store path', '/var/www/%s-data' % self.config.get('user', 'tagfiler'))
 
         self.table_changes = {}
         

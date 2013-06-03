@@ -45,6 +45,11 @@
    "transact cluster" : false,
    "transact analyze" : false,
 
+   "database_type": "postgres", 
+   "database_name": "", 
+   "database_schema": "", 
+   "database_max_retries": 5, 
+
    "webauthn2" : {
       "require_attributes": true, 
       "listusers_permit": ["adminrole"], 
