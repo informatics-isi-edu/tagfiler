@@ -18,6 +18,10 @@ var confirmLogoutDialog;
 var warn_window_is_open = false;
 var unique_tags = [];
 
+var allAvailableTags = [];
+var allViewTags = [];
+var otherAvailableTags;
+
 /**
  * Determines identification and dtype of subject based on already probed metadata.
  */
@@ -1587,6 +1591,23 @@ function chooseOptions(home, webauthnhome, typestr, id) {
 	}
 }
 
+function chooseBooleanOptions(id) {
+	if ($('#' + id).attr('clicked') != null) {
+		return;
+	} else {
+		$('#' + id).attr('clicked', 'clicked');
+	}
+	var select = $(document.getElementById(id));
+	var option = $('<option>');
+	option.text('False');
+	option.attr('value', 'false');
+	select.append(option);
+	option = $('<option>');
+	option.text('True');
+	option.attr('value', 'true');
+	select.append(option);
+}
+
 function appendOptions(typestr, id, pattern) {
 	if ($('#' + id).attr('clicked') != null) {
 		return;
@@ -1655,7 +1676,7 @@ function appendTypedefs(id) {
 	}
 	var select = $(document.getElementById(id));
 	$.each(typedefTags, function(i, item) {
-		if (item['typedef'] != 'empty') {
+		if (item['typedef'] != '') {
 			var option = $('<option>');
 			option.text(item['typedef description']);
 			option.attr('value', item['typedef']);
@@ -1736,6 +1757,8 @@ var confirmAddTagDialog = null;
 var confirmAddMultipleTagsDialog = null;
 var confirmTagValuesEditDialog = null;
 var confirmTagValuesDeleteDialog = null;
+
+var confirmShowAnotherTagDialog = null;
 
 var editTagValuesTemplate = null;
 var deleteTagValuesTemplate = null;
@@ -2803,7 +2826,7 @@ function addToQueryTable(tableId, tag) {
 	td.append(select);
 	td = $('<td>');
 	tr.append(td);
-	if (availableTags[tag] != 'empty') {
+	if (availableTags[tag] != '') {
 		var table = $('<table>');
 		table.attr('id', makeId('table', ROW_COUNTER));
 		td.append(table);
@@ -2874,7 +2897,7 @@ function getSelectTagOperator(tag, type) {
 					selId: id,
 					tag: tag },
 					function(event) {displayValuesTable(event.data.row, event.data.selId, event.data.tag);});
-	if (type != 'empty' && !allTagdefs[tag]['tagdef multivalue']) {
+	if (type != '' && !allTagdefs[tag]['tagdef multivalue']) {
 		var option = $('<option>');
 		option.text('Between');
 		option.attr('value', 'Between');
@@ -2894,7 +2917,7 @@ function getSelectTagOperator(tag, type) {
 	} else if (type == 'timestamptz' || type == 'date') {
 		select.val('Between');
 		select.attr('prevVal', 'Between');
-	} else if (type == 'empty') {
+	} else if (type == '') {
 		select.val('Tagged');
 		select.attr('prevVal', 'Tagged');
 	}
@@ -3816,9 +3839,9 @@ function postShowQueryResultsTable(data, textStatus, jqXHR, param) {
 			td.html('');
 			if (row[column] != null) {
 				if (!allTagdefs[column]['tagdef multivalue']) {
-					if (row[column] === true && availableTags[column] == 'empty') {
+					if (row[column] === true && availableTags[column] == '') {
 						td.html('is set');
-					} else if (row[column] === false && availableTags[column] == 'empty') {
+					} else if (row[column] === false && availableTags[column] == '') {
 						td.html('not set');
 					} else {
 						if (column == 'name') {
@@ -4496,7 +4519,7 @@ function addFilterToQueryTable(tag) {
 				});
 			}
 			select.val(pred['opUser']);
-			if (availableTags[tag] != 'empty') {
+			if (availableTags[tag] != '') {
 				if (pred['opUser'] == 'Between') {
 					var selId = select.attr('id');
 					addNewValue(ROW_COUNTER, availableTags[tag], selId, tag, pred['vals']);
@@ -5036,7 +5059,7 @@ function editCell(td, column, id) {
 		select.val(origValue);
 		td.append(select);
 	}
-	else if (availableTags[column] == 'empty') {
+	else if (availableTags[column] == '') {
 		select = $('<select>');
 		var option = $('<option>');
 		option.text('Tag absent');
@@ -5114,7 +5137,7 @@ function updateCell(td, origValue, column, id) {
 	var values = new Array();
 	if (child.is('SELECT')) {
 		value = child.val();
-		if (availableTags[column] == 'empty') {
+		if (availableTags[column] == '') {
 			if (value == 'is set') {
 				values.push(ops['Tagged']); 
 			} else {
@@ -5665,7 +5688,7 @@ function addFilter(tag, predIndex) {
 	td.css('padding', '0px 0px 0px 0px');
 	tr.append(td);
 	var tableId = makeId('table', ROW_COUNTER);
-	if (availableTags[tag] != 'empty') {
+	if (availableTags[tag] != '') {
 		var table = $('<table>');
 		table.attr('id', tableId);
 		td.append(table);
@@ -7023,10 +7046,28 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 	var h2 = $('<h2>');
 	uiDiv.append(h2);
 	h2.html('Tag(s) for subject matching "/' + decodeURIComponent((displayPredicate.indexOf('tags/') == 0 ? displayPredicate.substr('tags/'.length) : displayPredicate)) + '"');
+	var addTagButton = $('<button>');
+	var params = {};
+	params['defaultView'] = defaultView;
+	params['isId'] = isId;
+	params['isFile'] = isFile;
+	params['tags'] = tags;
+	params['roles'] = roles;
+	params['allTags'] = allTags;
+	params['predicate'] = displayPredicate.indexOf('tags/') == 0 ? displayPredicate.substr('tags/'.length) : displayPredicate;
+	addTagButton.attr({
+		'name': 'addTagButton',
+		'id': 'addTagButton'
+	});
+	addTagButton.click({'params': params},
+		function(event) {addTag(event.data.params);});
+	addTagButton.html('Add tag(s)...');
+	uiDiv.append(addTagButton);
 	var div = $('<div>');
 	uiDiv.append(div);
 	div.addClass('content');
 	var table = $('<table>');
+	table.attr('id', 'tags_table');
 	div.append(table);
 	table.addClass('file-list');
 	var tr = $('<tr>');
@@ -7043,358 +7084,12 @@ function postGetAllTagdefs(data, textStatus, jqXHR, param) {
 	th.append(a);
 	a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate.indexOf('tags/') == 0 ? predicate.substr('tags/'.length) : predicate) + '","' + defaultView + '")');
 	a.html(decodeURIComponent(displayPredicate.indexOf('tags/') == 0 ? displayPredicate.substr('tags/'.length) : displayPredicate));
+	allViewTags = [];
 	$.each(viewColumns, function(i, tag) {
-		tr = $('<tr>');
-		table.append(tr);
-		tr.addClass('file');
-		tr.addClass(((i+1)%2) == 1 ? 'odd' : 'even');
-		var td = $('<td>');
-		tr.append(td);
-		td.addClass('tag');
-		td.addClass('name');
-		td.html(tag);
-		td = $('<td>');
-		tr.append(td);
-		td.addClass('file-tag');
-		td.addClass(idquote(tag));
-		var writeOK = writeAllowed(tag, allTags, roles, tag == 'tagdef' ? tags[tag] : null);
-		var valuesTable = null;
-		valuesTable = $('<table>');
-		td.append(valuesTable);
-		valuesTable.addClass('file-tag-list');
-		if (tag == 'tagdef') {
-			if (tags[tag] != null) {
-				td.html(tags[tag]);
-			} else {
-				td.html('');
-			}
-		} else if (tag == 'id') {
-			if (isFile || isURL) {
-				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
-				if (userOK) {
-					var idTable = $('<table>');
-					td.append(idTable);
-					idTable.addClass('file-tag-list');
-					var idTr = $('<tr>');
-					idTable.append(idTr);
-					var idTd = $('<td>');
-					idTr.append(idTd);
-					idTd.addClass('file-tag id multivalue');
-					var multivalueTable = $('<table>');
-					idTd.append(multivalueTable);
-					var multivalueTr = $('<tr>');
-					multivalueTable.append(multivalueTr);
-					var multivalueTd = $('<td>');
-					multivalueTr.append(multivalueTd);
-					var a = $('<a>');
-					multivalueTd.append(a);
-					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
-					a.html(tags['name']);
-					var space = $('<label>');
-					multivalueTd.append(space);
-					space.html(' ');
-					a = $('<a>');
-					multivalueTd.append(a);
-					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
-					a.html('(tags)');
-					multivalueTd = $('<td>');
-					multivalueTr.append(multivalueTd);
-					var input = $('<input>');
-					input.attr({'type': 'button',
-						'value': 'Delete',
-						'name': 'Delete',
-						'id': 'Delete',
-						'onclick': "deleteDataset('" + tags['name'] + "', '" + HOME + '/file/name=' + encodeSafeURIComponent(tags['name']) + "')"
-						
-					});
-					multivalueTd.append(input);
-					multivalueTable = $('<table>');
-					idTd.append(multivalueTable);
-					var formTr = $('<tr>');
-					multivalueTable.append(formTr);
-					var formTd = $('<td>');
-					formTd.attr({'colspan': '2'});
-					formTr.append(formTd);
-					var form = $('<form>');
-					formTd.append(form);
-					form.attr({'id': 'NameForm'+tags['id'],
-						'name': 'NameForm',
-						'enctype': 'application/x-www-form-urlencoded',
-						'action': HOME + '/file/name=' + encodeSafeURIComponent(tags['name']),
-						'method': 'post',
-						'onsubmit': "return validateNameForm('replace', '" + tags['id'] +"')"
-					});
-					var div = $('<div>');
-					form.append(div);
-					div.attr({'id': 'NameForm_div'+tags['id']});
-					var input = $('<input>');
-					input.attr({'type': 'hidden',
-						'name': 'action',
-						'value': 'put'
-					});
-					div.append(input);
-					var label = $('<label>');
-					div.append(label);
-					label.html('Replace with:');
-					
-					var select = $('<select>');
-					select.attr({'name': 'type',
-						'id': 'type'+tags['id'],
-						'onchange': "changeNameFormType('replace', '" + tags['id'] + "');"
-					});
-					div.append(select);
-					var option = $('<option>');
-					select.append(option);
-					option.text('blank (Dataset node for metadata-only)');
-					option.attr('value', 'blank');
-					option = $('<option>');
-					select.append(option);
-					option.text('file (Named dataset for locally stored file)');
-					option.attr({'value': 'file',
-						'selected': 'selected'});
-					input = $('<input>');
-					input.attr({'name': 'myfile'+tags['id'],
-						'type': 'file',
-						'id': 'fileName'+tags['id']
-					});
-					input.css({'display': 'inline'});
-					div.append(input);
-					input = $('<input>');
-					input.attr({'type': 'submit',
-						'id': 'submit'+tags['id'],
-						'value': 'Replace'
-					});
-					div.append(input);
-					div = $('<div>');
-					formTd.append(div);
-					div.attr({'id': 'Copy'+tags['id']});
-				}
-			} else if (isId) { 
-				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
-				if (userOK) {
-					var valueTr = $('<tr>');
-					valuesTable.removeClass('file-tag-list');
-					valuesTable.append(valueTr);
-					var valueTd = $('<td>');
-					valueTr.append(valueTd);
-					var a = $('<a>');
-					valueTd.append(a);
-					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
-					a.html(predicate + ' (tags)');
-					valueTd = $('<td>');
-					valueTr.append(valueTd);
-					var input = $('<input>');
-					input.attr({'type': 'button',
-						'value': 'Delete',
-						'name': 'Delete',
-						'id': 'Delete',
-						'onclick': "deleteDataset('" + predicate + "', '" + HOME + '/subject/' + predicate + "')"
-					});
-					valueTd.append(input);
-				} else {
-					a = $('<a>');
-					td.append(a);
-					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
-					a.html(predicate + ' (tags)');
-				}
-			} else {
-				a = $('<a>');
-				td.append(a);
-				a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
-				a.html(predicate + ' (tags)');
-			}
-		} else if (tag == 'tagdef dbtype') {
-			if (tags[tag] != null) {
-				td.html(tags[tag]);
-			} else {
-				td.html('');
-			}
-		} else if (tags[tag] != null) {
-			if ($.isArray(tags[tag])) {
-				$.each(tags[tag], function(j, value) {
-					var valueTr = $('<tr>');
-					valuesTable.append(valueTr);
-					var valueTd = $('<td>');
-					valueTr.append(valueTd);
-					valueTd.addClass('file-tag');
-					valueTd.addClass(tag);
-					if (allTags[tag]['tagdef multivalue']) {
-						valueTd.addClass('multivalue');
-					}
-					valueTd.html(value);
-					if (writeOK) {
-						valueTd = $('<td>');
-						valueTr.append(valueTd);
-						valueTd.addClass('file-tag');
-						valueTd.addClass(tag);
-						if (allTags[tag]['tagdef multivalue']) {
-							valueTd.addClass('multivalue');
-						}
-						valueTd.addClass('delete');
-						var input = $('<input>');
-						input.attr({'type': 'button',
-							'name': 'tag',
-							'value': value
-						});
-						input.val('Remove Value');
-						valueTd.append(input);
-						input.click({	'tag': tag,
-										'value': value},
-										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
-					}
-				});
-			} else if (allTags[tag]['tagdef dbtype'] == 'boolean') {
-				td.html(tags[tag] ? 'True' : 'False');
-			} else if (allTags[tag]['tagdef dbtype'] == 'tagpolicy') {
-				td.html('' + tags[tag] + ' (' + tagdefPolicies[tags[tag]] + ')');
-			} else {
-				if (!writeOK) {
-					td.html('' + tags[tag]);
-				} else {
-					var valueTr = $('<tr>');
-					valuesTable.append(valueTr);
-					var valueTd = $('<td>');
-					valueTr.append(valueTd);
-					valueTd.addClass('file-tag');
-					valueTd.addClass(tag);
-					valueTd.addClass('multivalue');
-					if (allTags[tag]['tagdef dbtype'] == 'empty') {
-						valueTd.html(tags[tag] ? 'is set' : 'not set');
-					} else {
-						if (tag == 'url') {
-							var a = $('<a>');
-							valueTd.append(a);
-							a.attr({'href': tags[tag]});
-							a.html(tags[tag]);
-						} else {
-							valueTd.html(tags[tag]);
-						}
-					}
-					valueTd = $('<td>');
-					valueTr.append(valueTd);
-					valueTd.addClass('file-tag');
-					valueTd.addClass(tag);
-					valueTd.addClass('multivalue');
-					valueTd.addClass('delete');
-					var input = $('<input>');
-					if (allTags[tag]['tagdef dbtype'] == 'empty') {
-						input.attr({'type': 'button',
-							'name': 'tag',
-							'value': tags[tag]
-						});
-						input.val(tags[tag] ? 'Remove Tag' : 'Set Tag');
-						input.click({	'tag': tag,
-										'value': tags[tag]},
-										function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
-					} else {
-						input.attr({'type': 'button',
-							'name': 'tag',
-							'value': tags[tag]
-						});
-						input.val('Remove Value');
-						input.click({	'tag': tag,
-										'value': tags[tag]},
-										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
-					}
-					valueTd.append(input);
-				}
-			}
-		} else {
-			if (!writeOK) {
-				td.html('');
-			}
-		}
-		if (writeOK && allTags[tag]['tagdef dbtype'] != 'empty') {
-			var valueTr = $('<tr>');
-			valuesTable.append(valueTr);
-			var valueTd = $('<td>');
-			valueTr.append(valueTd);
-			valueTd.addClass('file-tag');
-			valueTd.addClass(tag);
-			valueTd.addClass('multivalue');
-			var tagType = allTags[tag]['tagdef dbtype'];
-			if (tagType == 'text' || tagType == 'int8' || tagType == 'date' || 
-					tagType == 'timestamptz' || tagType == 'id' || tagType == 'url') {
-				valueTd.addClass('input');
-				var input = $('<input>');
-				input.attr({'type': 'text',
-					'name': 'val_' + tag,
-					'id': idquote(tag)+'_id',
-					'typestr': 'text'
-				});
-				valueTd.append(input);
-				if (tagType == 'date') {
-					var a = $('<a>');
-					valueTd.append(a);
-					a.attr({'href': "javascript:generateCalendar('" + idquote(tag) + "_id')"});
-					var img = $('<img>');
-					a.append(img);
-					img.attr({'src': HOME + '/static/calendar.gif',
-						'width': 16,
-						'height': 16,
-						'border': 0,
-						'alt': 'Pick a date'
-					});
-				}
-			} else if (tagType == 'rolepat' || 
-					tagType == 'role' ||
-					tagType == 'tagdef' ||
-					tagType == 'boolean' ||
-					tagType == 'GUI features' ||
-					tagType == 'name' ||
-					tagType == 'data provider id' ||
-					tagType == 'view' ||
-					tagType == 'config') {
-				valueTd.addClass('input');
-				var select = $('<select>');
-				valueTd.append(select);
-				select.attr({'name': 'val-'+encodeSafeURIComponent(tag),
-					'id': idquote(tag)+'_id',
-					'typestr': tagType,
-					'onclick': "chooseOptions('" + HOME + "', '" + WEBAUTHNHOME + "', '" + tagType + "', '" + idquote(tag) + "_id')"
-				});
-				var option = $('<option>');
-				var text = '';
-				if (tagType == 'rolepat') {
-					text = 'Choose a Role pattern';
-				} else if (tagType == 'role') {
-					text = 'Choose a Role';
-				} else if (tagType == 'tagdef') {
-					text = 'Choose a Tag definition';
-				} else if (tagType == 'boolean') {
-					text = 'Choose a Boolean (true or false)';
-				} else if (tagType == 'GUI features') {
-					text = 'Choose a GUI configuration mode';
-				} else if (tagType == 'name') {
-					text = 'Choose a Subject name';
-				} else if (tagType == 'data provider id') {
-					text = 'Choose an Enumerated data provider IDs';
-				} else if (tagType == 'view') {
-					text = 'Choose a View name';
-				} else if (tagType == 'config') {
-					text = 'Choose a Study Type';
-				}
-                                option.text(text);
-				option.attr('value', '');
-				select.append(option);
-			}
-			var valueTd = $('<td>');
-			valueTr.append(valueTd);
-			valueTd.addClass('file-tag');
-			valueTd.addClass(tag);
-			valueTd.addClass('multivalue');
-			valueTd.addClass('set');
-			var input = $('<input>');
-			input.attr({'type': 'button',
-				'name': 'tag'
-			});
-			input.val('Set Value');
-			valueTd.append(input);
-			input.click({	'tag': tag},
-							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, predicate);});
-		}
+		allViewTags.push(tag);
 	});
-	
+	appendTags(viewColumns, params);
+	loadAllTags();
 }
 
 function idquote(value) {
@@ -7466,7 +7161,6 @@ function postRemoveTagValue(data, textStatus, jqXHR, param) {
 }
 
 function removeAddTag(tag, value, row, predicate) {
-	var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
 	var obj = new Object();
 	obj.action = value ? 'delete' : 'put';
 	obj['tag'] = tag;
@@ -7476,7 +7170,16 @@ function removeAddTag(tag, value, row, predicate) {
 		'row': row,
 		'predicate': predicate
 	};
-	tagfiler.POST(url, obj, true, postRemoveAddTag, param, null, 0);
+	if (value) {
+		var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
+		url += '(' + encodeSafeURIComponent(tag) + ')';
+		tagfiler.DELETE(url, true, postRemoveAddTag, param, null, 0);
+	} else {
+		var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
+		url += '(' + encodeSafeURIComponent(tag) + '=true)';
+		alert(url);
+		tagfiler.PUT(url, obj, true, postRemoveAddTag, param, null, 0);
+	}
 }
 
 /**
@@ -7846,6 +7549,7 @@ function homePage() {
 	//var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
 	//tagfiler.GET(url, true, postHomePage, null, null, 0);
 	manageAvailableTagDefinitions();
+	//getTagDefinition('id=47', 'defaultView');
 }
 
 /**
@@ -10336,3 +10040,488 @@ function postLoadReferenceTags(data, textStatus, jqXHR, param) {
 		select.append(option);
 	});
 }
+
+function loadAllTags() {
+	var url = HOME + '/subject/tagdef(tagdef)tagdef:asc:?limit=none';
+	tagfiler.GET(url, true, postLoadAllTags, null, null, 0);
+}
+
+function postLoadAllTags(data, textStatus, jqXHR, param) {
+	allAvailableTags = [];
+	$.each(data, function(i,obj) {
+		allAvailableTags.push(obj['tagdef']);
+	});
+	otherAvailableTags = [];
+	$.each(allAvailableTags, function(i, tag) {
+		if (!allViewTags.contains(tag)) {
+			otherAvailableTags.push(tag);
+		}
+	});
+	//alert(otherAvailableTags);
+}
+
+function addTag(params) {
+	var predicate = params['predicate'];
+	var div = $('<div>');
+	$('#ui').append(div);
+	div.attr({'id': 'customizedTagsDiv'});
+	var fieldset = $('<fieldset>');
+	div.append(fieldset);
+	var p = $('<p>');
+	fieldset.append(p);
+	p.html("Select new tag(s) and click 'Add':");
+	p = $('<p>');
+	fieldset.append(p);
+	var select = $('<select>');
+	fieldset.append(select);
+	select.attr({'id': 'customizedTagsSelect',
+		'name': 'customizedTagsSelect',
+		'multiple': 'multiple',
+		'size': otherAvailableTags.length < 8 ? '' + otherAvailableTags.length : '8'
+	});
+	$.each(otherAvailableTags, function(i, tag) {
+		var option = $('<option>');
+		select.append(option);
+		option.text(tag);
+		option.attr('value', tag);
+	});
+	
+	confirmShowAnotherTagDialog = $('#customizedTagsDiv');
+	confirmShowAnotherTagDialog.dialog({
+		autoOpen: false,
+		title: 'Add new tag(s)',
+		buttons: {
+			'Cancel': function() {
+					$(this).dialog('close');
+					$('#customizedTagsDiv').remove();
+				},
+			'Add': function() {
+					addTagsToView('customizedTagsSelect', params);
+					$('#customizedTagsDiv').remove();
+				}
+		},
+		draggable: true,
+		position: 'top',
+		height: ($(window).height() < 350 ? $(window).height() : 350),
+		modal: false,
+		resizable: true,
+		width: ($(window).width() < 450 ? $(window).width() : 450)
+	});
+	confirmShowAnotherTagDialog.dialog('open');
+	
+}
+
+function addTagsToView(selectId, params) {
+	var tags = $('#' + selectId).val();
+	if (tags == '') {
+		alert('Please select the new tag(s).');
+		return;
+	}
+	confirmShowAnotherTagDialog.dialog('close');
+	$.each(tags, function(i, tag) {
+		allViewTags.push(tag);
+	});
+	otherAvailableTags = [];
+	$.each(allAvailableTags, function(i, tag) {
+		if (!allViewTags.contains(tag)) {
+			otherAvailableTags.push(tag);
+		}
+	});
+	if (otherAvailableTags.length == 0) {
+		$('#addTagButton').hide();
+	}
+	getOtherTagdefs(tags, params);
+}
+
+function getOtherTagdefs(tags, params) {
+	// get all tags defitions
+	var predicate = params['predicate'];
+	var url = HOME + '/subject/' + predicate;
+	url += '(' + encodeURIArray(tags, '').join(';') + ')';
+	url += '?limit=none';
+	var param = {};
+	param['params'] = params;
+	param['newTags'] = tags;
+	tagfiler.GET(url, true, postGetOtherTagdefs, param, null, 0);
+}
+
+function postGetOtherTagdefs(data, textStatus, jqXHR, param) {
+	var params = param['params'];
+	var newTags = param.newTags;
+	var tags = params['tags'];
+
+	$.each(data[0], function(key, val) {
+		if (tags[key] == null) {
+			tags[key] = val;
+		}
+	});
+	appendTags(newTags, params);
+}
+
+function appendTags(newTags, params) {
+	var baseIndex = $('tr.file', $('#tags_table')).length;
+	var table = $('#tags_table');
+	var roles = params['roles'];
+	var allTags = params['allTags'];
+	var tags = params['tags'];
+	var isFile = params['isFile'];
+	var isId = params['isId'];
+	var predicate = params['predicate'];
+	var defaultView = params['defaultView'];
+
+	$.each(newTags, function(i, tag) {
+		tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('file');
+		tr.addClass(((baseIndex+i+1)%2) == 1 ? 'odd' : 'even');
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('tag');
+		td.addClass('name');
+		td.html(tag);
+		td = $('<td>');
+		tr.append(td);
+		td.addClass('file-tag');
+		td.addClass(idquote(tag));
+		var writeOK = writeAllowed(tag, allTags, roles, tag == 'tagdef' ? tags[tag] : null);
+		var valuesTable = null;
+		valuesTable = $('<table>');
+		td.append(valuesTable);
+		valuesTable.addClass('file-tag-list');
+		if (tag == 'tagdef') {
+			if (tags[tag] != null) {
+				td.html(tags[tag]);
+			} else {
+				td.html('');
+			}
+		} else if (tag == 'id') {
+			if (isFile) {
+				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
+				if (userOK) {
+					var idTable = $('<table>');
+					td.append(idTable);
+					idTable.addClass('file-tag-list');
+					var idTr = $('<tr>');
+					idTable.append(idTr);
+					var idTd = $('<td>');
+					idTr.append(idTd);
+					idTd.addClass('file-tag id multivalue');
+					var multivalueTable = $('<table>');
+					idTd.append(multivalueTable);
+					var multivalueTr = $('<tr>');
+					multivalueTable.append(multivalueTr);
+					var multivalueTd = $('<td>');
+					multivalueTr.append(multivalueTd);
+					var a = $('<a>');
+					multivalueTd.append(a);
+					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
+					a.html(tags['name']);
+					var space = $('<label>');
+					multivalueTd.append(space);
+					space.html(' ');
+					a = $('<a>');
+					multivalueTd.append(a);
+					a.attr({'href': 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")'});
+					a.html('(tags)');
+					multivalueTd = $('<td>');
+					multivalueTr.append(multivalueTd);
+					var input = $('<input>');
+					input.attr({'type': 'button',
+						'value': 'Delete',
+						'name': 'Delete',
+						'id': 'Delete',
+						'onclick': "deleteDataset('" + tags['name'] + "', '" + HOME + '/file/name=' + encodeSafeURIComponent(tags['name']) + "')"
+						
+					});
+					multivalueTd.append(input);
+					multivalueTable = $('<table>');
+					idTd.append(multivalueTable);
+					var formTr = $('<tr>');
+					multivalueTable.append(formTr);
+					var formTd = $('<td>');
+					formTd.attr({'colspan': '2'});
+					formTr.append(formTd);
+					var form = $('<form>');
+					formTd.append(form);
+					form.attr({'id': 'NameForm'+tags['id'],
+						'name': 'NameForm',
+						'enctype': 'application/x-www-form-urlencoded',
+						'action': HOME + '/file/name=' + encodeSafeURIComponent(tags['name']),
+						'method': 'post',
+						'onsubmit': "return validateNameForm('replace', '" + tags['id'] +"')"
+					});
+					var div = $('<div>');
+					form.append(div);
+					div.attr({'id': 'NameForm_div'+tags['id']});
+					var input = $('<input>');
+					input.attr({'type': 'hidden',
+						'name': 'action',
+						'value': 'put'
+					});
+					div.append(input);
+					var label = $('<label>');
+					div.append(label);
+					label.html('Replace with:');
+					
+					var select = $('<select>');
+					select.attr({'name': 'type',
+						'id': 'type'+tags['id'],
+						'onchange': "changeNameFormType('replace', '" + tags['id'] + "');"
+					});
+					div.append(select);
+					var option = $('<option>');
+					select.append(option);
+					option.text('blank (Dataset node for metadata-only)');
+					option.attr('value', 'blank');
+					option = $('<option>');
+					select.append(option);
+					option.text('file (Named dataset for locally stored file)');
+					option.attr({'value': 'file',
+						'selected': 'selected'});
+					input = $('<input>');
+					input.attr({'name': 'myfile'+tags['id'],
+						'type': 'file',
+						'id': 'fileName'+tags['id']
+					});
+					input.css({'display': 'inline'});
+					div.append(input);
+					input = $('<input>');
+					input.attr({'type': 'submit',
+						'id': 'submit'+tags['id'],
+						'value': 'Replace'
+					});
+					div.append(input);
+					div = $('<div>');
+					formTd.append(div);
+					div.attr({'id': 'Copy'+tags['id']});
+				}
+			} else if (isId) { 
+				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
+				if (userOK) {
+					var valueTr = $('<tr>');
+					valuesTable.removeClass('file-tag-list');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					var a = $('<a>');
+					valueTd.append(a);
+					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+					a.html(predicate + ' (tags)');
+					valueTd = $('<td>');
+					valueTr.append(valueTd);
+					var input = $('<input>');
+					input.attr({'type': 'button',
+						'value': 'Delete',
+						'name': 'Delete',
+						'id': 'Delete',
+						'onclick': "deleteDataset('" + predicate + "', '" + HOME + '/subject/' + predicate + "')"
+					});
+					valueTd.append(input);
+				} else {
+					a = $('<a>');
+					td.append(a);
+					a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+					a.html(predicate + ' (tags)');
+				}
+			} else {
+				a = $('<a>');
+				td.append(a);
+				a.attr('href', 'javascript:getTagDefinition("' + encodeSafeURIComponent(predicate) + '","' + defaultView + '")');
+				a.html(predicate + ' (tags)');
+			}
+		} else if (tag == 'tagdef dbtype') {
+			if (tags[tag] != null) {
+				td.html(tags[tag]);
+			} else {
+				td.html('');
+			}
+		} else if (tags[tag] != null || allTags[tag]['tagdef dbtype'] == '') {
+			if (allTags[tag]['tagdef dbtype'] != '' && $.isArray(tags[tag])) {
+				$.each(tags[tag], function(j, value) {
+					var valueTr = $('<tr>');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					if (allTags[tag]['tagdef multivalue']) {
+						valueTd.addClass('multivalue');
+					}
+					valueTd.html(value);
+					if (writeOK) {
+						valueTd = $('<td>');
+						valueTr.append(valueTd);
+						valueTd.addClass('file-tag');
+						valueTd.addClass(tag);
+						if (allTags[tag]['tagdef multivalue']) {
+							valueTd.addClass('multivalue');
+						}
+						valueTd.addClass('delete');
+						var input = $('<input>');
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': value
+						});
+						input.val('Remove Value');
+						valueTd.append(input);
+						input.click({	'tag': tag,
+										'value': value},
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
+					}
+				});
+			} else if (allTags[tag]['tagdef dbtype'] == 'boolean') {
+				td.html(tags[tag] ? 'True' : 'False');
+			} else if (allTags[tag]['tagdef dbtype'] == 'tagpolicy') {
+				td.html('' + tags[tag] + ' (' + tagdefPolicies[tags[tag]] + ')');
+			} else {
+				if (!writeOK) {
+					td.html('' + tags[tag]);
+				} else {
+					var valueTr = $('<tr>');
+					valuesTable.append(valueTr);
+					var valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					valueTd.addClass('multivalue');
+					if (allTags[tag]['tagdef dbtype'] == '') {
+						valueTd.html(tags[tag] ? 'is set' : 'not set');
+					} else {
+						if (tag == 'url') {
+							var a = $('<a>');
+							valueTd.append(a);
+							a.attr({'href': tags[tag]});
+							a.html(tags[tag]);
+						} else {
+							valueTd.html(tags[tag]);
+						}
+					}
+					valueTd = $('<td>');
+					valueTr.append(valueTd);
+					valueTd.addClass('file-tag');
+					valueTd.addClass(tag);
+					valueTd.addClass('multivalue');
+					valueTd.addClass('delete');
+					var input = $('<input>');
+					if (allTags[tag]['tagdef dbtype'] == '') {
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': tags[tag]
+						});
+						input.val(tags[tag] ? 'Remove Tag' : 'Set Tag');
+						input.click({	'tag': tag,
+										'value': tags[tag]},
+										function(event) {removeAddTag(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
+					} else {
+						input.attr({'type': 'button',
+							'name': 'tag',
+							'value': tags[tag]
+						});
+						input.val('Remove Value');
+						input.click({	'tag': tag,
+										'value': tags[tag]},
+										function(event) {removeTagValue(event.data.tag, event.data.value, $(this).parent().parent(), predicate);});
+					}
+					valueTd.append(input);
+				}
+			}
+		} else {
+			if (!writeOK) {
+				td.html('');
+			}
+		}
+		if (writeOK && allTags[tag]['tagdef dbtype'] != '') {
+			var valueTr = $('<tr>');
+			valuesTable.append(valueTr);
+			var valueTd = $('<td>');
+			valueTr.append(valueTd);
+			valueTd.addClass('file-tag');
+			valueTd.addClass(tag);
+			valueTd.addClass('multivalue');
+			var tagType = allTags[tag]['tagdef dbtype'];
+			if (tagType == 'text' || tagType == 'int8' || tagType == 'float8' || tagType == 'date' || 
+					tagType == 'timestamptz' || tagType == 'id' || tagType == 'url') {
+				valueTd.addClass('input');
+				var input = $('<input>');
+				input.attr({'type': 'text',
+					'name': 'val_' + tag,
+					'id': idquote(tag)+'_id',
+					'typestr': 'text'
+				});
+				valueTd.append(input);
+				
+				if (tagType == 'timestamptz') {
+					input.addClass('datetimepicker');
+					bindDateTimePicker();
+				} else if (tagType == 'date') {
+					input.addClass('datepicker');
+					bindDatePicker();
+				}
+			} else if (tagType == 'rolepat' || 
+					tagType == 'role' ||
+					tagType == 'tagdef' ||
+					tagType == 'boolean' ||
+					tagType == 'GUI features' ||
+					tagType == 'name' ||
+					tagType == 'data provider id' ||
+					tagType == 'view' ||
+					tagType == 'config') {
+				valueTd.addClass('input');
+				var select = $('<select>');
+				valueTd.append(select);
+				if (tagType == 'boolean') {
+					select.attr({'name': 'val-'+encodeSafeURIComponent(tag),
+						'id': idquote(tag)+'_id',
+						'typestr': tagType,
+						'onclick': "chooseBooleanOptions('" + idquote(tag) + "_id')"
+					});
+				} else {
+					select.attr({'name': 'val-'+encodeSafeURIComponent(tag),
+						'id': idquote(tag)+'_id',
+						'typestr': tagType,
+						'onclick': "chooseOptions('" + HOME + "', '" + WEBAUTHNHOME + "', '" + tagType + "', '" + idquote(tag) + "_id')"
+					});
+				}
+				var option = $('<option>');
+				var text = '';
+				if (tagType == 'rolepat') {
+					text = 'Choose a Role pattern';
+				} else if (tagType == 'role') {
+					text = 'Choose a Role';
+				} else if (tagType == 'tagdef') {
+					text = 'Choose a Tag definition';
+				} else if (tagType == 'boolean') {
+					text = 'Choose a Boolean (true or false)';
+				} else if (tagType == 'GUI features') {
+					text = 'Choose a GUI configuration mode';
+				} else if (tagType == 'name') {
+					text = 'Choose a Subject name';
+				} else if (tagType == 'data provider id') {
+					text = 'Choose an Enumerated data provider IDs';
+				} else if (tagType == 'view') {
+					text = 'Choose a View name';
+				} else if (tagType == 'config') {
+					text = 'Choose a Study Type';
+				}
+                                option.text(text);
+				option.attr('value', '');
+				select.append(option);
+			}
+			var valueTd = $('<td>');
+			valueTr.append(valueTd);
+			valueTd.addClass('file-tag');
+			valueTd.addClass(tag);
+			valueTd.addClass('multivalue');
+			valueTd.addClass('set');
+			var input = $('<input>');
+			input.attr({'type': 'button',
+				'name': 'tag'
+			});
+			input.val('Set Value');
+			valueTd.append(input);
+			input.click({	'tag': tag},
+							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, predicate);});
+		}
+	});
+}
+
