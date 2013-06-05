@@ -392,7 +392,7 @@ class Catalog (CNode):
         except:
             content_type = 'text/plain'
 
-        if content_type != 'application/json':
+        if content_type.split(';')[0] != ('application/json'):
             raise BadRequest(self, ('Content type (%s) not supported.' % content_type))
 
         # Might be worth getting the data now, before we're in the dbtransact call
