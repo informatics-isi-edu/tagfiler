@@ -44,17 +44,20 @@ config data is stored in the user's home directory.
 Database
 ========
 
-Create postgres user and db for tagfiler:
+Create postgres user and db for tagfiler (note that the tagfiler must be
+given create db rights for the new multi-tenant support):
 
-    sudo -u postgres createuser -S -D -R tagfiler
+    sudo -u postgres createuser -S -d -R tagfiler
     sudo -u postgres createdb -O tagfiler tagfiler
+    sudo -u postgres createdb -O tagfiler tagfiler_template
 
 Populate with initial tag model:
 
-    sudo cp dbsetup-template.sh /home/tagfiler
-    sudo chown tagfiler.tagfiler /home/tagfiler/dbsetup-template.sh
-    sudo chmod +x /home/tagfiler/dbsetup-template.sh
-    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup-template.sh $(hostname) tagfiler admin uploader download curator grader)"
+    sudo cp bin/dbsetup*.sh /home/tagfiler
+    sudo chown tagfiler.tagfiler /home/tagfiler/dbsetup*.sh
+    sudo chmod +x /home/tagfiler/dbsetup*.sh
+    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup.sh tagfiler)"
+    sudo -i -u tagfiler bash -c "(cd ~; ./dbsetup-template.sh $(hostname) tagfiler tagfiler_template admin)"
 
 WSGI Application
 ================
@@ -73,10 +76,10 @@ Static Content
 
 Copy images etc to web root:
 
-    sudo mkdir -p /var/www/tagfiler/static/images
-    sudo cp *.js *.css /var/www/tagfiler/static
-    sudo cp *.jpg *.png *.gif /var/www/tagfiler/static/images
-    sudo cp logo.png /var/www/tagfiler/static
+    sudo cp -R static images /var/www/tagfiler
+    sudo cp -R static /var/www/tagfiler
+    # TODO: is this still needed???
+    sudo cp images/logo.png /var/www/tagfiler/static
 
 Config File
 ===========
