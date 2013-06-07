@@ -188,13 +188,6 @@ function runExtendRequest() {
     }
 }
 
-function processLogoutRequest() {
-    if (ajax_request.readyState == 4) {
-	clearSessionTimer();
-	window.location = "/tagfiler/";
-    }
-}
-
 function redirectNow() {
     var node = document.getElementById("javascriptlog");
     clearSessionTimer();
@@ -202,7 +195,7 @@ function redirectNow() {
 	alert("About to redirect at end of session");
     }
     if (redirectToLogin) {
-    	window.location = '/tagfiler';
+    	window.location = '/tagfiler/static';
     }
     else {
 	window.location = window.location;
@@ -1234,7 +1227,7 @@ function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, as
 		if (err != null) {
 			err = decodeURIComponent(err);
 			if (err == 'The requested tagfiler API usage by unauthorized client requires authorization.') {
-				window.location = '/tagfiler';
+				window.location = '/tagfiler/static';
 				return;
 			}
 		}
@@ -1242,7 +1235,7 @@ function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, as
 	case 403:	// Forbidden
 		var err = jqXHR.responseText;
 		if (err == 'unauthenticated session access forbidden') {
-			window.location = '/tagfiler';
+			window.location = '/tagfiler/static';
 			return;
 		}
 		break;
@@ -1698,6 +1691,8 @@ var ROW_SORTED_COUNTER;
 var FIELDSET_COUNTER;
 var PAGE_PREVIEW;
 var LAST_PAGE_PREVIEW;
+var QUERY_SEARCH_OPTIONS;
+var QUERY_PATH;
 var availableTags = null;
 var availableTagdefs = null;
 var allTagdefs = null;
@@ -1736,7 +1731,6 @@ var opsExcludeTypes = {
 	    '!=': ['empty'],
 	    ':geq:': ['empty', 'boolean']
 };
-var typedefSubjects = null;
 
 var resultColumns = [];
 var viewListTags = new Object();
@@ -1935,7 +1929,7 @@ function loadRange(tdRange) {
 
 function loadTagRange(tdRange, tag, exclude) {
 	document.body.style.cursor = 'wait';
-	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl(exclude ? tag : '');
+	var predUrl = HOME + '/subject' + queryBasePath + getQueryPredUrl(exclude ? tag : '');
 	var columnArray = new Array();
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
@@ -2008,45 +2002,6 @@ function postLoadTagRangeValues(data, textStatus, jqXHR, param) {
 	setRangeValues(param.range, param.tdRange, param.tag);
 }
 
-function setGUIConfig() {
-	var url = HOME + '/query/config=tagfiler(config%20binding)/config%20parameter=enabled%20GUI%20features(config%20value)';
-	tagfiler.GET(url, false, postSetGUIConfig, null, errorSetGUIConfig, 0);
-}
-
-/**
- * Handle an error from a specific AJAX request
- * retry the request in case of timeout
- * maximum retries: 10
- * each retry is performed after an exponential delay
- * 
- * @param jqXHR
- * 	the jQuery XMLHttpRequest
- * @param textStatus
- * 	the string describing the type of error
- * @param errorThrown
- * 	the textual portion of the HTTP status
- * @param retryCallback
- * 	the AJAX request to be retried
- * @param url
- * 	the request url
- * @param obj
- * 	the parameters (in a dictionary form) for the POST request
- * @param async
- * 	the operation type (sync or async)
- * @param successCallback
- * 	the success callback function
- * @param param
- * 	the parameters for the success callback function
- * @param errorCallback
- * 	the error callback function
- * @param count
- * 	the number of retries already performed
- */
-function errorSetGUIConfig(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
-	// ignore for now until the tag will be defined 'enabled GUI features'
-	document.body.style.cursor = "default";
-}
-
 /**
  * initialize the GUI configuration
  * 
@@ -2059,8 +2014,8 @@ function errorSetGUIConfig(jqXHR, textStatus, errorThrown, retryCallback, url, o
  * @param param
  * 	the parameters to be used by the callback success function
  */
-function postSetGUIConfig(data, textStatus, jqXHR, param) {
-	var values = data[0]['config value'];
+function postSetGUIConfig() {
+	var values = null;
 	if (values != null) {
 		// initialize defaults
 		bulk_value_edit = false;
@@ -2351,10 +2306,10 @@ function dropColumn(e, tag, append) {
 }
 
 function updatePreviewURL(force) {
-	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl('');
+	var predUrl = HOME + '/subject' + queryBasePath + getQueryPredUrl('');
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
-	$('#Query_URL').attr('href', queryUrl);
+	$('#Query_URL').attr('href', HOME + '/static?query=' + encodeURIComponent(queryUrl));
 	if (force) {
 		lastPreviewURL = queryUrl;
 	}
@@ -2460,7 +2415,7 @@ function setPreviousPage() {
 }
 
 function initPreview() {
-	var searchString = window.location.search;
+	var searchString = QUERY_SEARCH_OPTIONS;
 	if (searchString != null && searchString.length > 1) {
 		searchString = searchString.substring(1);
 		var searchOptions = searchString.split('&');
@@ -2480,12 +2435,9 @@ function initPreview() {
 	}
 }
 
-function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
+function initPSOC(basepath, querypathJSON) {
 	//alert(basepath);
-	//alert(querypath);
-	HOME = home;
-	USER = user;
-	WEBAUTHNHOME = webauthnhome;
+	//alert(querypathJSON);
 	ROW_COUNTER = 0;
 	MULTI_VALUED_ROW_COUNTER = 0;
 	VAL_COUNTER = 0;
@@ -2513,7 +2465,7 @@ function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
 		queryBasePath += '/';
 	}
 	initPreview();
-	setGUIConfig();
+	postSetGUIConfig();
 	
 	editTagValuesTemplate = $('#editTagValuesDiv');
 	deleteTagValuesTemplate = $('#deleteTagValuesDiv');
@@ -2524,7 +2476,6 @@ function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
 	$.each(ops, function(key, value) {
 		userOp[value] = key;
 	});
-	loadTypedefs();
 	$(document).mousemove(function(e){
 		e.preventDefault();
 		if (tagToMove == null) {
@@ -2659,32 +2610,8 @@ function initPSOC(home, user, webauthnhome, basepath, querypathJSON) {
 	showPreview();
 }
 
-function loadTypedefs() {
-	var url = HOME + '/query/typedef(typedef;' + encodeSafeURIComponent('typedef values') + ';' +encodeSafeURIComponent('typedef dbtype') + ';' +encodeSafeURIComponent('typedef tagref') + ')?limit=none';
-	tagfiler.GET(url, false, postLoadTypedefs, null, null, 0);
-}
-
-/**
- * initialize the typedefs
- * 
- * @param data
- * 	the data returned from the server
- * @param textStatus
- * 	the string describing the status
- * @param jqXHR
- * 	the jQuery XMLHttpRequest
- * @param param
- * 	the parameters to be used by the callback success function
- */
-function postLoadTypedefs(data, textStatus, jqXHR, param) {
-	typedefSubjects = new Object();
-	$.each(data, function(i, object) {
-		typedefSubjects[object['typedef']] = object;
-	});
-}
-
 function loadTags() {
-	var url = HOME + '/query/tagdef(tagdef;' + 
+	var url = HOME + '/subject/tagdef(tagdef;' + 
 				encodeSafeURIComponent('tagdef dbtype') + ';' + 
 				encodeSafeURIComponent('tagdef multivalue') + ';' +
 				encodeSafeURIComponent('tagdef unique') + ')?limit=none';
@@ -2707,7 +2634,7 @@ function postLoadTags(data, textStatus, jqXHR, param) {
 	availableTags = new Object();
 	availableTagdefs = new Array();
 	allTagdefs = new Object();
-	var results = ['bytes', 'url', 'id'];
+	var results = ['bytes', 'id'];
 	$.each(data, function(i, object) {
 		availableTagdefs.push(object['tagdef']);
 		availableTags[object['tagdef']] = object['tagdef dbtype'];
@@ -2740,7 +2667,7 @@ function loadAvailableTags(id) {
 }
 
 function loadViews() {
-	var url = HOME + '/query/view(view)view?limit=none';
+	var url = HOME + '/subject/view(view)view?limit=none';
 	tagfiler.GET(url, false, postLoadViews, null, null, 0);
 }
 
@@ -2783,7 +2710,7 @@ function setViewTags(tag) {
 	if (viewListTags[tag] != null) {
 		return;
 	}
-	var url = HOME + '/query/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('view tags') + ')' + encodeSafeURIComponent('view tags');
+	var url = HOME + '/subject/view=' + encodeSafeURIComponent(tag) + '(' + encodeSafeURIComponent('view tags') + ')' + encodeSafeURIComponent('view tags');
 	var param = {
 		'tag': tag	
 	};
@@ -2935,8 +2862,6 @@ function isSelect(tag, type) {
 	var ret = false;
 	if (type == 'role' || 
 		type == 'rolepat' || 
-		typedefSubjects[type]['typedef values'] != null ||
-		typedefSubjects[type]['typedef tagref'] != null ||
 		select_tags[tag] != null) {
 		
 		ret = true;
@@ -3295,7 +3220,7 @@ function showQueryResults(limit) {
 	if (!editInProgress) {
 		offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	}
-	var predUrl = HOME + '/query' +queryBasePath + getQueryPredUrl('');
+	var predUrl = HOME + '/subject' +queryBasePath + getQueryPredUrl('');
 	var queryUrl = getQueryUrl(predUrl, limit, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
 	if (!editBulkInProgress && lastPreviewURL == queryUrl && lastEditTag == tagInEdit && PREVIEW_LIMIT == LAST_PREVIEW_LIMIT) {
 		return;
@@ -3337,7 +3262,7 @@ function postShowQueryResultsPreview(data, textStatus, jqXHR, param) {
 }
 
 function initDropDownList(tag) {
-	var predUrl = HOME + '/query' + queryBasePath + getQueryPredUrl('');
+	var predUrl = HOME + '/subject' + queryBasePath + getQueryPredUrl('');
 	var columnArray = new Array();
 	columnArray.push(tag);
 	queryUrl = getQueryUrl(predUrl, '&range=count', encodeURIArray(columnArray, ''), new Array(), '');
@@ -3996,7 +3921,7 @@ function fillIdContextMenu(ul) {
 	}
 	var id = ul.attr('idVal');
 	var subject = null;
-	var idUrl = HOME + '/query' + queryBasePath + 'id=' + id + '(' + probe_tags + ')';
+	var idUrl = HOME + '/subject' + queryBasePath + 'id=' + id + '(' + probe_tags + ')';
 	var param = {
 		'ul': ul	
 	};
@@ -4069,7 +3994,7 @@ function postFillIdContextMenu(data, textStatus, jqXHR, param) {
 		ul.append(li);
 		var a = $('<a>');
 		li.append(a);
-		a.attr({href: 'javascript:getTagDefinition("'+ encodeSafeURIComponent(results['datapred']) + '","alltags")' });
+		a.attr({href: 'javascript:getTagDefinition("'+ encodeSafeURIComponent(results['datapred']) + '","default")' });
 		a.html('View tags page');
 	}
 	if (ul.children().length == 0) {
@@ -6258,7 +6183,7 @@ function postSubmitLogin(data, textStatus, jqXHR, param) {
 
 function getRoles() {
 	var url = HOME + '/session';
-	tagfiler.GET(url, true, postGetRoles, null, null, 0);
+	tagfiler.GET(url, true, postGetRoles, null, errorGetRoles, 0);
 }
 
 /**
@@ -6326,7 +6251,7 @@ function postGetTopPage(data, textStatus, jqXHR, param) {
 
 function queryPage(uiopts) {
 	renderQueryHTML();
-	initPSOC(HOME, USER, WEBAUTHNHOME, uiopts.path, uiopts.queryopts);
+	initPSOC(uiopts.path, uiopts.queryopts);
 }
 
 function showAuthnInfo(data) {
@@ -7154,10 +7079,6 @@ function removeTagValue(tag, value, row, predicate) {
  */
 function postRemoveTagValue(data, textStatus, jqXHR, param) {
 	param.row.remove();
-	var tag = param.tag;
-	if (tag == '_cfg_enabled GUI features') {
-		setGUIConfig();
-	}
 }
 
 function removeAddTag(tag, value, row, predicate) {
@@ -7294,9 +7215,6 @@ function postAddTagValue(data, textStatus, jqXHR, param) {
 	$('#'+idquote(tag)+'_id').val('');
 	if (!allTags[tag]['tagdef multivalue']) {
 		valueTr.prev().remove();
-	}
-	if (tag == '_cfg_enabled GUI features') {
-		setGUIConfig();
 	}
 }
 
@@ -7548,8 +7466,9 @@ function homePage() {
 	// get the list on homepage files
 	//var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
 	//tagfiler.GET(url, true, postHomePage, null, null, 0);
-	manageAvailableTagDefinitions();
+	//manageAvailableTagDefinitions();
 	//getTagDefinition('id=47', 'defaultView');
+	queryByTags();
 }
 
 /**
@@ -8204,7 +8123,7 @@ function viewAvailableTagDefinitions() {
 }
 
 function viewLink(querypath) {
-	var url = HOME + '/query/';
+	var url = HOME + '/subject/';
 	if (querypath != null) {
 		url += querypath;
 	}
@@ -8213,7 +8132,7 @@ function viewLink(querypath) {
 
 function renderQuery(data, textStatus, jqXHR, param) {
 	renderQueryHTML();
-	initPSOC(HOME, USER, WEBAUTHNHOME, data.basepath, data.querypath);
+	initPSOC('/', QUERY_PATH);
 }
 
 function renderQueryHTML() {
@@ -8609,6 +8528,7 @@ function renderQueryHTML() {
 	select.append(option);
 	option.text('Show any version which matches');
 	option.attr('value', 'any');
+	select.hide();
 
 	div = $('<div>');
 	psoc.append(div);
@@ -8963,7 +8883,7 @@ function createCustomDatasetOriginal() {
 }
 
 function showFileLink(predicate) {
-	var url = HOME + '/query/' + predicate + '(url;tagdef)';
+	var url = HOME + '/subject/' + predicate + '(url;tagdef)';
 	tagfiler.GET(url, true, postShowFileLink, null, null, 0);
 }
 
@@ -8985,11 +8905,11 @@ function postShowFileLink(data, textStatus, jqXHR, param) {
 	if (url == null) {
 		alert('NULL url');
 	} else {
-		var index = url.indexOf('/query/');
+		var index = url.indexOf('/subject/');
 		if (index == -1) {
 			alert('url "' + url + '" is not a query.');
 		} else {
-			index += '/query/'.length;
+			index += '/subject/'.length;
 			viewLink(url.substr(index));
 		}
 	}
@@ -9978,14 +9898,89 @@ function postManageAllUsersAttributes(data, textStatus, jqXHR, param) {
 }
 
 function init() {
-	renderLogin();
+	// necessary for window.location to be initialized
+	setTimeout("initGUI()", 1);
+}
+
+function initGUI() {
+	//renderLogin();
+	QUERY_SEARCH_OPTIONS = null;
+	QUERY_PATH = null;
 	SEARCH_STRING = window.location.search;
 	if (SEARCH_STRING != null && SEARCH_STRING != '' && SEARCH_STRING[0] == '?') {
-		SEARCH_STRING = SEARCH_STRING.substring(1);
+		var index = SEARCH_STRING.indexOf('=') + 1;
+		SEARCH_STRING = decodeURIComponent(SEARCH_STRING.substring(index));
+		QUERY_PATH = [];
+		var query = {};
+		QUERY_PATH.push(query);
+		query['otags'] = [];
+		query['lpreds'] = [];
+		query['spreds'] = [];
+		var r = SEARCH_STRING.split('(');
+		r = r[1].split(')');
+		var tags = r[0].split(';');
+		$.each(tags, function(i, tag) {
+			var obj = {};
+			obj['tag'] = decodeURIComponent(tag);
+			obj['op'] = null;
+			obj['vals'] = [];
+			query['lpreds'].push(obj);
+		});
+		r = SEARCH_STRING.split(')');
+		r = r[1].split('?');
+		if (r[0] != '') {
+			r = r[0].split(',');
+			$.each(r, function(i, item) {
+				var obj = [];
+				var s = item.split(':');
+				obj.push(decodeURIComponent(s[0]));
+				obj.push(':' + s[1] + ':');
+				query['otags'].push(obj);
+			});
+		}
+		r = SEARCH_STRING.split('subject/');
+		r = r[1].split('(');
+		r = r[0].split(';');
+		$.each(r, function(i, item) {
+			query['spreds'].push(getSpred(item));
+		})
+		r = SEARCH_STRING.split('?');
+		QUERY_SEARCH_OPTIONS = r[1];
+	} else {
+		SEARCH_STRING = null;
 	}
 	HOME = '' + window.location;
-	var index = HOME.indexOf('/static');
+	index = HOME.indexOf('/static');
 	HOME = HOME.substring(0, index);
+	WEBAUTHNHOME = HOME;
+	getRoles();
+}
+
+var sortOps = [':!ciregexp:', ':ciregexp:', ':!regexp:', ':regexp:', ':simto:', ':like:', ':geq:', ':gt:', ':leq:', ':lt:', '!=', '=', ':absent:'];
+
+function getSpred(item) {
+	var ret = {};
+	$.each(sortOps, function(i, op) {
+		var r = item.split(op);
+		if (r.length > 1) {
+			ret['tag'] = decodeURIComponent(r[0]);
+			ret['op'] = op;
+			ret['vals'] = [];
+			if (op != ':absent:') {
+				r = r[1].split(',');
+				$.each(r, function(j, val) {
+					ret['vals'].push(decodeURIComponent(val));
+				});
+			}
+			return true;
+		}
+	});
+	if (ret['tag'] == null) {
+		ret['tag'] = decodeURIComponent(item);
+		ret['op'] = '';
+		ret['vals'] = [];
+	}
+	return ret;
 }
 
 function loadDbTypes(select) {
@@ -10523,5 +10518,10 @@ function appendTags(newTags, params) {
 							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, predicate);});
 		}
 	});
+}
+
+function errorGetRoles(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
+	document.body.style.cursor = "default";
+	renderLogin();
 }
 
