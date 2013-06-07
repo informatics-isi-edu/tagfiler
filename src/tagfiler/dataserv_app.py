@@ -3904,7 +3904,8 @@ class Application (DatabaseConnection):
                         m['where'] = ''
                         tables = [ m['table'] ]
                         for i in range(0, len(wheres)):
-                            tables.append( 'JOIN (SELECT subject FROM %s WHERE %s GROUP BY subject) AS %s USING (subject)'
+                            # Kyle Added 'AS t' - not sure if this is correct we could also drop the t from t.value and it would still work
+                            tables.append( 'JOIN (SELECT subject FROM %s AS t WHERE %s GROUP BY subject) AS %s USING (subject)'
                                            % (wraptag(tagdef.tagname), wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
                         m['table'] = ' '.join(tables)
 
