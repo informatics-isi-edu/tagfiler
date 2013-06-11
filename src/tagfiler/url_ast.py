@@ -777,7 +777,7 @@ class FileTags (Node):
             web.ctx.status = '204 No Content'
             return ''
 
-        elif content_type == 'application/x-www-form-urlencoded':
+        elif content_type[0:33] == 'application/x-www-form-urlencoded':
             # handle same entity body format we output in GETtag()
             #  tag=val&tag=val...
             content = web.ctx.env['wsgi.input'].read()
