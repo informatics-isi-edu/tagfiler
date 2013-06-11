@@ -88,8 +88,8 @@ def p_subject1_opts(p):
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=p[10], queryopts=p[11])
 
 def p_subject_opts(p):
-    """subject : slash string slash SUBJECT queryopts"""
-    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], path=[], queryopts=p[5])
+    """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT queryopts"""
+    p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=[], queryopts=p[9])
 
 def p_file(p):
     """file : slash string slash CATALOG slash NUMSTRING slash FILE slash querypath"""
