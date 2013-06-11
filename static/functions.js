@@ -130,7 +130,7 @@ function runSessionRequest() {
 	  ajax_request.abort();
       }
       log("runSessionRequest: starting GET " + expiration_check_url);
-      ajax_request.open("GET", HOME + expiration_check_url);
+      ajax_request.open("GET", WEBAUTHNHOME + expiration_check_url);
       ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
       ajax_request.onreadystatechange = processSessionRequest;
       ajax_request.send(null);
@@ -165,7 +165,7 @@ function runExtendRequest() {
 	if (ajax_request.readystate != 0) {
 	    ajax_request.abort();
 	}
-    ajax_request.open("PUT", HOME + expiration_check_url);
+    ajax_request.open("PUT", WEBAUTHNHOME + expiration_check_url);
 	ajax_request.setRequestHeader("User-agent", "Tagfiler/1.0");
 	ajax_request.onreadystatechange = processSessionRequest;
 	ajax_request.send(null);
@@ -580,6 +580,32 @@ function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, as
  * 	the number of retries already performed
  */
 var tagfiler = {
+		SET: function(url, obj, async, successCallback, param, errorCallback, count) {
+			$.ajax({
+				url: url,
+				headers: {'User-agent': 'Tagfiler/1.0'},
+				type: 'POST',
+				data: obj,
+				accepts: {text: 'application/json'},
+				timeout: AJAX_TIMEOUT,
+				async: async,
+				contentType: 'application/json',
+				dataFilter: function(data, type) {
+					return sanitize(data, type);
+				},
+				success: function(data, textStatus, jqXHR) {
+					document.body.style.cursor = "default";
+					successCallback(data, textStatus, jqXHR, param);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					if (errorCallback == null) {
+						handleError(jqXHR, textStatus, errorThrown, tagfiler.POST, url, obj, async, successCallback, param, errorCallback, count);
+					} else {
+						errorCallback(jqXHR, textStatus, errorThrown, tagfiler.POST, url, obj, async, successCallback, param, errorCallback, count);
+					}
+				}
+			});
+		},
 		POST: function(url, obj, async, successCallback, param, errorCallback, count) {
 			$.ajax({
 				url: url,
@@ -2095,7 +2121,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		var imgPlus = $('<img>');
-		imgPlus.attr({	src: HOME + '/static/plus.png',
+		imgPlus.attr({	src: WEBAUTHNHOME + '/static/plus.png',
 					    width: '16',
 					    height: '16',
 						alt: '+' });
@@ -2110,7 +2136,7 @@ function addNewValue(row, type, selectOperatorId, tag, values) {
 		td.css('padding', '0px 0px 0px 0px');
 		tr.append(td);
 		var img = $('<img>');
-		img.attr({	src: HOME + '/static/minus.png',
+		img.attr({	src: WEBAUTHNHOME + '/static/minus.png',
 				    width: '16',
 				    height: '16',
 					alt: '-' });
@@ -3360,7 +3386,7 @@ function tagTableWrapper(tag) {
 	tdWrapper.attr('valign', 'top');
 	trWrapper.append(tdWrapper);
 	var img = $('<img>');
-	img.attr({	src: HOME + '/static/plus.png',
+	img.attr({	src: WEBAUTHNHOME + '/static/plus.png',
 				width: '16',
 				height: '16',
 				alt: '+' });
@@ -3372,7 +3398,7 @@ function tagTableWrapper(tag) {
 	tdWrapper.attr('valign', 'top');
 	trWrapper.append(tdWrapper);
 	img = $('<img>');
-	img.attr({	src: HOME + '/static/minus.png',
+	img.attr({	src: WEBAUTHNHOME + '/static/minus.png',
 				width: '16',
 				height: '16',
 				alt: '-' });
@@ -3635,7 +3661,7 @@ function addBulkMultiValueRow(table, tag) {
 	}
 	if (allTagdefs[tag]['tagdef multivalue']) {
 		var imgPlus = $('<img>');
-		imgPlus.attr({	src: HOME + '/static/plus.png',
+		imgPlus.attr({	src: WEBAUTHNHOME + '/static/plus.png',
 					    width: '16',
 					    height: '16',
 						alt: '+' });
@@ -3644,7 +3670,7 @@ function addBulkMultiValueRow(table, tag) {
 						function(event) {addBulkMultiValueRow(event.data.table, event.data.tag);});
 		td.append(imgPlus);
 		var img = $('<img>');
-		img.attr({	src: HOME + '/static/minus.png',
+		img.attr({	src: WEBAUTHNHOME + '/static/minus.png',
 				    width: '16',
 				    height: '16',
 					alt: '-' });
@@ -4453,7 +4479,7 @@ function addMultiValueRow(table, tag, value) {
 	td.append(input);
 	input.val(value);
 	var imgPlus = $('<img>');
-	imgPlus.attr({	src: HOME + '/static/plus.png',
+	imgPlus.attr({	src: WEBAUTHNHOME + '/static/plus.png',
 				    width: '16',
 				    height: '16',
 					alt: '+' });
@@ -4462,7 +4488,7 @@ function addMultiValueRow(table, tag, value) {
 					function(event) {addMultiValueRow(event.data.table, event.data.tag, '');});
 	td.append(imgPlus);
 	var img = $('<img>');
-	img.attr({	src: HOME + '/static/minus.png',
+	img.attr({	src: WEBAUTHNHOME + '/static/minus.png',
 			    width: '16',
 			    height: '16',
 				alt: '-' });
@@ -4963,7 +4989,7 @@ function renderLogin() {
 function submitLogin() {
 	var user = $('#username').val();
 	var password = $('#password').val();
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	var obj = new Object();
 	obj['username'] = user;
 	obj['password'] = password;
@@ -4995,7 +5021,7 @@ function postSubmitLogin(data, textStatus, jqXHR, param) {
 }
 
 function getRoles() {
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	tagfiler.GET(url, true, postGetRoles, null, errorGetRoles, 0);
 }
 
@@ -5025,41 +5051,6 @@ function postGetRoles(data, textStatus, jqXHR, param) {
 	});
 	dbtypesDisplay.sort(compareIgnoreCase);
 	homePage();
-}
-
-function getTopPage(uiopts, page) {
-	var url = HOME + '/session';
-	var param = {
-			'page'	: page,
-			'uiopts': uiopts
-		};
-	tagfiler.GET(url, true, postGetTopPage, param, null, 0);
-}
-
-/**
- * initialize the top page
- * 
- * @param data
- * 	the data returned from the server
- * @param textStatus
- * 	the string describing the status
- * @param jqXHR
- * 	the jQuery XMLHttpRequest
- * @param param
- * 	the parameters to be used by the callback success function
- */
-function postGetTopPage(data, textStatus, jqXHR, param) {
-	var page = param.page;
-	var uiopts = param.uiopts;
-	USER_ROLES = data['attributes'];
-	USER = data['client'];
-	showAuthnInfo(data);
-	showTopMenu();
-	if (page == 'query') {
-		queryPage(uiopts);
-	} else if (page == 'tags') {
-		tagsUI(uiopts['queryopts']['url'], null, USER_ROLES);
-	}
 }
 
 function queryPage(uiopts) {
@@ -5136,7 +5127,12 @@ function showAuthnInfo(data) {
 function showTopMenu() {
 	var tr = $('#topmenu');
 	tr.html('');
-	var td = null;
+	var td = $('<td>');
+	tr.append(td);
+	a = $('<a>');
+	td.append(a);
+	a.attr({'href': 'javascript:getCatalogs()'});
+	a.html('Manage catalogs');
 	if (allowManageUsers) {
 		td = $('<td>');
 		tr.append(td);
@@ -5154,23 +5150,29 @@ function showTopMenu() {
 		}
 	}
 	td = $('<td>');
+	td.attr('id', 'queryByTags');
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
 	a.attr({'href': 'javascript:queryByTags()'});
 	a.html('Query by tags');
+	td.hide();
 	td = $('<td>');
+	td.attr('id', 'createCustomDataset');
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
 	a.attr({'href': 'javascript:createCustomDataset()'});
 	a.html('Create catalog entries');
+	td.hide();
 	td = $('<td>');
+	td.attr('id', 'manageAvailableTagDefinitions');
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
 	a.attr({'href': 'javascript:manageAvailableTagDefinitions()'});
 	a.html('Manage tag definitions');
+	td.hide();
 }
 
 function manageTagDefinitions(roles) {
@@ -5867,15 +5869,12 @@ function removeTagValue(tag, value, row, predicate) {
 		predicate = predicate.substr('tags/'.length);
 	}
 	var url = HOME + '/tags/' + predicate;
-	var obj = new Object();
-	obj.action = 'delete';
-	obj['tag'] = tag;
-	obj['value'] = unsanitize(value);
+	url += '(' + encodeSafeURIComponent(tag) + '=' + encodeSafeURIComponent(value) + ')';
 	var param = {
 		'row': row,
 		'tag': tag
 	};
-	tagfiler.POST(url, obj, true, postRemoveTagValue, param, null, 0);
+	tagfiler.DELETE(url, true, postRemoveTagValue, param, null, 0);
 }
 
 /**
@@ -5911,7 +5910,6 @@ function removeAddTag(tag, value, row, predicate) {
 	} else {
 		var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
 		url += '(' + encodeSafeURIComponent(tag) + '=true)';
-		alert(url);
 		tagfiler.PUT(url, obj, true, postRemoveAddTag, param, null, 0);
 	}
 }
@@ -5962,17 +5960,14 @@ function postRemoveAddTag(data, textStatus, jqXHR, param) {
 
 function addTagValue(tag, row, allTags, predicate) {
 	var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
-	var obj = new Object();
-	obj.action = 'put';
-	obj['set-'+tag] = true;
-	obj['val-'+tag] = htmlEscape($('#'+idquote(tag)+'_id').val());
+	var obj = encodeSafeURIComponent(tag) + '=' + encodeSafeURIComponent(htmlEscape($('#'+idquote(tag)+'_id').val()));
 	var param = {
 			'tag': tag,
 			'allTags': allTags,
 			'row': row,
 			'predicate': predicate
 		};
-	tagfiler.POST(url, obj, true, postAddTagValue, param, null, 0);
+	tagfiler.PUT(url, obj, true, postAddTagValue, param, null, 0);
 }
 
 /**
@@ -6032,7 +6027,7 @@ function postAddTagValue(data, textStatus, jqXHR, param) {
 }
 
 function userInfo() {
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	tagfiler.GET(url, true, postUserInfo, null, null, 0);
 }
 
@@ -6081,7 +6076,7 @@ function postUserInfo(data, textStatus, jqXHR, param) {
 }
 
 function userLogout() {
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	tagfiler.DELETE(url, true, postUserLogout, null, null, 0);
 }
 
@@ -6100,7 +6095,7 @@ function userLogout() {
 function postUserLogout(data, textStatus, jqXHR, param) {
 	$('#topmenu').html('');
 	$('#authninfo').html('');
-	window.location = HOME + '/static';
+	window.location = WEBAUTHNHOME + '/static';
 }
 
 function userChangePassword() {
@@ -6209,7 +6204,7 @@ function changePassword() {
 		alert('The confirm new password is invalid.');
 		return;
 	}
-	var url = HOME + '/password';
+	var url = WEBAUTHNHOME + '/password';
 	var obj = {'old_password': oldpassword,
 			'password': newpassword1
 	};
@@ -6276,12 +6271,7 @@ function postChangePassword(data, textStatus, jqXHR, param) {
 }
 
 function homePage() {
-	// get the list on homepage files
-	//var url = HOME + '/query/' + encodeSafeURIComponent('list on homepage') + '(name;onclick)name:asc:';
-	//tagfiler.GET(url, true, postHomePage, null, null, 0);
-	//manageAvailableTagDefinitions();
-	//getTagDefinition('id=47', 'defaultView');
-	queryByTags();
+	getCatalogs();
 }
 
 /**
@@ -6312,12 +6302,12 @@ function postHomePage(data, textStatus, jqXHR, param) {
 }
 
 function manageAttributes(data, textStatus, jqXHR, param) {
-	var url = HOME + '/attribute';
+	var url = WEBAUTHNHOME + '/attribute';
 	tagfiler.GET(url, true, postManageAttributes, null, null, 0);
 }
 
 function manageUsers(data, textStatus, jqXHR, param) {
-	var url = HOME + '/user';
+	var url = WEBAUTHNHOME + '/user';
 	tagfiler.GET(url, true, postManageUsers, null, null, 0);
 }
 
@@ -6504,23 +6494,23 @@ function postManageAttributes(data, textStatus, jqXHR, param) {
 }
 
 function manageAllRoles() {
-	var url = HOME + '/user';
+	var url = WEBAUTHNHOME + '/user';
 	tagfiler.GET(url, true, manageAllUsersAttributes, null, null, 0);
 }
 
 function deleteUser(user) {
-	var url = HOME + '/user/' + encodeSafeURIComponent(user);
+	var url = WEBAUTHNHOME + '/user/' + encodeSafeURIComponent(user);
 	tagfiler.DELETE(url, true, manageUsers, null, null, 0);
 }
 
 function deleteGlobalAttribute(attribute) {
-	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
+	var url = WEBAUTHNHOME + '/attribute/' + encodeSafeURIComponent(attribute);
 	tagfiler.DELETE(url, true, manageAttributes, null, null, 0);
 }
 
 function manageMembership(allAttributes, user) {
 	// get user attributes
-	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute';
+	var url = WEBAUTHNHOME + '/user/' + encodeSafeURIComponent(user) + '/attribute';
 	var param = {
 		'allAttributes': allAttributes,
 		'user': user
@@ -6621,7 +6611,7 @@ function postManageUserAttributes(data, textStatus, jqXHR, param) {
 
 function assignAttribute(user) {
 	var attribute = $('#attribute_' + idquote(user)).val();
-	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
+	var url = WEBAUTHNHOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
 	var param = {
 		'attribute': attribute,
 		'user': user
@@ -6707,7 +6697,7 @@ function postAssignAttribute(data, textStatus, jqXHR, param) {
 }
 
 function removeUserAttribute(user, attribute) {
-	var url = HOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
+	var url = WEBAUTHNHOME + '/user/' + encodeSafeURIComponent(user) + '/attribute/' + encodeSafeURIComponent(attribute);
 	var param = {
 		'user': user,
 		'attribute': attribute
@@ -6804,7 +6794,7 @@ function postRemoveUserAttribute(data, textStatus, jqXHR, param) {
 }
 
 function resetPassword(user) {
-	var url = HOME + '/password/' + encodeSafeURIComponent(user);
+	var url = WEBAUTHNHOME + '/password/' + encodeSafeURIComponent(user);
 	var param = {
 		'user': user	
 	};
@@ -6838,7 +6828,7 @@ function postResetPassword(data, textStatus, jqXHR, param) {
 }
 
 function disableLogin(user) {
-	var url = HOME + '/password/' + encodeSafeURIComponent(user);
+	var url = WEBAUTHNHOME + '/password/' + encodeSafeURIComponent(user);
 	var param = {
 		'user': user	
 	};
@@ -6913,7 +6903,7 @@ function createUser() {
 		alert('Please provide a name for the new user.');
 		return;
 	}
-	var url = HOME + '/user/' + encodeSafeURIComponent(role);
+	var url = WEBAUTHNHOME + '/user/' + encodeSafeURIComponent(role);
 	tagfiler.PUT(url, {}, true, manageUsers, null, null, 0);
 }
 
@@ -6923,7 +6913,7 @@ function buildAttribute() {
 		alert('Please provide a name for the new attribute.');
 		return;
 	}
-	var url = HOME + '/attribute/' + encodeSafeURIComponent(attribute);
+	var url = WEBAUTHNHOME + '/attribute/' + encodeSafeURIComponent(attribute);
 	tagfiler.PUT(url, {}, true, manageAttributes, null, null, 0);
 }
 
@@ -7073,7 +7063,7 @@ function renderQueryHTML() {
 	var img = $('<img>');
 	td.append(img);
 	img.attr({'id': 'pagePrevious',
-		'src': HOME + '/static/back.jpg',
+		'src': WEBAUTHNHOME + '/static/back.jpg',
 		'alt': 'Previous',
 		'onclick': 'setPreviousPage();'});
 	img.addClass('margin');
@@ -7083,7 +7073,7 @@ function renderQueryHTML() {
 	var img = $('<img>');
 	td.append(img);
 	img.attr({'id': 'pageNext',
-		'src': HOME + '/static/forward.jpg',
+		'src': WEBAUTHNHOME + '/static/forward.jpg',
 		'alt': 'Previous',
 		'onclick': 'setNextPage();'});
 	img.addClass('margin');
@@ -7374,7 +7364,7 @@ function renderQueryHTML() {
 function manageAvailableTagDefinitions() {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	tagfiler.GET(url, true, postManageAvailableTagDefinitions, null, null, 0);
 }
 
@@ -7729,7 +7719,7 @@ function postShowFileLink(data, textStatus, jqXHR, param) {
 }
 
 function getTagDefinition(predicate, view) {
-	var url = HOME + '/session';
+	var url = WEBAUTHNHOME + '/session';
 	var param = {
 		'predicate': predicate,
 		'view': view
@@ -7853,7 +7843,7 @@ function manageUserRoles(user) {
 
 function manageAllUsersAttributes(data, textStatus, jqXHR, param) {
 	// get all the available attributes
-	var url = HOME + '/attribute';
+	var url = WEBAUTHNHOME + '/attribute';
 	users = data;
 	var param = {
 		'users': users	
@@ -8524,3 +8514,309 @@ function errorGetRoles(jqXHR, textStatus, errorThrown, retryCallback, url, obj, 
 	renderLogin();
 }
 
+function getCatalogs() {
+	var url = WEBAUTHNHOME + '/catalog'
+	document.body.style.cursor = "wait";
+	tagfiler.GET(url, true, postManageCatalogs, null, null, 0);
+	
+}
+
+function postManageCatalogs(data, textStatus, jqXHR, param) {
+	document.body.style.cursor = "default";
+	var uiDiv = $('#ui');
+	uiDiv.html('');
+	var h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Catalog Management');
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Create a Catalog');
+	buildCatalogFields(uiDiv);
+	uiDiv.append('<br/>');
+	input = $('<input>');
+	input.attr({'type': 'button',
+		'value': 'Create catalog',
+		'id': 'createCatalog',
+		'onclick': 'createCatalog();'
+	});
+	uiDiv.append(input);
+	uiDiv.append('<br/><br/><br/><br/>');
+	h2 = $('<h2>');
+	uiDiv.append(h2);
+	h2.html('Existing Catalogs');
+	var table = $('<table>');
+	uiDiv.append(table);
+	table.addClass('role-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	var th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Name&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Description&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Owner&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Admin users&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Read users&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Write users&nbsp;&nbsp;');
+	th = $('<th>');
+	tr.append(th);
+	th.html('&nbsp;&nbsp;Id&nbsp;&nbsp;');
+	$.each(data, function(i,catalog) {
+		tr = $('<tr>');
+		tr.addClass('role');
+		table.append(tr);
+		td = $('<td>');
+		tr.append(td);
+		var input = $('<input>');
+		input.attr({
+			'type': 'radio',
+			'name': 'catalog',
+			'value': catalog['id']
+		});
+		input.click(function(event) {enableCatalogButtons();})
+		td.append(input);
+		td = $('<td>');
+		tr.append(td);
+		td.html(catalog['name']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(catalog['description']);
+		td = $('<td>');
+		tr.append(td);
+		td.html(catalog['owner']);
+		td = $('<td>');
+		tr.append(td);
+		var userTable = $('<table>');
+		td.append(userTable);
+		$.each(catalog['admin_users'], function(j, user) {
+			var trUser = $('<tr>');
+			userTable.append(trUser);
+			var tdUser = $('<td>');
+			tdUser.css('border-width', '0px 0px 0px 0px');
+			trUser.append(tdUser);
+			tdUser.html(user);
+		});
+		td = $('<td>');
+		tr.append(td);
+		var userTable = $('<table>');
+		td.append(userTable);
+		$.each(catalog['read_users'], function(j, user) {
+			var trUser = $('<tr>');
+			userTable.append(trUser);
+			var tdUser = $('<td>');
+			tdUser.css('border-width', '0px 0px 0px 0px');
+			trUser.append(tdUser);
+			tdUser.html(user);
+		});
+		td = $('<td>');
+		tr.append(td);
+		var userTable = $('<table>');
+		td.append(userTable);
+		$.each(catalog['write_users'], function(j, user) {
+			var trUser = $('<tr>');
+			userTable.append(trUser);
+			var tdUser = $('<td>');
+			tdUser.css('border-width', '0px 0px 0px 0px');
+			trUser.append(tdUser);
+			tdUser.html(user);
+		});
+		td = $('<td>');
+		tr.append(td);
+		td.html(catalog['id']);
+	});
+	uiDiv.append('<br/><br/>');
+	var button = $('<button>');
+	button.attr({
+		'name': 'selectCatalogButton',
+		'id': 'selectCatalogButton',
+		'disabled': 'disabled'
+	});
+	button.click(function(event) {selectCatalog();});
+	button.html('Open catalog');
+	uiDiv.append(button);
+	button = $('<button>');
+	button.attr({
+		'name': 'deleteCatalogButton',
+		'id': 'deleteCatalogButton',
+		'disabled': 'disabled'
+	});
+	button.click(function(event) {deleteCatalog();});
+	button.html('Delete catalog');
+	uiDiv.append(button);
+	$('#createCatalog').css('cursor', 'default');
+	$('#deleteCatalogButton').css('cursor', 'default');
+}
+
+function enableCatalogButtons() {
+	$('#deleteCatalogButton').removeAttr('disabled');
+	$('#selectCatalogButton').removeAttr('disabled');
+}
+
+function selectCatalog() {
+	HOME = WEBAUTHNHOME + '/catalog/' + $('input:radio[name=catalog]:checked').val();
+	$('#queryByTags').show();
+	$('#createCustomDataset').show();
+	$('#manageAvailableTagDefinitions').show();
+	queryByTags();
+}
+
+function deleteCatalog() {
+	var url = WEBAUTHNHOME + '/catalog/' + $('input:radio[name=catalog]:checked').val();
+	document.body.style.cursor = "wait";
+	$('#deleteCatalogButton').css('cursor', 'wait');
+	tagfiler.DELETE(url, true, getCatalogs, null, null, 0);
+}
+
+var catalogFields = ['name', 'description', 'admin_users', 'read_users', 'write_users'];
+var catalogMultivalueFields = ['admin_users', 'read_users', 'write_users'];
+
+function buildCatalogFields(uiDiv) {
+	var div = $('<div>');
+	uiDiv.append(div);
+	div.addClass('content');
+	var table = $('<table>');
+	table.attr('id', 'catalog_fields_table');
+	div.append(table);
+	table.addClass('file-list');
+	var tr = $('<tr>');
+	table.append(tr);
+	tr.addClass('file-heading');
+	var th = $('<th>');
+	tr.append(th);
+	th.addClass('tag-name');
+	th.html('Field');
+	th = $('<th>');
+	tr.append(th);
+	th.addClass('file-name');
+	th.html('Value(s)');
+	var baseIndex = 0;
+
+	$.each(catalogFields, function(i, tag) {
+		tr = $('<tr>');
+		table.append(tr);
+		tr.addClass('file');
+		tr.addClass(((baseIndex+i+1)%2) == 1 ? 'odd' : 'even');
+		var td = $('<td>');
+		tr.append(td);
+		td.addClass('name');
+		td.html(tag);
+		td = $('<td>');
+		tr.append(td);
+		td.addClass('file-tag');
+		var valuesTable = null;
+		valuesTable = $('<table>');
+		valuesTable.attr('id', idquote(tag)+'_values')
+		td.append(valuesTable);
+		valuesTable.addClass('file-tag-list');
+		var valueTr = $('<tr>');
+		valuesTable.append(valueTr);
+		var valueTd = $('<td>');
+		valueTr.append(valueTd);
+		valueTd.addClass('file-tag');
+		valueTd.addClass('multivalue');
+		valueTd.addClass('input');
+		var input = $('<input>');
+		input.attr({'type': 'text',
+			'name': 'val_' + tag,
+			'id': idquote(tag)+'_id',
+			'typestr': 'text'
+		});
+		valueTd.append(input);
+		var valueTd = $('<td>');
+		valueTr.append(valueTd);
+		valueTd.addClass('file-tag');
+		valueTd.addClass(tag);
+		valueTd.addClass('multivalue');
+		valueTd.addClass('set');
+		var input = $('<input>');
+		input.attr({'type': 'button',
+			'name': 'tag'
+		});
+		input.val('Set Value');
+		valueTd.append(input);
+		input.click({	'tag': tag},
+						function(event) {addCatalogFieldValue(event.data.tag, $(this).parent().parent());});
+	});
+}
+
+/**
+ * initialize the add catalog field value
+ * 
+ */
+function addCatalogFieldValue(tag, row) {
+	var value = $('#'+idquote(tag)+'_id').val();
+	if (value.replace(/^\s*/, "").replace(/\s*$/, "").length == 0) {
+		// ignore empty strings
+		return;
+	}
+	var valueTr = $('<tr>');
+	valueTr.insertBefore(row);
+	var valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.html(value);
+	valueTd = $('<td>');
+	valueTr.append(valueTd);
+	valueTd.addClass('file-tag');
+	valueTd.addClass(tag);
+	valueTd.addClass('multivalue');
+	valueTd.addClass('delete');
+	var input = $('<input>');
+	input.attr({'type': 'button',
+		'name': 'tag',
+		'value': value
+	});
+	input.val('Remove Value');
+	valueTd.append(input);
+	input.click({	'tag': tag,
+					'value': value},
+					function(event) {removeCatalogFieldValue(event.data.tag, event.data.value, $(this).parent().parent());});
+	$('#'+idquote(tag)+'_id').val('');
+	if (!catalogMultivalueFields.contains(tag)) {
+		valueTr.prev().remove();
+	}
+}
+
+function removeCatalogFieldValue(tag, value, row) {
+	row.remove();
+}
+
+function createCatalog() {
+	var obj = getCatalogJSON();
+	var url = WEBAUTHNHOME + '/catalog';
+	document.body.style.cursor = "wait";
+	$('#createCatalog').css('cursor', 'wait');
+	tagfiler.SET(url, obj, true, getCatalogs, null, null, 0);
+}
+
+function getCatalogJSON() {
+	var obj = {};
+	$.each(catalogFields, function(i, tag) {
+		var table = $('#' + idquote(tag)+'_values');
+		var tbody = getChild(table, 1);
+		var values = [];
+		for (var j=0; j < tbody.children().length - 1; j++) {
+			var tr = getChild(tbody, j+1);
+			var td = getChild(tr, 1);
+			values.push(td.html());
+		}
+		if (values.length > 0) {
+			obj[tag] = (catalogMultivalueFields.contains(tag) ? values : values[0]);
+		}
+	});
+	return valueToString(obj);
+}
