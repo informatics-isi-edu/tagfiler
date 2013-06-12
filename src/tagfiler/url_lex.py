@@ -22,6 +22,7 @@
 
 import urllib
 import ply.lex as lex
+from dataserv_app import RuntimeError
 
 # except '%' which we do not want to recognize
 # adding STRING which is everything else
@@ -71,7 +72,7 @@ def urlunquote(url):
     elif type(text) == unicode:
         pass
     else:
-        raise RuntimeError('unexpected decode type %s in urllex.urlunquote()' % type(text))
+        raise RuntimeError(None, 'unexpected decode type %s in urllex.urlunquote()' % type(text))
     return text
 
 def t_ESCAPESTRING(t):

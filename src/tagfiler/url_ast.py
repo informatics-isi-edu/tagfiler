@@ -20,7 +20,7 @@ import sys
 import web
 import re
 import os
-from dataserv_app import CatalogManager, Application, NotFound, BadRequest, Conflict, Forbidden, urlquote, urlunquote, idquote, jsonWriter, jsonReader, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes, wrapval
+from dataserv_app import CatalogManager, Application, NotFound, BadRequest, Conflict, Forbidden, RuntimeError, urlquote, urlunquote, idquote, jsonWriter, jsonReader, parseBoolString, predlist_linearize, path_linearize, downcast_value, jsonFileReader, jsonArrayFileReader, JSONArrayError, make_temporary_file, yieldBytes, wrapval
 from rest_fileio import FileIO
 import subjects
 from subjects import Node
@@ -294,7 +294,7 @@ class Catalog (CNode):
             et, ev, tb = sys.exc_info()
             web.debug('got exception "%s" calling createdb subprocess' % str(ev),
                       traceback.format_exception(et, ev, tb))
-            raise RuntimeError('createdb failed')
+            raise RuntimeError(self, 'createdb failed')
 
 
     def _create_catalog(self, catalog):
