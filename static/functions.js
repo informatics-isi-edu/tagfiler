@@ -1380,7 +1380,7 @@ function updatePreviewURL(force) {
 	var predUrl = HOME + '/subject' + queryBasePath + getQueryPredUrl('');
 	var offset = '&offset=' + PAGE_PREVIEW * PREVIEW_LIMIT;
 	var queryUrl = getQueryUrl(predUrl, '&limit=' + PREVIEW_LIMIT, encodeURIArray(resultColumns, ''), encodeURISortArray(), offset);
-	$('#Query_URL').attr('href', HOME + '/static?query=' + encodeURIComponent(queryUrl));
+	$('#Query_URL').attr('href', WEBAUTHNHOME + '/static?query=' + encodeURIComponent(queryUrl));
 	if (force) {
 		lastPreviewURL = queryUrl;
 	}
@@ -5154,7 +5154,7 @@ function showTopMenu() {
 	tr.append(td);
 	a = $('<a>');
 	td.append(a);
-	a.attr({'href': 'javascript:queryByTags()'});
+	a.attr({'href': 'javascript:loadQueryByTags()'});
 	a.html('Query by tags');
 	td.hide();
 	td = $('<td>');
@@ -5173,6 +5173,11 @@ function showTopMenu() {
 	a.attr({'href': 'javascript:manageAvailableTagDefinitions()'});
 	a.html('Manage tag definitions');
 	td.hide();
+}
+
+function loadQueryByTags() {
+	QUERY_PATH = null;
+	queryByTags();
 }
 
 function manageTagDefinitions(roles) {
@@ -5894,9 +5899,6 @@ function postRemoveTagValue(data, textStatus, jqXHR, param) {
 }
 
 function removeAddTag(tag, value, row, predicate) {
-	var obj = new Object();
-	obj.action = value ? 'delete' : 'put';
-	obj['tag'] = tag;
 	var param = {
 		'tag': tag,
 		'value': value,
@@ -5908,8 +5910,8 @@ function removeAddTag(tag, value, row, predicate) {
 		url += '(' + encodeSafeURIComponent(tag) + ')';
 		tagfiler.DELETE(url, true, postRemoveAddTag, param, null, 0);
 	} else {
+		var obj = encodeSafeURIComponent(tag) + '=true';
 		var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
-		url += '(' + encodeSafeURIComponent(tag) + '=true)';
 		tagfiler.PUT(url, obj, true, postRemoveAddTag, param, null, 0);
 	}
 }
@@ -6271,34 +6273,14 @@ function postChangePassword(data, textStatus, jqXHR, param) {
 }
 
 function homePage() {
-	getCatalogs();
-}
-
-/**
- * initialize the home page
- * 
- * @param data
- * 	the data returned from the server
- * @param textStatus
- * 	the string describing the status
- * @param jqXHR
- * 	the jQuery XMLHttpRequest
- * @param param
- * 	the parameters to be used by the callback success function
- */
-function postHomePage(data, textStatus, jqXHR, param) {
-	var uiDiv = $('#ui');
-	uiDiv.html('');
-	var ol = $('<ol>');
-	uiDiv.append(ol);
-	$.each(data, function(i, entry) {
-		var li = $('<li>');
-		ol.append(li);
-		a = $('<a>');
-		li.append(a);
-		a.attr({'href': entry.onclick});
-		a.html(entry.name);
-	});
+	if (QUERY_PATH == null) {
+		getCatalogs();
+	} else {
+		$('#queryByTags').show();
+		$('#createCustomDataset').show();
+		$('#manageAvailableTagDefinitions').show();
+		queryByTags();
+	}
 }
 
 function manageAttributes(data, textStatus, jqXHR, param) {
@@ -7942,6 +7924,11 @@ function initGUI() {
 	index = HOME.indexOf('/static');
 	HOME = HOME.substring(0, index);
 	WEBAUTHNHOME = HOME;
+	if (SEARCH_STRING != null) {
+		// we have already a catalog
+		index = SEARCH_STRING.indexOf('/subject/');
+		HOME = SEARCH_STRING.substring(0, index);
+	}
 	getRoles();
 }
 
