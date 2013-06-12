@@ -137,6 +137,10 @@ class Dispatcher:
                     detail = dataserv_app.myutf8(e.detail)
                     web.header('X-Error-Description', detail)
                 raise e
+            except Exception, e:
+                et, ev, tb = sys.exc_info()
+                web.debug('got exception "%s"' % str(ev), traceback.format_exception(et, ev, tb))
+                raise dataserv_app.RuntimeError(None, str(e))
 
         finally:
             # log after we force iterator, to flush any deferred transaction log messages
