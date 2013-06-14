@@ -245,3 +245,13 @@ td.rangeConstraint, fieldset.rangeConstraint {
 img.margin {
 	margin: 0px 5px -5px 5px;
 }
+
+#ajaxSpinnerContainer {
+	height:11px;
+	margin: 25px;
+}
+
+#ajaxSpinnerImage {
+	display:none;
+}
+

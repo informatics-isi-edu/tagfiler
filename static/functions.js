@@ -289,8 +289,10 @@ function checkInput(id, message) {
 	}
 }
 
-var datasetStatusPrefix = '<table align="center" ><tr><td><b style="color:green">';
-var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
+var datasetStatusPrefix = '<table><tr><td><b style="color:green">';
+var datasetSuffixHeader = '. Please wait...</b></td><td><div id="ajaxSpinnerContainer"><img src="';
+var datasetSuffixFooter = '/static/ajax-loader.gif" id="ajaxSpinnerImage" title="Processing..." alt="Spinner" /></div></td></tr></table>';
+var datasetStatusSuffix = null;
 
 /**
  * Make html transformations for the NameForm based on the dataset type
@@ -572,6 +574,7 @@ function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, as
 }
 
 function uploadError(jqXHR, textStatus, errorThrown, url) {
+	$('#uploadStatus').html('');
 	var msg = '';
 	var err = jqXHR.status;
 	if (err != null) {
@@ -7419,11 +7422,14 @@ function showRequest(formData, jqForm, options) {
 		options.error = function(jqXHR, textStatus, errorThrown) {
 			uploadError(jqXHR, textStatus, errorThrown, url);
 		};
+		$('#uploadStatus').html(datasetStatusPrefix + 'Uploading file "' + $('#fileName').val() + '"' + datasetStatusSuffix);
+		$('#ajaxSpinnerImage').show();
 	}
 	return ret;
 }
 
 function showResponse(responseText, statusText, xhr, $form)  {
+	$('#uploadStatus').html('');
 	var index = responseText.lastIndexOf('/') + 1;
 	var predicate = responseText.substring(index);
 	index = predicate.indexOf('\n');
@@ -7584,9 +7590,9 @@ function createCustomDataset() {
 		'value': 'Submit'
 	});
 	form.append(input);
-	//div = $('<div>');
-	//uiDiv.append(div);
-	//div.attr({'id': 'Copy'});
+	var statusDiv = $('<div>');
+	statusDiv.attr('id', 'uploadStatus');
+	div.append(statusDiv);
 }
 
 function createSubject() {
@@ -8010,6 +8016,7 @@ function initGUI() {
 	index = HOME.indexOf('/static');
 	HOME = HOME.substring(0, index);
 	WEBAUTHNHOME = HOME;
+	datasetStatusSuffix = datasetSuffixHeader + WEBAUTHNHOME + datasetSuffixFooter;
 	if (SEARCH_STRING != null) {
 		// we have already a catalog
 		index = SEARCH_STRING.indexOf('/subject/');

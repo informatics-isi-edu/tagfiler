@@ -60,6 +60,7 @@ SCRIPTFILEBASES=logo.png \
 				control_stop.png \
 				minus.png \
 				plus.png \
+				ajax-loader.gif \
 				back.jpg \
 				forward.jpg \
 				back_disabled.jpg \
