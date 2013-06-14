@@ -121,6 +121,7 @@ class Subject (Node):
         self.referer = None
         self.update = False
         self.subject = None
+        self.name = None
         self.mergeSubjpredsTags = False
         self.path = path
         if len(self.path) == 0:
@@ -370,6 +371,7 @@ class Subject (Node):
 
         newfile = web.Storage()
         newfile.bytes = self.bytes
+        newfile.name = self.name
         newfile.dtype = self.dtype
         newfile.file = self.file
         # don't blindly trust DB data from earlier transactions... do a fresh lookup
@@ -443,6 +445,9 @@ class Subject (Node):
         if newfile.dtype == 'file':
             if newfile.bytes != None and (not basefile or newfile.bytes != basefile.bytes or basefile.id != newfile.id):
                 self.set_tag(newfile, self.tagdefsdict['bytes'], newfile.bytes)
+                
+            if newfile.name != None and (not basefile or newfile.name != basefile.name or basefile.id != newfile.id):
+                self.set_tag(newfile, self.tagdefsdict['name'], newfile.name)
                 
             if newfile['content-type'] and (not basefile or basefile['content-type'] != newfile['content-type'] or basefile.id != newfile.id):
                 self.set_tag(newfile, self.tagdefsdict['content-type'], newfile['content-type'])

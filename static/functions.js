@@ -296,7 +296,15 @@ var datasetStatusSuffix = '. Please wait...</b></td></tr></table>';
  * Make html transformations for the NameForm based on the dataset type
  */
 function changeNameFormType(op, suffix) {
-	document.getElementById('fileName'+suffix).style.display = (document.getElementById('type'+suffix).value == 'file' ? 'inline' : 'none');
+	if (document.getElementById('type'+suffix).value == 'file') {
+		document.getElementById('fileName'+suffix).style.display = 'inline';
+		$('#uploadFile').show();
+		$('#submitSubject').hide();
+	} else {
+		document.getElementById('fileName'+suffix).style.display = 'none';
+		$('#uploadFile').hide();
+		$('#submitSubject').show();
+	}
 	if (op == 'create') {
 		if (document.getElementById('type'+suffix).value == 'blank') {
 			document.getElementById('namedDataset'+suffix).style.display = 'none';
@@ -561,6 +569,31 @@ function handleError(jqXHR, textStatus, errorThrown, retryCallback, url, obj, as
 		var delay = Math.round(Math.ceil((0.75 + Math.random() * 0.5) * Math.pow(10, count) * 0.00001));
 		setTimeout(function(){retryCallback(url, obj, async, successCallback, param, errorCallback, count+1);}, delay);
 	}
+}
+
+function uploadError(jqXHR, textStatus, errorThrown, url) {
+	var msg = '';
+	var err = jqXHR.status;
+	if (err != null) {
+		msg += 'Status: ' + err + '\n';
+	}
+	err = jqXHR.responseText;
+	if (err != null) {
+		msg += 'ResponseText: ' + err + '\n';
+	}
+	err = jqXHR.getResponseHeader('X-Error-Description');
+	if (err != null) {
+		msg += 'X-Error-Description: ' + decodeURIComponent(err) + '\n';
+	}
+	if (textStatus != null) {
+		msg += 'TextStatus: ' + textStatus + '\n';
+	}
+	if (errorThrown != null) {
+		msg += 'ErrorThrown: ' + errorThrown + '\n';
+	}
+	msg += 'URL: ' + url + '\n';
+	alert(msg);
+	document.body.style.cursor = "default";
 }
 
 /**
@@ -6279,6 +6312,7 @@ function homePage() {
 		$('#queryByTags').show();
 		$('#createCustomDataset').show();
 		$('#manageAvailableTagDefinitions').show();
+		$('#ui').html('');
 		queryByTags();
 	}
 }
@@ -7368,22 +7402,57 @@ function postManageAvailableTagDefinitions(data, textStatus, jqXHR, param) {
 	manageTagDefinitions(data['attributes']);
 }
 
+function showRequest(formData, jqForm, options) {
+	var ret = validateNameForm('create', '');
+	if (ret) {
+		var url = HOME + '/file/';
+		url += '?name=' + encodeSafeURIComponent($('#datasetName').val().replace(/^\s*/, "").replace(/\s*$/, ""));
+		url += '&' + encodeSafeURIComponent('read users') + '=' + encodeSafeURIComponent($('#read_users').val());
+		url += '&' + encodeSafeURIComponent('write users') + '=' + encodeSafeURIComponent($('#write_users').val());
+		if ($('#defaultView').val() != '') {
+			url += '&' + encodeSafeURIComponent('default view') + '=' + encodeSafeURIComponent($('#defaultView').val());
+		}
+		if ($('#incomplete').attr('checked') == 'checked') {
+			url += '&incomplete';
+		}
+		options.url = url;
+		options.error = function(jqXHR, textStatus, errorThrown) {
+			uploadError(jqXHR, textStatus, errorThrown, url);
+		};
+	}
+	return ret;
+}
+
+function showResponse(responseText, statusText, xhr, $form)  {
+	var index = responseText.lastIndexOf('/') + 1;
+	var predicate = responseText.substring(index);
+	index = predicate.indexOf('\n');
+	if (index > 0) {
+		predicate = predicate.substring(0, index);
+	}
+	getTagDefinition(predicate, $('#defaultView').val());
+}
+
 function createCustomDataset() {
 	var uiDiv = $('#ui');
 	uiDiv.html('');
-	/*
+	var options = {
+		beforeSubmit: showRequest,
+		dataType: 'text',
+		success: showResponse,
+		error: function(jqXHR, textStatus, errorThrown) {
+			uploadError(jqXHR, textStatus, errorThrown, null);
+		}
+	};
 	var form = $('<form>');
-	uiDiv.append(form);
-	alert(HOME);
 	form.attr({'id': 'NameForm',
 		'name': 'NameForm',
-		'enctype': 'application/x-www-form-urlencoded',
-		'action': HOME + '/file',
-		'method': 'post',
-		'onsubmit': "return validateNameForm('create', '')"
+		'enctype': 'multipart/form-data',
+		'action': HOME + '/file/',
+		'method': 'post'
 	});
-	*/
-	div = $('<div>');
+	form.ajaxForm(options);
+	var div = $('<div>');
 	uiDiv.append(div);
 	div.attr({'id': 'NameForm_div'});
 	var h3 = $('<h3>');
@@ -7420,13 +7489,6 @@ function createCustomDataset() {
 	option.text('file (Named dataset for locally stored file)');
 	option.attr({'value': 'file',
 		'selected': 'selected'});
-	input = $('<input>');
-	input.attr({'name': 'myfile',
-		'type': 'file',
-		'id': 'fileName'
-	});
-	input.css({'display': 'inline'});
-	div.append(input);
 	div.append($('<br>'));
 	label = $('<label>');
 	div.append(label);
@@ -7490,13 +7552,38 @@ function createCustomDataset() {
 	label = $('<label>');
 	div.append(label);
 	label.html('Incomplete');
+	div.append($('<br>'));
 	input = $('<input>');
 	input.attr({'type': 'button',
-		'id': 'submit',
+		'id': 'submitSubject',
 		'value': 'Submit',
 		'onclick': 'createSubject()'
 	});
-	uiDiv.append(input);
+	div.append(input);
+	input.hide();
+	div = $('<div>');
+	uiDiv.append(div);
+	div.attr('id', 'uploadFile');
+	div.append($('<br>'));
+	label = $('<label>');
+	div.append(label);
+	label.html('Select a file to upload:');
+	div.append(label);
+	div.append(form);
+	input = $('<input>');
+	input.attr({'name': 'myfile',
+		'type': 'file',
+		'id': 'fileName'
+	});
+	input.css({'display': 'inline'});
+	form.append(input);
+	form.append($('<br>'));
+	input = $('<input>');
+	input.attr({'type': 'submit',
+		'id': 'uploadFileName',
+		'value': 'Submit'
+	});
+	form.append(input);
 	//div = $('<div>');
 	//uiDiv.append(div);
 	//div.attr({'id': 'Copy'});
@@ -7520,7 +7607,6 @@ function createSubject() {
 }
 
 function postCreateSubject(data, textStatus, jqXHR, param) {
-	//alert(data);
 	var index = data.lastIndexOf('/') + 1;
 	var predicate = data.substring(index);
 	index = predicate.indexOf('\n');

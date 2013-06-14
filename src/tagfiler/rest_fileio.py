@@ -109,8 +109,8 @@ class FileIO (Subject):
     """
     __slots__ = [ 'formHeaders', 'action', 'filetype', 'bytes', 'client_content_type', 'referer' ]
 
-    def __init__(self, parser=None, appname=None, path=None, queryopts=None):
-        Subject.__init__(self, parser, appname, path, queryopts)
+    def __init__(self, parser=None, appname=None, catalog_id=None, path=None, queryopts=None):
+        Subject.__init__(self, parser, appname, catalog_id, path, queryopts)
         self.api = 'file'
         self.action = None
         self.key = None
@@ -120,6 +120,8 @@ class FileIO (Subject):
         self.subject = None
         self.newMatch = None
         self.mergeSubjpredsTags = False
+        if self.queryopts.has_key('name'):
+            self.name = self.queryopts['name']
 
     def GET(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -505,8 +507,8 @@ class FileIO (Subject):
                 self.header('Content-Type', 'application/json')
                 return jsonWriter(self.subject)
             else:
-                self.header('Content-Type', 'text/uri-list')
-                web.ctx.status = '204 No Content'
+                #self.header('Content-Type', 'text/uri-list')
+                #web.ctx.status = '204 No Content'
                 return '%s\n' % url
 
         contentType = web.ctx.env.get('CONTENT_TYPE', "").lower()
@@ -514,7 +516,7 @@ class FileIO (Subject):
             # we only support file PUT simulation this way
 
             # do pre-test of permissions to abort early if possible
-            self.dbtransact(lambda : self.put_preWriteBody(),
+            self.dbtransact(lambda : self.put_preWriteBody(post_method=True),
                             preWritePostCommit)
 
             inf = web.ctx.env['wsgi.input']
@@ -551,7 +553,7 @@ class FileIO (Subject):
                 self.dtype = 'file'
                 self.bytes = bytes
 
-                result = self.dbtransact(lambda : self.insertForStore(allow_blank=False, post_method=True),
+                result = self.dbtransact(lambda : self.insertForStore(allow_blank=True, post_method=True),
                                          putPostCommit)
                 return result
             except web.SeeOther:

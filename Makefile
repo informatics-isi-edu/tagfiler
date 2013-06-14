@@ -45,6 +45,7 @@ SCRIPTFILEBASES=logo.png \
 				jquery-ui.js \
 				jquery-ui-timepicker-addon.js \
 				jquery.contextMenu.js \
+				jquery.form.js \
 				main.css \
 				jquery-ui.css \
 				StyleSheet.css \
