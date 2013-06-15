@@ -8620,121 +8620,123 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 		'onclick': 'createCatalog();'
 	});
 	uiDiv.append(input);
-	uiDiv.append('<br/><br/><br/><br/>');
-	h2 = $('<h2>');
-	uiDiv.append(h2);
-	h2.html('Existing Catalogs');
-	var table = $('<table>');
-	uiDiv.append(table);
-	table.addClass('role-list');
-	var tr = $('<tr>');
-	table.append(tr);
-	var th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Name&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Description&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Owner&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Admin users&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Read users&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Write users&nbsp;&nbsp;');
-	th = $('<th>');
-	tr.append(th);
-	th.html('&nbsp;&nbsp;Id&nbsp;&nbsp;');
-	$.each(data, function(i,catalog) {
-		tr = $('<tr>');
-		tr.addClass('role');
+	if (data.length > 0) {
+		uiDiv.append('<br/><br/><br/><br/>');
+		h2 = $('<h2>');
+		uiDiv.append(h2);
+		h2.html('Existing Catalogs');
+		var table = $('<table>');
+		uiDiv.append(table);
+		table.addClass('role-list');
+		var tr = $('<tr>');
 		table.append(tr);
-		td = $('<td>');
-		tr.append(td);
-		var input = $('<input>');
-		input.attr({
-			'type': 'radio',
-			'name': 'catalog',
-			'value': catalog['id']
+		var th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Name&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Description&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Owner&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Admin users&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Read users&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Write users&nbsp;&nbsp;');
+		th = $('<th>');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Id&nbsp;&nbsp;');
+		$.each(data, function(i,catalog) {
+			tr = $('<tr>');
+			tr.addClass('role');
+			table.append(tr);
+			td = $('<td>');
+			tr.append(td);
+			var input = $('<input>');
+			input.attr({
+				'type': 'radio',
+				'name': 'catalog',
+				'value': catalog['id']
+			});
+			input.click(function(event) {enableCatalogButtons();})
+			td.append(input);
+			td = $('<td>');
+			tr.append(td);
+			td.html(catalog['name']);
+			td = $('<td>');
+			tr.append(td);
+			td.html(catalog['description']);
+			td = $('<td>');
+			tr.append(td);
+			td.html(catalog['owner']);
+			td = $('<td>');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(catalog['admin_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(catalog['read_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(catalog['write_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			tr.append(td);
+			td.html(catalog['id']);
 		});
-		input.click(function(event) {enableCatalogButtons();})
-		td.append(input);
-		td = $('<td>');
-		tr.append(td);
-		td.html(catalog['name']);
-		td = $('<td>');
-		tr.append(td);
-		td.html(catalog['description']);
-		td = $('<td>');
-		tr.append(td);
-		td.html(catalog['owner']);
-		td = $('<td>');
-		tr.append(td);
-		var userTable = $('<table>');
-		td.append(userTable);
-		$.each(catalog['admin_users'], function(j, user) {
-			var trUser = $('<tr>');
-			userTable.append(trUser);
-			var tdUser = $('<td>');
-			tdUser.css('border-width', '0px 0px 0px 0px');
-			trUser.append(tdUser);
-			tdUser.html(user);
+		uiDiv.append('<br/><br/>');
+		var button = $('<button>');
+		button.attr({
+			'name': 'selectCatalogButton',
+			'id': 'selectCatalogButton',
+			'disabled': 'disabled'
 		});
-		td = $('<td>');
-		tr.append(td);
-		var userTable = $('<table>');
-		td.append(userTable);
-		$.each(catalog['read_users'], function(j, user) {
-			var trUser = $('<tr>');
-			userTable.append(trUser);
-			var tdUser = $('<td>');
-			tdUser.css('border-width', '0px 0px 0px 0px');
-			trUser.append(tdUser);
-			tdUser.html(user);
+		button.click(function(event) {selectCatalog();});
+		button.html('Open catalog');
+		uiDiv.append(button);
+		button = $('<button>');
+		button.attr({
+			'name': 'deleteCatalogButton',
+			'id': 'deleteCatalogButton',
+			'disabled': 'disabled'
 		});
-		td = $('<td>');
-		tr.append(td);
-		var userTable = $('<table>');
-		td.append(userTable);
-		$.each(catalog['write_users'], function(j, user) {
-			var trUser = $('<tr>');
-			userTable.append(trUser);
-			var tdUser = $('<td>');
-			tdUser.css('border-width', '0px 0px 0px 0px');
-			trUser.append(tdUser);
-			tdUser.html(user);
-		});
-		td = $('<td>');
-		tr.append(td);
-		td.html(catalog['id']);
-	});
-	uiDiv.append('<br/><br/>');
-	var button = $('<button>');
-	button.attr({
-		'name': 'selectCatalogButton',
-		'id': 'selectCatalogButton',
-		'disabled': 'disabled'
-	});
-	button.click(function(event) {selectCatalog();});
-	button.html('Open catalog');
-	uiDiv.append(button);
-	button = $('<button>');
-	button.attr({
-		'name': 'deleteCatalogButton',
-		'id': 'deleteCatalogButton',
-		'disabled': 'disabled'
-	});
-	button.click(function(event) {deleteCatalog();});
-	button.html('Delete catalog');
-	uiDiv.append(button);
+		button.click(function(event) {deleteCatalog();});
+		button.html('Delete catalog');
+		uiDiv.append(button);
+	}
 	$('#createCatalog').css('cursor', 'default');
 	$('#deleteCatalogButton').css('cursor', 'default');
 }
