@@ -6309,7 +6309,7 @@ function postChangePassword(data, textStatus, jqXHR, param) {
 }
 
 function homePage() {
-	if (QUERY_PATH == null) {
+	if (QUERY_PATH == null && HOME.indexOf('/catalog/') < 0) {
 		getCatalogs();
 	} else {
 		$('#queryByTags').show();
