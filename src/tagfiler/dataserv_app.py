@@ -2667,7 +2667,9 @@ class Application (DatabaseConnection):
                                           + ' UNION ALL '
                                           ' SELECT DISTINCT subject, True AS created' + newsubj_newtrips_query_frag + ')'
                                           ) % parts,
-                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, newcol='created', test=False)
+                                         idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                         flagcol=None, wokcol=None, isowncol=None, 
+                                         unnest=False, enforce_tag_authz=False, depth=depth+1, newcol='created', test=False)
 
                 query = ('INSERT INTO %(table)s (subject)'
                          + ' SELECT subject' + oldsubj_newtrips_query_frag
@@ -2690,7 +2692,9 @@ class Application (DatabaseConnection):
                      self.set_tag_intable(self.tagdefsdict['tags present'], 
                                           ('(SELECT DISTINCT subject' + allsubj_newtrips_query_frag + ')'
                                            ) % parts,
-                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', unnest=False, enforce_tag_authz=False, depth=depth+1, test=False)
+                                          idcol='subject', valcol=wrapval(tagdef.tagname) + '::text', 
+                                          flagcol=None, wokcol=None, isowncol=None, 
+                                          unnest=False, enforce_tag_authz=False, depth=depth+1, test=False)
 
                  query = ('INSERT INTO %(table)s (subject)'
                           + ' SELECT subject' + allsubj_newtrips_query_frag
