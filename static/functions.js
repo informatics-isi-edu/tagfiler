@@ -5946,9 +5946,9 @@ function removeAddTag(tag, value, row, predicate) {
 		url += '(' + encodeSafeURIComponent(tag) + ')';
 		tagfiler.DELETE(url, true, postRemoveAddTag, param, null, 0);
 	} else {
-		var obj = encodeSafeURIComponent(tag) + '=true';
 		var url = HOME + '/tags/' + ((predicate.indexOf('tags/') == 0) ? predicate.substr('tags/'.length) : predicate);
-		tagfiler.PUT(url, obj, true, postRemoveAddTag, param, null, 0);
+		url += '(' + encodeSafeURIComponent(tag) + ')';
+		tagfiler.PUT(url, null, true, postRemoveAddTag, param, null, 0);
 	}
 }
 
