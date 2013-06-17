@@ -115,8 +115,6 @@ CREATE FUNCTION jsonobj(text[]) RETURNS text AS \$\$
 \$\$ LANGUAGE SQL;
 
 CREATE TABLE resources ( subject bigserial PRIMARY KEY );
-CREATE SEQUENCE transmitnumber;
-CREATE SEQUENCE keygenerator;
 
 CREATE FUNCTION tsv_accum(tsvector, tsvector) RETURNS tsvector AS \$\$
   SELECT CASE WHEN \$1 IS NOT NULL THEN \$1 || \$2 ELSE \$2 END ;
