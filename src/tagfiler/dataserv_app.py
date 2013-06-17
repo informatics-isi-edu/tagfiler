@@ -3410,7 +3410,9 @@ class Application (DatabaseConnection):
                             if pred.op == '=':
                                 vals.update(set(pred.vals))
                             elif pred.op == None:
-                                pass
+                                if td.dbtype == '':
+                                    # treat this as a psuedo-boolean for set_tag_intable() calls below
+                                    vals.add(True)
                             else:
                                 raise BadRequest(self, 'Patterned bulk tag update does not support predicate operator "%s" for list predicates.' % pred.op )
 
