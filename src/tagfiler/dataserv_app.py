@@ -2867,7 +2867,7 @@ class Application (DatabaseConnection):
             if tagdef.multivalue:
                 self.dbquery(("UPDATE %(dtable)s d SET modified = True"
                               + " FROM (SELECT DISTINCT id"
-                              + "       FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s)"
+                              + "       FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d1"
                               + "       WHERE value IS NOT NULL) d2"
                               + " WHERE d.id = d2.id AND NOT d.modified"
                               ) % dict(dtable=dtable, dvalcol=dvalcol),
