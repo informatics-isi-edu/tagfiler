@@ -2724,7 +2724,7 @@ class Application (DatabaseConnection):
             dwheres.append( 'd.value = i.value' )
 
         sql = ('DELETE FROM %(table)s AS d'
-               + ' USING (SELECT UNIQUE %(icols)s FROM %(intable)s) i'
+               + ' USING (SELECT DISTINCT %(icols)s FROM %(intable)s) i'
                + ' WHERE %(dwheres)s'
                ) % dict(table=table, intable=intable, icols=','.join(icols), dwheres=' AND '.join(dwheres))
 
