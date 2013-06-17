@@ -2724,7 +2724,7 @@ class Application (DatabaseConnection):
             dwheres.append( 'd.value = i.value' )
 
         sql = ('DELETE FROM %(table)s AS d'
-               + ' USING (SELECT %(icols)s FROM %(intable)s) i'
+               + ' USING (SELECT UNIQUE %(icols)s FROM %(intable)s) i'
                + ' WHERE %(dwheres)s'
                ) % dict(table=table, intable=intable, icols=','.join(icols), dwheres=' AND '.join(dwheres))
 
@@ -3032,7 +3032,7 @@ class Application (DatabaseConnection):
                                     ('(SELECT subject, value'
                                      + ' FROM "_tags present" p'
                                      + ' WHERE p.value = %(tagname)s'
-                                     + '   AND (SELECT True FROM %(tagtable)s d WHERE d.subject = p.subject AND %(tagname)s = p.value) IS NULL) s')
+                                     + '   AND (SELECT True FROM %(tagtable)s d WHERE d.subject = p.subject AND %(tagname)s = p.value LIMIT 1) IS NULL) s')
                                     % dict(tagname=wrapval(dtag), tagtable=wraptag(dtag)),
                                     idcol='subject', 
                                     valcol=wrapval(dtag) + '::text', unnest=False)
