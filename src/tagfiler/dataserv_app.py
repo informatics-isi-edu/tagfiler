@@ -3636,7 +3636,7 @@ class Application (DatabaseConnection):
                     web.debug('got exception "%s" peforming body1compensation for %s' % (str(ev), self.input_tablename),
                               traceback.format_exception(et, ev, tb))
 
-    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, builtins=False, unnest=None):
+    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, unnest=None):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3932,13 +3932,6 @@ class Application (DatabaseConnection):
                values is used to produce a query parameter mapping
                with keys unique across a set of compiled queries.
             """
-            if final and (not json):
-                if builtins:
-                    lpreds = lpreds + [ web.storage(tag='readok', op=None, vals=[]),
-                                        web.Storage(tag='id', op=None, vals=[]),
-                                        web.storage(tag='writeok', op=None, vals=[]),
-                                        web.storage(tag='owner', op=None, vals=[])  ]
-
             if not lpreds:
                 raise BadRequest(self, 'A query requires at least one list predicate.')
 
