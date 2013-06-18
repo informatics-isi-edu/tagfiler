@@ -89,7 +89,7 @@ $(HOME)/.tagfiler.predeploy:
 
 deploy: $(HOME)/.tagfiler.predeploy install
 	./bin/deploy.sh $(INSTALLSVC)
-	./bin/register-software-version.sh $(INSTALLSVC)
+	#./bin/register-software-version.sh $(INSTALLSVC)
 
 install: $(FILES) $(WSGI)
 	mkdir -p /usr/local/sbin
@@ -102,7 +102,7 @@ install: $(FILES) $(WSGI)
 	rsync -av $(IMAGEFILES) /var/www/html/$(INSTALLSVC)/static/images/.
 	rsync -av $(BINFILES) /usr/local/bin/.
 	rsync -av $(SBINFILES) /usr/local/sbin/.
-	./bin/register-software-version.sh $(INSTALLSVC)
+	#./bin/register-software-version.sh $(INSTALLSVC)
 
 restart: force install
 	service httpd restart
