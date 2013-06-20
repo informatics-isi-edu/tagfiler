@@ -300,12 +300,12 @@ var datasetStatusSuffix = null;
 function changeNameFormType(op, suffix) {
 	if (document.getElementById('type'+suffix).value == 'file') {
 		document.getElementById('fileName'+suffix).style.display = 'inline';
-		$('#uploadFile').show();
-		$('#submitSubject').hide();
+		$('#uploadFile'+suffix).show();
+		$('#submitSubject'+suffix).hide();
 	} else {
 		document.getElementById('fileName'+suffix).style.display = 'none';
-		$('#uploadFile').hide();
-		$('#submitSubject').show();
+		$('#uploadFile'+suffix).hide();
+		$('#submitSubject'+suffix).show();
 	}
 	if (op == 'create') {
 		if (document.getElementById('type'+suffix).value == 'blank') {
@@ -8132,7 +8132,10 @@ function appendTags(newTags, params) {
 					form.ajaxForm(options);
 					var div = $('<div>');
 					formTd.append(div);
-					formTd.append(form);
+					var uploadDiv = $('<div>');
+					uploadDiv.attr('id', 'uploadFile'+tags['id']);
+					formTd.append(uploadDiv);
+					uploadDiv.append(form);
 					div.attr({'id': 'NameForm_div'+tags['id']});
 					var label = $('<label>');
 					div.append(label);
@@ -8145,14 +8148,26 @@ function appendTags(newTags, params) {
 					});
 					div.append(select);
 					var option = $('<option>');
+					/*
+					// This will be disabled once we will support replacing a file with a blank node
 					select.append(option);
 					option.text('blank (Dataset node for metadata-only)');
 					option.attr('value', 'blank');
 					option = $('<option>');
+					*/
 					select.append(option);
 					option.text('file (Named dataset for locally stored file)');
 					option.attr({'value': 'file',
 						'selected': 'selected'});
+					div.append($('<br>'));
+					input = $('<input>');
+					input.attr({'type': 'button',
+						'id': 'submitSubject'+tags['id'],
+						'value': 'Replace',
+						'onclick': 'replaceSubject('+tags['id']+')'
+					});
+					div.append(input);
+					input.hide();
 					input = $('<input>');
 					input.attr({'name': 'myfile'+tags['id'],
 						'type': 'file',
@@ -8168,7 +8183,7 @@ function appendTags(newTags, params) {
 					form.append(input);
 					var statusDiv = $('<div>');
 					statusDiv.attr('id', 'uploadStatus');
-					div.append(statusDiv);
+					formTd.append(statusDiv);
 				}
 			} else if (isId) { 
 				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
@@ -8398,6 +8413,10 @@ function appendTags(newTags, params) {
 							function(event) {addTagValue(event.data.tag, $(this).parent().parent(), allTags, predicate);});
 		}
 	});
+}
+
+function replaceSubject(id) {
+	alert(id);
 }
 
 function errorGetRoles(jqXHR, textStatus, errorThrown, retryCallback, url, obj, async, successCallback, param, errorCallback, count) {
