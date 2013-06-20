@@ -326,92 +326,11 @@ function validateNameForm(op, suffix) {
 		return false;
 	}
 	var type = document.getElementById('type'+suffix).value;
-	var fileInput = null;
 	if (type == 'file') {
 		if (!checkInput('fileName'+suffix, 'file to be uploaded')) {
 			return false;
 		}
-		fileInput = document.getElementById('fileName'+suffix);
 	}
-	
-	return true;
-}
-
-/**
- * Validate and make html transformations for the NameForm
- * Return True in case of success and False otherwise
- */
-function validateNameFormOriginal(op, suffix) {
-	if (op == 'create' && document.getElementById('type'+suffix).value != 'blank' && !checkInput('datasetName'+suffix, 'name of the dataset')) {
-		return false;
-	}
-	var type = document.getElementById('type'+suffix).value;
-	var fileInput = null;
-	if (type == 'file') {
-		if (!checkInput('fileName'+suffix, 'file to be uploaded')) {
-			return false;
-		}
-		fileInput = document.getElementById('fileName'+suffix);
-	}
-	var data_id = '';
-	if (op == 'create') {
-		data_id = document.getElementById('datasetName'+suffix).value.replace(/^\s*/, "").replace(/\s*$/, "");
-		var action = document.NameForm.getAttribute('action');
-		if (data_id.length > 0) {
-			action += '/name=' + encodeSafeURIComponent(data_id);
-		}
-		var prefix = '?';
-		if (document.getElementById('read users'+suffix).value == '*') {
-			action += '?read%20users=*';
-			prefix = '&';
-		}
-		if (document.getElementById('write users'+suffix).value == '*') {
-			action += prefix + 'write%20users=*';
-			prefix = '&';
-		}
-		var defaultView = document.getElementById('defaultView'+suffix).value;
-		if (defaultView != '') {
-			action += prefix + 'default%20view=' + encodeSafeURIComponent(defaultView);
-			prefix = '&';
-		}
-		if (document.getElementById('incomplete'+suffix).checked) {
-			action += prefix + 'incomplete';
-		}
-		document.NameForm.setAttribute('action', action);
-	}
-	var NameForm = document.getElementById('NameForm'+suffix);
-	if (type == 'file') {
-		NameForm.setAttribute('enctype', 'multipart/form-data');
-	} else {
-		NameForm.setAttribute('enctype', 'application/x-www-form-urlencoded');
-	}
-	var form = document.getElementById('NameForm'+suffix);
-	orig_form = document.getElementById('NameForm_div'+suffix);
-	form.removeChild(orig_form);
-	var statusValue = datasetStatusPrefix;
-	if (type == 'file') {
-		form.appendChild(fileInput);
-		fileInput.style.display = 'none';
-		statusValue += 'Uploading file "' + fileInput.value + '"';
-	} else {
-		var input = document.createElement('input');
-		input.setAttribute('type', 'hidden');		
-		input.setAttribute('name', 'action');		
-		input.setAttribute('id', 'action'+suffix);		
-		input.setAttribute('value', 'post');		
-		form.appendChild(input);
-		if (op == 'create') {
-			statusValue += 'Registering ' + (data_id.length > 0 ? '"'+data_id+'" dataset' : 'the blank node');
-		} else {
-			statusValue += 'Replacing the dataset';
-		}
-	}
-	
-	if (suffix.length == 0) {
-		document.getElementById('submit'+suffix).style.display = 'none';
-	}
-	statusValue += datasetStatusSuffix;
-	document.getElementById('Copy'+suffix).innerHTML = statusValue;
 	
 	return true;
 }
@@ -7428,6 +7347,31 @@ function showRequest(formData, jqForm, options) {
 	return ret;
 }
 
+function showPutRequest(formData, jqForm, options) {
+	var index = options.url.lastIndexOf('=') + 1;
+	var suffix = options.url.substring(index);
+	var ret = validateNameForm('replace', suffix);
+	if (ret) {
+		options.error = function(jqXHR, textStatus, errorThrown) {
+			uploadError(jqXHR, textStatus, errorThrown, url);
+		};
+		$('#uploadStatus').html(datasetStatusPrefix + 'Uploading file "' + $('#fileName').val() + '"' + datasetStatusSuffix);
+		$('#ajaxSpinnerImage').show();
+	}
+	return ret;
+}
+
+function showPutResponse(responseText, statusText, xhr, $form)  {
+	$('#uploadStatus').html('');
+	var index = responseText.lastIndexOf('/') + 1;
+	var predicate = responseText.substring(index);
+	index = predicate.indexOf('\n');
+	if (index > 0) {
+		predicate = predicate.substring(0, index);
+	}
+	getTagDefinition(predicate, 'default');
+}
+
 function showResponse(responseText, statusText, xhr, $form)  {
 	$('#uploadStatus').html('');
 	var index = responseText.lastIndexOf('/') + 1;
@@ -7620,143 +7564,6 @@ function postCreateSubject(data, textStatus, jqXHR, param) {
 		predicate = predicate.substring(0, index);
 	}
 	getTagDefinition(predicate, $('#defaultView').val());
-}
-
-function createCustomDatasetOriginal() {
-	var uiDiv = $('#ui');
-	uiDiv.html('');
-	var form = $('<form>');
-	uiDiv.append(form);
-	alert(HOME);
-	form.attr({'id': 'NameForm',
-		'name': 'NameForm',
-		'enctype': 'application/x-www-form-urlencoded',
-		'action': HOME + '/file',
-		'method': 'post',
-		'onsubmit': "return validateNameForm('create', '')"
-	});
-	div = $('<div>');
-	form.append(div);
-	div.attr({'id': 'NameForm_div'});
-	var h3 = $('<h3>');
-	div.append(h3);
-	h3.html('Choose Type of Data');
-	var input = $('<input>');
-	input.attr({'type': 'hidden',
-		'name': 'action',
-		'value': 'put'
-	});
-	div.append(input);
-	var namedDataset_div = $('<div>');
-	div.append(namedDataset_div);
-	namedDataset_div.attr({'id': 'namedDataset'});
-	namedDataset_div.css({'display': 'block'});
-	var label = $('<label>');
-	namedDataset_div.append(label);
-	label.html('Enter a name for the dataset:');
-	input = $('<input>');
-	input.attr({'name': 'name',
-		'type': 'text',
-		'id': 'datasetName'
-	});
-	namedDataset_div.append(input);
-	label = $('<label>');
-	div.append(label);
-	label.html('Select a type of dataset definition:');
-	var select = $('<select>');
-	select.attr({'name': 'type',
-		'id': 'type',
-		'onchange': "changeNameFormType('create', '');"
-	});
-	div.append(select);
-	var option = $('<option>');
-	select.append(option);
-	option.text('blank (Dataset node for metadata-only)');
-	option.attr('value', 'blank');
-	option = $('<option>');
-	select.append(option);
-	option.text('file (Named dataset for locally stored file)');
-	option.attr({'value': 'file',
-		'selected': 'selected'});
-	input = $('<input>');
-	input.attr({'name': 'myfile',
-		'type': 'file',
-		'id': 'fileName'
-	});
-	input.css({'display': 'inline'});
-	div.append(input);
-	div.append($('<br>'));
-	label = $('<label>');
-	div.append(label);
-	label.html('Select an initial read permission:');
-	select = $('<select>');
-	div.append(select);
-	select.attr({'name': 'read users',
-		'id': 'read users'
-	});
-	option = $('<option>');
-	select.append(option);
-	option.text('Only owner may read');
-	option.attr('value', 'owner');
-	option = $('<option>');
-	select.append(option);
-	option.text('Anybody may read');
-	option.attr({'value': '*'});
-	div.append($('<br>'));
-	label = $('<label>');
-	div.append(label);
-	label.html('Select an initial write permission:');
-	select = $('<select>');
-	div.append(select);
-	select.attr({'name': 'write users',
-		'id': 'write users'
-	});
-	option = $('<option>');
-	select.append(option);
-	option.text('Only owner may write');
-	option.attr('value', 'owner');
-	option = $('<option>');
-	select.append(option);
-	option.text('Anybody may write');
-	option.attr({'value': '*'});
-	div.append($('<br>'));
-	label = $('<label>');
-	div.append(label);
-	label.html('Default View:');
-	select = $('<select>');
-	div.append(select);
-	select.attr({'name': 'defaultView',
-		'id': 'defaultView',
-		'onclick': "chooseView()"
-	});
-	option = $('<option>');
-	select.append(option);
-	option.text('Choose a View name');
-	option.attr('value', '');
-	div.append($('<br>'));
-	label = $('<label>');
-	div.append(label);
-	label.html('Status of the dataset:  ');
-	input = $('<input>');
-	input.attr({'type': 'checkbox',
-		'id': 'incomplete',
-		'name': 'incomplete',
-		'value': 'incomplete',
-		'checked': 'checked'
-	});
-	div.append(input);
-	label = $('<label>');
-	div.append(label);
-	label.html('Incomplete');
-	input = $('<input>');
-	input.attr({'type': 'submit',
-		'id': 'submit',
-		'value': 'Submit'
-	});
-	form.append(input);
-	div = $('<div>');
-	uiDiv.append(div);
-	div.attr({'id': 'Copy'});
 }
 
 function showFileLink(predicate) {
@@ -8305,24 +8112,28 @@ function appendTags(newTags, params) {
 					var formTd = $('<td>');
 					formTd.attr({'colspan': '2'});
 					formTr.append(formTd);
+					var options = {
+							beforeSubmit: showPutRequest,
+							dataType: 'text',
+							url: HOME + '/file/id='+tags['id']+'?id='+tags['id'],
+							suffix: tags['id'],
+							success: showPutResponse,
+							error: function(jqXHR, textStatus, errorThrown) {
+								uploadError(jqXHR, textStatus, errorThrown, null);
+							}
+						};
 					var form = $('<form>');
-					formTd.append(form);
 					form.attr({'id': 'NameForm'+tags['id'],
 						'name': 'NameForm',
-						'enctype': 'application/x-www-form-urlencoded',
-						'action': HOME + '/file/name=' + encodeSafeURIComponent(tags['name']),
-						'method': 'post',
-						'onsubmit': "return validateNameForm('replace', '" + tags['id'] +"')"
+						'enctype': 'multipart/form-data',
+						'action': HOME + '/file/id='+tags['id'],
+						'method': 'post'
 					});
+					form.ajaxForm(options);
 					var div = $('<div>');
-					form.append(div);
+					formTd.append(div);
+					formTd.append(form);
 					div.attr({'id': 'NameForm_div'+tags['id']});
-					var input = $('<input>');
-					input.attr({'type': 'hidden',
-						'name': 'action',
-						'value': 'put'
-					});
-					div.append(input);
 					var label = $('<label>');
 					div.append(label);
 					label.html('Replace with:');
@@ -8348,16 +8159,16 @@ function appendTags(newTags, params) {
 						'id': 'fileName'+tags['id']
 					});
 					input.css({'display': 'inline'});
-					div.append(input);
+					form.append(input);
 					input = $('<input>');
 					input.attr({'type': 'submit',
 						'id': 'submit'+tags['id'],
 						'value': 'Replace'
 					});
-					div.append(input);
-					div = $('<div>');
-					formTd.append(div);
-					div.attr({'id': 'Copy'+tags['id']});
+					form.append(input);
+					var statusDiv = $('<div>');
+					statusDiv.attr('id', 'uploadStatus');
+					div.append(statusDiv);
 				}
 			} else if (isId) { 
 				var userOK = (tags['write users'] == '*') || roles.contains(tags['write users']) || tags['owner'] == USER;
