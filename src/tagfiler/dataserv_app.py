@@ -695,7 +695,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         self.content_range = None
         self.last_log_time = 0
         self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
-        self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
+        self.request_guid = base64.b64encode( struct.pack('Q', random.getrandbits(64)) )
         
         #TODO: ideally, we refactor this out of here
         self.emitted_headers = dict()
