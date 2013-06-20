@@ -754,7 +754,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
             'homepath': cfg.get('homepath', 
                         home + web.ctx.homepath + '/catalog/%d' % self.catalog_id),
             'store path': cfg.get('store path', 
-                          '/var/www/%s-data' % cfg.get('user', 'tagfiler'))})
+                          '/var/www/%s-data/%d' % (cfg.get('user', 'tagfiler'), self.catalog_id))})
         return cfg
     
     def get_context(self):
