@@ -161,7 +161,7 @@ class Subject (Node):
         self.unique = self.validate_subjpreds_unique(acceptBlank=allow_blank, subjpreds=subjpreds)
 
         listpreds = [ web.Storage(tag=tag,op=None,vals=[])
-                      for tag in ['id', 'content-type', 'bytes', 'modified', 'modified by', 'incomplete']
+                      for tag in ['id', 'content-type', 'bytes', 'modified', 'modified by', 'incomplete', 'readok', 'writeok']
                       + [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.unique ] ]
 
         querypath = [ x for x in self.path ]
@@ -399,7 +399,7 @@ class Subject (Node):
         if self.subject:
             # this is the case where we update an existing uniquely tagged file in place
             self.txlog('UPDATE', dataset=path_linearize(self.path))
-            newfile.id = None
+            newfile.id = self.subject.id
             if self.subject.file:
                 junk_files.append(self.subject.file)
             if newfile.file:
