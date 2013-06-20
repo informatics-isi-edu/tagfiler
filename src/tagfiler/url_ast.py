@@ -209,6 +209,7 @@ class Catalog (CNode):
        PUT    -- not yet implemented
     """
     
+    __ANONYMOUS = set(['*'])
     __EMPTY_STR = "''"
     __STD_SELECT_COLUMNS = 'id, owner, admin_users, write_users, read_users, name, description'
 
@@ -254,7 +255,7 @@ class Catalog (CNode):
         
         # Filter by role, if not admin
         if admin not in attrs:
-            qry += (" AND ARRAY[%s] && %s" % (wraparray(attrs), acl_list))
+            qry += (" AND ARRAY[%s] && %s" % (wraparray(attrs | Catalog.__ANONYMOUS), acl_list))
             
         return self.dbquery(qry)
 
@@ -331,6 +332,8 @@ class Catalog (CNode):
         for key in ['admin_users', 'write_users', 'read_users']:
             if key in catalog:
                 users = catalog[key]
+                if not isinstance(users, list):
+                    raise ValueError( ("%s must be a list" % key) )
                 if client not in users:
                     users.append(client)
             else:
@@ -403,8 +406,8 @@ class Catalog (CNode):
                 catalog = jsonReader(input)
                 return self._create_catalog(catalog)
             
-            except ValueError:
-                raise BadRequest(self, 'Invalid json input to POST catalog: %s' % input)
+            except ValueError, msg:
+                raise BadRequest(self, 'Invalid json input to POST catalog: %s' % msg)
 
             return catalog
 
