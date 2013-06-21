@@ -3872,7 +3872,7 @@ class Application (DatabaseConnection):
                     m['table'] = ('(SELECT %s,' % scalar_subj
                                   + ' (SELECT value IN (%s) FROM _owner WHERE subject = %s)' % (rolekeys, scalar_subj)
                                   + ' OR '
-                                  + ' (SELECT value IN (%s) FROM "_read users" WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' (SELECT bool_or(value IN (%s)) FROM "_read users" WHERE subject = %s GROUP BY subject)' % (rolekeys, scalar_subj)
                                   + ' AS value) t')
                 else:
                     m['table'] = ('(SELECT subject, True AS value'
@@ -3886,7 +3886,7 @@ class Application (DatabaseConnection):
                     m['table'] = ('(SELECT %s,' % scalar_subj
                                   + ' (SELECT value IN (%s) FROM _owner WHERE subject = %s)' % (rolekeys, scalar_subj)
                                   + ' OR '
-                                  + ' (SELECT value IN (%s) FROM "_write users" WHERE subject = %s)' % (rolekeys, scalar_subj)
+                                  + ' (SELECT bool_or(value IN (%s)) FROM "_write users" WHERE subject = %s GROUP BY subject)' % (rolekeys, scalar_subj)
                                   + ' AS value) t')
                 else:
                     m['table'] = ('(SELECT subject, True AS value'
