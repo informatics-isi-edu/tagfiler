@@ -21,7 +21,6 @@ import psycopg2
 import os
 import tempfile
 import logging
-import subprocess
 import itertools
 import datetime
 import dateutil.parser
@@ -502,6 +501,11 @@ def wrapval(value, dbtype=None, range_extensions=False):
     else:
         return "'%s'" % value.replace("'", "''").replace("%", "%%").replace("$", "$$")
     
+def wraparray(iter):
+    """Wraps an iterable as for use as a postgres ARRAY."""
+    # TODO(rs): should take 'dbtype' param and pass to wrapval
+    #           should move this to dataserve_app with wrapval()
+    return ','.join([ wrapval(i) for i in iter])
 
 """ Set the logger """
 logger = logging.getLogger('tagfiler')
@@ -683,6 +687,9 @@ def get_db():
 
 class CatalogRequest (webauthn2_handler_factory.RestHandler):
     
+    ANONYMOUS = set(['*'])
+    STD_SELECT_COLUMNS = 'id, owner, admin_users, write_users, read_users, name, description'
+    
     def __init__(self, catalog_id, parser=None, queryopts=None):
         webauthn2_handler_factory.RestHandler.__init__(self)
         
@@ -761,9 +768,44 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         #TODO: Not sure we need a getter for a public member variable anyway
         return self.context
 
+    def select_catalogs(self, cols=None, catalog_id=None, active=True,
+                              acl_list='read_users', attrs=[], admin=None):
+        """Select catalog(s) from the database.
+        
+        If 'catalog_id' is given it will return only one catalog. If 
+        'catalog_id' is not given it will return all of the catalogs that 
+        satisfy the role filter.
+        
+        By default only 'active' catalogs are returned. Set 'active' to False
+        to return only the inactive catalogs. TBD, since 'active' is trivalent
+        we ought to support searches where 'active = NULL' in the database.
+        
+        By default, the 'acl_list' is evaluated. The callers 'attr'ibutes must
+        be 'in' the catalogs 'acl_list'. However, if the system 'admin' role is
+        in the caller's 'attr' list, then the filter is not used.
+        """
+        
+        if not cols:
+            cols = CatalogRequest.STD_SELECT_COLUMNS
+            
+        # Base query, get active catalogs
+        qry = "SELECT %s FROM catalogs WHERE active = %s" % (cols, str(active))
+        
+        # Get only catalog specified by catalog_id
+        if catalog_id:
+            qry += " AND id = %d" % catalog_id
+        
+        # Filter by role, if not admin
+        if admin not in attrs:
+            qry += (" AND ARRAY[%s] && %s" % (wraparray(attrs | CatalogRequest.ANONYMOUS), acl_list))
+            
+        return self.dbquery(qry)
+
 
 class CatalogManager (CatalogRequest):
     """The Catalog Manager App."""
+    
+    __EMPTY_STR = "''"
     
     def __init__(self, parser=None, catalog_id=None, queryopts=None):
         CatalogRequest.__init__(self, parser, catalog_id, queryopts)
@@ -789,8 +831,108 @@ class CatalogManager (CatalogRequest):
 
         return postCommit(bodyval)
 
+    
+    def delete_catalog(self, catalog_id):
+        """Deletes a catalog.
+        
+        The catalog identified by 'catalog_id' is deleted from the system. At 
+        present, deletion sets the 'active' flag to false, thereby making the 
+        catalog invisible to future operations.
+        
+        TBD, we may implement a sweeper process that eventually cleans the 
+        database system of inactive catalogs, perhaps dumping and archiving
+        the contents.
+        """
+        
+        # Delete toggles the 'active' flag to false, to deactive this catalog
+        self.dbquery("UPDATE catalogs SET active = false WHERE id = %d" % catalog_id)
 
-#class Application (webauthn2_handler_factory.RestHandler):
+
+    def _create_db(self, dbname):
+        """Creates a catalog database.
+        
+        The 'dbname' must be a non-existent database name. The new database
+        will be a clone of the tagfiler template database.
+        
+        This call will make a subprocess call to the PostgreSQL 'createdb'
+        utility.
+        """
+        # TODO(rs): really do not want to be in the business of subproc calls
+        #           maybe can refactor POST handler to do this in a dbquery(...) call
+        #           rather than a subprocess which is going to be fragile.
+        import subprocess
+        try:
+            subprocess.check_call(["createdb", "-T", self.template, dbname])
+        except subprocess.CalledProcessError:
+            et, ev, tb = sys.exc_info()
+            web.debug('got exception "%s" calling createdb subprocess' % str(ev),
+                      traceback.format_exception(et, ev, tb))
+            raise RuntimeError(self, 'createdb failed')
+
+
+    def create_catalog(self, catalog):
+        """Creates a catalog.
+        
+        The parameters for the new catalog should be specified in a dictionary
+        given by 'catalog'.
+        
+        Returns the header metadata for the newly created catalog, which is
+        essentially the same as the input 'catalog' but with the acl lists
+        complete and the catalog_id set.
+        """
+        # Create a dictionary of 'wrapped' values (i.e., db safe)
+        wrapped = dict()
+
+        # Owner comes from the request context
+        if 'owner' in catalog:
+            raise BadRequest(self, 'Cannot specify "owner" field.')
+        
+        client = self.context.client
+        wrapped['owner'] = wrapval(client)
+
+        if 'name' in catalog:
+            wrapped['name'] = wrapval(catalog['name'])
+        else:
+            wrapped['name'] = CatalogManager.__EMPTY_STR
+
+        if 'description' in catalog:
+            wrapped['description'] = wrapval(catalog['description'])
+        else:
+            wrapped['description'] = CatalogManager.__EMPTY_STR
+        
+        # Wrap roles arrays, add client to them if not already in them
+        for key in ['admin_users', 'write_users', 'read_users']:
+            if key in catalog:
+                users = catalog[key]
+                if not isinstance(users, list):
+                    raise ValueError( ("%s must be a list" % key) )
+                if client not in users:
+                    users.append(client)
+            else:
+                users = [client]
+            wrapped[key] = wraparray(users)
+        
+        self.dbquery("INSERT INTO catalogs "
+                     + "(owner, admin_users, write_users, read_users, name, description) "
+                     + "VALUES (%(owner)s, ARRAY[%(admin_users)s], ARRAY[%(write_users)s], ARRAY[%(read_users)s], %(name)s, %(description)s)"
+                     % wrapped)
+        
+        # Now get the catalog_id of the last entered catalog
+        results = self.dbquery("SELECT max(id) as last_id FROM catalogs")
+        last_id = results[0]['last_id']
+        
+        # Now, clone the template to a new database.
+        self._create_db( self.dbnprefix + str(last_id) )
+
+        # Now mark the catalog as active
+        self.dbquery("UPDATE catalogs SET active = true WHERE id = %s" % last_id)
+        
+        # Return the newly created catalog
+        results = self.dbquery("SELECT %(cols)s FROM catalogs WHERE id=%(catalog_id)d" % 
+                               dict(cols=CatalogRequest.STD_SELECT_COLUMNS, catalog_id=last_id))
+        return results[0]
+
+
 class Application (DatabaseConnection):
     "common parent class of all service handler classes to use db etc."
 
