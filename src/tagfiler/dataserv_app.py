@@ -3878,7 +3878,9 @@ class Application (DatabaseConnection):
                     m['table'] = ('(SELECT subject, True AS value'
                                   + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
                                   + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_read users" WHERE value IN (%s)) r' % rolekeys
-                                  + '  USING (subject)) t')
+                                  + '  USING (subject)'
+                                  + ' GROUP BY subject'
+                                  + ') t')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.tagname == 'writeok':
@@ -3892,7 +3894,9 @@ class Application (DatabaseConnection):
                     m['table'] = ('(SELECT subject, True AS value'
                                   + ' FROM (SELECT subject FROM _owner WHERE value IN (%s)) o' % rolekeys
                                   + ' FULL OUTER JOIN (SELECT DISTINCT subject FROM "_write users" WHERE value IN (%s)) w' % rolekeys
-                                  + '  USING (subject)) t')
+                                  + '  USING (subject)'
+                                  + ' GROUP BY subject'
+                                  + ') t')
                 valcol = 'value'
                 m['value'] = ', value' 
             elif tagdef.multivalue and final:
