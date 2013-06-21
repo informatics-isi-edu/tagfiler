@@ -1265,7 +1265,7 @@ class Application (DatabaseConnection):
                 ])
 
         if value not in policies:
-            raise Conflict(self, 'Supplied tagdef policy "%s" is not recognized.' % tag)
+            raise Conflict(self, 'Supplied tagdef policy "%s" is not recognized.' % value)
 
     def validateRole(self, role, tagdef=None, subject=None):
         # TODO: fixme with webauthn2
