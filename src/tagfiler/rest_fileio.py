@@ -120,12 +120,6 @@ class FileIO (Subject):
         self.subject = None
         self.newMatch = None
         self.mergeSubjpredsTags = False
-        self.replace = None
-        if self.queryopts.has_key('name'):
-            self.name = self.queryopts['name']
-        if self.queryopts.has_key('id'):
-            self.replace = True
-            del self.queryopts['id']
 
     def GET(self, uri, sendBody=True):
         global mime_types_suffixes
@@ -519,10 +513,11 @@ class FileIO (Subject):
         if contentType[0:19] == 'multipart/form-data':
             # we only support file PUT simulation this way
             post_method = True
-            if self.replace == True:
+            if self.queryopts.has_key('name'):
+                self.name = self.queryopts['name']
+            else:
                 post_method = False
                 
-
             # do pre-test of permissions to abort early if possible
             self.dbtransact(lambda : self.put_preWriteBody(post_method=post_method),
                             preWritePostCommit)

@@ -8115,7 +8115,7 @@ function appendTags(newTags, params) {
 					var options = {
 							beforeSubmit: showPutRequest,
 							dataType: 'text',
-							url: HOME + '/file/id='+tags['id']+'?id='+tags['id'],
+							url: HOME + '/file/id='+tags['id'],
 							suffix: tags['id'],
 							success: showPutResponse,
 							error: function(jqXHR, textStatus, errorThrown) {
