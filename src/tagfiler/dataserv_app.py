@@ -768,6 +768,27 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         #TODO: Not sure we need a getter for a public member variable anyway
         return self.context
 
+    def dbquery(self, query, vars={}):
+        #TODO: see dbtransact() comment
+        return db_dbquery(self.db, query, vars=vars)
+    
+    def dbtransact(self, body, postCommit, limit=8):
+        #TODO: we may want to refactor the dbtransact/dbquery pattern in this
+        #      CatalogRequest
+
+        def db_body(db):
+            self.db = db
+            self.logmsgs = []
+            return body()
+
+        # run under transaction control implemented by our parent class
+        bodyval = self._db_wrapper(db_body)
+
+        for msg in self.logmsgs:
+            logger.info(myutf8(msg))
+
+        return postCommit(bodyval)
+
     def select_catalogs(self, cols=None, catalog_id=None, active=True,
                               acl_list='read_users', attrs=[], admin=None):
         """Select catalog(s) from the database.
@@ -801,6 +822,36 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
             
         return self.dbquery(qry)
 
+    
+    def acl_check(self, catalog_id=None, active=True, acl_list='read_users', 
+                  attrs=[], admin=None):
+        """Checks to see if the user is in the ACL for the specified catalog.
+        
+        The parameters are the same as those of select_catalogs, the only 
+        difference is that 'cols' is not repeated here.
+        """
+        
+        def body():
+            catalogs = self.select_catalogs(cols='id', catalog_id=catalog_id, 
+                                            active=active, acl_list=acl_list, 
+                                            attrs=attrs, admin=admin)
+            if len(catalogs) == 0:
+                return False
+            else:
+                return True
+        
+        def postCommit(bodyresults):
+            # TODO: this needs to be moved to the Application.__init__
+            #   call rather than thrown here. The only reason it is here is
+            #   that the exception class requires parameters that are not initialized
+            #   at the time Application does the ACL check. I will do this next.
+            # NOTE: There is not problem with having it here, it just causes
+            #   annoying (b/c they are unnecessary) error messages in the log
+            if not bodyresults:
+                raise NotFound(self, 'catalog')
+
+        return self.dbtransact(body, postCommit)
+
 
 class CatalogManager (CatalogRequest):
     """The Catalog Manager App."""
@@ -809,27 +860,6 @@ class CatalogManager (CatalogRequest):
     
     def __init__(self, parser=None, catalog_id=None, queryopts=None):
         CatalogRequest.__init__(self, parser, catalog_id, queryopts)
-
-    def dbquery(self, query, vars={}):
-        #TODO: see dbtransact() comment
-        return db_dbquery(self.db, query, vars=vars)
-    
-    def dbtransact(self, body, postCommit, limit=8):
-        #TODO: we may want to refactor the dbtransact/dbquery pattern in this
-        #      CatalogRequest
-
-        def db_body(db):
-            self.db = db
-            self.logmsgs = []
-            return body()
-
-        # run under transaction control implemented by our parent class
-        bodyval = self._db_wrapper(db_body)
-
-        for msg in self.logmsgs:
-            logger.info(myutf8(msg))
-
-        return postCommit(bodyval)
 
     
     def delete_catalog(self, catalog_id):
@@ -1113,11 +1143,18 @@ class Application (DatabaseConnection):
 
         # get the config and context from the CatalogRequest instance 
         # associated with this catalog id
-        self.catalog_id = catalog_id
+        self.catalog_id = int(catalog_id)
         catalog_req = CatalogRequest(catalog_id)
         self.config = catalog_req.get_config()
         self.context = catalog_req.get_context()
         
+        # Access Control enforcement
+        catalog_req.acl_check(catalog_id=self.catalog_id, 
+                              acl_list='read_users',
+                              attrs=self.context.attributes, 
+                              admin=self.config.admin)
+
+        # Now, inialize this class
         DatabaseConnection.__init__(self, self.config)
 
         def long2str(x):
