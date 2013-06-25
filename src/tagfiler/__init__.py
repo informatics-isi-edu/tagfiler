@@ -28,10 +28,29 @@ import rest_fileio
 import url_ast
 import url_lex
 import url_parse
+import webauthn2
 
 from dataserv_app import webauthn2_manager
 
+import hashlib
+import inspect
 
+def source_checksum():
+    """Get checksum representing the loaded module for cache management etc."""
+
+    if dataserv_app.source_checksum is None:
+        h = hashlib.md5()
+        for mod in [ dataserv_app, subjects, rest_fileio, url_ast, url_lex, url_parse ]:
+            try:
+                h.update( inspect.getsource( mod ) )
+            except IOError:
+                pass
+
+        h.update( webauthn2.source_checksum() )
+
+        dataserv_app.source_checksum = h.hexdigest()
+
+    return dataserv_app.source_checksum
 
 def deploy_webauthn2():
     """

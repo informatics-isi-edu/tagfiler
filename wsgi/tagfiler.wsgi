@@ -25,7 +25,10 @@ import datetime
 import pytz
 
 # Uncomment the below line in case of a RPM installation
-from tagfiler import url_lex, url_parse, dataserv_app
+from tagfiler import url_lex, url_parse, dataserv_app, source_checksum
+
+# force calculation of checksums so service can use it internally w/o cyclic dependency
+hx = source_checksum()
 
 # need to find our other local modules
 

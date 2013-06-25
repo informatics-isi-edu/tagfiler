@@ -39,6 +39,8 @@ import struct
 
 import json
 
+source_checksum = None
+
 try:
     import simplejson
     try:
