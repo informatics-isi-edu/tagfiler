@@ -7913,14 +7913,16 @@ function postLoadReferenceTags(data, textStatus, jqXHR, param) {
 }
 
 function loadAllTags() {
-	var url = HOME + '/subject/tagdef(tagdef)tagdef:asc:?limit=none';
+	var url = HOME + '/subject/tagdef(tagdef;' + encodeSafeURIComponent('tagdef dbtype') + ')tagdef:asc:?limit=none';
 	tagfiler.GET(url, true, postLoadAllTags, null, null, 0);
 }
 
 function postLoadAllTags(data, textStatus, jqXHR, param) {
 	allAvailableTags = [];
 	$.each(data, function(i,obj) {
-		allAvailableTags.push(obj['tagdef']);
+		if (obj['tagdef dbtype'] != 'tsvector') {
+			allAvailableTags.push(obj['tagdef']);
+		}
 	});
 	otherAvailableTags = [];
 	$.each(allAvailableTags, function(i, tag) {
@@ -7928,7 +7930,6 @@ function postLoadAllTags(data, textStatus, jqXHR, param) {
 			otherAvailableTags.push(tag);
 		}
 	});
-	//alert(otherAvailableTags);
 }
 
 function addTag(params) {
