@@ -1090,6 +1090,9 @@ class Application (DatabaseConnection):
 
         """
         etag = []
+
+        etag.append( source_checksum )
+
         if 'Cookie' in self.http_vary:
             etag.append( '%s' % self.context.client )
         else:
@@ -1118,6 +1121,7 @@ class Application (DatabaseConnection):
 
         def etags_parse(s):
             etags = []
+            s, strong = etag_parse(s)
             while s:
                 s = s.strip()
                 m = re.match('^,? *(?P<first>(W/)?"(.|\\")*")(?P<rest>.*)', s)
@@ -1132,9 +1136,7 @@ class Application (DatabaseConnection):
         client_etags = etags_parse( web.ctx.env.get('HTTP_IF_NONE_MATCH', ''))
         #web.debug(client_etags)
         
-        if client_etags.has_key('"*"'):
-            return True
-        if client_etags.has_key('%s' % self.http_etag):
+        if self.http_etag is not None and client_etags.has_key('%s' % self.http_etag):
             return True
 
         return False
