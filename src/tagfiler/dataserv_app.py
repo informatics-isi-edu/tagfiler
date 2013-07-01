@@ -708,7 +708,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         
         #TODO: ideally, we refactor this out of here
         self.emitted_headers = dict()
-        self.http_vary = set(['Cookie'])
+        self.http_vary = self.manager.get_http_vary()
         self.http_etag = None
         
         self.config = web.Storage(global_env.items())
@@ -1151,6 +1151,7 @@ class Application (DatabaseConnection):
         catalog_req = CatalogRequest(catalog_id)
         self.config = catalog_req.get_config()
         self.context = catalog_req.get_context()
+        self.http_vary = catalog_req.http_vary.copy()
         
         # Access Control enforcement
         catalog_req.acl_check(catalog_id=self.catalog_id, 
@@ -1172,7 +1173,6 @@ class Application (DatabaseConnection):
         self.start_time = datetime.datetime.now(pytz.timezone('UTC'))
 
         self.emitted_headers = dict()
-        self.http_vary = set(['Cookie'])
         self.http_etag = None
 
         self.request_guid = base64.b64encode(  struct.pack('Q', random.getrandbits(64)) )
