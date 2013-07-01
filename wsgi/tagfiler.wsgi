@@ -143,7 +143,7 @@ class Dispatcher:
             except Exception, e:
                 et, ev, tb = sys.exc_info()
                 web.debug('got exception "%s"' % str(ev), traceback.format_exception(et, ev, tb))
-                raise dataserv_app.RuntimeError(None, str(e))
+                raise
 
         finally:
             # log after we force iterator, to flush any deferred transaction log messages
