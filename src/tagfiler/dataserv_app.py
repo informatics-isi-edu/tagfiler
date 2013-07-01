@@ -3821,7 +3821,7 @@ class Application (DatabaseConnection):
                     web.debug('got exception "%s" peforming body1compensation for %s' % (str(ev), self.input_tablename),
                               traceback.format_exception(et, ev, tb))
 
-    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, unnest=None):
+    def build_files_by_predlist_path(self, path=None, limit=None, enforce_read_authz=True, tagdefs=None, vprefix='', listas={}, values=None, offset=None, json=False, unnest=None, rangemode=''):
         """Build SQL query expression and values map implementing path query.
 
            'path = []'    equivalent to path = [ ([], [], []) ]
@@ -3866,9 +3866,10 @@ class Application (DatabaseConnection):
         if len(prohibited) > 0:
             raise BadRequest(self, 'Aliasing of %s is prohibited.' % ', '.join(['"%s"' % t for t in prohibited]))
 
-        rangemode = self.queryopts.get('range', None)
-        if rangemode not in [ 'values', 'count', 'values<', 'values>' ]:
-            rangemode = None
+        if rangemode == '':
+            rangemode = self.queryopts.get('range', None)
+            if rangemode not in [ 'values', 'count', 'values<', 'values>' ]:
+                rangemode = None
 
         def tag_query(tagdef, preds, values, final=True, tprefix='_', spred=False, scalar_subj=None):
             """Compile preds for one tag into a query fetching all satisfactory triples.
@@ -3968,7 +3969,8 @@ class Application (DatabaseConnection):
                                                          []) ],
                                                       enforce_read_authz=enforce_read_authz,
                                                       values=values,
-                                                      tagdefs=tagdefs)[0]
+                                                      tagdefs=tagdefs,
+                                                      rangemode=None)[0]
                     )
                 preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
 
