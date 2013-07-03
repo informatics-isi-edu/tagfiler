@@ -55,6 +55,27 @@ chkconfig httpd on
 
 SVCHOME=$(eval "echo ~${SVCUSER}")
 
+# Sets PostgreSQL database flags
+#   $1 : db name
+#   $2 : true/false flag for 'datistemplate'
+#   $3 : true/false flag for 'datallowconn'
+#
+# A pg database cannot be deleted if its datistemplate flag is set to true. A 
+# pg database cannot allow connections (open sessions) if its datallowconn 
+# flag is set to false.
+pg_set_db_flags()
+{
+  dbn=$1
+  istempl=$2
+  allowconn=$3
+
+  echo "Updating pg_database flags for ${dbn} (template=${istempl}, allowconn=${allowconn})..."
+
+  runuser -c "psql ${PGADMIN}" - ${PGADMIN} >/dev/null <<EOF
+  UPDATE pg_database SET datistemplate='${istempl}', datallowconn='${allowconn}' WHERE datname='${dbn}';
+EOF
+}
+
 # finish initializing system for our service
 semanage fcontext --add --ftype "" --type httpd_sys_rw_content_t "${DATADIR}(/.*)?" \
     || semanage fcontext --add --ftype "" --type httpd_sys_script_rw_t "${DATADIR}(/.*)?"
@@ -97,6 +118,9 @@ for id in $catalog_ids; do
   runuser -c "dropdb ${SVCPREFIX}_${id}" - ${SVCUSER}
 done
 
+# unset template flags
+pg_set_db_flags ${TEMPLATE} false true
+
 # create catalog and template databases
 runuser -c "dropdb ${DBNAME}" - ${PGADMIN}
 runuser -c "createdb -O ${SVCUSER} ${DBNAME}" - ${PGADMIN}
@@ -131,6 +155,9 @@ chmod a+x ${SVCHOME}/dbsetup-template.sh
 # setup core and template databases
 runuser -c "${SVCHOME}/dbsetup.sh \"${DBNAME}\"" - ${SVCUSER}
 runuser -c "${SVCHOME}/dbsetup-template.sh ${HOME_HOST} ${SVCPREFIX} \"${TEMPLATE}\" \"${admin}\"" - ${SVCUSER}
+
+# set template flags
+pg_set_db_flags ${TEMPLATE} true false
 
 # register our service code
 cat > /etc/httpd/conf.d/zz_${SVCPREFIX}.conf <<EOF
