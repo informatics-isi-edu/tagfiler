@@ -885,22 +885,33 @@ class CatalogManager (CatalogRequest):
         
         The 'dbname' must be a non-existent database name. The new database
         will be a clone of the tagfiler template database.
-        
-        This call will make a subprocess call to the PostgreSQL 'createdb'
-        utility.
         """
-        # TODO(rs): really do not want to be in the business of subproc calls
-        #           maybe can refactor POST handler to do this in a dbquery(...) call
-        #           rather than a subprocess which is going to be fragile.
-        import subprocess
+        local_db = self._get_pooled_connection()
+        local_db._db_cursor().connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         try:
-            subprocess.check_call(["createdb", "-T", self.template, dbname])
-        except subprocess.CalledProcessError:
-            et, ev, tb = sys.exc_info()
-            web.debug('got exception "%s" calling createdb subprocess' % str(ev),
-                      traceback.format_exception(et, ev, tb))
-            raise RuntimeError(self, 'createdb failed')
-
+            # dbname and template are not wrapped because they are coming from
+            # or constructed from the system configuration, they are not from
+            # user supplied parameters, therefore should not be a point of 
+            # attack.
+            local_db.query("CREATE DATABASE %s TEMPLATE=%s" % (dbname, self.template))
+        except psycopg2.Error, ev:
+            et, ev2, tb = sys.exc_info()
+            web.debug('PostgreSQL Error while creating catalog database from template. PG Code: %s, PG Error: %s' % 
+                      (ev.pgcode, str(ev)),
+                      traceback.format_exception(et, ev2, tb))
+            
+            # Strip off the "DETAIL:..." part of the string from PG if it 
+            # exists. The details seem like too much information to expose to 
+            # the user.
+            msg = str(ev)
+            idx = msg.find("\n") # DETAIL starts after the first line feed
+            if idx > -1:
+                msg = msg[0:idx]
+            raise RuntimeError(self, data=msg)
+        finally:
+            local_db._db_cursor().connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+            self._put_pooled_connection(local_db)
+        
 
     def create_catalog(self, catalog):
         """Creates a catalog.
