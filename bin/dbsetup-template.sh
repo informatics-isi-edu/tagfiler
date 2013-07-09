@@ -85,7 +85,7 @@ cat >&${COPROC[1]} <<EOF
 BEGIN;
 
 CREATE FUNCTION val2json(text) RETURNS text AS \$\$
-  SELECT CASE WHEN \$1 IS NULL THEN 'null' ELSE '"' || regexp_replace(\$1, '"', E'\\\\"', 'g') || '"' END ;
+  SELECT CASE WHEN \$1 IS NULL THEN 'null' ELSE '"' || regexp_replace(regexp_replace(\$1, '"', E'\\\\"', 'g'), E'\\n', E'\\\\n', 'g') || '"' END ;
 \$\$ LANGUAGE SQL;
 
 CREATE FUNCTION val2json(boolean) RETURNS text AS \$\$
