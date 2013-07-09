@@ -236,10 +236,10 @@ def downcast_value(dbtype, value, range_extensions=False):
             return value
         raise ValueError('Value %s of type %s cannot be coerced to boolean' % (str(value), type(value)))
     
-    elif dbtype in [ 'text', 'tsword', 'textblob' ]:
+    elif dbtype in [ 'text', 'tsword', 'bigtext' ]:
         value = '%s' % value
         if value.find('\00') >= 0:
-            raise ValueError('Null bytes not allowed in text value "%s"' % value)
+            raise ValueError('Null bytes not allowed in text value.')
         if dbtype == 'tsword':
             for c in [ '|', '&', '!', '(', ')', ':', ' ' ]:
                 if value.find(c) >= 0:
@@ -1021,18 +1021,18 @@ class Application (DatabaseConnection):
 
     opsExcludeTypes = dict([ ('', ['tsvector']),
                              (':absent:', ['tsvector']),
-                             ('=', ['','tsvector', 'textblob']),
-                             ('!=', ['','tsvector', 'textblob']),
-                             (':lt:', ['', 'boolean','tsvector', 'textblob']),
-                             (':leq:', ['', 'boolean','tsvector', 'textblob']),
-                             (':gt:', ['', 'boolean','tsvector', 'textblob']),
-                             (':geq:', ['', 'boolean','tsvector', 'textblob']),
-                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
-                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
-                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
-                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
-                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
-                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'textblob']),
+                             ('=', ['','tsvector', 'bigtext']),
+                             ('!=', ['','tsvector', 'bigtext']),
+                             (':lt:', ['', 'boolean','tsvector', 'bigtext']),
+                             (':leq:', ['', 'boolean','tsvector', 'bigtext']),
+                             (':gt:', ['', 'boolean','tsvector', 'bigtext']),
+                             (':geq:', ['', 'boolean','tsvector', 'bigtext']),
+                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
+                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
+                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
+                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
+                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
+                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
                              (':word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
                              (':!word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
 
@@ -1280,7 +1280,7 @@ class Application (DatabaseConnection):
 
            this is enforced during set_tag() during insert_tagdef() and cannot happen during bulk inserts
         """
-        if dbtype not in set(['', 'boolean', 'int8', 'float8', 'text', 'textblob', 'date', 'timestamptz']):
+        if dbtype not in set(['', 'boolean', 'int8', 'float8', 'text', 'bigtext', 'date', 'timestamptz']):
             raise Conflict(self, 'Supplied dbtype "%s" is not supported.' % dbtype)
 
     def validateTagname(self, tag, tagdef=None, subject=None):
@@ -1859,7 +1859,7 @@ class Application (DatabaseConnection):
             self.dbtype = ''
             
         if self.tagref:
-            if self.dbtype in [ '', 'textblob' ]:
+            if self.dbtype in [ '', 'bigtext' ]:
                 raise Conflict(self, 'Requested type incompatible with tag reference feature')
             if not self.tagref in self.tagdefsdict:
                 raise Conflict(self, 'Referenced tagdef "%s" does not exist.' % self.tagref)
@@ -1898,7 +1898,7 @@ class Application (DatabaseConnection):
         else:
             tags.append( ('tagdef multivalue', False) )
 
-        if self.multivalue and self.dbtype in [ '', 'textblob' ]:
+        if self.multivalue and self.dbtype in [ '', 'bigtext' ]:
             raise Conflict(self, 'Requested type incompatible with multivalue tag feature')
 
         if self.is_unique:
@@ -1911,7 +1911,7 @@ class Application (DatabaseConnection):
         else:
             tags.append( ('tagdef unique', False) )
 
-        if self.is_unique == True and self.dbtype in [ '', 'textblob' ]:
+        if self.is_unique == True and self.dbtype in [ '', 'bigtext' ]:
             raise Conflict(self, 'Requested type incompatible with unique tag feature')
         
         tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
@@ -1962,7 +1962,7 @@ class Application (DatabaseConnection):
             dbtype = ''
 
         if dbtype != '':
-            tabledef += ", value %s" % dict(textblob='text').get(dbtype, dbtype)
+            tabledef += ", value %s" % dict(bigtext='text').get(dbtype, dbtype)
             if dbtype == 'text':
                 tabledef += " DEFAULT ''"
             elif dbtype == 'boolean':
@@ -1990,7 +1990,7 @@ class Application (DatabaseConnection):
                     else:
                         tabledef += ' REFERENCES %s (value) ON DELETE CASCADE' % self.wraptag(tagref)
                 
-            if dbtype in ['text', 'textblob']:
+            if dbtype in ['text', 'bigtext']:
                 tabledef += ', tsv tsvector'
 
             if not tagdef.multivalue:
@@ -1998,7 +1998,7 @@ class Application (DatabaseConnection):
             else:
                 tabledef += ", UNIQUE(subject, value)"
 
-            if dbtype != 'textblob':
+            if dbtype != 'bigtext':
                 indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
                 indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
                 indexdef += ' (value %s)' % (dbtype == 'text' and 'text_pattern_ops' or '')
@@ -2010,7 +2010,7 @@ class Application (DatabaseConnection):
         self.dbquery(tabledef)
         if indexdef:
             self.dbquery(indexdef)
-        if dbtype in [ 'text', 'textblob' ]:
+        if dbtype in [ 'text', 'bigtext' ]:
             self.dbquery('CREATE TRIGGER tsvupdate BEFORE INSERT OR UPDATE ON %s' % self.wraptag(tagdef.tagname)
                          + " FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(tsv, 'pg_catalog.english', value)")
             self.dbquery('CREATE INDEX %s ON %s USING gin(tsv)' % (
@@ -3040,7 +3040,7 @@ class Application (DatabaseConnection):
 
         for tagdef in dtagdefs:
             col = '%s %s%s %s' % (wraptag(tagdef.tagname, prefix='d_'), 
-                                  {'': 'bool', 'textblob': 'text'}.get(tagdef.dbtype, tagdef.dbtype), 
+                                  {'': 'bool', 'bigtext': 'text'}.get(tagdef.dbtype, tagdef.dbtype), 
                                   {True:'[]'}.get(tagdef.multivalue, ''),
                                   {True:'UNIQUE'}.get(tagdef.unique, ''))
             dtable_columns.append(col)
@@ -3428,7 +3428,7 @@ class Application (DatabaseConnection):
             # remap multivalue tags to value array
             # 1 column per tag: in_tag
             input_column_defs = [ '%s %s%s %s' % (wraptag(td.tagname, '', 'in_'),
-                                                  {'': 'boolean', 'textblob': 'text'}.get(td.dbtype, td.dbtype),
+                                                  {'': 'boolean', 'bigtext': 'text'}.get(td.dbtype, td.dbtype),
                                                   {True: '[]'}.get(td.multivalue, ''),
                                                   {True: 'UNIQUE'}.get(td.unique, ''))
                                   for td in self.input_column_tds ]
@@ -3459,7 +3459,7 @@ class Application (DatabaseConnection):
 
         def wrapped_constant(td, v):
             """Return one SQL literal representing values v"""
-            param_type = { '': 'boolean', 'textblob': 'text' }.get(td.dbtype, td.dbtype)
+            param_type = { '': 'boolean', 'bigtext': 'text' }.get(td.dbtype, td.dbtype)
 
             if v != None:
                 try:
@@ -3477,6 +3477,9 @@ class Application (DatabaseConnection):
                         else:
                             return '%s::%s' % (wrapval(v, param_type), param_type)
                 except ValueError, e:
+                    et, ev2, tb = sys.exc_info()
+                    web.debug('got exception "%s" during value wrapping' % str(ev2),
+                              traceback.format_exception(et, ev2, tb))
                     raise Conflict(self, data=str(e))
             else:
                 return 'NULL'
@@ -4049,13 +4052,13 @@ class Application (DatabaseConnection):
                         # mergepreds already downcasted and reduced all free-text queries to a single query
                         constants = [ 'to_tsquery(%s)' % wrapval(pred.vals[0]) ]
                     else:
-                        constants = [ '(%s::%s)' % (v, dict(textblob='text').get(tagdef.dbtype, tagdef.dbtype)) for v in vals if type(v) != tuple ]
+                        constants = [ '(%s::%s)' % (v, dict(bigtext='text').get(tagdef.dbtype, tagdef.dbtype)) for v in vals if type(v) != tuple ]
 
                     clauses = []
                     if constants:
                         if len(constants) > 1:
                             constants = ', '.join(constants)
-                            rhs = 'ANY (ARRAY[%s]::%s[])' % (constants, dict(textblob='text').get(tagdef.dbtype, tagdef.dbtype))
+                            rhs = 'ANY (ARRAY[%s]::%s[])' % (constants, dict(bigtext='text').get(tagdef.dbtype, tagdef.dbtype))
                         else:
                             rhs = constants[0]
                         clauses.append( '%s %s %s' % (pred.op == ':tsquery:' and tsvcol or valcol, Application.opsDB[pred.op], rhs) )
@@ -4440,7 +4443,7 @@ class Application (DatabaseConnection):
             return
 
         # we only index text tags that are effectively the same read authz as the subjects themselves
-        text_tags = [ td.tagname for td in self.tagdefsdict.values() if td.dbtype in [ 'text', 'textblob' ] and td.readpolicy in ['anonymous', 'subject', 'tagorsubject'] ]
+        text_tags = [ td.tagname for td in self.tagdefsdict.values() if td.dbtype in [ 'text', 'bigtext' ] and td.readpolicy in ['anonymous', 'subject', 'tagorsubject'] ]
         
         parts = [ "SELECT subject, tsv FROM %s" % self.wraptag(tagname) for tagname in text_tags ]
 
