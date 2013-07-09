@@ -3617,8 +3617,8 @@ class Application (DatabaseConnection):
                             else:
                                 raise BadRequest(self, 'Patterned bulk tag update does not support predicate operator "%s" for list predicates.' % pred.op )
 
-                            assigns.append( (wraptag(td.tagname, '', 'in_'),
-                                             wrapped_constant(td, list(vals))) )
+                        assigns.append( (wraptag(td.tagname, '', 'in_'),
+                                         wrapped_constant(td, list(vals))) )
 
                 cols = ', '.join([ lhs for lhs, rhs in assigns ])
                 vals = ', '.join([ rhs for lhs, rhs in assigns ])
