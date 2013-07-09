@@ -1925,12 +1925,16 @@ class Application (DatabaseConnection):
         else:
             tagdef.softtagref = False
         tagdef.multivalue = self.multivalue
-        
-        self.deploy_tagdef(tagdef)
-        #self.log('TRACE', 'Application.insert_tagdef() after deploy')
 
+        self.validateTagdefDbtype(self.dbtype)
+        self.validateTagdefPolicy(self.remapTagdefReadPolicy(self.readpolicy))
+        self.validateTagdefPolicy(self.writepolicy)
+        
         for tag, value in tags:
             self.set_tag(subject, self.tagdefsdict[tag], value)
+
+        self.deploy_tagdef(tagdef)
+        #self.log('TRACE', 'Application.insert_tagdef() after deploy')
 
         self.dbquery('ANALYZE "_tagdef"')
         self.dbquery('ANALYZE "_tagdef tagref"')
