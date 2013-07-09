@@ -461,10 +461,7 @@ class FileTags (Node):
         self.path_modified, self.listtags, writetags, self.limit, self.offset = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
-                                      extra_tags=
-                                      [ 'id', 'file', 'name', 
-                                        'write users', 'modified' ] 
-                                      + [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.unique ])
+                                      extra_tags=[ ])
 
         self.http_vary.add('Accept')
         self.set_http_etag(self.select_predlist_path_txid(self.path_modified))
