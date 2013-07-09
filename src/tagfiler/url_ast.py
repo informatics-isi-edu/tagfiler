@@ -456,6 +456,8 @@ class FileTags (Node):
             self.path = [ ([], [], []) ]
 
     def get_body(self):
+        subjpreds, listpreds, otags = self.path[-1]
+
         self.path_modified, self.listtags, writetags, self.limit, self.offset = \
               self.prepare_path_query(self.path,
                                       list_priority=['path', 'list', 'view', 'subject', 'all'],
@@ -487,6 +489,16 @@ class FileTags (Node):
 
         if len(files) == 0:
             raise NotFound(self, 'subject matching "%s"' % predlist_linearize(self.path_modified[-1][0], lambda x: x))
+
+        if self.acceptType == 'text/plain':
+            if len(files) > 1:
+                raise Conflict(self, 'Multiple matching subjects conflict with returning tag value as plain text.')
+
+            td = self.tagdefsdict.get(listpreds[0].tag)
+            if td and td.multivalue:
+                raise Conflict(self, 'Multivalue tagdef conflicts with returning tag value as plain text.')
+            # td is None will be error-handled by the query engine itself
+            self.plain_tag = td
 
         return (files, all)
 
@@ -550,6 +562,10 @@ class FileTags (Node):
                 os.remove(self.temporary_filename)
 
             return
+        elif self.acceptType == 'text/plain':
+            self.header('Content-Type', 'text/plain')
+            
+            yield files[0].get(self.plain_tag.tagname)
         else:
             self.header('Content-Type', 'application/json')
             yield '['
@@ -572,7 +588,8 @@ class FileTags (Node):
             if acceptType in ['text/uri-list',
                               'application/x-www-form-urlencoded',
                               'text/csv',
-                              'application/json']:
+                              'application/json',
+                              'text/plain']:
                 self.acceptType = acceptType
                 break
 
@@ -582,6 +599,11 @@ class FileTags (Node):
         if self.acceptType == 'text/csv':
             temporary_file, self.temporary_filename = make_temporary_file('query-result-', self.config['store path'], 'a')
             temporary_file.close()
+
+        if self.acceptType == 'text/plain':
+            subjpreds, listpreds, otags = self.path[-1]
+            if len(listpreds) != 1:
+                raise Conflict(self, 'Query returning %d tags conflicts with returning tag value as plain text.', len(listpreds))
 
         for r in self.dbtransact(self.get_body, self.get_postCommit):
             yield r
@@ -663,6 +685,11 @@ class FileTags (Node):
 
             for tag, vals in tagvals.items():
                 listpreds.append( web.Storage(tag=tag,op='=', vals=vals) )
+
+        elif content_type == 'text/plain' and len(listpreds) == 1 and listpreds[0].op == None:
+            # treat request body as a single tag value
+            content = web.ctx.env['wsgi.input'].read()
+            listpreds.append( web.Storage(tag=listpreds[0].tag, op='=', vals=[ content ]) )
 
         # engage special patterned update mode using 'id' as correlation and False as subjects_iter to signal a path-based subjects query
         subjpreds.append( web.Storage(tag='id', op=None, vals=[]) )
