@@ -266,9 +266,12 @@ class Catalog (CNode):
 
             return catalog
 
-        def postCommit(bodyresults):
+        def postCommit(catalog):
+            web.ctx.status = '201 Created'
+            uri = self.get_homepath(self.get_home(), catalog.id)
+            self.header('Location', uri)
             self.header('Content-Type', 'application/json')
-            catalog = jsonWriter(bodyresults, indent=2) + '\n'
+            catalog = jsonWriter(catalog, indent=2) + '\n'
             self.header('Content-Length', str(len(catalog)))
             return catalog
 

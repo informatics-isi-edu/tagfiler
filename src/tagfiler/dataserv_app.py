@@ -752,16 +752,23 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
     def preDispatch(self, uri):
         self.preDispatchCore(uri)
 
+    def get_home(self):
+        """Returns the current context's home."""
+        return self.config.get('home', 'https://%s' % web.ctx.host)
+    
+    def get_homepath(self, home, catalog_id):
+        """Returns the current context's homepath."""
+        return self.config.get('homepath', home + web.ctx.homepath + '/catalog/%d' % catalog_id)
+    
     def get_config(self):
         """Returns a catalog specific configuration."""
         cfg = web.Storage(self.config)
         # we may get config out of the core database
-        home = cfg.get('home', 'https://%s' % web.ctx.host)
+        home = self.get_home()
         cfg.update({
             'database_name': 'tagfiler_%d' % self.catalog_id,
             'home': home,
-            'homepath': cfg.get('homepath', 
-                        home + web.ctx.homepath + '/catalog/%d' % self.catalog_id),
+            'homepath': self.get_homepath(home, self.catalog_id),
             'store path': cfg.get('store path', 
                           '/var/www/%s-data/%d' % (cfg.get('user', 'tagfiler'), self.catalog_id))})
         return cfg

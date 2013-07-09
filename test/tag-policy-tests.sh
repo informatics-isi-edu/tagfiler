@@ -1,9 +1,11 @@
 #!/bin/sh
 
-if [[ $# -lt 4 ]]
+script=`basename "$0"`
+
+if [[ $# -lt 3 ]]
 then
     cat >&2 <<EOF
-usage: $0 <user> <password> <non-user role> <mutable role> <catalog id>
+usage: ${script} <user> <password> <non-user role> <mutable role>
 
 Test against a default tagfiler installation on localhost with default
 security behavior allowing username and password POST to the /session
@@ -20,9 +22,6 @@ test tagdefs can be purged.  For this feature to work, the
 tagfiler-config.json must also grant the user rights via the webauthn2
 manageusers and manageroles permissions.
 
-The <catalog id> identifies the catalog instance to be used in the tests.
-It must be created before the tests are run.
-
 This script runs tests of tag policy models by creating tagdefs and
 using them to create and retrieve graph content.  The non-user role is
 needed to allow content to be created that the user should not be able
@@ -33,45 +32,46 @@ EOF
     exit 1
 fi
 
-API="https://localhost/tagfiler"
 username=$1
 password=$2
 otherrole=$3
 mutablerole=$4
-catalogid=$5
 
 testno=${RANDOM}
+catname=${script}_${testno}
 
 tempfile=$(mktemp)
 tempfile2=$(mktemp)
 cookie=$(mktemp)
-
+headers=$(mktemp)
 logfile=$(mktemp)
+
+tagfiler_loc="https://localhost/tagfiler"
+catalog_loc=""
 
 ACCEPT="${ACCEPT:-text/csv}"
 
 cleanup()
 {
-    rm -f "$tempfile" "$logfile" "$tempfile2" "$cookie"
+    rm -f "$tempfile" "$logfile" "$tempfile2" "$cookie" "$headers"
 }
 
 trap cleanup 0
 
 mycurl_base()
 {
-    local url="$1"
+    local urlpath="$1"
     shift
     truncate -s 0 $logfile
-    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
+    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${tagfiler_loc}${urlpath}"
 }
 
 mycurl()
 {
-    local url="$1"
-    local catalog="/catalog/${catalogid}"
+    local urlpath="$1"
     shift
     truncate -s 0 $logfile
-    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${catalog}${url}"
+    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${catalog_loc}${urlpath}"
 }
 
 tagdef_writepolicies=(
@@ -114,12 +114,19 @@ reset()
 	mycurl "/tagdef/foo${i}" -X DELETE > /dev/null
     done
 
+    # Delete the test catalog, then logout
+    mycurl "" -X DELETE > /dev/null
     mycurl_base "/session" -X DELETE > /dev/null
 }
 
 error()
 {
-    reset
+    if [[ -n "${catalog_loc}" ]]
+    then
+        reset
+    else
+        mycurl_base "/session" -X DELETE > /dev/null
+    fi
     cat >&2 <<EOF
 $0: $@
 $(cat $logfile)
@@ -127,10 +134,18 @@ EOF
     exit 1
 }
 
+
+# Login, POST username/password form parameters to the session/ resource
 status=$(mycurl_base "/session" -d username="$username" -d password="$password" -o $logfile)
 [[ "$status" = 201 ]] || error got "$status" during login
 
-#mycurl "/subject/tagdef:regexp:foo(tagdef;tagdef%20readpolicy;tagdef%20writepolicy)" -H "Accept: ${ACCEPT}"
+
+# Create catalog, POST a small json document to the catalog/ resource
+status=$(mycurl_base "/catalog" -D ${headers} -o $logfile -H "Content-Type: application/json" -d "{\"name\": \"${catname}\"}")
+[[ "$status" = 201 ]] || error got "$status" during create catalog
+# Parse the Location: field from the HTTP header
+catalog_loc=$(awk '/^Location:/ {sub(/\r/,"",$2); print $2}' ${headers})
+
 
 querytest()
 {
