@@ -245,6 +245,12 @@ def downcast_value(dbtype, value, range_extensions=False):
                 if value.find(c) >= 0:
                     raise ValueError('Character "%s" not allowed in text search words' % c)
         
+    elif dbtype == 'bytea':
+        if type(value) == unicode:
+            value = value.encode('utf8')
+        if type(value) == str:
+            value = buffer(value)
+
     elif dbtype in [ 'int8', 'float8', 'date', 'timestamptz', 'interval' ] and range_extensions and type(value) in [ str, unicode ]:
         m = re.match(' *[(](?P<lower>[^,()]+) *, *(?P<upper>[^,()]+)[)] *', value)
 
@@ -500,6 +506,8 @@ def wrapval(value, dbtype=None, range_extensions=False):
 
     if dbtype in [ 'boolean', 'int8', 'float8' ]:
         return '%s' % value
+    elif dbtype == 'bytea':
+        return "E'\\\\x" + ''.join([ c.encode('hex') for c in value ]) + "'"
     else:
         return "'%s'" % value.replace("'", "''").replace("%", "%%").replace("$", "$$")
     
@@ -1021,20 +1029,20 @@ class Application (DatabaseConnection):
 
     opsExcludeTypes = dict([ ('', ['tsvector']),
                              (':absent:', ['tsvector']),
-                             ('=', ['','tsvector', 'bigtext']),
-                             ('!=', ['','tsvector', 'bigtext']),
-                             (':lt:', ['', 'boolean','tsvector', 'bigtext']),
-                             (':leq:', ['', 'boolean','tsvector', 'bigtext']),
-                             (':gt:', ['', 'boolean','tsvector', 'bigtext']),
-                             (':geq:', ['', 'boolean','tsvector', 'bigtext']),
-                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext']),
-                             (':word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']),
-                             (':!word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean']) ])
+                             ('=', ['','tsvector', 'bigtext', 'bytea']),
+                             ('!=', ['','tsvector', 'bigtext', 'bytea']),
+                             (':lt:', ['', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':leq:', ['', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':gt:', ['', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':geq:', ['', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':like:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':simto:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':!regexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':!ciregexp:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean','tsvector', 'bigtext', 'bytea']),
+                             (':word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean', 'bytea']),
+                             (':!word:', ['', 'int8', 'float8', 'date', 'timestamptz', 'boolean', 'bytea']) ])
 
     opsDB = dict([ ('=', '='),
                    ('!=', '!='),
@@ -1280,7 +1288,7 @@ class Application (DatabaseConnection):
 
            this is enforced during set_tag() during insert_tagdef() and cannot happen during bulk inserts
         """
-        if dbtype not in set(['', 'boolean', 'int8', 'float8', 'text', 'bigtext', 'date', 'timestamptz']):
+        if dbtype not in set(['', 'boolean', 'int8', 'float8', 'text', 'bigtext', 'date', 'timestamptz', 'bytea']):
             raise Conflict(self, 'Supplied dbtype "%s" is not supported.' % dbtype)
 
     def validateTagname(self, tag, tagdef=None, subject=None):
@@ -1859,7 +1867,7 @@ class Application (DatabaseConnection):
             self.dbtype = ''
             
         if self.tagref:
-            if self.dbtype in [ '', 'bigtext' ]:
+            if self.dbtype in [ '', 'bigtext', 'bytea' ]:
                 raise Conflict(self, 'Requested type incompatible with tag reference feature')
             if not self.tagref in self.tagdefsdict:
                 raise Conflict(self, 'Referenced tagdef "%s" does not exist.' % self.tagref)
@@ -1898,7 +1906,7 @@ class Application (DatabaseConnection):
         else:
             tags.append( ('tagdef multivalue', False) )
 
-        if self.multivalue and self.dbtype in [ '', 'bigtext' ]:
+        if self.multivalue and self.dbtype in [ '', 'bigtext', 'bytea' ]:
             raise Conflict(self, 'Requested type incompatible with multivalue tag feature')
 
         if self.is_unique:
@@ -1911,7 +1919,7 @@ class Application (DatabaseConnection):
         else:
             tags.append( ('tagdef unique', False) )
 
-        if self.is_unique == True and self.dbtype in [ '', 'bigtext' ]:
+        if self.is_unique == True and self.dbtype in [ '', 'bigtext', 'bytea' ]:
             raise Conflict(self, 'Requested type incompatible with unique tag feature')
         
         tagdef = web.Storage([ (Application.tagdef_listas.get(key, key), value) for key, value in tags ])
@@ -2002,7 +2010,7 @@ class Application (DatabaseConnection):
             else:
                 tabledef += ", UNIQUE(subject, value)"
 
-            if dbtype != 'bigtext':
+            if dbtype not in [ 'bigtext', 'bytea' ]:
                 indexdef = 'CREATE INDEX %s' % (self.wraptag(tagdef.tagname, '_value_idx'))
                 indexdef += ' ON %s' % (self.wraptag(tagdef.tagname))
                 indexdef += ' (value %s)' % (dbtype == 'text' and 'text_pattern_ops' or '')

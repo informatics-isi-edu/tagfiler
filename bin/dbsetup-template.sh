@@ -92,6 +92,10 @@ CREATE FUNCTION val2json(boolean) RETURNS text AS \$\$
   SELECT CASE WHEN \$1 IS NULL THEN 'null' WHEN \$1 THEN 'true' ELSE 'false' END ;
 \$\$ LANGUAGE SQL;
 
+CREATE FUNCTION val2json(bytea) RETURNS text AS \$\$
+  SELECT '\\\\x' || encode(\$1, 'hex') || '"' ;
+\$\$ LANGUAGE SQL;
+
 $(json_native_func int)
 $(json_native_func bigint)
 $(json_native_func float8)
