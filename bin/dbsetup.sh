@@ -41,13 +41,12 @@ BEGIN;
 
 CREATE TABLE catalogs (
 	id bigserial PRIMARY KEY,
-	owner text NOT NULL,
-	admin_users text[] NOT NULL,
-	write_users text[] NOT NULL,
-	read_users text[] NOT NULL,
         active boolean,
-	name text,
-	description text,
+	owner text NOT NULL,
+	write_users text[],
+	read_users text[],
+        db_bytes bigint default 0,
+        fs_bytes bigint default 0,
         config text);
 
 COMMIT;

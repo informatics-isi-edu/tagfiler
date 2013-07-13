@@ -698,7 +698,7 @@ def get_db():
 class CatalogRequest (webauthn2_handler_factory.RestHandler):
     
     ANONYMOUS = set(['*'])
-    STD_SELECT_COLUMNS = 'id, owner, admin_users, write_users, read_users, name, description'
+    STD_SELECT_COLUMNS = 'id, owner, write_users, read_users, config'
     
     def __init__(self, catalog_id, parser=None, queryopts=None):
         webauthn2_handler_factory.RestHandler.__init__(self)
@@ -822,6 +822,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         be 'in' the catalogs 'acl_list'. However, if the system 'admin' role is
         in the caller's 'attr' list, then the filter is not used.
         """
+        catalogs = list()
         
         if not cols:
             cols = CatalogRequest.STD_SELECT_COLUMNS
@@ -833,11 +834,32 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         if catalog_id:
             qry += " AND id = %d" % catalog_id
         
-        # Filter by role, if not admin
+        # Filter by owner or acl, if not admin
         if admin not in attrs:
-            qry += (" AND ARRAY[%s] && %s" % (wraparray(attrs | CatalogRequest.ANONYMOUS), acl_list))
+            qry += (" AND (ARRAY[%s] && %s OR owner IN (%s))" 
+                    % (wraparray(attrs | CatalogRequest.ANONYMOUS), acl_list, 
+                       wraparray(attrs)))
+        
+        for result in self.dbquery(qry):
+            # Deserialize the json config string returned by the db
+            #   note: this might be worth having a deserializer function
+            config = dict()
+            if 'config' in result:
+                raw = result['config']
+                if len(raw) > 0:
+                    config = jsonReader(raw)
+                    
+            # Some db columns actually belong in the config
+            for key in ['owner', 'read_users', 'write_users']:
+                # I bet there's a more pythonic way for this...
+                if key in result:
+                    config[key] = result[key]
+                    del result[key]
             
-        return self.dbquery(qry)
+            result['config'] = config
+            catalogs.append(result)
+            
+        return catalogs
 
     
     def acl_check(self, catalog_id=None, active=True, acl_list='read_users', 
@@ -934,46 +956,39 @@ class CatalogManager (CatalogRequest):
         The parameters for the new catalog should be specified in a dictionary
         given by 'catalog'.
         
-        Returns the header metadata for the newly created catalog, which is
-        essentially the same as the input 'catalog' but with the acl lists
-        complete and the catalog_id set.
+        Returns the JSON representation of the newly created catalog.
         """
         # Create a dictionary of 'wrapped' values (i.e., db safe)
         wrapped = dict()
+        
+        # Get config from catalog record or nulls
+        config = catalog.get('config', dict())
 
         # Owner comes from the request context
-        if 'owner' in catalog:
+        if 'owner' in config:
             raise BadRequest(self, 'Cannot specify "owner" field.')
         
         client = self.context.client
         wrapped['owner'] = wrapval(client)
-
-        if 'name' in catalog:
-            wrapped['name'] = wrapval(catalog['name'])
-        else:
-            wrapped['name'] = CatalogManager.__EMPTY_STR
-
-        if 'description' in catalog:
-            wrapped['description'] = wrapval(catalog['description'])
-        else:
-            wrapped['description'] = CatalogManager.__EMPTY_STR
         
-        # Wrap roles arrays, add client to them if not already in them
-        for key in ['admin_users', 'write_users', 'read_users']:
-            if key in catalog:
-                users = catalog[key]
+        # Extract read and write roles from the supplied config
+        for key in ['write_users', 'read_users']:
+            if key in config:
+                users = config[key]
                 if not isinstance(users, list):
                     raise ValueError( ("%s must be a list" % key) )
-                if client not in users:
-                    users.append(client)
+                wrapped[key] = wraparray(users)
             else:
-                users = [client]
-            wrapped[key] = wraparray(users)
+                wrapped[key] = wraparray(list())
         
-        self.dbquery("INSERT INTO catalogs "
-                     + "(owner, admin_users, write_users, read_users, name, description) "
-                     + "VALUES (%(owner)s, ARRAY[%(admin_users)s], ARRAY[%(write_users)s], ARRAY[%(read_users)s], %(name)s, %(description)s)"
-                     % wrapped)
+        # Add remaining config to fields for insert into registry
+        wrapped['config'] = wrapval(jsonWriter(config))
+        
+        # Insert new catalog into registry
+        query = ("INSERT INTO catalogs "
+                     + "(owner, write_users, read_users, config) "
+                     + "VALUES (%(owner)s, ARRAY[%(write_users)s]::text[], ARRAY[%(read_users)s]::text[], %(config)s)" % wrapped)
+        self.dbquery(query)
         
         # Now get the catalog_id of the last entered catalog
         results = self.dbquery("SELECT max(id) as last_id FROM catalogs")
@@ -986,8 +1001,7 @@ class CatalogManager (CatalogRequest):
         self.dbquery("UPDATE catalogs SET active = true WHERE id = %s" % last_id)
         
         # Return the newly created catalog
-        results = self.dbquery("SELECT %(cols)s FROM catalogs WHERE id=%(catalog_id)d" % 
-                               dict(cols=CatalogRequest.STD_SELECT_COLUMNS, catalog_id=last_id))
+        results = self.select_catalogs(catalog_id=last_id, attrs=set([client]))
         return results[0]
 
 

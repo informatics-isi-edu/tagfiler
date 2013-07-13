@@ -240,8 +240,8 @@ class Catalog (CNode):
 
     def POST(self, uri):
         
-        # Cannot create a catalog unless user is in admin role
-        if self.config.admin not in self.context.attributes:
+        # Check if user can create catalogs
+        if len( set(self.config['create catalog users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
             raise Forbidden(self, 'catalog')
 
         # Only accept application/json
@@ -258,7 +258,10 @@ class Catalog (CNode):
 
         def body():
             try:
-                catalog = jsonReader(input)
+                if input and len(input) > 0:
+                    catalog = jsonReader(input)
+                else:
+                    catalog = dict()
                 return self.create_catalog(catalog)
             
             except ValueError, msg:
@@ -268,7 +271,7 @@ class Catalog (CNode):
 
         def postCommit(catalog):
             web.ctx.status = '201 Created'
-            uri = self.get_homepath(self.get_home(), catalog.id)
+            uri = self.get_homepath(self.get_home(), catalog['id'])
             self.header('Location', uri)
             self.header('Content-Type', 'application/json')
             catalog = jsonWriter(catalog, indent=2) + '\n'
@@ -287,7 +290,7 @@ class Catalog (CNode):
             # Use this selector for access control, only users in the
             # catalog's 'admin_users' role list can delete a catalog.
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
-                                             acl_list='admin_users', 
+                                             acl_list='write_users', 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
             if len(catalogs) == 0:
