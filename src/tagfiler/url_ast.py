@@ -287,14 +287,20 @@ class Catalog (CNode):
             raise BadRequest(self, 'Catalog id must be specified')
 
         def body():
-            # Use this selector for access control, only users in the
-            # catalog's 'admin_users' role list can delete a catalog.
+            # First, get the catalog. This implicitly tests the read_users
+            # ACL, which influences how we respond if the owner test fails.
+            # I.e., reader but not owner --> Forbidden
+            #       not reader --> NotFound (don't reveal catalog exists
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
-                                             acl_list='write_users', 
+                                             acl_list='read_users', 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
             if len(catalogs) == 0:
                 raise NotFound(self, 'catalog')
+            else:
+                config = catalogs[0].get('config')
+                if config.get('owner') not in self.context.attributes:
+                    raise Forbidden(self, 'config/'+self.catalog_id)
             
             self.delete_catalog(self.catalog_id)
         
