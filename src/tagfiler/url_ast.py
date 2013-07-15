@@ -241,7 +241,7 @@ class Catalog (CNode):
     def POST(self, uri):
         
         # Check if user can create catalogs
-        if len( set(self.config['create_catalog_users']).intersection(set(self.context.attributes).union(set('*'))) ) == 0:
+        if set(self.config['create_catalog_users']).isdisjoint(self.context.attributes | set('*')):
             raise Forbidden(self, 'catalog')
 
         # Only accept application/json
