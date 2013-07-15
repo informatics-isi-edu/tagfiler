@@ -13,7 +13,7 @@
      "dbmaxconnections" : "Limit the number of SQL connections when pooling",
      "chunk bytes": "The number of bytes to use in file read/write buffers",
      "admin" : "The administrative user role as known by the configured webauthn2 providers",
-     "create catalog users" : ["The list of roles allowed to create catalogs"],
+     "create_catalog_users" : ["The list of roles allowed to create catalogs"],
      "file write users": ["The list of roles allowed to create subjects"],
      "tagdef write users": ["The list of roles allowed to create tagdefs"],
      "policy remappings": {"source role": ["remap role", ["read role", "..."], ["write role", "..."], "boolean readok", "boolean writeok"]},
@@ -36,7 +36,7 @@
    "chunk bytes": 1048576,
 
    "admin" : "adminrole",
-   "create catalog users": ["adminrole", "*"],
+   "create_catalog_users": ["adminrole", "*"],
    "file write users": ["adminrole", "*"],
    "tagdef write users": ["adminrole", "*"],
    "policy remappings": {},
