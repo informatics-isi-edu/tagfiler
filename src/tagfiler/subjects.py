@@ -99,7 +99,7 @@ class Node (Application):
 
     def __init__(self, parser, appname, catalog_id, queryopts=None):
         self.appname = appname
-        Application.__init__(self, catalog_id, parser, queryopts)
+        Application.__init__(self, appname, catalog_id, parser, queryopts)
 
     def uri2referer(self, uri):
         return self.config['home'] + uri

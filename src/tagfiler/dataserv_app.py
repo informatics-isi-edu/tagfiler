@@ -711,16 +711,24 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
     CONFIG_WRITE_USERS          = 'write_users'
     CONFIG_CONTENT_READ_USERS   = 'content_read_users'
     CONFIG_CONTENT_WRITE_USERS  = 'content_write_users'
-    ALL_FIELDS = set([CONFIG_NAME,
+    CONFIG_ALL = set([CONFIG_NAME,
                       CONFIG_DESC,
                       CONFIG_OWNER,
                       CONFIG_READ_USERS,
                       CONFIG_WRITE_USERS,
                       CONFIG_CONTENT_READ_USERS,
                       CONFIG_CONTENT_WRITE_USERS])
+    CONFIG_ACL = set([CONFIG_READ_USERS,
+                      CONFIG_WRITE_USERS,
+                      CONFIG_CONTENT_READ_USERS,
+                      CONFIG_CONTENT_WRITE_USERS])
     
-    def __init__(self, catalog_id, parser=None, queryopts=None):
+    def __init__(self, parser=None, appname=None, catalog_id=None, queryopts=None):
         webauthn2_handler_factory.RestHandler.__init__(self)
+        
+        self.appname = appname
+        self.template = appname + "_template"
+        self.dbnprefix = appname + "_"
         
         if catalog_id:
             self.catalog_id = int(catalog_id)
@@ -825,7 +833,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
 
         return postCommit(bodyval)
 
-    def select_catalogs(self, cols=None, catalog_id=None, active=True,
+    def select_catalogs(self, catalog_id=None, active=True,
                               acl_list='read_users', attrs=[], admin=None):
         """Select catalog(s) from the database.
         
@@ -842,9 +850,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         in the caller's 'attr' list, then the filter is not used.
         """
         catalogs = list()
-        
-        if not cols:
-            cols = CatalogRequest.STD_SELECT_COLUMNS
+        cols = CatalogRequest.STD_SELECT_COLUMNS
             
         # Base query, get active catalogs
         qry = "SELECT %s FROM catalogs WHERE active = %s" % (cols, str(active))
@@ -853,8 +859,8 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         if catalog_id:
             qry += " AND id = %d" % catalog_id
         
-        # Filter by owner or acl, if not admin
-        if admin not in attrs:
+        # Filter by acl_list or owner, if not admin. Skip if no acl_list given.
+        if acl_list and (admin not in attrs):
             qry += (" AND (ARRAY[%s] && %s OR owner IN (%s))" 
                     % (wraparray(attrs | CatalogRequest.ANONYMOUS), acl_list, 
                        wraparray(attrs)))
@@ -881,34 +887,27 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
         return catalogs
 
     
-    def acl_check(self, catalog_id=None, active=True, acl_list='read_users', 
+    def acl_check(self, catalog_id=None, active=True, acl_list=None, 
                   attrs=[], admin=None):
         """Checks to see if the user is in the ACL for the specified catalog.
-        
-        The parameters are the same as those of select_catalogs, the only 
-        difference is that 'cols' is not repeated here.
         """
         
         def body():
-            catalogs = self.select_catalogs(cols='id', catalog_id=catalog_id, 
-                                            active=active, acl_list=acl_list, 
+            catalogs = self.select_catalogs(catalog_id=catalog_id, 
+                                            active=active, acl_list=None, 
                                             attrs=attrs, admin=admin)
             if len(catalogs) == 0:
                 return False
+            
+            config = catalogs[0]['config']
+            acl    = config.get(acl_list, list())
+            
+            if (attrs | self.ANONYMOUS).isdisjoint(acl):
+                return False
             else:
                 return True
-        
-        def postCommit(bodyresults):
-            # TODO: this needs to be moved to the Application.__init__
-            #   call rather than thrown here. The only reason it is here is
-            #   that the exception class requires parameters that are not initialized
-            #   at the time Application does the ACL check. I will do this next.
-            # NOTE: There is not problem with having it here, it just causes
-            #   annoying (b/c they are unnecessary) error messages in the log
-            if not bodyresults:
-                raise NotFound(self, 'catalog')
 
-        return self.dbtransact(body, postCommit)
+        return self.dbtransact(body, lambda result: result)
 
 
 class CatalogManager (CatalogRequest):
@@ -916,9 +915,8 @@ class CatalogManager (CatalogRequest):
     
     __EMPTY_STR = "''"
     
-    def __init__(self, parser=None, catalog_id=None, queryopts=None):
-        CatalogRequest.__init__(self, parser, catalog_id, queryopts)
-
+    def __init__(self, parser=None, appname=None, catalog_id=None, queryopts=None):
+        CatalogRequest.__init__(self, parser, appname, catalog_id, queryopts)
     
     def delete_catalog(self, catalog_id):
         """Deletes a catalog.
@@ -968,6 +966,45 @@ class CatalogManager (CatalogRequest):
             local_db._db_cursor().connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
             self._put_pooled_connection(local_db)
         
+
+    def update_catalog_config(self, catalog, config):
+        """Updates a catalog.
+        
+        This function will treat 'config' as the master copy of values, and
+        it will update the indexed values (i.e., those stored in thier own
+        database columns based on the values extracted from 'config'.
+        """
+        # Create a dictionary of 'wrapped' values (i.e., db safe)
+        wrapped = dict()
+        
+        # Get config from catalog record or nulls
+        config = catalog.get('config', dict())
+        
+        # Extract owner
+        wrapped['owner'] = wrapval(config.get(self.CONFIG_OWNER))
+        
+        # Extract read and write roles from the supplied config
+        for key in [self.CONFIG_READ_USERS, self.CONFIG_WRITE_USERS]:
+            if key in config:
+                users = config[key]
+                if not isinstance(users, list):
+                    raise ValueError( ("%s must be a list" % key) )
+                wrapped[key] = wraparray(users)
+            else:
+                wrapped[key] = wraparray(list())
+        
+        # Add remaining config to fields for insert into registry
+        wrapped['config'] = wrapval(jsonWriter(config))
+        
+        # Update catalog in registry
+        query = ("UPDATE catalogs SET "
+                 + "owner = %(owner)s, " % wrapped
+                 + "write_users = ARRAY[%(write_users)s]::text[], " % wrapped
+                 + "read_users = ARRAY[%(read_users)s]::text[], " % wrapped
+                 + "config = %(config)s " % wrapped
+                 + "WHERE id = %d" % catalog.id)
+        self.dbquery(query)
+
 
     def create_catalog(self, catalog):
         """Creates a catalog.
@@ -1207,23 +1244,26 @@ class Application (DatabaseConnection):
 
         return False
 
-    def __init__(self, catalog_id=None, parser=None, queryopts=None):
+    def __init__(self, appname=None, catalog_id=None, parser=None, queryopts=None):
         "store common configuration data for all service classes"
         global db_cache
 
         # get the config and context from the CatalogRequest instance 
         # associated with this catalog id
         self.catalog_id = int(catalog_id)
-        catalog_req = CatalogRequest(catalog_id)
+        catalog_req = CatalogRequest(appname=appname, catalog_id=catalog_id)
         self.config = catalog_req.get_config()
         self.context = catalog_req.get_context()
         self.http_vary = catalog_req.http_vary.copy()
         
         # Access Control enforcement
-        catalog_req.acl_check(catalog_id=self.catalog_id, 
-                              acl_list='read_users',
+        # TODO: Need to test read or write acl according to GET or PUT/POST/DEL
+        acl_check_result = catalog_req.acl_check(catalog_id=self.catalog_id, 
+                              acl_list=catalog_req.CONFIG_CONTENT_READ_USERS,
                               attrs=self.context.attributes, 
                               admin=self.config.admin)
+        if not acl_check_result:
+            raise NotFound(catalog_req, 'catalog')
 
         # Now, inialize this class
         DatabaseConnection.__init__(self, self.config)

@@ -188,8 +188,7 @@ class CNode (CatalogManager):
     __slots__ = [ 'appname' ]
 
     def __init__(self, parser, appname, catalog_id, queryopts=None):
-        self.appname = appname
-        CatalogManager.__init__(self, catalog_id, parser, queryopts)
+        CatalogManager.__init__(self, parser, appname, catalog_id, queryopts)
 
     def uri2referer(self, uri):
         return self.config['home'] + uri
@@ -200,13 +199,10 @@ class Catalog (CNode):
        GET    -- returns a listing of catalogs
        POST   -- creates a catalog
        DELETE -- deletes a catalog
-       PUT    -- not yet implemented
     """
 
     def __init__(self, parser, appname, queryopts={}, catalog_id=None):
         CNode.__init__(self, parser, appname, catalog_id, queryopts)
-        self.template = appname + "_template"
-        self.dbnprefix = appname + "_"
         try:
             if catalog_id:
                 self.catalog_id = int(catalog_id)
@@ -224,7 +220,7 @@ class Catalog (CNode):
             
             if self.catalog_id:
                 if len(catalogs) == 0:
-                    raise NotFound(self, 'catalog')
+                    raise NotFound(self, uri)
                 return catalogs[0]
             else:
                 return catalogs
@@ -296,15 +292,165 @@ class Catalog (CNode):
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
             if len(catalogs) == 0:
-                raise NotFound(self, 'catalog')
+                raise NotFound(self, uri)
             else:
                 config = catalogs[0].get('config')
                 if config.get('owner') not in self.context.attributes:
-                    raise Forbidden(self, 'config/'+self.catalog_id)
+                    raise Forbidden(self, uri)
             
             self.delete_catalog(self.catalog_id)
         
         def postCommit(results):
+            self.emit_headers()
+            web.ctx.status = '204 No Content'
+            return ''
+
+        return self.dbtransact(body, postCommit)
+
+
+class CatalogConfig (CNode):
+    """Represents a catalog/ID/config[/name] URI
+
+       GET    -- returns the catalog configuration
+       PUT    -- set a named property
+       DELETE -- delete a named property
+    """
+
+    def __init__(self, parser, appname, catalog_id=None, prop_name=None, queryopts={}):
+        CNode.__init__(self, parser, appname, catalog_id, queryopts)
+        self.prop_name = prop_name
+        try:
+            if catalog_id:
+                self.catalog_id = int(catalog_id)
+            else:
+                self.catalog_id = None
+        except ValueError:
+            raise BadRequest(self, 'Bad catalog id.')
+        
+        
+    def GET(self, uri):
+        
+        def body():
+            catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
+                        attrs=self.context.attributes, admin=self.config.admin)
+            
+            if len(catalogs) == 0:
+                raise NotFound(self, 'catalog')
+            
+            config = catalogs[0]['config']
+            if not self.prop_name:
+                return config
+            else:
+                return config.get(self.prop_name,'')
+        
+        def postCommit(bodyresults):
+            self.header('Content-Type', 'application/json')
+            bodyresults = jsonWriter(bodyresults, indent=2) + '\n'
+            self.header('Content-Length', str(len(bodyresults)))
+            return bodyresults
+
+        return self.dbtransact(body, postCommit)
+        
+        
+    def PUT(self, uri):
+        
+        if not self.prop_name:
+            raise BadRequest(self, 'Catalog property name must be specified')
+
+        # Might be worth getting the data now, before we're in the dbtransact call
+        input = web.data()
+
+        def body():
+            try:
+                if input and len(input) > 0:
+                    prop_val = jsonReader(input)
+                else:
+                    prop_val = ''
+            
+            except ValueError, msg:
+                raise BadRequest(self, 'Malformed JSON document: %s' % msg)
+            
+            # Get catalog, only testing 'write_users' acl right now
+            catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
+                                             acl_list=self.CONFIG_WRITE_USERS, 
+                                             attrs=self.context.attributes, 
+                                             admin=self.config.admin)
+            if len(catalogs) == 0:
+                raise Forbidden(self, uri)
+            
+            catalog  = catalogs[0]
+            config   = catalog.get('config')
+            owner    = config.get(self.CONFIG_OWNER)
+            is_owner = owner in self.context.attributes
+            
+            # Validate property name
+            if self.prop_name not in self.CONFIG_ALL:
+                raise BadRequest(self, 'Property not supported')
+            
+            # Validate owner
+            if self.prop_name == self.CONFIG_OWNER:
+                if not is_owner:
+                    raise Forbidden(self, uri)
+                if not prop_val or len(prop_val)==0:
+                    raise BadRequest(self, 'Owner must not be blank.')
+                if prop_val in self.ANONYMOUS:
+                    raise BadRequest(self, 'Owner must not be anonymous.')
+            
+            # Validate ACL updates
+            if self.prop_name in self.CONFIG_ACL:
+                if not prop_val or len(prop_val)==0:
+                    prop_val = list()
+                elif isinstance(prop_val, str):
+                    prop_val = [prop_val]
+                elif not isinstance(prop_val, list):
+                    raise BadRequest(self, 'Bad input type. Must be list or string value.')
+            else:
+                # All others must be strings
+                if not isinstance(prop_val, str):
+                    raise BadRequest(self, 'Bad input type. Must be string value.')
+            
+            # Set new property value
+            config[self.prop_name] = prop_val
+            
+            # Update the catalog configuration in the registry
+            self.update_catalog_config(catalog, config)
+        
+        def postCommit(results):
+            self.emit_headers()
+            web.ctx.status = '204 No Content'
+            return ''
+
+        return self.dbtransact(body, postCommit)
+        
+        
+    def DELETE(self, uri):
+        
+        def body():
+            # Get catalog, only testing 'write_users' acl right now
+            catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
+                                             acl_list=self.CONFIG_WRITE_USERS, 
+                                             attrs=self.context.attributes, 
+                                             admin=self.config.admin)
+            if len(catalogs) == 0:
+                raise Forbidden(self, uri)
+            
+            catalog = catalogs[0]
+            config  = catalog['config']
+            
+            # Validate property in supported set
+            if self.prop_name not in self.CONFIG_ALL:
+                raise BadRequest(self, 'Property not supported.')
+            
+            # Validate property not 'owner'
+            if self.prop_name == self.CONFIG_OWNER:
+                raise BadRequest(self, 'Cannot delete owner.')
+            
+            # Update the catalog configuration in the registry
+            if self.prop_name in config:
+                del config[self.prop_name]
+                self.update_catalog_config(catalog, config)
+        
+        def postCommit(bodyresults):
             self.emit_headers()
             web.ctx.status = '204 No Content'
             return ''

@@ -36,6 +36,7 @@ literals = [ '(', ')', ':', ';', ',', '=', '@', '&', '$',
 # special strings which are keywords
 keywords = {
     'catalog' : 'CATALOG',
+    'config' : 'CONFIG',
     'file' : 'FILE',
     'subject' : 'SUBJECT',
     'tagdef' : 'TAGDEF',

@@ -40,6 +40,7 @@ def p_start(p):
              | tags
              | querypathroot
              | catalog
+             | configure
 """
     p[0] = p[1]
 
@@ -75,6 +76,15 @@ def p_catalogs_id(p):
                | slash string slash CATALOG slash NUMSTRING slash"""
     p[0] = url_ast.Catalog(parser=url_parse_func, appname=p[2], catalog_id=p[6])
 
+def p_configure(p):
+    """configure : slash string slash CATALOG slash NUMSTRING slash CONFIG
+                 | slash string slash CATALOG slash NUMSTRING slash CONFIG slash"""
+    p[0] = url_ast.CatalogConfig(parser=url_parse_func, appname=p[2], catalog_id=p[6])
+
+def p_configure_property(p):
+    """configure : slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING"""
+    p[0] = url_ast.CatalogConfig(parser=url_parse_func, appname=p[2], catalog_id=p[6], prop_name=p[10])
+    
 def p_subject0(p):
     """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT"""
     p[0] = url_ast.Subject(parser=url_parse_func, appname=p[2], catalog_id=p[6], path=[])
