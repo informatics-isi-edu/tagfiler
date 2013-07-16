@@ -697,8 +697,27 @@ def get_db():
 
 class CatalogRequest (webauthn2_handler_factory.RestHandler):
     
+    # The 'anonymous' user attribute
     ANONYMOUS = set(['*'])
+    
+    # Standard select columns
     STD_SELECT_COLUMNS = 'id, owner, write_users, read_users, config'
+    
+    # Configuration fields
+    CONFIG_NAME                 = 'name'
+    CONFIG_DESC                 = 'description'
+    CONFIG_OWNER                = 'owner'
+    CONFIG_READ_USERS           = 'read_users'
+    CONFIG_WRITE_USERS          = 'write_users'
+    CONFIG_CONTENT_READ_USERS   = 'content_read_users'
+    CONFIG_CONTENT_WRITE_USERS  = 'content_write_users'
+    ALL_FIELDS = set([CONFIG_NAME,
+                      CONFIG_DESC,
+                      CONFIG_OWNER,
+                      CONFIG_READ_USERS,
+                      CONFIG_WRITE_USERS,
+                      CONFIG_CONTENT_READ_USERS,
+                      CONFIG_CONTENT_WRITE_USERS])
     
     def __init__(self, catalog_id, parser=None, queryopts=None):
         webauthn2_handler_factory.RestHandler.__init__(self)
@@ -971,8 +990,15 @@ class CatalogManager (CatalogRequest):
         client = self.context.client
         wrapped['owner'] = wrapval(client)
         
+        # Set defaults for certain ACLs
+        for key in [self.CONFIG_READ_USERS,
+                    self.CONFIG_CONTENT_READ_USERS,
+                    self.CONFIG_CONTENT_WRITE_USERS]:
+            if key not in config:
+                config[key] = list(self.ANONYMOUS)
+        
         # Extract read and write roles from the supplied config
-        for key in ['write_users', 'read_users']:
+        for key in [self.CONFIG_READ_USERS, self.CONFIG_WRITE_USERS]:
             if key in config:
                 users = config[key]
                 if not isinstance(users, list):
