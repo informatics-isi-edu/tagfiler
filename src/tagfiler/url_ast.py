@@ -316,9 +316,10 @@ class CatalogConfig (CNode):
        DELETE -- delete a named property
     """
 
-    def __init__(self, parser, appname, catalog_id=None, prop_name=None, queryopts={}):
+    def __init__(self, parser, appname, catalog_id=None, prop_name=None, prop_val=None, queryopts={}):
         CNode.__init__(self, parser, appname, catalog_id, queryopts)
         self.prop_name = prop_name
+        self.prop_val  = prop_val
         try:
             if catalog_id:
                 self.catalog_id = int(catalog_id)
@@ -329,6 +330,9 @@ class CatalogConfig (CNode):
         
         
     def GET(self, uri):
+        
+        if self.prop_val:
+            raise BadRequest(self, 'Cannot get a property by value.')
         
         def body():
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
@@ -364,7 +368,7 @@ class CatalogConfig (CNode):
 
         def body():
             try:
-                if input and len(input) > 0:
+                if input and len(input):
                     prop_val = jsonReader(input)
                 else:
                     prop_val = ''

@@ -82,8 +82,14 @@ def p_configure(p):
     p[0] = url_ast.CatalogConfig(parser=url_parse_func, appname=p[2], catalog_id=p[6])
 
 def p_configure_property(p):
-    """configure : slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING"""
+    """configure : slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING
+                 | slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING slash"""
     p[0] = url_ast.CatalogConfig(parser=url_parse_func, appname=p[2], catalog_id=p[6], prop_name=p[10])
+
+def p_configure_property_value(p):
+    """configure : slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING slash STRING
+                 | slash string slash CATALOG slash NUMSTRING slash CONFIG slash STRING slash STRING slash"""
+    p[0] = url_ast.CatalogConfig(parser=url_parse_func, appname=p[2], catalog_id=p[6], prop_name=p[10], prop_val=p[12])
     
 def p_subject0(p):
     """subject : slash string slash CATALOG slash NUMSTRING slash SUBJECT"""
