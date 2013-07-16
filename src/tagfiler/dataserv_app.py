@@ -913,8 +913,6 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
 class CatalogManager (CatalogRequest):
     """The Catalog Manager App."""
     
-    __EMPTY_STR = "''"
-    
     def __init__(self, parser=None, appname=None, catalog_id=None, queryopts=None):
         CatalogRequest.__init__(self, parser, appname, catalog_id, queryopts)
     
@@ -967,12 +965,8 @@ class CatalogManager (CatalogRequest):
             self._put_pooled_connection(local_db)
         
 
-    def update_catalog_config(self, catalog, config):
+    def update_catalog(self, catalog):
         """Updates a catalog.
-        
-        This function will treat 'config' as the master copy of values, and
-        it will update the indexed values (i.e., those stored in thier own
-        database columns based on the values extracted from 'config'.
         """
         # Create a dictionary of 'wrapped' values (i.e., db safe)
         wrapped = dict()

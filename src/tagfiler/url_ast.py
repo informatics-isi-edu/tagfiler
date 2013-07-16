@@ -237,7 +237,7 @@ class Catalog (CNode):
     def POST(self, uri):
         
         # Check if user can create catalogs
-        if set(self.config['create_catalog_users']).isdisjoint(self.context.attributes | CatalogManager.ANONYMOUS):
+        if (self.context.attributes | CatalogManager.ANONYMOUS).isdisjoint(self.config['create_catalog_users']):
             raise Forbidden(self, 'catalog')
 
         # Only accept application/json
@@ -332,7 +332,9 @@ class CatalogConfig (CNode):
         
         def body():
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
-                        attrs=self.context.attributes, admin=self.config.admin)
+                                            acl_list='read_users', 
+                                            attrs=self.context.attributes, 
+                                            admin=self.config.admin)
             
             if len(catalogs) == 0:
                 raise NotFound(self, 'catalog')
@@ -370,18 +372,28 @@ class CatalogConfig (CNode):
             except ValueError, msg:
                 raise BadRequest(self, 'Malformed JSON document: %s' % msg)
             
-            # Get catalog, only testing 'write_users' acl right now
+            # Get catalog, test acls later
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
-                                             acl_list=self.CONFIG_WRITE_USERS, 
+                                             acl_list=None, 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
             if len(catalogs) == 0:
-                raise Forbidden(self, uri)
+                raise NotFound(self, uri)
             
             catalog  = catalogs[0]
             config   = catalog.get('config')
+            writers  = catalog.get(self.CONFIG_WRITE_USERS, list())
+            readers  = catalog.get(self.CONFIG_READ_USERS, list())
+            attrs    = self.context.attributes | self.ANONYMOUS
             owner    = config.get(self.CONFIG_OWNER)
             is_owner = owner in self.context.attributes
+            
+            # Test permission to write to properties
+            if (not is_owner and attrs.isdisjoint(writers)):
+                if attrs.isdisjoint(readers):
+                    raise NotFound(self, uri)
+                else:
+                    raise Forbidden(self, uri)
             
             # Validate property name
             if self.prop_name not in self.CONFIG_ALL:
@@ -413,7 +425,7 @@ class CatalogConfig (CNode):
             config[self.prop_name] = prop_val
             
             # Update the catalog configuration in the registry
-            self.update_catalog_config(catalog, config)
+            self.update_catalog(catalog)
         
         def postCommit(results):
             self.emit_headers()
@@ -426,16 +438,28 @@ class CatalogConfig (CNode):
     def DELETE(self, uri):
         
         def body():
-            # Get catalog, only testing 'write_users' acl right now
+            # Get catalog, test acls later
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
-                                             acl_list=self.CONFIG_WRITE_USERS, 
+                                             acl_list=None, 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
             if len(catalogs) == 0:
-                raise Forbidden(self, uri)
+                raise NotFound(self, uri)
             
-            catalog = catalogs[0]
-            config  = catalog['config']
+            catalog  = catalogs[0]
+            config   = catalog.get('config')
+            writers  = catalog.get(self.CONFIG_WRITE_USERS, list())
+            readers  = catalog.get(self.CONFIG_READ_USERS, list())
+            attrs    = self.context.attributes | self.ANONYMOUS
+            owner    = config.get(self.CONFIG_OWNER)
+            is_owner = owner in self.context.attributes
+            
+            # Test permission to write to properties
+            if (not is_owner and attrs.isdisjoint(writers)):
+                if attrs.isdisjoint(readers):
+                    raise NotFound(self, uri)
+                else:
+                    raise Forbidden(self, uri)
             
             # Validate property in supported set
             if self.prop_name not in self.CONFIG_ALL:
@@ -448,7 +472,7 @@ class CatalogConfig (CNode):
             # Update the catalog configuration in the registry
             if self.prop_name in config:
                 del config[self.prop_name]
-                self.update_catalog_config(catalog, config)
+                self.update_catalog(catalog)
         
         def postCommit(bodyresults):
             self.emit_headers()
