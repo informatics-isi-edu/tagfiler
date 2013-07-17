@@ -363,18 +363,22 @@ class CatalogConfig (CNode):
         if not self.prop_name:
             raise BadRequest(self, 'Catalog property name must be specified')
 
-        # Might be worth getting the data now, before we're in the dbtransact call
-        input = web.data()
-
         def body():
-            try:
-                if input and len(input):
-                    prop_val = jsonReader(input)
-                else:
-                    prop_val = ''
-            
-            except ValueError, msg:
-                raise BadRequest(self, 'Malformed JSON document: %s' % msg)
+
+            # Get property value
+            if self.prop_val:
+                overwrite = False
+                prop_val = self.prop_val
+            else:
+                overwrite = True
+                try:
+                    data = web.data()
+                    if data and len(data):
+                        prop_val = jsonReader(data)
+                    else:
+                        prop_val = ''
+                except ValueError, msg:
+                    raise BadRequest(self, 'Malformed JSON document: %s' % msg)
             
             # Get catalog, test acls later
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
@@ -407,14 +411,14 @@ class CatalogConfig (CNode):
             if self.prop_name == self.CONFIG_OWNER:
                 if not is_owner:
                     raise Forbidden(self, uri)
-                if not prop_val or len(prop_val)==0:
+                if not prop_val or not len(prop_val):
                     raise BadRequest(self, 'Owner must not be blank.')
                 if prop_val in self.ANONYMOUS:
                     raise BadRequest(self, 'Owner must not be anonymous.')
             
             # Validate ACL updates
             if self.prop_name in self.CONFIG_ACL:
-                if not prop_val or len(prop_val)==0:
+                if not prop_val or not len(prop_val):
                     prop_val = list()
                 elif isinstance(prop_val, str):
                     prop_val = [prop_val]
@@ -425,8 +429,20 @@ class CatalogConfig (CNode):
                 if not isinstance(prop_val, str):
                     raise BadRequest(self, 'Bad input type. Must be string value.')
             
-            # Set new property value
-            config[self.prop_name] = prop_val
+            # Update property value
+            if (overwrite or
+                self.prop_name not in config or
+                not isinstance(prop_val, list)):
+                # Must overwrite if,
+                #  a. value given in uri
+                #  b. property not in config already
+                #  c. property is immutable
+                config[self.prop_name] = prop_val
+            else:
+                # Merge existing and provided lists
+                #  ...it's okay if current val is None
+                newval = set(prop_val) | set(config[self.prop_name] or list())
+                config[self.prop_name] = list(newval)
             
             # Update the catalog configuration in the registry
             self.update_catalog(catalog)
@@ -473,9 +489,19 @@ class CatalogConfig (CNode):
             if self.prop_name == self.CONFIG_OWNER:
                 raise BadRequest(self, 'Cannot delete owner.')
             
-            # Update the catalog configuration in the registry
+            # Delete value and update catalog, if property is in config
             if self.prop_name in config:
-                del config[self.prop_name]
+                # Test if this operation is a mutable delete
+                if not (self.prop_val and len(self.prop_val) and
+                        self.prop_name in self.CONFIG_ACL):
+                    # Simply delete if prop is not mutable
+                    del config[self.prop_name]
+                else:
+                    # Remove value from list, if mutable
+                    currval = config[self.prop_name]
+                    if self.prop_val in currval:
+                        currval.remove(self.prop_val)
+                # Update registry
                 self.update_catalog(catalog)
         
         def postCommit(bodyresults):
