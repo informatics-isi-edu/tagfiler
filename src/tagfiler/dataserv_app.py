@@ -1250,12 +1250,22 @@ class Application (DatabaseConnection):
         self.context = catalog_req.get_context()
         self.http_vary = catalog_req.http_vary.copy()
         
-        # Access Control enforcement
-        # TODO: Need to test read or write acl according to GET or PUT/POST/DEL
+        # Use web method to determine appropriate content acl to test
+        if web.ctx.method in ['GET', 'HEAD']:
+            test_acl = catalog_req.CONFIG_CONTENT_READ_USERS
+        else:
+            test_acl = catalog_req.CONFIG_CONTENT_WRITE_USERS
+            
         acl_check_result = catalog_req.acl_check(catalog_id=self.catalog_id, 
-                              acl_list=catalog_req.CONFIG_CONTENT_READ_USERS,
+                              acl_list=test_acl,
                               attrs=self.context.attributes, 
                               admin=self.config.admin)
+        
+        # TODO: Ideally this *might* differentiate between not found vs. 
+        #       forbidden based on read/write acl. But this also adds to
+        #       the overhead of the acl_check. For now, this seems okay,
+        #       albeit might be slightly confusing to users with read but
+        #       not write permissions.
         if not acl_check_result:
             raise NotFound(catalog_req, 'catalog')
 
