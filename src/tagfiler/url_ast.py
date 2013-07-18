@@ -219,7 +219,7 @@ class Catalog (CNode):
                         attrs=self.context.attributes, admin=self.config.admin)
             
             if self.catalog_id:
-                if len(catalogs) == 0:
+                if not catalogs or not len(catalogs):
                     raise NotFound(self, uri)
                 return catalogs[0]
             else:
@@ -291,7 +291,7 @@ class Catalog (CNode):
                                              acl_list='read_users', 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
-            if len(catalogs) == 0:
+            if not catalogs or not len(catalogs):
                 raise NotFound(self, uri)
             else:
                 config = catalogs[0].get('config')
@@ -340,7 +340,7 @@ class CatalogConfig (CNode):
                                             attrs=self.context.attributes, 
                                             admin=self.config.admin)
             
-            if len(catalogs) == 0:
+            if not catalogs or not len(catalogs):
                 raise NotFound(self, 'catalog')
             
             config = catalogs[0]['config']
@@ -379,13 +379,12 @@ class CatalogConfig (CNode):
                         prop_val = ''
                 except ValueError, msg:
                     raise BadRequest(self, 'Malformed JSON document: %s' % msg)
-            
             # Get catalog, test acls later
             catalogs = self.select_catalogs(catalog_id=self.catalog_id, 
                                              acl_list=None, 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
-            if len(catalogs) == 0:
+            if not catalogs or not len(catalogs):
                 raise NotFound(self, uri)
             
             catalog  = catalogs[0]
@@ -463,7 +462,7 @@ class CatalogConfig (CNode):
                                              acl_list=None, 
                                              attrs=self.context.attributes, 
                                              admin=self.config.admin)
-            if len(catalogs) == 0:
+            if not catalogs or len(catalogs):
                 raise NotFound(self, uri)
             
             catalog  = catalogs[0]
