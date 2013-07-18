@@ -40,8 +40,8 @@ tagdef_opts=(
 )
 
 # an ordered, space-separated list of column numbers in the input file
-REST_COLS="${REST_COLS:-0 6 3 5 4 7 8 9 10}" # default to twit-t9 extract
-# REST_COLS=${REST_COLS:-0 3 4 8}"  # default to twit-t4 extract
+#REST_COLS="${REST_COLS:-0 6 3 5 4 7 8 9 10}" # default to twit-t9 extract
+REST_COLS="${REST_COLS:-0 3 4 8}"  # default to twit-t4 extract
 REST_COLS=( ${REST_COLS} )
 
 # the integer number of input rows to add to graph per test cycle
@@ -64,9 +64,12 @@ username=$1
 password=$2
 command=$3
 
-host=${4:-localhost}
+API="$4"
+# "https://${host}/tagfiler"
+base_api="${API%/catalog/*}"
 
-API="https://${host}/tagfiler"
+host="${API%/tagfiler/catalog/*}"
+host="${host#http*://}"
 
 tempfile=$(mktemp)
 tempfile2=$(mktemp)
@@ -87,7 +90,17 @@ mycurl()
     local url="$1"
     shift
     truncate -s 0 $logfile
-    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${API}${url}"
+
+    case "$url" in
+	/session)
+	    url="${base_api}${url}"
+	    ;;
+	*)
+	    url="${API}${url}"
+	    ;;
+    esac
+
+    curl -b $cookie -c $cookie -k -w "%{http_code}\n" -s "$@" "${url}"
 }
 
 error()
@@ -110,7 +123,7 @@ EOF
 help()
 {
     cat >&2 <<EOF
-$0 <username> <password> <command> [<host>]
+$0 <username> <password> <command> <catalog>
 
 Where command is one of:
 
@@ -119,6 +132,9 @@ Where command is one of:
    runtest   --> test loading/getting/deleting data, print perf trace to stdout
    unload    --> remove test data
    delete    --> delete tagdefs
+
+Catalog is a URL such as https://hostname/tagfiler/catalog/7 to which this
+script can append API URL fragments to construct test resources.
 
 Load takes environment parameters:
 
@@ -154,6 +170,8 @@ EOF
 [[ "${TEST_STRIDE}" -gt 0 ]] || error stride size "${TEST_STRIDE}" must be greater than 0
 
 [[ "${TEST_CYCLES}" -gt 0 ]] || error test cycle count "${TEST_CYCLES}" must be greater than 0
+
+[[ -n "$API" ]] || error catalog URL required
 
 REST_COL_NAMES=''
 sep=''
@@ -243,7 +261,9 @@ runtest()
 	if [[ -n "${first_byte}" ]]
 	then
 	    # efficiently jump to offset found by last stride iteration
-	    tail -c +$(( 1 + ${first_byte} )) < ${LOAD_FILE} | tail -n +$(( 1 + ${TEST_STRIDE} )) | head -n ${TEST_STRIDE} > $tempfile2
+	    # first_byte is zero-based length of content we are skipping
+	    # tail -c +N expects 1-based byte position, so add 1
+	    tail -c +$(( 1 + ${first_byte} )) < ${LOAD_FILE} | head -n ${TEST_STRIDE} > $tempfile2
 	    first_byte=$(( ${first_byte} + $(wc -c < $tempfile2) ))
 	else
 	    tail -n +$(( 1 + ${stride} * ${TEST_STRIDE} )) < ${LOAD_FILE} | head -n ${TEST_STRIDE} > $tempfile2
@@ -280,8 +300,9 @@ runtest()
 
 		# do PUT test
 		t0=$(datems)
-		status=$(mycurl "/subject/${tagdefs[0]}(${REST_COL_NAMES})" -H "Content-Type: text/csv" -T $tempfile3 -o $logfile)
-		[[ "$status" = 204 ]] || error got status "$status" bulk putting batch data
+
+		status=$(mycurl "/subject/${tagdefs[0]}(${REST_COL_NAMES})" -H "Content-Type: text/csv" -T $tempfile3 -X POST -o $logfile)
+		[[ "$status" = 204 ]] || error got status "$status" bulk putting test data
 		t1=$(datems)
 		printf ",$(ms2sec $(( $t1 - $t0 )) )"
 
@@ -300,6 +321,7 @@ runtest()
 		t1=$(datems)
 		length=$(wc -l < $logfile)
 		[[ $length -eq ${test_size} ]] || error got $length results instead of ${test_size} doing bulk get
+
 		printf ",$(ms2sec $(( $t1 - $t0 )) )"
 
 		# do DELETE test
@@ -323,7 +345,7 @@ runtest()
 	done
 
 	# insert current stride so graph grows for next test round
-	status=$(mycurl "/subject/${tagdefs[0]}(${REST_COL_NAMES})" -H "Content-Type: text/csv" -T $tempfile2 -o $logfile)
+	status=$(mycurl "/subject/${tagdefs[0]}(${REST_COL_NAMES})" -H "Content-Type: text/csv" -T $tempfile2 -X POST -o $logfile)
 	[[ "$status" = 204 ]] || error got status "$status" bulk putting batch data
 	
 	stride=$(( $stride + 1 ))
