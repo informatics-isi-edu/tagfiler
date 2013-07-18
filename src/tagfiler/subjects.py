@@ -741,6 +741,26 @@ class Subject (Node):
             else:
                 raise BadRequest(self, data="Form field action=%s not understood." % self.action)
 
+        elif contentType == 'application/json':
+            try:
+                rows = jsonArrayFileReader(web.ctx.env['wsgi.input'])
+                self.bulk_update_transact(rows, on_missing='create', on_existing='abort')
+            except JSONArrayError:
+                et, ev, tb = sys.exc_info()
+                web.debug('got exception "%s" parsing JSON input from client' % str(ev),
+                          traceback.format_exception(et, ev, tb))
+                raise BadRequest(self, 'Invalid JSON input to bulk PUT of subjects.')
+                
+            web.ctx.status = '204 No Content'
+            return ''
+
+        elif contentType == 'text/csv':
+            csvfp = web.ctx.env['wsgi.input']
+            self.bulk_update_transact(csvfp, on_missing='create', on_existing='abort')
+
+            web.ctx.status = '204 No Content'
+            return ''
+
         else:
             # any unrecognized input type is ignored, and we just process URI with action=post
             return self.dbtransact(lambda : self.insertForStore(allow_blank=True, post_method=True),

@@ -3764,6 +3764,10 @@ class Application (DatabaseConnection):
             if bool(getParamEnv('bulk tmp analyze', False)):
                 self.dbquery('ANALYZE %s' % intable)
 
+            if on_existing == 'abort':
+                if len(self.dbquery('SELECT True AS found FROM %(intable)s WHERE id IS NOT NULL LIMIT 1' % dict(intable=intable))) > 0:
+                    raise Conflict(self, 'One or more bulk-insert subject(s) already exist.')
+
             # create subjects based on 'create' conditions and update subject-row map, tracking set of modified tags
             if on_missing == 'create':
 
