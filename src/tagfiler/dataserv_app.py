@@ -4023,7 +4023,6 @@ class Application (DatabaseConnection):
             subject_wheres = []
 
             m = dict(value='', where='', group='', table='%s t' % wraptag(tagdef.tagname), alias=wraptag(tagdef.tagname, prefix=tprefix))
-            wheres = []
 
             # make a copy so we can mutate it safely
             preds = list(preds)
@@ -4080,6 +4079,8 @@ class Application (DatabaseConnection):
             used_not_op = False
             used_other_op = False
 
+            inner_wheres_proto = []
+
             if tagdef.tagref and (not tagdef.softtagref) and enforce_read_authz:
                 # add a constraint so that we can only see tags referencing another entry we can see
                 reftagdef = tagdefs[tagdef.tagref]
@@ -4100,12 +4101,29 @@ class Application (DatabaseConnection):
                                                       tagdefs=tagdefs,
                                                       rangemode=None)[0]
                     )
-                preds.append( web.Storage(tag=tagdef.tagname, op='IN', vals=refquery) )
+                inner_wheres_proto.append( '%s IN (%s)' % (valcol, refquery) )
 
             if scalar_subj:
-                wheres.append( 'subject = %s' % scalar_subj )
+                inner_wheres_proto.append( 'subject = %s' % scalar_subj )
+
+            if enforce_read_authz:
+                if tagdef.readok == False:
+                    # this tag is statically unreadable for this user, i.e. user roles not in required tag ACL
+                    inner_wheres_proto = [ 'False' ]
+                elif tagdef.readok == None:
+                    # this tag is dynamically unreadable for this user, i.e. depends on subject or object status
+                    if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
+                        # need to add subject ownership test that is more strict than baseline subject readok enforcement
+                        if scalar_subj:
+                            inner_wheres_proto.append( 'r.is_owner' )
+                        else:
+                            inner_wheres_proto.append( '(SELECT value IN (%s) FROM _owner o WHERE o.subject = t.subject)' % rolekeys )
+
+            pred_wheres = []
 
             for pred in preds:
+                inner_wheres = list(inner_wheres_proto)
+
                 if tagdef.dbtype in self.opsExcludeTypes.get(pred.op and pred.op or '', []):
                     raise Conflict(self, 'Operator %s not allowed on tag "%s"' % (pred.op, tagdef.tagname))
 
@@ -4115,7 +4133,7 @@ class Application (DatabaseConnection):
                     used_other_op = True
 
                 if pred.op == 'IN':
-                    wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
+                    inner_wheres.append( '%s IN (%s)' % (valcol, pred.vals) )
                 elif pred.op != ":absent:" and pred.op and pred.vals:
                     if tagdef.dbtype == '':
                         raise Conflict(self, 'Operator "%s" not supported for tag "%s".' % (pred.op, tagdef.tagname))
@@ -4175,7 +4193,10 @@ class Application (DatabaseConnection):
                         vqueries = ' UNION '.join(vqueries)
                         clauses.append( '(SELECT bool_or(%s %s t.x) FROM (%s) AS t (x))'
                                         % (valcol, Application.opsDB[pred.op], vqueries) )
-                    wheres.append( ' OR '.join(clauses) )
+                    inner_wheres.append( ' OR '.join(clauses) )
+
+                if inner_wheres:
+                    pred_wheres.append( ' AND '.join([ '(%s)' % w for w in inner_wheres ]) )
 
             if used_not_op:
                 # we need to enforce absence of (readable) triples
@@ -4184,25 +4205,7 @@ class Application (DatabaseConnection):
                     # we also need to enforce presence of (readable) triples! (will always be False)
                     subject_wheres.append('%s.subject IS NOT NULL' % wraptag(tagdef.tagname, prefix=tprefix))
                     
-            if enforce_read_authz:
-                if tagdef.readok == False:
-                    # this tag is statically unreadable for this user, i.e. user roles not in required tag ACL
-                    wheres = [ 'False' ]
-                elif tagdef.readok == None:
-                    # this tag is dynamically unreadable for this user, i.e. depends on subject or object status
-                    if tagdef.readpolicy in [ 'subjectowner', 'tagandowner', 'tagorowner' ]:
-                        # need to add subject ownership test that is more strict than baseline subject readok enforcement
-                        if scalar_subj:
-                            wheres.append( 'r.is_owner' )
-                        else:
-                            wheres.append( '(SELECT value IN (%s) FROM _owner o WHERE o.subject = t.subject)' % rolekeys )
-                    # other authz modes need no further tests here:
-                    # -- subject readok status enforced by enclosing elem_query
-                    # -- object status enforced by value IN subquery predicate injected before processing preds list
-                    #    -- object readok enforced by default
-                    #    -- object ownership enforced if necessary by extra owner predicate
-
-            w = ' AND '.join([ '(%s)' % w for w in wheres ])
+            w = ' AND '.join([ '(%s)' % w for w in pred_wheres ])
             if w:
                 m['where'] = 'WHERE ' + w
 
@@ -4218,14 +4221,14 @@ class Application (DatabaseConnection):
                 return (q % m, [])
             else:
                 if tagdef.dbtype != '':
-                    if tagdef.multivalue and wheres and spred:
+                    if tagdef.multivalue and pred_wheres and spred:
                         # multivalue spred requires SUBJECT to match all preds, possibly using different triples for each match
                         m['where'] = ''
                         tables = [ m['table'] ]
-                        for i in range(0, len(wheres)):
+                        for i in range(0, len(pred_wheres)):
                             # Kyle Added 'AS t' - not sure if this is correct we could also drop the t from t.value and it would still work
                             tables.append( 'JOIN (SELECT subject FROM %s AS t WHERE %s GROUP BY subject) AS %s USING (subject)'
-                                           % (wraptag(tagdef.tagname), wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
+                                           % (wraptag(tagdef.tagname), pred_wheres[i], wraptag(tagdef.tagname, prefix='w%d' % i)) )
                         m['table'] = ' '.join(tables)
 
                     # single value or multivalue lpred requires VALUE to match all preds
