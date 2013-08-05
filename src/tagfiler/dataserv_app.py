@@ -2475,7 +2475,7 @@ class Application (DatabaseConnection):
                 if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                     # None means we need object writeok for this user
                     query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
-                              + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
+                              + ' JOIN (SELECT %(refcol)s AS refcol, writeok FROM (%(refquery)s) r) r ON (s.val = r.refcol)'
                               + ' WHERE coalesce(NOT r.writeok, True)'
                               + ' LIMIT 1'
                               ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres)))
@@ -2486,7 +2486,7 @@ class Application (DatabaseConnection):
                 if tagdef.writepolicy in [ 'objectowner' ]:
                     # None means we need object is_owner for this user
                     query = (('SELECT True AS unauthorized FROM (SELECT %(refval)s AS val FROM %(intable)s s WHERE %(wheres)s ) s'
-                              + ' JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
+                              + ' JOIN (SELECT %(refcol)s AS refcol, owner FROM (%(refquery)s) r) r ON (s.val = r.refcol)'
                               + ' WHERE coalesce(r.owner NOT IN (%(rolekeys)s), True)'
                               + ' LIMIT 1'
                               ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval, wheres=' AND '.join(wheres), rolekeys=rolekeys))
@@ -2502,12 +2502,23 @@ class Application (DatabaseConnection):
         table = wraptag(tagdef.tagname)
         count = 0
 
+        parts = dict(table=table,
+                     intable=intable,
+                     idcol=idcol,
+                     valcol=tagdef.multivalue and unnest and 'unnest(%s)' % valcol or valcol,
+                     flagcol=flagcol,
+                     isowncol=isowncol,
+                     newcol=newcol,
+                     tagname=wrapval(tagdef.tagname),
+                     rolekeys=rolekeys,
+                     wheres=' AND '.join(wheres))
+
         if test and tagdef.tagref and (not tagdef.softtagref):
             # need to validate referential integrity of user input on visible graph content
             query = (('SELECT True AS notfound'
                       + ' FROM (SELECT %(refval)s AS val FROM %(intable)s s) s'
-                      + ' LEFT OUTER JOIN (%(refquery)s) r ON (s.val = r.%(refcol)s)'
-                      + ' WHERE r.%(refcol)s IS NULL'
+                      + ' LEFT OUTER JOIN (SELECT %(refcol)s AS refcol FROM (%(refquery)s) r) r ON (s.val = r.refcol)'
+                      + ' WHERE r.refcol IS NULL'
                       + ' LIMIT 1'
                       ) % dict(intable=intable, refquery=refquery, refcol=refcol, refval=refval))
             results = self.dbquery(query, vars=refvalues)
@@ -2523,23 +2534,11 @@ class Application (DatabaseConnection):
                                     + ' JOIN %(table)s AS t USING (value)'
                                     + ' WHERE i.subject != t.subject'
                                     + ' LIMIT 1'
-                                    ) % dict(intable=intable, table=table, idcol=idcol, valcol=valcol, wheres=' AND '.join(wheres)))
+                                    ) % parts)
             if len(results) > 0:
                 raise Conflict(self, 'Duplicate value violates uniqueness constraint for tag "%s".' % tagdef.tagname)
                 
             #self.log('TRACE', 'Application.set_tag_intable("%s",d=%d) uniqueness checked' % (tagdef.tagname, depth))
-
-        parts = dict(table=table,
-                     intable=intable,
-                     idcol=idcol,
-                     valcol=tagdef.multivalue and unnest and 'unnest(%s)' % valcol or valcol,
-                     flagcol=flagcol,
-                     isowncol=isowncol,
-                     newcol=newcol,
-                     tagname=wrapval(tagdef.tagname),
-                     tagspresent=wraptag('tags present'),
-                     rolekeys=rolekeys,
-                     wheres=' AND '.join(wheres))
 
         if tagdef.multivalue:
             # multi-valued tags are straightforward set-algebra on triples
@@ -3236,15 +3235,14 @@ class Application (DatabaseConnection):
                             [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', 'owner', 'writeok', tagdef.tagref] ],
                             []
                             )],
-                                                                    values=dvalues,
-                                                                    unnest=otagdef.tagname)
+                                                                    values=dvalues)
                 if tagdef.writeok is None:
                     # may need to test permissions on per-object basis for this tag before deleting triples
                     if tagdef.writepolicy in [ 'object', 'subjectandobject', 'tagorsubjectandobject', 'tagandsubjectandobject' ]:
                         if tagdef.multivalue:
                             results = self.dbquery(('SELECT d.id'
                                                     + ' FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
-                                                    + ' JOIN (%(oquery)s) o ON (d.value = o.%(tagref)s)'
+                                                    + ' JOIN (SELECT unnest(%(tagref)s) AS tagref, writeok FROM (%(oquery)s) o) o ON (d.value = o.tagref)'
                                                     + ' WHERE NOT coalesce(o.writeok, False)'
                                                     + ' LIMIT 1'
                                                     ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', '')),
@@ -3252,7 +3250,7 @@ class Application (DatabaseConnection):
                         else:
                             results = self.dbquery(('SELECT d.id'
                                                     + ' FROM %(dtable)s d'
-                                                    + ' JOIN (%(oquery)s) o ON (d.%(dvalcol)s = o.%(tagref)s)'
+                                                    + ' JOIN (SELECT %(tagref)s AS tagref, writeok FROM (%(oquery)s) o) o ON (d.%(dvalcol)s = o.tagref)'
                                                     + ' WHERE NOT coalesce(o.writeok, False)'
                                                     + ' LIMIT 1'
                                                     ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', '')),
@@ -3265,7 +3263,7 @@ class Application (DatabaseConnection):
                         if tagdef.multivalue:
                             results = self.dbquery(('SELECT d.id'
                                                     + ' FROM (SELECT id, unnest(%(dvalcol)s) AS value FROM %(dtable)s) d'
-                                                    + ' JOIN (%(oquery)s) o ON (d.value = o.%(tagref)s)'
+                                                    + ' JOIN (SELECT unnest(%(tagref)s) AS tagref, owner FROM (%(oquery)s) o) o ON (d.value = o.tagref)'
                                                     + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
                                                     + ' LIMIT 1'
                                                     ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', ''),
@@ -3274,7 +3272,7 @@ class Application (DatabaseConnection):
                         else:
                             results = self.dbquery(('SELECT d.id'
                                                     + ' FROM %(dtable)s d'
-                                                    + ' JOIN (%(oquery)s) o ON (d.%(dvalcol)s = o.%(tagref)s)'
+                                                    + ' JOIN (SELECT %(tagref)s AS tagref, owner FROM (%(oquery)s) o) o ON (d.%(dvalcol)s = o.tagref)'
                                                     + ' WHERE NOT coalesce(o.owner = ANY (ARRAY[%(roles)s]), False)'
                                                     + ' LIMIT 1'
                                                     ) % dict(dtable=dtable, dvalcol=dvalcol, oquery=oquery, tagref=wraptag(tagdef.tagref, '', ''),
@@ -3405,20 +3403,22 @@ class Application (DatabaseConnection):
         # update per-tag metadata and track all subjects whose tags are modified due to cascading tagref deletion
         for tagname in subject_tags:
             tagdef = self.tagdefsdict[tagname]
+            tagcol = self.wraptag(tagname, '', '')
+            if tagdef.multivalue:
+                tagcol = 'unnest(%s)' % tagcol
             self.set_tag_lastmodified(None, tagdef)
 
             stquery, stvalues = self.build_files_by_predlist_path([ (spreds, [ web.Storage(tag=tag, op=None, vals=[]) for tag in ['id', tagname]], [])],
-                                                                  values=evalues,
-                                                                  unnest=tagname)
+                                                                  values=evalues)
             reftags = self.tagdef_reftags_closure(tagdef)
             mtags.update(reftags)
 
             for reftag in reftags:
                 self.dbquery(('INSERT INTO %(mtable)s (id)'
-                              + ' SELECT DISTINCT r.subject FROM (%(stquery)s) s JOIN %(reftable)s r ON (s.%(tagname)s = r.value)'
+                              + ' SELECT DISTINCT r.subject FROM (SELECT %(tagcol)s AS tagval FROM (%(stquery)s) s) s JOIN %(reftable)s r ON (s.tagval = r.value)'
                               + ' WHERE (SELECT id FROM %(mtable)s m WHERE r.subject = m.id LIMIT 1) IS NULL'
                               + '   AND (SELECT id FROM %(etable)s e WHERE r.subject = e.id LIMIT 1) IS NULL')
-                             % dict(mtable=mtable, etable=etable, stquery=stquery, reftable=self.wraptag(reftag), tagname=self.wraptag(tagname, '', '')),
+                             % dict(mtable=mtable, etable=etable, stquery=stquery, reftable=self.wraptag(reftag), tagcol=tagcol),
                              vars=evalues)
 
         #self.log('TRACE', value='after set_tag_lastmodified loop')
