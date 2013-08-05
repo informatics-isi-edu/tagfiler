@@ -134,6 +134,22 @@ EOF
     exit 1
 }
 
+if [[ -n "$MULTIVALUE" ]]
+then
+    case "$MULTIVALUE" in
+	true|t|y|yes)
+	    multivalue=true
+	    ;;
+	*)
+	    multivalue=false
+	    ;;
+    esac
+else
+    chmod a+x $0
+    MULTIVALUE=false $0 "$@" || error "failed multivalue=false test phase"
+    MULTIVALUE=true $0 "$@" || error "failed multivalue=true test phase"
+    exit 0
+fi
 
 # Login, POST username/password form parameters to the session/ resource
 status=$(mycurl_base "/session" -d username="$username" -d password="$password" -o $logfile)
@@ -166,18 +182,18 @@ querytest()
 # setup the test schema
 for i in ${!tagdef_writepolicies[@]}
 do
-    status=$(mycurl "/tagdef/fooread${i}?dbtype=text&unique=true&multivalue=false&readpolicy=${tagdef_writepolicies[$i]}&writepolicy=subject" -X PUT -o $logfile)
+    status=$(mycurl "/tagdef/fooread${i}?dbtype=text&unique=true&multivalue=${multivalue}&readpolicy=${tagdef_writepolicies[$i]}&writepolicy=subject" -X PUT -o $logfile)
     [[ "$status" = 201 ]] || error got "$status" creating tagdef fooread${i}
 
-    status=$(mycurl "/tagdef/foo${i}?dbtype=text&unique=true&multivalue=false&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
+    status=$(mycurl "/tagdef/foo${i}?dbtype=text&unique=true&multivalue=${multivalue}&readpolicy=anonymous&writepolicy=${tagdef_writepolicies[$i]}" -X PUT -o $logfile)
     [[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}
 
     for j in ${!tagdefref_writepolicies[@]}
     do
-	status=$(mycurl "/tagdef/fooread${i}_${j}?dbtype=text&multivalue=false&readpolicy=${tagdefref_writepolicies[$j]}&writepolicy=subject&tagref=fooread${i}" -X PUT -o $logfile)
+	status=$(mycurl "/tagdef/fooread${i}_${j}?dbtype=text&multivalue=${multivalue}&readpolicy=${tagdefref_writepolicies[$j]}&writepolicy=subject&tagref=fooread${i}" -X PUT -o $logfile)
 	[[ "$status" = 201 ]] || error got "$status" creating tagdef fooread${i}_${j}
 
-	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&multivalue=false&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o $logfile)
+	status=$(mycurl "/tagdef/foo${i}_${j}?dbtype=text&multivalue=${multivalue}&readpolicy=anonymous&writepolicy=${tagdefref_writepolicies[$j]}&tagref=foo${i}" -X PUT -o $logfile)
 	[[ "$status" = 201 ]] || error got "$status" creating tagdef foo${i}_${j}
     done
 done
@@ -208,7 +224,12 @@ querytest 200 0 "/subject/name=softtest${testno}(fooread0softref)/id(id;name)"
 
 
 # test subjects for later write-authz tests
-cat > $tempfile <<EOF
+if  [[ "$multivalue" = "true" ]]
+then
+    sed -e "s/,\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\)\$/,{\1},{\2},{\3},{\4},{\5},{\6},{\7}/" -e "s/{}//g" > $tempfile
+else
+    cat > $tempfile
+fi <<EOF
 test${testno}-1,${username},{*},{*},,,,,,,
 test${testno}-2,${username},{${username}},{${username}},,,,,,,
 test${testno}-3,${username},{},{},,,,,,,
@@ -234,7 +255,12 @@ querytest 200 14 "/subject/name:regexp:test${testno}-(name)"
 
 # start with ownership of all so we can construct all the tag values
 # drop ownership of 4..7 before testing read authz
-cat > $tempfile <<EOF
+if  [[ "$multivalue" = "true" ]]
+then
+    sed -e "s/,\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\)\$/,{\1},{\2},{\3},{\4},{\5},{\6},{\7}/" -e "s/{}//g" > $tempfile
+else
+    cat > $tempfile
+fi <<EOF
 test${testno}-1-R,${username},{*},val1,val1,val1,val1,val1,val1,val1
 test${testno}-2-R,${username},{${username}},val2,val2,val2,val2,val2,val2,val2
 test${testno}-3-R,${username},{},val3,val3,val3,val3,val3,val3,val3
@@ -258,7 +284,12 @@ do
 
 	# start with ownership of all so we can construct all the tag values
 	# drop ownership of 4..6 before testing read authz
-	cat > $tempfile <<EOF
+	if  [[ "$multivalue" = "true" ]]
+	then
+	    sed -e "s/,\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\),\([^,]*\)\$/,{\1},{\2},{\3},{\4},{\5},{\6},{\7}/" -e "s/{}//g" > $tempfile
+	else
+	    cat > $tempfile
+	fi <<EOF
 test${testno}-1.${o}.${j}-R,${username},{*},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
 test${testno}-2.${o}.${j}-R,${username},{${username}},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
 test${testno}-3.${o}.${j}-R,${username},{},val${o},val${o},val${o},val${o},val${o},val${o},val${o}
@@ -280,7 +311,7 @@ done
 
 # shed ownership of refenced objects as per above
 status=$(mycurl "/tags/name:regexp:test${testno}-%5B4567%5D-R(owner=${otherrole})" -X PUT -o logfile)
-[[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6}-R
+[[ "$status" = 204 ]] || error got "$status" dropping ownership of named test subjects test${testno}-{4,5,6,7}-R
 
 #mycurl "/subject/name:regexp:test${testno}-(name;owner;read%20users;write%20users;readok;writeok)" -H "Accept: ${ACCEPT}"
 
@@ -324,8 +355,8 @@ tagtest_serial()
     do
 	local subj="test${testno}-${s}"
 	local obj="value$s"
-	echo "${subj},${obj}" > $tempfile
-	
+	[[ "$multivalue" = "true" ]] && echo "${subj},{${obj}}" || echo "${subj},${obj}"
+
 	status=$(mycurl "/tags/name(${tag})" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 	[[ "$status" = $code ]] || error "/tags/name=$subj(${tag}=$obj)" got "$status" instead of $code while bulk putting tag
 
@@ -348,7 +379,7 @@ tagtest()
     do
 	local subj="test${testno}-${s}"
 	local obj="value$s"
-	echo "${subj},${obj}"
+	[[ "$multivalue" = "true" ]] && echo "${subj},{${obj}}" || echo "${subj},${obj}"
 	
     done > $tempfile
 
@@ -434,7 +465,7 @@ tagreftest_serial()
 	    for o in "${objects[@]}"
 	    do
 		local subj="test${testno}-${s}"
-		echo "${subj},${o}" > $tempfile
+		{ [[ "$multivalue" = "true" ]] && echo "${subj},{${o}}" || echo "${subj},${o}" ; } > $tempfile
 		url="/tags/name(${tag})"
 		status=$(mycurl "$url" -H "Content-Type: text/csv" -T $tempfile -o $logfile)
 		[[ "$status" = $code ]] || error got "$status" instead of $code while bulk putting "$url" "$(cat $tempfile)"
@@ -522,7 +553,7 @@ tagreftest()
 		    sep=";"
 		fi
 
-		printf ",${o}" >> $tempfile
+		{ [[ "$multivalue" = "true" ]] && printf ",{${o}}" || printf ",${o}" ; } >> $tempfile
 	    done
 
 	    subjslist+="${lsep}${subj}"
@@ -699,21 +730,24 @@ tagdeltest 404 foo0 ''                   7B
 # test change to referenced tag foo1, for which we already deleted references above
 tagtest 204 foo1 1B 2B 3B
 
-# test implicit delete path via change to referenced tag foo3, for which we preserved references above
-# this depends on 3B being the final object tested above for tagreftest 204 3 ...
-truncate -s 0 $tempfile2
-status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
-[[ "$status" = 200 ]] || error got status $status querying "foo3_3"
-count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
-[[ $count -gt 0 ]] || error failed to find existing references foo3_3 to tag foo3
+if [[ "$multivalue" = "false" ]]
+then
+    # test implicit delete path via change to referenced tag foo3, for which we preserved references above
+    # this depends on 3B being the final object tested above for tagreftest 204 3 ...
+    truncate -s 0 $tempfile2
+    status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
+    [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
+    count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
+    [[ $count -gt 0 ]] || error failed to find existing references foo3_3 to tag foo3
 
-tagtest 204 foo3 1B 2B 3B 4B 5B
+    tagtest 204 foo3 1B 2B 3B 4B 5B
 
-truncate -s 0 $tempfile2
-status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
-[[ "$status" = 200 ]] || error got status $status querying "foo3_3"
-count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
-[[ $count -eq 0 ]] || error found $count existing references foo3_3 to tag foo3 after they should have disappeared: "$(cat $tempfile2)"
+    truncate -s 0 $tempfile2
+    status=$(mycurl "/subject/foo3_3(id;name;foo3_3;subject%20last%20tagged)id?limit=none" -H "Accept: ${ACCEPT}" -o $tempfile2)
+    [[ "$status" = 200 ]] || error got status $status querying "foo3_3"
+    count=$(grep -v '^[][]*$' < $tempfile2 | wc -l)
+    [[ $count -eq 0 ]] || error found $count existing references foo3_3 to tag foo3 after they should have disappeared: "$(cat $tempfile2)"
+fi
 
 
 deletetest_serial()
