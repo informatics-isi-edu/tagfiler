@@ -4650,7 +4650,7 @@ class Application (DatabaseConnection):
                 have_tags = set([ p.tag for p in listpreds ])
             else:
                 if not listtags:
-                    listtags = [ tagdef.tagname for tagdef in self.tagdefsdict.values() ]
+                    listtags = [ tagdef.tagname for tagdef in self.tagdefsdict.values() if tagdef.tagname != 'subject text' ]
                 listpreds = [ web.Storage(tag=tag, op=None, vals=[]) for tag in listtags ]
                 have_tags = set(listtags)
 
