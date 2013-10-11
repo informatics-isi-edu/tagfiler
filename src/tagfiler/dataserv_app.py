@@ -1023,6 +1023,7 @@ class CatalogManager (CatalogRequest):
         
         # Set defaults for certain ACLs
         for key in [self.CONFIG_READ_USERS,
+                    self.CONFIG_WRITE_USERS,
                     self.CONFIG_CONTENT_READ_USERS,
                     self.CONFIG_CONTENT_WRITE_USERS]:
             if key not in config:
