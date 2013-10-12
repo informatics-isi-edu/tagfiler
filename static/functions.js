@@ -8458,38 +8458,46 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 		h2.html('Existing Catalogs');
 		var table = $('<table>');
 		uiDiv.append(table);
-		table.addClass('role-list');
+		table.addClass('file-list');
 		var tr = $('<tr>');
+		tr.addClass('file-heading');
 		table.append(tr);
 		var th = $('<th>');
 		tr.append(th);
 		th.html('&nbsp;&nbsp;');
 		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
-		th.html('&nbsp;&nbsp;Name&nbsp;&nbsp;');
+		th.html('&nbsp;&nbsp;Id&nbsp;&nbsp;');
 		th = $('<th>');
-		tr.append(th);
-		th.html('&nbsp;&nbsp;Description&nbsp;&nbsp;');
-		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
 		th.html('&nbsp;&nbsp;Owner&nbsp;&nbsp;');
 		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
-		th.html('&nbsp;&nbsp;Admin users&nbsp;&nbsp;');
+		th.html('&nbsp;&nbsp;Read Users&nbsp;&nbsp;');
 		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
-		th.html('&nbsp;&nbsp;Read users&nbsp;&nbsp;');
+		th.html('&nbsp;&nbsp;Write Users&nbsp;&nbsp;');
 		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
-		th.html('&nbsp;&nbsp;Write users&nbsp;&nbsp;');
+		th.html('&nbsp;&nbsp;Content Read Users&nbsp;&nbsp;');
 		th = $('<th>');
+		th.addClass('tag-name');
 		tr.append(th);
-		th.html('&nbsp;&nbsp;Id&nbsp;&nbsp;');
+		th.html('&nbsp;&nbsp;Content Write Users&nbsp;&nbsp;');
+		var baseIndex = 0;
 		$.each(data, function(i,catalog) {
+			var config = catalog['config'];
 			tr = $('<tr>');
-			tr.addClass('role');
+			tr.addClass('file');
+			tr.addClass(((baseIndex+i+1)%2) == 1 ? 'odd' : 'even');
 			table.append(tr);
 			td = $('<td>');
+			td.addClass('file-tag');
 			tr.append(td);
 			var input = $('<input>');
 			input.attr({
@@ -8500,53 +8508,65 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 			input.click(function(event) {enableCatalogButtons();})
 			td.append(input);
 			td = $('<td>');
-			tr.append(td);
-			td.html(catalog['name']);
-			td = $('<td>');
-			tr.append(td);
-			td.html(catalog['description']);
-			td = $('<td>');
-			tr.append(td);
-			td.html(catalog['owner']);
-			td = $('<td>');
-			tr.append(td);
-			var userTable = $('<table>');
-			td.append(userTable);
-			$.each(catalog['admin_users'], function(j, user) {
-				var trUser = $('<tr>');
-				userTable.append(trUser);
-				var tdUser = $('<td>');
-				tdUser.css('border-width', '0px 0px 0px 0px');
-				trUser.append(tdUser);
-				tdUser.html(user);
-			});
-			td = $('<td>');
-			tr.append(td);
-			var userTable = $('<table>');
-			td.append(userTable);
-			$.each(catalog['read_users'], function(j, user) {
-				var trUser = $('<tr>');
-				userTable.append(trUser);
-				var tdUser = $('<td>');
-				tdUser.css('border-width', '0px 0px 0px 0px');
-				trUser.append(tdUser);
-				tdUser.html(user);
-			});
-			td = $('<td>');
-			tr.append(td);
-			var userTable = $('<table>');
-			td.append(userTable);
-			$.each(catalog['write_users'], function(j, user) {
-				var trUser = $('<tr>');
-				userTable.append(trUser);
-				var tdUser = $('<td>');
-				tdUser.css('border-width', '0px 0px 0px 0px');
-				trUser.append(tdUser);
-				tdUser.html(user);
-			});
-			td = $('<td>');
+			td.addClass('file-tag');
 			tr.append(td);
 			td.html(catalog['id']);
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			td.html(config['owner']);
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(config['read_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(config['write_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(config['content_read_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			var userTable = $('<table>');
+			td.append(userTable);
+			$.each(config['content_write_users'], function(j, user) {
+				var trUser = $('<tr>');
+				userTable.append(trUser);
+				var tdUser = $('<td>');
+				tdUser.css('border-width', '0px 0px 0px 0px');
+				trUser.append(tdUser);
+				tdUser.html(user);
+			});
 		});
 		uiDiv.append('<br/><br/>');
 		var button = $('<button>');
@@ -8592,8 +8612,8 @@ function deleteCatalog() {
 	tagfiler.DELETE(url, true, getCatalogs, null, null, 0);
 }
 
-var catalogFields = ['name', 'description', 'admin_users', 'read_users', 'write_users'];
-var catalogMultivalueFields = ['admin_users', 'read_users', 'write_users'];
+var catalogFields = ['read_users', 'write_users', 'content_read_users', 'content_write_users'];
+var catalogMultivalueFields = ['read_users', 'write_users', 'content_read_users', 'content_write_users'];
 
 function buildCatalogFields(uiDiv) {
 	var div = $('<div>');
@@ -8718,6 +8738,8 @@ function createCatalog() {
 
 function getCatalogJSON() {
 	var obj = {};
+	var config = {};
+	obj['config'] = config;
 	$.each(catalogFields, function(i, tag) {
 		var table = $('#' + idquote(tag)+'_values');
 		var tbody = getChild(table, 1);
@@ -8728,7 +8750,7 @@ function getCatalogJSON() {
 			values.push(td.html());
 		}
 		if (values.length > 0) {
-			obj[tag] = (catalogMultivalueFields.contains(tag) ? values : values[0]);
+			config[tag] = (catalogMultivalueFields.contains(tag) ? values : values[0]);
 		}
 	});
 	return valueToString(obj);
