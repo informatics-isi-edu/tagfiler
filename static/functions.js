@@ -4927,6 +4927,7 @@ function renderLogin() {
 		'size': 15
 	});
 	td.append(input);
+	input.keyup(function(event) {checkSubmitLogin(event);});
 	tr = $('<tr>');
 	table.append(tr);
 	td = $('<td>');
@@ -4939,6 +4940,12 @@ function renderLogin() {
 	td.append(input);
 	input.click(function(event) {submitLogin();});
 	td.append(input);
+}
+
+function checkSubmitLogin(event) {
+	if (event.which == 13) {
+		submitLogin();
+	}
 }
 
 function submitLogin() {
