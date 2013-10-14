@@ -902,7 +902,7 @@ class CatalogRequest (webauthn2_handler_factory.RestHandler):
             config = catalogs[0]['config']
             acl    = config.get(acl_list, list())
             
-            if (attrs | self.ANONYMOUS).isdisjoint(acl):
+            if (attrs | self.ANONYMOUS).isdisjoint(acl) and self.context.client != config['owner']:
                 return False
             else:
                 return True
