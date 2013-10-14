@@ -8458,7 +8458,14 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 		'onclick': 'createCatalog();'
 	});
 	uiDiv.append(input);
-	if (data.length > 0) {
+	catalogDict = {};
+	$.each(data, function(i,catalog) {
+		if (checkCatalogReadPermission(catalog)) {
+			catalogDict[catalog['id']] = catalog;
+		}
+	});
+
+	if (data.length > 0 && !$.isEmptyObject(catalogDict)) {
 		uiDiv.append('<br/><br/><br/><br/>');
 		h2 = $('<h2>');
 		uiDiv.append(h2);
@@ -8472,6 +8479,10 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 		var th = $('<th>');
 		tr.append(th);
 		th.html('&nbsp;&nbsp;');
+		th = $('<th>');
+		th.addClass('tag-name');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Name&nbsp;&nbsp;');
 		th = $('<th>');
 		th.addClass('tag-name');
 		tr.append(th);
@@ -8496,8 +8507,15 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 		th.addClass('tag-name');
 		tr.append(th);
 		th.html('&nbsp;&nbsp;Content Write Users&nbsp;&nbsp;');
+		th = $('<th>');
+		th.addClass('tag-name');
+		tr.append(th);
+		th.html('&nbsp;&nbsp;Description&nbsp;&nbsp;');
 		var baseIndex = 0;
 		$.each(data, function(i,catalog) {
+			if (catalogDict[catalog['id']] == null) {
+				return true;
+			}
 			var config = catalog['config'];
 			tr = $('<tr>');
 			tr.addClass('file');
@@ -8514,6 +8532,10 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 			});
 			input.click(function(event) {enableCatalogButtons();})
 			td.append(input);
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			td.html(config['name'] != null ? config['name'] : '');
 			td = $('<td>');
 			td.addClass('file-tag');
 			tr.append(td);
@@ -8574,6 +8596,10 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 				trUser.append(tdUser);
 				tdUser.html(user);
 			});
+			td = $('<td>');
+			td.addClass('file-tag');
+			tr.append(td);
+			td.html(config['description'] != null ? config['description'] : '');
 		});
 		uiDiv.append('<br/><br/>');
 		var button = $('<button>');
@@ -8600,8 +8626,17 @@ function postManageCatalogs(data, textStatus, jqXHR, param) {
 }
 
 function enableCatalogButtons() {
-	$('#deleteCatalogButton').removeAttr('disabled');
-	$('#selectCatalogButton').removeAttr('disabled');
+	var id = $('input:radio[name=catalog]:checked').val();
+	if (checkCatalogOpenPermission(id)) {
+		$('#selectCatalogButton').removeAttr('disabled');
+	} else {
+		$('#selectCatalogButton').attr('disabled', 'disabled');
+	}
+	if (checkCatalogDeletePermission(id)) {
+		$('#deleteCatalogButton').removeAttr('disabled');
+	} else {
+		$('#deleteCatalogButton').attr('disabled','disabled');
+	}
 }
 
 function selectCatalog() {
@@ -8619,8 +8654,9 @@ function deleteCatalog() {
 	tagfiler.DELETE(url, true, getCatalogs, null, null, 0);
 }
 
-var catalogFields = ['read_users', 'write_users', 'content_read_users', 'content_write_users'];
+var catalogFields = ['name', 'description', 'read_users', 'write_users', 'content_read_users', 'content_write_users'];
 var catalogMultivalueFields = ['read_users', 'write_users', 'content_read_users', 'content_write_users'];
+var catalogDict = null;
 
 function buildCatalogFields(uiDiv) {
 	var div = $('<div>');
@@ -8762,3 +8798,38 @@ function getCatalogJSON() {
 	});
 	return valueToString(obj);
 }
+
+function checkCatalogReadPermission(catalog) {
+	var ret = false;
+	var config = catalog['config'];
+	var validUsers = config['read_users'].concat(config['write_users']).concat(config['content_read_users']);
+	validUsers.push(config['owner']);
+	if (validUsers.contains(USER) || validUsers.contains('*')) {
+		ret = true;
+	}
+	return ret;
+}
+
+function checkCatalogOpenPermission(index) {
+	var ret = false;
+	var catalog = catalogDict[index];
+	var config = catalog['config'];
+	var validUsers = config['content_read_users'].concat(config['content_write_users']);
+	validUsers.push(config['owner']);
+	if (validUsers.contains(USER) || validUsers.contains('*')) {
+		ret = true;
+	}
+	return ret;
+}
+
+function checkCatalogDeletePermission(index) {
+	var ret = false;
+	var catalog = catalogDict[index];
+	var config = catalog['config'];
+	if (USER == config['owner']) {
+		ret = true;
+	}
+	return ret;
+}
+
+
