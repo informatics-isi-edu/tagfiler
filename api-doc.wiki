@@ -1,0 +1,649 @@
+{toc:depth=10}
+
+h2. Introduction
+
+Tagfiler is a very accessible, RESTful web service to track data sets or other resources, identifying and describing them via extensible metadata. While it is a work in progress, Tagfiler shares many features with semantic web technologies such as RDF stores and SPARQL, or with general entity-attribute-value (EAV) systems. However, it also supports bulk file management for easily sharing data in a community repository.
+
+Tagfiler has the following features:
+# Core catalog tracks *subjects* of catalog and *metadata* about those subjects
+## Every subject has a unique, numeric identifier assigned by the catalog
+## Some subjects have other unique attributes which can be used as identifiers
+## Some subjects are locally stored files, for which we can support arbitrary *byte-access* by HTTP clients
+# Simple HTTP-based access protocol, making client programming trivial
+## REST model defined in terms of actions on "HTTP resources" named with URIs
+### URIs embed flexible Tagfiler resource language based on metadata patterns
+### Multiple APIs are exposed under different URI prefixes
+#### */subject/* API exposes REST management of subjects and their descriptive metadata
+#### */file/* API exposes REST management of subjects with byte-oriented file representations
+#### */tagdef/* API exposes REST management of the metadata schema
+#### */tags/* API exposes REST management of metadata bindings (triples) on existing subjects
+## Uses HTTP methods for access to "HTTP resources"
+### HTTP GET: fetch or "read" representation of identified resource(s)
+### HTTP PUT: create and/or update identified resource
+### HTTP DELETE: delete identified resource(s)
+### HTTP POST: create new resource
+## Uses HTTP content negotiation to support selection of alternative representations
+### JSON, CSV, URI lists, form-encoded attr/value lists, raw values
+## Uses HTTP features for efficient, partial file access in PUT and GET
+### Range header allows selection of byte ranges in GET
+#### Conceptually similar to POSIX: open, seek(start offset), read(buffer len)
+### Content-Range header allows specification of payload byte range and total file length in PUT
+#### Conceptually similar to POSIX: open seek(start offset), write(buffer), truncate(total len)
+# Browser-based application (GUI)
+## Provides easy access to all major features, useful for developers and admins
+## Easily customized for new projects
+## Expected to evolve or be replaced by better clients over time...
+
+h2. Quick Start with Examples
+
+This section provides examples using features explain in detail later in this document. This will hopefully help those readers who learn better by example than by top-down specification.
+
+In general, italicized parts of URIs below are stand-ins for user-provided content and they should be url-encoded (as per RFC 3986) to protect any special characters in them. Conversely, the basic meta-syntax of the URIs including characters like '/', '=', ';', '(', and ')' *must not* be encoded or they lose their special meaning for Tagfiler. For example: /tags/id%20tag=id%20value(attribute%201) is made up of user-supplied parts which decode as "id tag", "id value", and "attribute 1"; the slightly different URI /tags/id%20tag=id%20value%28attribute%201%29 is made up of user-supplied parts which decode as "id tag" and "id value(attribute 1)"; these two different URIs have very different meaning to Tagfiler. Also, the example URIs here are rooted within the catalog, while a real deployment has another prefix naming the catalog within a web server, e.g. the example "/subject" is really "/tagfiler/catalog/1/subject" on a default server after creating one catalog.
+
+
+h3. Creating Subjects in Catalog
+
+h4. Creating Psuedo-anonymous Non-File Subjects
+
+* POST /subject/
+
+Result is a 201 Created with the URL of the newly created subject in the response Location header. The client can parse this URI to obtain the bare id=N identifier for use in other APIs. Depending on the negotiated content type, the URL may also be present in the response body, or other more structured information may be available, e.g. JSON.
+
+h4. Creating Attribute-Identified Non-File Subjects
+
+* POST /subject/name=_myname_
+
+Result is same as for /subject/ but the subject will also be assigned the specified attribute name=myname.
+
+h4. Creating File-bearing Subjects
+
+* PUT /file/name=_myname_
+* Content-Type: _content-type_
+* Payload is file body
+
+Result is a 201 Created response with a Location header to the /file/name=_myname_ URI of the newly created subject version.
+
+h4. Deleting Subjects
+
+# DELETE /subject/name=myname
+# DELETE /subject/id=23234
+
+In these examples, a subject is found based on its identifier and then removed from the catalog.
+
+h3. Updating Subjects in Catalog
+
+h4. Set or Update File Body
+
+* PUT /file/_pattern_
+** id=_N_
+** name=_myname_
+** etc.
+* Content-Type: _content-type_
+* Payload is file body
+
+Result is a 200 OK response. This request mutates the existing subject or creates a new one if no matching identifier exists and the client is authorized to bind the specified attribute.
+
+h4. Set a Tag Value on an Existing Subject
+
+# Sending tag value in entity body
+## PUT /tags/_pattern_
+### id=_N_
+### name=_myname_
+### etc.
+## Content-Type: application/x-www-form-urlencoded
+## Payload is set of form parameters:
+### _tag name_=_tag value_
+# Encoding tag value in triple URI itself
+## PUT /tags/_pattern_(_tag name=tag value_)
+
+These requests require that the pattern-identified subject already exists in the catalog.
+
+h4. Set or Mutate Redirection URL
+
+Use the general "set a tag value" example, modifying the tag named "url".
+
+h3. Large or Raw Data as HTTP Entity
+
+Two tag types allow large values to be stored: bigtext and bytea.&nbsp; For these, encoding values in a URL or JSON document may be awkward.
+
+h4. Retrieve one value as Entity Body
+
+* GET /tags/id=_N_(_tagname_)
+* Accept: text/plain
+* Response contains tag value as entity body
+
+This is only supported when several conditions are met:
+# The subject selection criteria must yield a single subject
+# Only one tag may be requested
+# The requested tag must be a single-valued tag since the entity body represents a single value
+
+h4. Send one value as Entity Body
+
+* PUT /tags/_pattern_(_tagname_)
+* Content-Type: text/plain
+* Request payload contains single value
+
+This request tags any number of matching subjects with the same tag-value pair identified by the tagname in the URL and the value in the request body.
+
+
+h3. Bulk Operations
+
+In addition to the above methods to manipulate individual subjects or tags, there are several ways to manipulate many subjects at once. These are based on using more general forms of patterns that do not uniquely identify individual subjects or tag values.
+
+h4. Bulk Retrieve subjects in JSON Format
+
+* GET /query/name=subject%201,subject%202(name,attr1,attr2)
+* Accept: application/json
+
+See the full API reference later in this document for more information about pattern syntax as used in this request URI. The resulting content is a JSON list of matching subjects (where name is 'subject 1' or 'subject 2' in this example) and a set of projected attributes (attr1 and attr2 in this example).
+
+{code}
+[
+{ "name": "subject 1", "attr1": 3, "attr2": [ "foo", "bar" ] },
+{ "name": "subject 2", "attr1": 7, "attr2": null }
+]
+{code}
+
+This and related bulk interfaces have been tested with up to 100k subjects, though such an operation may run for several minutes before completing.
+
+h4. Bulk Retrieve subjects in CSV Format
+
+* GET /query/name=subject%201,subject%202(name,attr1,attr2)
+* Accept: text/csv
+
+See the full API reference later in this document for more information about pattern syntax as used in this request URI. The resulting content is a CSV table of matching subjects (where name is 'subject 1' or 'subject 2' in this example) and a set of projected attributes (attr1 and attr2 in this example). The exact CSV syntax is as understood by PostgreSQL, which we believe matches the syntax for the MIME type although it has extensions for multi-valued array cells.
+
+{code}
+"subject 1",3,"{""foo"",""bar""}"
+"subject 2",7,
+{code}
+This and related bulk interfaces have been tested with up to 100k subjects.
+
+h4. Bulk Create or Update Subjects from JSON Input
+
+* PUT /subject/name(attr1;attr2)
+* Content-Type: application/json
+* Payload is JSON list of simple JSON objects
+
+In this scenario, the URL identifies two sets of tags that are found in the input:
+# Identifying tag or tags that are unique per subject ('name' in this example)
+## If an existing subject exists with the same identifier, this request modifies attributes of the existing subject
+## If no existing subject has the same identifier, this request creates a new subject
+# Other annotations that may or may not be unique per subject ('attr1', 'attr2' in this example)
+# The HTTP method can control the behavior for existing subjects
+## PUT will update existing subjects and create missing subjects
+## POST will create subjects and signal a conflict if subjects already exist
+
+The JSON format is the same as the bulk retrieve example above.
+
+A practical limit to this interface is when request time exceeds HTTP timeout for the given server or client libraries. At 100K subjects being inserted, the request may take 5-10 minutes. For such cases, consider breaking the input into several batches which can be sent sequentially as separate requests.&nbsp; Also, performance varies greatly with server hardware capability and PostgreSQL tuning parameters.
+
+h4. Bulk Create or Update Subjects from CSV Input
+
+* PUT /subject/name(attr1;attr2)
+* Content-Type: text/csv
+* Payload is CSV table of simple subject rows
+
+In this scenario, the URL identifies two sets of tags that are found in the input in the same order reading left to right:
+# Identifying tag or tags that are unique per subject ('name' in this example)
+## If an existing subject exists with the same identifier, this request modifies attributes of the existing subject
+## If no existing subject has the same identifier, this request creates a new subject
+# Other annotations that may or may not be unique per subject ('attr1', 'attr2' in this example)
+# The HTTP method can control the behavior for existing subjects
+## PUT will update existing subjects and create missing subjects
+## POST will create subjects and signal a conflict if subjects already exist
+
+The CSV format is the same as the bulk retrieve example above.
+
+h4. Bulk Annotate Subjects from JSON Input
+
+* PUT /tags/name(attr1;attr2)
+* Content-Type: application/json
+* Payload is JSON list of simple JSON objects
+
+This API differs from the previous example in that subjects must already exist corresponding to each input identifier, or an error status is returned without modifying the catalog.
+
+h4. Bulk Annotate Subjects from CSV Input
+
+* PUT /tags/name(attr1;attr2)
+* Content-Type: text/csv
+* Payload is CSV table of simple subject rows
+
+This API differs from the previous example in that subjects must already exist corresponding to each input identifier, or an error status is returned without modifying the catalog.
+
+h4. Bulk Annotate Subjects by Pattern
+
+* PUT /tags/attr1=5(attr1=2;attr2=foo,bar)
+* Payload is absent
+
+In this scenario, a set of subjects is found using the pattern (where attr1=5 in this example), and all matching subjects are annotated with the same set of tags (attr1=5&nbsp; and attr2=\[foo,bar\] in this example). This is a generalization of the tagging API described previously, in that patterns matching multiple subjects are allowed, where the non-bulk examples used patterns exactly matching one subject.
+
+h4. Bulk Delete Subjects by Pattern
+
+* DELETE /tags/attr1=5
+* Payload is absent
+
+In this scenario, a set of subjects is found using the pattern (where attr1=5 in this example), and all matching subjects are deleted from the catalog.
+
+h2. Catalog Management Resource Model
+
+The multi-tenant features of Tagfiler are exposed via a top-level set of catalogs, each of which provides a graph store with its own schema and content.
+
+h3. Configuration Parameters
+
+|| Parameter || Type \\ || Description \\ ||
+| description \\ | text \\ | A human-readable description of the catalog to help other users understand available data. \\ |
+| owner \\ | text \\ | A role-name granted full ownership rights on the catalog. \\ |
+| read_user \\ | text list \\ | An unordered set of roles allowed to see the catalog description, configuration, and status information. The owner role implicitly has these rights as well whether or not it is present in this list. \\ |
+| write_user \\ | text list \\ | An unordered set of roles allowed to modify the catalog configuration. The owner role implicitly has these rights as well whether or not it is present in this list. \\ |
+| content_read_user \\ | text list \\ | An unordered set of roles allowed to access the catalog content sub-APIs with read methods (GET, HEAD). The owner role implicitly has these rights as well whether or not it is present in this list. |
+| content_write_user \\ | text list \\ | An unordered set of roles allowed to access the catalog content sub-APIs with write methods (PUT, POST, DELETE). The owner role implicitly has these rights as well whether or not it is present in this list. |
+| content_create_tagdef_user \\ | text list \\ | An unordered set of roles allowed to create new tag definitions (schema) in the catalog. The owner role implicitly has these rights as well whether or not it is present in this list. |
+| content_create_subject_user \\ | text list \\ | An unordered set of roles allowed to create new subjects in the catalog. The owner role implicitly has these rights as well whether or not it is present in this list. |
+| content_create_file_user \\ | text list \\ | An unordered set of roles allowed to create new files (subjects with arbitrary byte representation) in the catalog. The owner role implicitly has these rights as well whether or not it is present in this list. |
+| policy_remappings \\ | policy map \\ | A dictionary mapping where the keys are "source roles" and the values are objects representing a remapping target. Each target object has several fields: \\
+* owner: the remapped owner
+* read users: the remapped read users set
+* write users: the remapped write users set
+* readok: boolean whether to add the original client to the read users set
+* writeok: boolean whether to add the original client to the write users set |
+
+h3. Access Control Logic
+
+Access is performed in this ordered algorithm:
+
+# Clients are authenticated and unauthenticated clients may be rejected based on a service-wide configuration.
+# A catalog is only visible to the 'owner' or 'read_user' roles.
+# Catalog parameter management is only allowed by 'owner' or 'write_user' roles where the catalog is visible.
+# Catalog content APIs are only accessible with read methods to 'owner' or 'content_read_user' roles. These act as a sort of course-grained firewall.
+# Catalog content is subject to fine-grained authorization even if the client is allowed access to the APIs
+## Tagdefs can only be created by catalog 'owner' or 'content_create_tagdef_user' roles.
+## Subjects can only be created by catalog 'owner' or 'content_create_subject_user' roles.
+### Subjects with file bodies can only be created by catalog 'owner' or 'content_create_file_user' roles who are also permitted to create subjects in general.
+## Subjects are only visible to the subject 'owner' or 'read user' roles stored in the catalog content itself (distinct from the catalog-wide parameters described above).
+## Subjects can be deleted by the 'owner' or 'write user' roles when the subject is visible.
+## Tags can only be modified on visible subjects by the fine-grained authorization annotations on the subjects themselves.
+
+h3. Resource APIs
+
+# The */catalog/* API is the root of the multi-tenant service
+## For method POST, a new catalog instance is created and the newly issued catalog number is returned in the response
+## For method GET, a list of existing and visible catalog instances is returned
+# The */catalog/*{*}{_}number{_}* API is the root of one catalog for one tenant
+## For method GET, a detailed descriptive document about the catalog is returned
+# The */catalog/*{*}{_}number{_}{*}*/config* API is the root of the catalog management settings for one catalog instance
+## For method GET, the config sub-section of the detailed descriptive document is returned
+## Sub-resource APIs support read and write access to specific configuration parameters which may hold a single value or a list of values
+### The */catalog/*{*}{_}number{_}{*}*/config/*{*}{_}parameter{_}* API provides access to parameters
+### The */catalog/*{*}{_}number{_}{*}*/config/*{*}{_}parameter{_}{*}*=*{*}{_}value{_}* API provides incremental access to list-typed parameters
+# The */catalog/*{*}{_}number{_}{*}*/*{*}{_}subapi{_}* APIs provide access to catalog content as described in the next section.
+
+h2. Catalog Content Resource Model
+
+The catalog is a RESTful web service that knows about several kinds of _resource_ (in the W3C sense of the word):
+# The catalog tracks _subject resources_, providing support for annotation and discovery:
+## Some subject resources are represented by arbitrary, byte-oriented file data stored by clients.
+## Some subject resources have no representation other than descriptive metadata.
+# The catalog exposes its metadata as _triple resources_ (also known as _tags_), providing fine-grained, RESTful access to manipulate catalog content:
+## Individual triples can be manipulated by CRUD methods (HTTP GET, PUT, DELETE) using uniquely identifying patterns.
+## Sets of triples can be manipulated by RD methods (HTTP GET, DELETE) using generalized identifying patterns.
+## Sets of triples about a given subject resource can be used as a representation of that subject resource.
+## Sets of triples about a set of subjects can be used as a representation of those subjects in bulk update or retrieval.
+# The schema for triples is stored reflectively in the catalog as _tag definitions_ which are abstract subjects decorated with *tagdef* and related tags.
+## Tags are defined with a *tagdef dbtype*, using one of the basic built-in storage types
+##* The special empty string ('') dbtype allows tags without objects (i.e. pairs instead of triples)
+##* The special 'tsvector' dbtype is used only for the built-in *subject text* tag which supports free-text search over all text values associated with a subject. This type cannot be used for user-defined tagdefs.
+##* Most dbtypes allow a scalar value to be stored
+##** text
+##** bigtext (like text but supports fewer search functions and has fewer length restrictions)
+##** bytea (byte array: an arbitrary blob of data that supports no search functions)
+##** int8
+##** float8
+##** timestamptz
+##** date
+## Tags are defined with a *tagdef tagref* text property which can reference another existing tagdef.
+### If non-null, tag values must reference existing values for the referenced tagdef.
+### If null (the default), there are no reference constraints for values of this tagdef.
+## Tags are defined with a *tagdef multivalue* boolean property; a single-valued tag (when this property is false) has at most one triple for a given subject, while a multi-valued tag (when this value is true) has no such restriction
+## Tags are defined with a *tagdef unique* boolean property; a unique tag has at most one triple for a given value while a non-unique tag has no such restriction
+
+As part of its REST API, the catalog defined URIs to address cataloged resources and triples about those resources.
+
+Rendered as regular subjects and metadata, the schema can then be viewed through the same mechanisms as regular catalog content. A legacy /tagdef/ API remains to support management of tag definitions, until complete management via the /subject/ and /tags/ APIs is possible.
+
+h3. Resource Addressing Language
+
+The resource addressing language is the language of URIs for catalog content. The following syntax discussion defined URI fragments, not whole URIs. These fragments are combined with different URI prefixes to define specific APIs. The Tagfiler URIs have special meta-syntax, using RFC 3986 _reserved characters_ which must remain in their literal form in the URI in order to be recognized as meta-syntax. All other user-provided values must be URL-encoded to protect special characters as payload.
+
+h4. Cataloged Resource Address Syntax
+
+The catalog uses a generic attribute-based resource addressing syntax:
+# URIs for individual cataloged resources (valid for PUT, GET, DELETE)
+## Using a unique tag: /_tagname_=_value_
+##* Tagdefs use this scheme: /tagdef=_tagname_
+##* The default "name" tag can be used: /name=_myname_
+## Using the internal cataloged resource id: /id=_integer_ (a specific unique tag that is always bound for every subject)
+# URIs for sets of cataloged resources (valid for GET and DELETE only)
+## Using mere presence of a triple for a given tag: /_tagname_
+## Using general predicate constraints: /_tagname operator value-list_;._.._
+### A number of numeric and string comparison operators are supported
+### A value list allows for disjunctive matching on a set of possible comma-separated values
+### Multiple predicates allow for conjunctive matching of several tag/operator/value expressions at once
+### A sub-query expression can occur in the value list to match subjects found in the catalog, e.g. _value_,@(/_subquery_),...
+
+All of these are examples of a more general subject query URI model, consisting of a _predicate list_ that denotes a set of triple constraints which must be met in order for a subject to match the query. A query constraining a unique tag with a specific value denotes a single cataloged resource, while less constraining queries may denote sets of resources.
+
+h4. General Predicate List Syntax
+
+# A predicate list is zero or more subject-constraining predicate constraints
+#* An empty list is satisfied by all subjects
+#* The list is a conjunction (logical AND) of all the subject-constraining predicates
+#* Each predicate constrains the subject based on a tag or tag-value constraint semantics, effectively filtering the cataloged resources based on the presence (or absence) of tags binding the cataloged resource as subject.
+# Every predicate constraint starts with a _tag name_
+# Some predicate constraints continue with an operator
+#* The default constraint "is tagged by" is denoted when no operator is present
+#* The operator *:not:* or "is not tagged by" is available to invert the sense of the default constraint
+#* Other operators allow binary relations matching the triple's object value
+#** Numeric, date, timestamp, text operators
+#*** *=* for tag and value equality
+#*** *\!=* for tag and value inequality
+#*** *:lt:* for tag less than value
+#*** *:gt:* for tag greater than value
+#*** *:leq:* for tag less than or equal to value
+#*** *:geq:* for tag greater than or equal to value
+#** Text pattern operators
+#*** *:regexp:* for regular expression match
+#*** *:ciregexp:* for case-insensitive regular expression match
+#*** *:\!regexp:* for negated regular expression match
+#*** *:\!ciregexp:* for negated, case-insensitive regular expression match
+#*** *:like:* for SQL LIKE operator
+#*** *:simto:* for SQL SIMILAR TO operator
+#** Free-text search operators can be applied to any text or bigtext tag, treating individual tag values as small search texts. The operators can also be used with the special *subject text* tag that summarizes all text tags via a single search text per subject; this special tag cannot be written nor returned in a query result, but can be used when filtering subjects. The tag values incorporated into the *subject text* are only those with read access controls equivalent to the read access controls for the subject as a whole, as these values must be pre-indexed without knowledge of a particular client's fine-grained access rights.
+#*** *:word:* for presence of a word within the searched text
+#*** *:\!word:* for negated presence of a word within the searched text
+# Some operators are binary relations, requiring a _value list_ of operands
+#* The operator constrains the triple's object to a single value according to the operator's binary relation semantics
+#* Multiple values are treated as a disjunction (logical OR) of the value-specific relation
+#* A subquery in the value list denotes matching subjects as additional operands also considered as a disjunction
+
+h4. Triple Address Syntax
+
+Triple resources are always addressed relative to subjects, by appending a tag binding pattern to the basic subject predicate list syntax. The tag binding pattern reuses the same tag/operator/value notations in a parenthetic group.
+# URIs for individual triples (valid for PUT, GET, DELETE on /tags/ API)
+## /_subject predlist_(_tag name_=_value-list_;...)
+### The subject predicate list must uniquely identify a subject resource
+### Only the '=' operator is allowed for tag binding patterns.
+### The tag name and value in the binding pattern uniquely identify a triple on the identified subject
+# URIs for multiple triples (valid for GET and DELETE on /tags/ API, or GET on /query/ API)
+## /_subject predlist_(_binding predlist_)
+### The subject predicate list may denote a set of subjects
+### The binding predicate list denotes a set of bindings on those subjects (particular tags, optionally specific values with a comparison operator)
+# URIs for bulk subject metadata update (valid for PUT and POST only to the */subject* API or PUT to the /tags/ API)
+## /_identity tag list_(_binding tag list_)
+### No operators nor values are allowed in either predicate list
+### The binding tag list includes tag names for all properties of the input data to be written by the bulk operation
+#### For *text/csv* input, the ordered list assigns the tag names for each positional column of the input table
+#### For *application/json* input, the unordered list configures the expected attributes for each input JSON object
+### The identity tag list is a subset of binding tag names for identifying properties
+#### There must be at least one unique identifying tag
+#### Every subject description in the input MUST bind every identifying tag with a valid (non-null and unique for that column) value
+#### Every subject description in the input MUST have a unique combination of identity tag bindings
+### The input entity body is interpreted as an array of resource descriptions with this configured metadata shape
+#### For *text/csv* input, each table row is a subject description
+#### For *application/json* input, the input is a flat array of JSON objects
+
+h4. Predicate Path Syntax
+
+# Resources in the catalog's "global" context (as per above)
+## Cataloged resources: /_subject predlist_
+## Triples: /_subject predlist_(_binding predlist_)
+# Using triples as a limiting context
+## Context URI prefix: /_subject predlist_(_binding predlist_)/
+## Denotes the union of objects bound by the denoted triples, only allowed when the binding predlist matches triples of an appropriate object type which references subjects in the catalog.
+## Conceptually, the "/" syntax dereferences the objects as subjects in a derived catalog which is a subset of the root catalog
+# Resources in limited context
+## Cataloged resources: /_subject predlist1_(_binding predlist1_)/_subject predlist2_
+##* Evaluate the _subject predlist2_ constraints within the limited context
+## Triples: /_subject predlist1_(_binding predlist1_)/_subject predlist2_(_binding predlist2_)
+##* Evaluate the _binding predlist2_ constraints on the more limited set of subjects
+
+This syntax grows inductively to allow long chains of subject-as-object context to be created, limiting the set of cataloged resources considered in the next predicate list in the chain. This syntax, when composed with the sub-query syntax in value lists, allows more complex graph patterns to be constructed, allowing complex query for subjects indirectly linked to other contextual metadata.
+
+h3. Resource APIs
+
+There are several resource APIs that both use the same resource address syntax in different limited forms:
+# The */subject/*{*}{_}address{_}* API provides access to subject resources with general CRUD operations
+## Address can be in one form
+### A predicate path with no binding predlist on the final path element
+## For methods PUT and POST without an entity body, the address denotes exactly one cataloged resource
+### The identifying and descriptive properties are bound in the subject and binding predicate lists of the address, respectively
+### If the subject does not already exist, it is created. Otherwise, it is updated for PUT method or signals a conflict for POST method.
+## For methods PUT and POST with a tabular entity body, the address denotes the shape of a bulk-update
+### The identifying properties from the subject predicate list are used to link input subjects with the cataloged subjects
+### The descriptive properties from the binding predicate list are used to interpret the input descriptive data
+### Subjects described in input but missing from the catalog are created as new subjects with all the descriptive triples from the input
+### For PUT method, subjects described in input and found in the catalog are updated by adding any descriptive triples from the input which are absent from the catalog, while for the POST method existing subjects cause a conflict.
+### The current implementation supports JSON and CSV input.
+## For method DELETE, the address may denote multiple cataloged resources
+## For method POST, the address may be empty to denote creation of a new psuedo-anonymous subject
+# The */file/*{*}{_}address{_}* API provides access to file resources with general CRUD operations
+## Address can be in one form
+### A predicate path with no binding predlist on the final path element
+## For methods GET and PUT, the address must denote exactly one cataloged resource
+### A file body may be sent during resource creation or update
+### A file body may be sent during resource retrieval
+## For method DELETE, the address may denote multiple cataloged resources
+# The */tags/*{*}{_}address{_}* API provides access to triples with general CRUD operations
+## Address can be in one of two different forms
+### A predicate path with a binding predlist on the final path element
+### A predicate path without a binding predlist on the final path element
+###* Denotes a default view
+###* With query parameter view=_viewname_, selects a predefined view
+## For methods PUT and POST without an entity body, the address denotes one or more matching subjects
+### The identifying and descriptive properties are bound in the subject and binding predicate lists of the address, respectively
+### If a matching subject does not already exist, a conflict error is returned.
+## For method DELETE, the address denotes one or more matching triples
+### If a matching triples are found, they are deleted from the catalog.
+### Otherwise, a not-found error is returned.
+## For methods PUT and POST with a tabular entity body, the address denotes the shape of a bulk-update
+### The identifying properties from the subject predicate list are used to link input subjects with the cataloged subjects
+### The descriptive properties from the binding predicate list are used to interpret the input descriptive data
+### For CSV input, the columns must be in exactly the left-to-right order of tags (by first occurrence) in the subject and binding predicates portions of the URI.
+### Subjects described in input but missing from the catalog cause the request to terminate with a conflict error
+### Otherwise, subjects described in input and found in the catalog are updated by adding any descriptive triples from the input which are absent from the catalog
+## Object values are supplied during triple creation
+### Value may be encoded in URL in restricted tag=value predicates
+### Value may be supplied as literal request body
+### Bulk values may be supplied as above for tabular input
+## A representation is sent during triple retrieval
+### JSON can be negotiated to get a set of dictionaries \[\{ tagname : value. ... \}... \] bindings for the addressed subject, where value may be a list of values depending on the tagdef involved.
+### CSV can be negotiated to get a simple table without headers, with the columns in exactly the left-to-right order of tags (by first occurrence) in the binding predicates portion of the URI, where the value may be a brace-enclosed list of values \{value,value,...\} depending on the tagdef involved.
+### Might be worth introducing other supported content-types like RDF for bulk triple retrieval.
+
+
+h2. Security Model
+
+h3. Webauthn2 Abstracted Security Providers
+
+The Tagfiler security model is based on an abstract, unified client and attribute model.&nbsp; The trunk code uses a new webauthn2 support library as of 2012-09-19.&nbsp; This library does not have its own web UI, so instead tagfiler exposes its functions through extensions to the Tagfiler REST API:
+* */tagfiler/session*
+** POST with form parameters 'username' and 'password' to login
+** DELETE to logout
+* */tagfiler/user*
+** GET will list users
+* */tagfiler/password*
+** PUT with form parameters 'password' and 'old_password' will change logged in user's password if old_password matches
+** DELETE with form parameter 'old_password' will disable the logged in user's password if old_password matches, requiring admin intervention to reset
+* */tagfiler/password/*{_}username_
+** PUT with form parameters 'password' will change named user's password if the logged in user is an admin
+** PUT without parameters will change the named user's password to a new random password and return it in the response if the logged in user is an admin
+** DELETE will disable the named user's password if the logged in user is an admin
+* */tagfiler/user/*{_}username_
+** GET will list username if it exists
+** PUT will create username
+** DELETE will remove username
+* */tagfiler/user/*{_}username{_}*/attribute*
+** GET will list directly assigned attributes of user
+* */tagfiler/user/*{_}username{_}*/attribute/*{_}attributename_
+** GET will list attribute if directly assigned to user
+** PUT will directly assign the attribute to the user
+** DELETE will remove direct assignment of attribute to user
+* */tagfiler/attribute*
+** GET will list attributes
+* */tagfiler/attribute/*{_}attributename_
+** GET will list attribute if it exists
+** PUT will create attribute
+** DELETE will remove attribute
+* */tagfiler/attribute/*{_}attributename1{_}*/implies*
+** GET will list directly implied attributes, e.g. ones which contain attribute1 as members
+* */tagfiler/attribute/*{_}attributename1{_}*/implies/*{_}attributename2_
+** GET will list attribute2 if attribute1 directly implies it
+** PUT will make attribute1 directly imply attribute2, e.g. make attribute1 a member of attribute2
+** DELETE will remove direct implication of attribute2, e.g. remove attribute1 from membership in attribute2
+
+These purely RESTful APIs do not provide any HTML UI and instead must be driven by a programmed client such as the Tagfiler AJAX GUI.
+
+The attribute implication is a generalized nesting model which can be understood by analogy to set membership. An attribute can be thought of as a set of users who have been assigned the attribute.&nbsp; An parent attribute can also be thought of as a set of more child attributes if those attributes imply it.&nbsp; By extension, an ancestor attribute may be thought of as a set of direct and indirect users if a user is directly assigned the ancestor attribute or if the user is assigned another intermediary attribute which implies the ancestor attribute either through direct or transitive implications.
+
+The implementation has an extensible layer within which to define classes of security information provider. It also has several providers already implemented.
+# Session ID provider
+## Determines how a session ID is embedded in request and response web messages.
+## Default 'webcookie' provider passes the session ID in HTTP cookie headers.
+## Experimental 'oauth1a' provider recognizes an OAuth 1a Authorization header and interprets its access token as a session ID.
+# Session State provider
+## Allows session information to be shared between multiple web messages sharing the same session ID.
+## Default 'database' provider stores session data in a database table.
+## Experimental 'oauth1a' provider extends 'database' with additional OAuth 1a session state information.
+# Client Identity provider
+## Determines how a client's primary identity is determined
+## May support password authentication
+## May support derivation of identity from other message structure, e.g. signatures or connection security
+## Default 'database' provider stores a table of users and password hashes
+## Optional 'crowd2' provider delegates decisions to Crowd2 SOAP API
+## Experimental 'globusonline' provider recognizes a Globus Online Authorization header and contacts Globus Online security services to determine the client identity directly from the web request message context, with no persistent session tracking.
+# Client Attribute provider
+## Determines extended attributes of client
+## May support derivation of attributes from client identity and provider knowledge
+## May support derivation of attributes from other message structure, e.g. signatures or connection security
+## Default 'database' provider stores a table of user-attribute and attribute-attribute mappings
+## Optional 'crowd2' provider delegates decisions to Crowd2 SOAP API, interpreting groups as attributes
+## Experimental 'globusonline' provider complements the identity provider module to incorporate client attribute information obtained from Globus Online.
+
+This solution is a small library used by the Tagfiler implementation, and likely will be further refined as more external providers are needed.
+
+h3. Fine-Grained Access Control Model
+
+Tagfiler stores its operating policies as metadata within the catalog itself, and exploits the "triple" representation to allow fine-grained authorization rules to be attached to individual subjects in the catalog.&nbsp; In many authorization tags, a role value of '*' allows a wildcard to provide access to arbitrary users, e.g. make it public.
+# Special tags available on every subject
+## Owner: which role "owns" a subject and retains full read/write access to it
+### By default, initialized to the authenticated primary role of the client who creates the subject
+### Can be changed by the owner to transfer ownership
+## Write users: which additional role(s) have write access
+## Read users: which additional role(s) have read access
+# Special tags available on tag definitions, providing tag-specific authorization rules
+## Tagdef writepolicy: an enumerated policy model defining write permissions for tags
+### System: only the Tagfiler system writes the triple, and no client can ever do so
+### Tag: only a role listed in the tagdef-specific ACL can write the triple
+### Subjectowner: only an owner of the subject can write the triple
+### Subject: only an authorized writer of the subject can write the triple
+### Tagandsubject: only an authorized writer of the subject also listed in the tagdef-specific ACL can write the triple
+### Tagorsubject: an authorized writer of the subject or a role listed in the tagdef-specific ACL can write the triple
+### Tagandowner: only an owner of the subject also listed in the tagdef-specific ACL can write the triple
+### Tagorowner: an owner of the subject or a role listed in the tagdef-specific ACL can write the triple
+### Objectowner: only the owner of the triple's object can write the tag (only valid in combination with non-null tagrefs)
+### Object: only an authorized writer of the object can write the tag (only valid in combination with non-null tagrefs)
+### Subjectandobject: only an authorized writer of the subject and the object can write the triple
+### Tagandsubjectandobject: only an authorized writer of the subject and object also listed in the tagdef-specific ACL can write the triple
+### Tagorsubjectandobject: an authorized writer of the subject and object or a role listed in the tagdef-specific ACL can write the triple
+### Anonymous: any client may write the triple
+## Tagdef readpolicy: an enumerated policy model defining read permissions for tags
+### System: only the Tagfiler system reads the triple, and no client can ever do so
+### Subjectowner: only an owner of the subject can read the triple
+### Subject: only an authorized read of the subject can read the triple
+### Tagandsubject: only an authorized reader of the subject also listed in the tagdef-specific ACL can read the triple
+### Tagandowner: only an owner of the subject also listed in the tagdef-specific ACL can read the triple
+### Objectowner: only an authorized reader of the subject also owning of the triple's object can read the tag (only valid in combination with non-null tagrefs)
+## Tag write users: which role(s) can write tags when the tagdef write policy is "tag"
+## Tag read users: which role(s) can read tags when the tagdef read policy is "tag"
+
+In addition to these per-subject and per-tagdef policies, there are several global rules:
+# A global authorization list can restrict creation of new catalog subjects
+# A client can only see subjects that the client can read
+#* A read-restricted subject is invisible, almost indistinguishable from being absent
+#* However, existence of read-restricted subjects MAY be leaked, if the subject is tagged with a _unique_ tag for which the client has write permission: he will detect conflicts if he tries to use the same tag value which is already asserted on a hidden subject.
+# A client can only access triples on subjects that the client can see
+#* A read-restricted subject is invisible, and cannot be referenced to construct or access triples
+# A client can only access triples on tagref-linked objects that the client can see
+#* A read-restricted object is invisible, and its referenced attributes cannot be seen to construct a triple
+# A client can only see triples when the client can read the tag AND the bound subject
+#* A read-restricted triple is invisible, almost indistinguishable from being absent
+#* However, existence of read-restricted triples MAY be leaked, if the triple is for a tag for which the client has write permission: he may detect conflicts if he tries to create a triple which conflicts with the hidden triple, e.g. due to the tag being single-valued or unique.
+
+h2. File Storage Model
+
+Tagfiler allows storage of arbitrary file payloads with subjects in the catalog. These are associated with a special tag called 'file' which can be used to find subjects with file payload in them. However, the file payload can only be accessed via the special */file/*{_}address_ API; it cannot be access by the */tags/*{_}address_ API, nor can predicate constraints express matching rules on file payload content.
+
+Implementation wise, Tagfiler uses a POSIX filesystem to store the file payloads. But, it uses its metadata catalog model to associate backing files with catalog resource URIs, and to store access policy and other file meta-information.
+
+h3. File Naming
+
+Tagfiler uses the same subject identification rules for all subjects, regardless of whether they have local file payloads, remote redirect URLs, or only metadata. Some subjects may use application-specific unique tags and others may use no unique tagging at all, save for the catalog-generated 'id' tag.
+
+h3. File Access Control
+
+Tagfiler uses the normal subject-specific access control model, described previously, to control access to file payloads.
+# Authorized readers of the subject can read the file payload.
+# Authorized writers of the subject can update or delete the file payload.
+# An optional "immutable" policy can prevent existing payloads from being deleted nor modified, useful in some policy environments
+## When using versioned naming, a new version can be created but the older versions are immutable and remain available
+
+h3. High Performance File Access
+
+Tagfiler provides a relatively low-level access model to file payloads, allowing for a broad range of client programming scenarios
+# Basic whole-representation PUT is atomic
+## PUT as subject creation makes the whole representation available at once
+## PUT as subject update makes the switch from old representation to new at once
+# Range-based partial-representation PUT is not atomic
+## High performance parallel transfer can send different regions of the same file over concurrent requests
+## Concurrent GET may see partially-written file content
+## Applications using range-based PUT must synchronize themselves, for example using tags to signal completeness of data
+# Basic whole-representation GET
+## Is atomic with respect to whole-representation PUT
+## Is non-atomic with respect to range-based GET
+# Range-based partial-representation GET
+## Is atomic with respect to whole-representation PUT
+## Is non-atomic with respect to range-based GET
+## High performance parallel transfer can fetch different regions of the same file over concurrent requests
+
+h3. File Integrity Protection
+
+# Applications should use HTTPS to get integrity-protection of requests
+# The backing POSIX filesystem is responsible for integrity protection of the stored files within the service
+# Tags can be used to annotate file-bearing subjects with checksum information, allowing end-to-end integrity checking by applications
+# The provided GUI includes a high-performance file transfer applet demonstrating end-to-end integrity
+## The uploading client computes sha256 checksums on the source files on the client system
+## The uploading client performs high-performance, parallel PUT of partial files
+## The uploading client tags files with checksum information on the server
+## The downloading client performs high-performance, parallel GET of partial files
+## The downloading client retrieves the checksum information from the tags on the server
+## The downloading client computes and verifies checksums on the destination files on the client system
+# For methods PUT and POST with a tabular entity body, the address denotes the shape of a bulk-update
+## The identifying properties from the subject predicate list are used to link input subjects with the cataloged subjects
+## The descriptive properties from the binding predicate list are used to interpret the input descriptive data
+## Subjects described in input but missing from the catalog cause the request to terminate with an error
+## Otherwise, subjects described in input and found in the catalog are updated by adding any descriptive triples from the input which are absent from the catalog
+# Object values are supplied during triple creation
+## Value may be encoded in URL in restricted tag=value predicates
+## Value may be supplied as literal request body
+## Might be worth extending with RDF or other multi-triple bulk inputs?
+# A representation is sent during triple retrieval
+## JSON can be negotiated to get a set of dictionaries \[\{ tagname : value. ... \}... \] bindings for the addressed subject, where value may be a list of values depending on the tagdef involved.
+## A default HTML representation allows tabular presentation of tag/value bindings for one or more subjects.
+## Might be worth introducing other supported content-types like RDF for bulk triple retrieval.
+# The */query/*{*}{_}address{_}* API provides general read-only access to catalog content
+## The address denotes a set of cataloged resources, each with bound triples
+### Any predicate path is allowed, and the binding predlist modifies the set of metadata projected for each matching subject
+## A representation is sent during triple retrieval
+### JSON can be negotiated to get a sequence of dictionaries \[\{ tagname : value, ... \}... \] for each of the matching subjects.
+### A default HTML representation allows tabular presentation of tag/value bindings for one or more subjects.
+### Might be worth introducing other supported content-types like RDF for bulk triple retrieval.
